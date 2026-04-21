@@ -99,6 +99,11 @@
       flex-direction: column;
     }
 
+    /* Content sections get padding, top-bar doesn't */
+    .tab-content {
+      padding: 24px 28px;
+    }
+
     .top-bar {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
@@ -122,10 +127,7 @@
     }
     .admin-info i { font-size: 1.4rem; color: var(--primary); }
 
-    .content-area {
-      padding: 24px 28px;
-      flex: 1;
-    }
+    /* intentionally empty - sections use .tab-content padding */
 
     /* ===== MOBILE TOP HEADER ===== */
     .mobile-top-header {
@@ -597,9 +599,10 @@
 
       .main-content {
         margin-left: 0 !important;
+        padding: 0;
       }
 
-      .content-area {
+      .tab-content {
         padding: 16px 15px 100px;
       }
 
@@ -685,7 +688,6 @@
       </div>
     </header>
 
-    <div class="content-area">
 
       <!-- HOME -->
       <section id="home" class="tab-content active">
@@ -829,32 +831,31 @@
         </div>
       </section>
 
-    </div><!-- /content-area -->
   </main>
 
   <!-- ===== MOBILE BOTTOM NAV ===== -->
   <nav class="mobile-bottom-nav">
     <div class="nav-items">
-      <button class="bottom-nav-item active" data-tab="home">
+      <a class="bottom-nav-item active" data-tab="home">
         <i class="fas fa-home"></i>
         <span>Home</span>
-      </button>
-      <button class="bottom-nav-item" data-tab="report">
+      </a>
+      <a class="bottom-nav-item" data-tab="report">
         <i class="fas fa-chart-line"></i>
         <span>Report</span>
-      </button>
-      <button class="bottom-nav-item" data-tab="patient">
+      </a>
+      <a class="bottom-nav-item" data-tab="patient">
         <i class="fas fa-user-injured"></i>
         <span>Patient</span>
-      </button>
-      <button class="bottom-nav-item" data-tab="update">
+      </a>
+      <a class="bottom-nav-item" data-tab="update">
         <i class="fas fa-user-md"></i>
         <span>Update</span>
-      </button>
-      <button class="bottom-nav-item" onclick="showMoreMenu()">
+      </a>
+      <a class="bottom-nav-item" onclick="showMoreMenu()">
         <i class="fas fa-ellipsis-h"></i>
         <span>More</span>
-      </button>
+      </a>
     </div>
   </nav>
 
@@ -863,18 +864,18 @@
     <div class="more-menu" onclick="event.stopPropagation()">
       <h3><i class="fas fa-bars"></i> আরও অপশন</h3>
       <div class="more-menu-grid">
-        <button class="more-menu-item" data-tab="notice" onclick="selectFromMore('notice')">
+        <a class="more-menu-item" data-tab="notice" onclick="selectFromMore('notice')">
           <i class="fas fa-bell"></i>
           <span>Notice & Offers</span>
-        </button>
-        <button class="more-menu-item" data-tab="feedback" onclick="selectFromMore('feedback')">
+        </a>
+        <a class="more-menu-item" data-tab="feedback" onclick="selectFromMore('feedback')">
           <i class="fas fa-comment-dots"></i>
           <span>Feedback</span>
-        </button>
-        <button class="more-menu-item" onclick="staffLogout()">
+        </a>
+        <a class="more-menu-item" onclick="staffLogout()">
           <i class="fas fa-sign-out-alt" style="color:#ef4444;"></i>
           <span>Logout</span>
-        </button>
+        </a>
       </div>
     </div>
   </div>
@@ -887,5 +888,7 @@
   <script src="js/marketing.js"></script>
 </body>
 </html>
+
+  
 
 
