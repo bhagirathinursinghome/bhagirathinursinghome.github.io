@@ -314,7 +314,7 @@ async function loadReport() {
       const m = L.marker([v.latitude, v.longitude]).addTo(reportMap);
       m.bindPopup(`
         <strong>${v.visit_person}</strong><br>
-        ${new Date(v.created_at).toLocaleString('bn-BD')}<br>
+        ${new Date(v.created_at).toLocaleString('bn-BD', { timeZone: 'Asia/Kolkata' })}<br>
         ${v.remark || ''}
       `);
       markers.push([v.latitude, v.longitude]);
@@ -334,7 +334,7 @@ async function loadReport() {
   
   tbody.innerHTML = data.map(v => `
     <tr>
-      <td>${new Date(v.created_at).toLocaleString('bn-BD')}</td>
+      <td>${new Date(v.created_at).toLocaleString('bn-BD', { timeZone: 'Asia/Kolkata' })}</td>
       <td>${v.visit_person}</td>
       <td>${(v.location_name || '').substring(0, 40)}...</td>
       <td>${v.remark || '-'}</td>
@@ -352,7 +352,7 @@ async function loadReport() {
       <div class="data-card-body">
         <div style="grid-column:1/-1;">
           <span class="label-tiny">📅 Date & Time</span>
-          <span class="value">${new Date(v.created_at).toLocaleString('bn-BD')}</span>
+          <span class="value">${new Date(v.created_at).toLocaleString('bn-BD', { timeZone: 'Asia/Kolkata' })}</span>
         </div>
         <div style="grid-column:1/-1;">
           <span class="label-tiny">📍 Location</span>
@@ -457,7 +457,7 @@ async function loadReferrals() {
     const due = parseFloat(r.refer_amount || 0) - parseFloat(r.paid_amount || 0);
     return `
       <tr>
-        <td>${new Date(r.created_at).toLocaleDateString('bn-BD')}</td>
+        <td>${new Date(r.created_at).toLocaleDateString('bn-BD', { timeZone: 'Asia/Kolkata' })}</td>
         <td>${r.patient_name}</td>
         <td>${r.refer_name}</td>
         <td>${r.issue || '-'}</td>
@@ -480,7 +480,7 @@ async function loadReferrals() {
         </div>
         <div class="data-card-body">
           <div><span class="label-tiny">Refer By</span><span class="value">${r.refer_name}</span></div>
-          <div><span class="label-tiny">Date</span><span class="value">${new Date(r.created_at).toLocaleDateString('bn-BD')}</span></div>
+          <div><span class="label-tiny">Date</span><span class="value">${new Date(r.created_at).toLocaleDateString('bn-BD', { timeZone: 'Asia/Kolkata' })}</span></div>
           ${r.issue ? `<div style="grid-column:1/-1;"><span class="label-tiny">Issue</span><span class="value">${r.issue}</span></div>` : ''}
           <div><span class="label-tiny">Amount</span><span class="value">₹${r.refer_amount || 0}</span></div>
           <div><span class="label-tiny">Paid</span><span class="value" style="color:#10b981;">₹${r.paid_amount || 0}</span></div>
@@ -564,7 +564,7 @@ async function loadMyFeedback() {
     <div class="feedback-item ${f.status}">
       <strong>[${f.type}]</strong> ${f.message}
       <div style="font-size:0.85rem;color:#64748b;margin-top:5px;">
-        ${new Date(f.created_at).toLocaleString('bn-BD')} • Status: ${f.status}
+        ${new Date(f.created_at).toLocaleString('bn-BD', { timeZone: 'Asia/Kolkata' })} • Status: ${f.status}
       </div>
     </div>
   `).join('');
