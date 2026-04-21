@@ -4,9 +4,9 @@
 if (localStorage.getItem('userType') !== 'staff' || localStorage.getItem('staffRole') !== 'marketing') {
   window.location.href = 'login.html';
 }
-
-document.getElementById('staffName').textContent = localStorage.getItem('staffName') || 'Staff';
-
+const staffNameValue = localStorage.getItem('staffName') || 'Staff';
+document.getElementById('staffName').textContent = staffNameValue;
+document.getElementById('staffNameMobile').textContent = staffNameValue;
 // ===== GLOBAL VARS =====
 let currentUser = null;
 let cameraStream = null;
@@ -35,22 +35,77 @@ let reportMap = null;
 
 // ===== TAB NAVIGATION =====
 document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
+// ===== UNIFIED TAB NAVIGATION =====
+function switchToTab(tabName) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById(tabName).classList.add('active');
+  
+  // Update sidebar
+  document.querySelectorAll('.sidebar .nav-item').forEach(n => {
+    n.classList.toggle('active', n.getAttribute('data-tab') === tabName);
+  });
+  
+  // Update bottom nav
+  document.querySelectorAll('.bottom-nav-item').forEach(n => {
+    n.classList.toggle('active', n.getAttribute('data-tab') === tabName);
+  });
+  
+  // Update more menu
+  document.querySelectorAll('.more-menu-item').forEach(n => {
+    n.classList.toggle('active', n.getAttribute('data-tab') === tabName);
+  });
+  
+  // Page title
+  const titles = {
+    home: 'Home - Visit Entry',
+    report: 'Visit Report',
+    notice: 'Notice & Offers',
+    patient: 'Patient Referral',
+    update: 'Doctor Update',
+    feedback: 'Feedback'
+  };
+  document.getElementById('pageTitle').textContent = titles[tabName] || '';
+  
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  
+  // Load data
+  if (tabName === 'report') setTimeout(loadReport, 100);
+  if (tabName === 'notice') loadNotices();
+  if (tabName === 'patient') loadReferrals();
+  if (tabName === 'update') loadSchedule();
+  if (tabName === 'feedback') loadMyFeedback();
+}
+
+// Attach to sidebar links
+document.querySelectorAll('.sidebar .nav-item[data-tab]').forEach(item => {
   item.addEventListener('click', (e) => {
     e.preventDefault();
-    const tab = item.getAttribute('data-tab');
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    item.classList.add('active');
-    document.getElementById(tab).classList.add('active');
-    document.getElementById('pageTitle').textContent = item.textContent.trim();
-    
-    if (tab === 'report') setTimeout(loadReport, 100);
-    if (tab === 'notice') loadNotices();
-    if (tab === 'patient') loadReferrals();
-    if (tab === 'update') loadSchedule();
-    if (tab === 'feedback') loadMyFeedback();
+    switchToTab(item.getAttribute('data-tab'));
   });
 });
+
+// Attach to bottom nav
+document.querySelectorAll('.bottom-nav-item[data-tab]').forEach(item => {
+  item.addEventListener('click', (e) => {
+    e.preventDefault();
+    switchToTab(item.getAttribute('data-tab'));
+  });
+});
+
+// More menu functions
+function showMoreMenu() {
+  document.getElementById('moreMenu').classList.add('show');
+}
+function hideMoreMenu(e) {
+  if (e.target.id === 'moreMenu') {
+    document.getElementById('moreMenu').classList.remove('show');
+  }
+}
+function selectFromMore(tab) {
+  switchToTab(tab);
+  document.getElementById('moreMenu').classList.remove('show');
+}
 
 function showToast(msg, type = 'success') {
   const toast = document.getElementById('toast');
@@ -225,6 +280,8 @@ document.getElementById('visitForm').addEventListener('submit', async (e) => {
 
 // ===== LOAD REPORT =====
 async function loadReport() {
+// ===== LOAD REPORT =====
+async function loadReport() {
   const from = document.getElementById('fromDate').value;
   const to = document.getElementById('toDate').value;
   
@@ -247,7 +304,7 @@ async function loadReport() {
   
   // Map
   if (reportMap) { reportMap.remove(); reportMap = null; }
-  reportMap = L.map('map').setView([22.5726, 88.3639], 11); // Kolkata default
+  reportMap = L.map('map').setView([22.5726, 88.3639], 11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(reportMap);
@@ -266,12 +323,16 @@ async function loadReport() {
   });
   if (markers.length) reportMap.fitBounds(markers, { padding: [50, 50] });
   
-  // Table
+  // Desktop Table
   const tbody = document.querySelector('#reportTable tbody');
+  const cardsDiv = document.getElementById('reportCards');
+  
   if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="5">কোনো visit নেই</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">কোনো visit নেই</td></tr>';
+    cardsDiv.innerHTML = '<p style="text-align:center;color:#64748b;padding:20px;">কোনো visit নেই</p>';
     return;
   }
+  
   tbody.innerHTML = data.map(v => `
     <tr>
       <td>${new Date(v.created_at).toLocaleString('bn-BD')}</td>
@@ -281,16 +342,32 @@ async function loadReport() {
       <td><img src="${v.image_url}" class="photo-thumb" onclick="showImage('${v.image_url}')" /></td>
     </tr>
   `).join('');
+  
+  // Mobile Cards
+  cardsDiv.innerHTML = data.map(v => `
+    <div class="data-card">
+      <div class="data-card-header">
+        <strong><i class="fas fa-user"></i> ${v.visit_person}</strong>
+        <img src="${v.image_url}" class="photo-thumb" onclick="showImage('${v.image_url}')" />
+      </div>
+      <div class="data-card-body">
+        <div style="grid-column:1/-1;">
+          <span class="label-tiny">📅 Date & Time</span>
+          <span class="value">${new Date(v.created_at).toLocaleString('bn-BD')}</span>
+        </div>
+        <div style="grid-column:1/-1;">
+          <span class="label-tiny">📍 Location</span>
+          <span class="value">${v.location_name || `${v.latitude?.toFixed(4)}, ${v.longitude?.toFixed(4)}`}</span>
+        </div>
+        ${v.remark ? `
+        <div style="grid-column:1/-1;">
+          <span class="label-tiny">📝 Remark</span>
+          <span class="value">${v.remark}</span>
+        </div>` : ''}
+      </div>
+    </div>
+  `).join('');
 }
-
-function showImage(url) {
-  const modal = document.createElement('div');
-  modal.className = 'img-modal show';
-  modal.innerHTML = `<img src="${url}" />`;
-  modal.onclick = () => modal.remove();
-  document.body.appendChild(modal);
-}
-
 // ===== NOTICES =====
 async function loadNotices() {
   const { data, error } = await supabaseClient
@@ -360,17 +437,22 @@ async function loadReferrals() {
   const totalDue = totalAmt - totalPaid;
   
   document.getElementById('referralStats').innerHTML = `
-    <div class="summary-box"><h3>${data.length}</h3><p>Total Referrals</p></div>
-    <div class="summary-box"><h3>₹${totalAmt}</h3><p>Total Amount</p></div>
+    <div class="summary-box"><h3>${data.length}</h3><p>Referrals</p></div>
+    <div class="summary-box"><h3>₹${totalAmt}</h3><p>Total</p></div>
     <div class="summary-box"><h3>₹${totalPaid}</h3><p>Paid</p></div>
     <div class="summary-box"><h3>₹${totalDue}</h3><p>Due</p></div>
   `;
   
   const tbody = document.querySelector('#referralTable tbody');
+  const cardsDiv = document.getElementById('referralCards');
+  
   if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="8">কোনো referral নেই</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;">কোনো referral নেই</td></tr>';
+    cardsDiv.innerHTML = '<p style="text-align:center;color:#64748b;padding:20px;">কোনো referral নেই</p>';
     return;
   }
+  
+  // Desktop Table
   tbody.innerHTML = data.map(r => {
     const due = parseFloat(r.refer_amount || 0) - parseFloat(r.paid_amount || 0);
     return `
@@ -386,7 +468,28 @@ async function loadReferrals() {
       </tr>
     `;
   }).join('');
-}
+  
+  // Mobile Cards
+  cardsDiv.innerHTML = data.map(r => {
+    const due = parseFloat(r.refer_amount || 0) - parseFloat(r.paid_amount || 0);
+    return `
+      <div class="data-card">
+        <div class="data-card-header">
+          <strong><i class="fas fa-user-injured"></i> ${r.patient_name}</strong>
+          <span class="status-${r.payment_status}">${r.payment_status}</span>
+        </div>
+        <div class="data-card-body">
+          <div><span class="label-tiny">Refer By</span><span class="value">${r.refer_name}</span></div>
+          <div><span class="label-tiny">Date</span><span class="value">${new Date(r.created_at).toLocaleDateString('bn-BD')}</span></div>
+          ${r.issue ? `<div style="grid-column:1/-1;"><span class="label-tiny">Issue</span><span class="value">${r.issue}</span></div>` : ''}
+          <div><span class="label-tiny">Amount</span><span class="value">₹${r.refer_amount || 0}</span></div>
+          <div><span class="label-tiny">Paid</span><span class="value" style="color:#10b981;">₹${r.paid_amount || 0}</span></div>
+          <div><span class="label-tiny">Due</span><span class="value" style="color:${due > 0 ? '#ef4444' : '#10b981'};">₹${due}</span></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+              }
 
 // ===== DOCTOR SCHEDULE =====
 async function loadSchedule() {
