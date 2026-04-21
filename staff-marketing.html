@@ -11,9 +11,18 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
-<body>
+                        <body>
 
-  <!-- Sidebar -->
+  <!-- ===== MOBILE TOP HEADER ===== -->
+  <header class="mobile-top-header">
+    <h1><i class="fas fa-bullhorn"></i> Marketing</h1>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="user-badge"><i class="fas fa-user"></i> <span id="staffNameMobile">Staff</span></span>
+      <button class="logout-btn" onclick="staffLogout()"><i class="fas fa-sign-out-alt"></i></button>
+    </div>
+  </header>
+
+  <!-- ===== DESKTOP SIDEBAR ===== -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <i class="fas fa-bullhorn"></i>
@@ -80,14 +89,14 @@
           <label>Remark (ঐচ্ছিক)</label>
           <textarea id="remark" rows="3" placeholder="কোনো মন্তব্য..."></textarea>
           
-          <button type="submit" class="auth-btn" id="submitBtn" disabled>
+          <button type="submit" class="auth-btn" id="submitBtn" disabled style="margin-top:20px;">
             <i class="fas fa-paper-plane"></i> Submit Visit
           </button>
         </form>
       </div>
     </section>
 
-    <!-- ===== REPORT WITH MAP ===== -->
+    <!-- ===== REPORT ===== -->
     <section id="report" class="tab-content">
       <div class="form-card">
         <h2><i class="fas fa-chart-line"></i> Visit Report</h2>
@@ -98,6 +107,8 @@
         </div>
         <div id="reportSummary" class="summary-row"></div>
         <div id="map" style="height: 400px; border-radius: 12px; margin: 20px 0;"></div>
+        
+        <!-- Desktop Table -->
         <div class="table-container">
           <table id="reportTable">
             <thead>
@@ -106,10 +117,13 @@
             <tbody></tbody>
           </table>
         </div>
+        
+        <!-- Mobile Cards -->
+        <div class="data-cards" id="reportCards"></div>
       </div>
     </section>
 
-    <!-- ===== NOTICE & OFFERS ===== -->
+    <!-- ===== NOTICE ===== -->
     <section id="notice" class="tab-content">
       <div class="form-card">
         <h2><i class="fas fa-bell"></i> Notice & Offers</h2>
@@ -128,7 +142,7 @@
             <input type="text" id="referName" placeholder="Refer এর নাম" required />
             <input type="text" id="referIssue" placeholder="সমস্যা" />
           </div>
-          <button type="submit" class="auth-btn"><i class="fas fa-plus"></i> যোগ করুন</button>
+          <button type="submit" class="auth-btn" style="margin-top:15px;"><i class="fas fa-plus"></i> যোগ করুন</button>
         </form>
       </div>
 
@@ -140,6 +154,7 @@
           <button class="auth-btn" onclick="loadReferrals()"><i class="fas fa-search"></i> Search</button>
         </div>
         <div id="referralStats" class="summary-row"></div>
+        
         <div class="table-container">
           <table id="referralTable">
             <thead>
@@ -151,10 +166,12 @@
             <tbody></tbody>
           </table>
         </div>
+        
+        <div class="data-cards" id="referralCards"></div>
       </div>
     </section>
 
-    <!-- ===== DOCTOR UPDATE ===== -->
+    <!-- ===== UPDATE ===== -->
     <section id="update" class="tab-content">
       <div class="form-card">
         <h2><i class="fas fa-user-md"></i> আজকের ডাক্তার চেম্বার</h2>
@@ -176,7 +193,7 @@
           </select>
           <label>Message</label>
           <textarea id="feedbackMsg" rows="5" placeholder="আপনার অভিজ্ঞতা/সমস্যা লিখুন..." required></textarea>
-          <button type="submit" class="auth-btn"><i class="fas fa-paper-plane"></i> পাঠান</button>
+          <button type="submit" class="auth-btn" style="margin-top:15px;"><i class="fas fa-paper-plane"></i> পাঠান</button>
         </form>
       </div>
 
@@ -186,6 +203,53 @@
       </div>
     </section>
   </main>
+
+  <!-- ===== MOBILE BOTTOM NAV ===== -->
+  <nav class="mobile-bottom-nav">
+    <div class="nav-items">
+      <a class="bottom-nav-item active" data-tab="home">
+        <i class="fas fa-home"></i>
+        <span>Home</span>
+      </a>
+      <a class="bottom-nav-item" data-tab="report">
+        <i class="fas fa-chart-line"></i>
+        <span>Report</span>
+      </a>
+      <a class="bottom-nav-item" data-tab="patient">
+        <i class="fas fa-user-injured"></i>
+        <span>Patient</span>
+      </a>
+      <a class="bottom-nav-item" data-tab="update">
+        <i class="fas fa-user-md"></i>
+        <span>Update</span>
+      </a>
+      <a class="bottom-nav-item" onclick="showMoreMenu()">
+        <i class="fas fa-ellipsis-h"></i>
+        <span>More</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- ===== MORE MENU ===== -->
+  <div class="more-menu-overlay" id="moreMenu" onclick="hideMoreMenu(event)">
+    <div class="more-menu" onclick="event.stopPropagation()">
+      <h3><i class="fas fa-bars"></i> আরও অপশন</h3>
+      <div class="more-menu-grid">
+        <a class="more-menu-item" data-tab="notice" onclick="selectFromMore('notice')">
+          <i class="fas fa-bell"></i>
+          <span>Notice & Offers</span>
+        </a>
+        <a class="more-menu-item" data-tab="feedback" onclick="selectFromMore('feedback')">
+          <i class="fas fa-comment-dots"></i>
+          <span>Feedback</span>
+        </a>
+        <a class="more-menu-item" onclick="staffLogout()">
+          <i class="fas fa-sign-out-alt" style="color:#ef4444;"></i>
+          <span>Logout</span>
+        </a>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" class="toast"></div>
 
