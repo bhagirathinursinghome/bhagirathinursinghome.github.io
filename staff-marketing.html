@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Marketing Dashboard | Nursing Home</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+  <link rel="stylesheet" href="css/marketing.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <i class="fas fa-bullhorn"></i>
+      <h2>Marketing</h2>
+    </div>
+    <nav>
+      <a href="#" class="nav-item active" data-tab="home"><i class="fas fa-home"></i> <span>Home</span></a>
+      <a href="#" class="nav-item" data-tab="report"><i class="fas fa-chart-line"></i> <span>Report</span></a>
+      <a href="#" class="nav-item" data-tab="notice"><i class="fas fa-bell"></i> <span>Notice</span></a>
+      <a href="#" class="nav-item" data-tab="patient"><i class="fas fa-user-injured"></i> <span>Patient</span></a>
+      <a href="#" class="nav-item" data-tab="update"><i class="fas fa-user-md"></i> <span>Update</span></a>
+      <a href="#" class="nav-item" data-tab="feedback"><i class="fas fa-comment-dots"></i> <span>Feedback</span></a>
+      <a href="#" onclick="staffLogout()" class="nav-item logout"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <header class="top-bar">
+      <h1 id="pageTitle">Home - Visit Entry</h1>
+      <div class="admin-info">
+        <i class="fas fa-user-circle"></i>
+        <span id="staffName">Staff</span>
+      </div>
+    </header>
+
+    <!-- ===== HOME: VISIT ENTRY ===== -->
+    <section id="home" class="tab-content active">
+      <div class="form-card">
+        <h2><i class="fas fa-map-marker-alt"></i> নতুন Visit এন্ট্রি</h2>
+        <form id="visitForm">
+          
+          <label>Visit Person Name *</label>
+          <input type="text" id="visitPerson" placeholder="যাঁর সাথে সাক্ষাৎ হয়েছে" required />
+          
+          <label>Selfie (auto geo-location) *</label>
+          <div class="camera-box">
+            <video id="camera" autoplay playsinline style="display:none;"></video>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <img id="preview" style="display:none;" />
+            
+            <div id="cameraControls">
+              <button type="button" class="cam-btn" onclick="startCamera()">
+                <i class="fas fa-camera"></i> ক্যামেরা চালু করুন
+              </button>
+            </div>
+            
+            <div id="captureControls" style="display:none;">
+              <button type="button" class="cam-btn primary" onclick="capturePhoto()">
+                <i class="fas fa-camera-retro"></i> ছবি তুলুন
+              </button>
+            </div>
+            
+            <div id="retakeControls" style="display:none;">
+              <button type="button" class="cam-btn" onclick="retakePhoto()">
+                <i class="fas fa-redo"></i> আবার তুলুন
+              </button>
+            </div>
+          </div>
+          
+          <div id="locationInfo" class="location-info" style="display:none;">
+            <i class="fas fa-map-marker-alt"></i> <span id="locText">Location পাচ্ছি...</span>
+          </div>
+          
+          <label>Remark (ঐচ্ছিক)</label>
+          <textarea id="remark" rows="3" placeholder="কোনো মন্তব্য..."></textarea>
+          
+          <button type="submit" class="auth-btn" id="submitBtn" disabled>
+            <i class="fas fa-paper-plane"></i> Submit Visit
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== REPORT WITH MAP ===== -->
+    <section id="report" class="tab-content">
+      <div class="form-card">
+        <h2><i class="fas fa-chart-line"></i> Visit Report</h2>
+        <div class="filter-row">
+          <input type="date" id="fromDate" />
+          <input type="date" id="toDate" />
+          <button class="auth-btn" onclick="loadReport()"><i class="fas fa-search"></i> Search</button>
+        </div>
+        <div id="reportSummary" class="summary-row"></div>
+        <div id="map" style="height: 400px; border-radius: 12px; margin: 20px 0;"></div>
+        <div class="table-container">
+          <table id="reportTable">
+            <thead>
+              <tr><th>Date</th><th>Visit Person</th><th>Location</th><th>Remark</th><th>Photo</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== NOTICE & OFFERS ===== -->
+    <section id="notice" class="tab-content">
+      <div class="form-card">
+        <h2><i class="fas fa-bell"></i> Notice & Offers</h2>
+        <div id="noticeList" class="notice-list"></div>
+      </div>
+    </section>
+
+    <!-- ===== PATIENT REFERRAL ===== -->
+    <section id="patient" class="tab-content">
+      <div class="form-card">
+        <h2><i class="fas fa-user-injured"></i> Patient Referral</h2>
+        <form id="referralForm">
+          <div class="form-grid">
+            <input type="text" id="patientName" placeholder="রোগীর নাম" required />
+            <input type="tel" id="patientMobile" placeholder="রোগীর মোবাইল" />
+            <input type="text" id="referName" placeholder="Refer এর নাম" required />
+            <input type="text" id="referIssue" placeholder="সমস্যা" />
+          </div>
+          <button type="submit" class="auth-btn"><i class="fas fa-plus"></i> যোগ করুন</button>
+        </form>
+      </div>
+
+      <div class="form-card" style="margin-top:20px;">
+        <h2><i class="fas fa-history"></i> আমার Referral History</h2>
+        <div class="filter-row">
+          <input type="date" id="refFromDate" />
+          <input type="date" id="refToDate" />
+          <button class="auth-btn" onclick="loadReferrals()"><i class="fas fa-search"></i> Search</button>
+        </div>
+        <div id="referralStats" class="summary-row"></div>
+        <div class="table-container">
+          <table id="referralTable">
+            <thead>
+              <tr>
+                <th>Date</th><th>রোগী</th><th>Refer</th><th>সমস্যা</th>
+                <th>Amount</th><th>Paid</th><th>Due</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== DOCTOR UPDATE ===== -->
+    <section id="update" class="tab-content">
+      <div class="form-card">
+        <h2><i class="fas fa-user-md"></i> আজকের ডাক্তার চেম্বার</h2>
+        <input type="date" id="scheduleDate" onchange="loadSchedule()" />
+        <div id="scheduleList" class="schedule-list" style="margin-top:20px;"></div>
+      </div>
+    </section>
+
+    <!-- ===== FEEDBACK ===== -->
+    <section id="feedback" class="tab-content">
+      <div class="form-card">
+        <h2><i class="fas fa-comment-dots"></i> আপনার মতামত / সমস্যা</h2>
+        <form id="feedbackForm">
+          <label>Type</label>
+          <select id="feedbackType" required>
+            <option value="feedback">সাধারণ মতামত</option>
+            <option value="problem">সমস্যা</option>
+            <option value="suggestion">পরামর্শ</option>
+          </select>
+          <label>Message</label>
+          <textarea id="feedbackMsg" rows="5" placeholder="আপনার অভিজ্ঞতা/সমস্যা লিখুন..." required></textarea>
+          <button type="submit" class="auth-btn"><i class="fas fa-paper-plane"></i> পাঠান</button>
+        </form>
+      </div>
+
+      <div class="form-card" style="margin-top:20px;">
+        <h2>আমার পূর্বের Feedback</h2>
+        <div id="feedbackList"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/marketing.js"></script>
+</body>
+</html>
