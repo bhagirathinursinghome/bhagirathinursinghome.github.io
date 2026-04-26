@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DocVault — Login</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .login-features {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 32px;
+    }
+    .login-feature {
+      text-align: center;
+      padding: 16px 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .login-feature .fi { font-size: 22px; margin-bottom: 6px; }
+    .login-feature p { font-size: 11px; color: var(--text3); line-height: 1.4; }
+    .login-tagline {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text3);
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div id="login-page">
+  <!-- Left: Branding panel -->
+  <div class="login-bg" style="flex:1.2">
+    <div class="login-grid"></div>
+    <div style="max-width:420px;padding:40px;position:relative;z-index:1;text-align:center;">
+      <div style="font-size:48px;margin-bottom:20px;">🗄️</div>
+      <h1 style="font-family:var(--font-head);font-size:36px;font-weight:800;margin-bottom:12px;letter-spacing:-0.02em;">DocVault</h1>
+      <p style="color:var(--text2);font-size:15px;line-height:1.7;margin-bottom:32px;">
+        A secure document management system for storing, tracking, and receiving expiry alerts on all your critical documents.
+      </p>
+      <div class="login-features">
+        <div class="login-feature">
+          <div class="fi">📋</div>
+          <p>Organized by Category</p>
+        </div>
+        <div class="login-feature">
+          <div class="fi">⏰</div>
+          <p>Expiry Alerts</p>
+        </div>
+        <div class="login-feature">
+          <div class="fi">🔄</div>
+          <p>Version History</p>
+        </div>
+      </div>
+    </div>
+    <div class="login-tagline">SECURE · ORGANIZED · ALWAYS CURRENT</div>
+  </div>
+
+  <!-- Right: Login form -->
+  <div class="login-bg" style="flex:0.8;background:var(--bg2);border-left:1px solid var(--border);">
+    <div class="login-panel">
+      <div class="login-card">
+        <div class="login-logo">
+          <div class="logo-mark">D</div>
+          <div>
+            <div class="login-logo-text">DocVault</div>
+            <div class="login-subtitle">Document Management System</div>
+          </div>
+        </div>
+
+        <div class="login-title">Welcome back</div>
+        <div class="login-desc">Sign in to access your documents</div>
+
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username"/>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password"/>
+        </div>
+
+        <button class="login-btn" id="login-btn" onclick="handleLogin()">
+          Sign In →
+        </button>
+
+        <p style="text-align:center;margin-top:20px;font-size:11px;color:var(--text3);font-family:var(--font-mono);">
+          Default admin: admin / Admin@123
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="loading-overlay" class="loading-overlay hidden">
+  <div class="spinner"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+  
+  
+  // Allow Enter key to submit login
+  document.getElementById('login-password').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') handleLogin();
+  });
+  document.getElementById('login-username').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') handleLogin();
+  });
+
+  // If already logged in, redirect
+  window.addEventListener('DOMContentLoaded', () => {
+    const session = sessionStorage.getItem(CONFIG.SESSION_KEY);
+    if (session) {
+      try {
+        const user = JSON.parse(session);
+        if (user && user.id) window.location.href = 'dashboard.html';
+      } catch(e) {}
+    }
+  });
+  
+  
+ 
+ 
+  </script>
+</body>
+</html>

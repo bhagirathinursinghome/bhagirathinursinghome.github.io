@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DocVault — Dashboard</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div id="toast-container"></div>
+<div id="loading-overlay" class="loading-overlay hidden"><div class="spinner"></div></div>
+
+<div id="app-shell">
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
+  <!-- ── Sidebar ────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">D</div>
+      <div class="logo-text">DocVault</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <button class="nav-item active" onclick="navigate('overview')" id="nav-overview">
+        <span class="nav-icon">📊</span><span>Overview</span>
+      </button>
+      <button class="nav-item" onclick="navigate('documents')" id="nav-documents">
+        <span class="nav-icon">📁</span><span>Documents</span>
+      </button>
+
+      <div class="nav-section-label admin-only">Management</div>
+      <button class="nav-item admin-only editor-only" onclick="navigate('upload')" id="nav-upload">
+        <span class="nav-icon">⬆️</span><span>Upload Doc</span>
+      </button>
+      <button class="nav-item admin-only" onclick="navigate('categories')" id="nav-categories">
+        <span class="nav-icon">🏷️</span><span>Categories</span>
+      </button>
+      <button class="nav-item admin-only" onclick="navigate('users')" id="nav-users">
+        <span class="nav-icon">👥</span><span>Users</span>
+      </button>
+      <button class="nav-item admin-only" onclick="navigate('notifications')" id="nav-notifications">
+        <span class="nav-icon">🔔</span><span>Notifications</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar" id="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name" id="user-display-name">Admin</div>
+          <div class="user-role" id="user-display-role">ADMIN</div>
+        </div>
+      </div>
+      <button class="nav-item" onclick="handleLogout()" style="margin-top:6px;color:var(--red)">
+        <span class="nav-icon">🚪</span><span>Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main ──────────────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- ── Overview Page ───────────────────────────────────── -->
+    <div id="page-overview">
+      <div class="topbar">
+        <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+        <h1>Overview</h1>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary" onclick="checkAndSendExpiryNotifications()" title="Check & send expiry notifications">
+            🔔 Check Notifications
+          </button>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card"><div class="stat-label">Total Documents</div><div class="stat-value" id="stat-total">—</div></div>
+          <div class="stat-card"><div class="stat-label">Expiring (30 days)</div><div class="stat-value warning" id="stat-expiring">—</div></div>
+          <div class="stat-card"><div class="stat-label">Expired</div><div class="stat-value danger" id="stat-expired">—</div></div>
+          <div class="stat-card"><div class="stat-label">Categories</div><div class="stat-value" id="stat-cats">—</div></div>
+        </div>
+
+        <div class="overview-grid">
+            <div class="card">
+            <div style="font-family:var(--font-head);font-weight:700;margin-bottom:14px;font-size:14px;">⚠️ Expiring Soon</div>
+            <div id="expiring-list"><div class="empty-state"><div class="icon">✅</div><p>No documents expiring soon</p></div></div>
+          </div>
+          <div class="card">
+            <div style="font-family:var(--font-head);font-weight:700;margin-bottom:14px;font-size:14px;">🕐 Recently Added</div>
+            <div id="recent-list"><div class="empty-state"><div class="icon">📄</div><p>No documents yet</p></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Documents Page ──────────────────────────────────── -->
+    <div id="page-documents" class="hidden">
+      <div class="topbar">
+        <h1>Documents</h1>
+        <div class="topbar-actions">
+          <div class="editor-only admin-only">
+            <button class="btn btn-primary" onclick="navigate('upload')">+ Upload Document</button>
+          </div>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="search-bar">
+          <input type="text" id="doc-search" placeholder="🔍  Search by name, number, filename…" oninput="renderDocuments()"/>
+          <select id="doc-filter-cat" class="category-select" onchange="renderDocuments()">
+            <option value="">All Categories</option>
+          </select>
+          <select id="doc-filter-status" onchange="renderDocuments()">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="expiring">Expiring Soon</option>
+            <option value="expired">Expired</option>
+          </select>
+          <select id="doc-sort" onchange="renderDocuments()">
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="name">Name A–Z</option>
+            <option value="expiry">Expiry Date</option>
+          </select>
+          <button class="btn btn-secondary" onclick="loadDocumentsPage()">↺</button>
+        </div>
+        <div id="doc-results">
+          <div class="empty-state"><div class="icon">📁</div><p>Loading documents…</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Upload Page ──────────────────────────────────────── -->
+    <div id="page-upload" class="hidden">
+      <div class="topbar">
+        <h1 id="upload-page-title">Upload Document</h1>
+      </div>
+      <div class="page-body">
+        <div class="card" style="max-width:680px">
+          <div id="upload-renew-banner" class="hidden" style="background:var(--yellow-bg);border:1px solid var(--yellow);border-radius:var(--radius);padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--yellow)">
+            📋 Renewing document: <strong id="renew-doc-name"></strong>
+          </div>
+          <div id="upload-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Document Name <span style="color:var(--red)">*</span></label>
+                <input type="text" id="up-name" placeholder="e.g. Business License"/>
+              </div>
+              <div class="form-group">
+                <label>Category</label>
+                <select id="up-category" class="category-select">
+                  <option value="">Select category…</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Document Number</label>
+                <input type="text" id="up-docnum" placeholder="e.g. LIC-2024-001"/>
+              </div>
+              <div class="form-group">
+                <label>Expiry Date</label>
+                <input type="date" id="up-expiry"/>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Physical Store File Name</label>
+              <input type="text" id="up-physical" placeholder="e.g. Cabinet A, Folder 3"/>
+            </div>
+            <div class="form-group">
+              <label>Description (Optional)</label>
+              <textarea id="up-desc" placeholder="Additional notes or description…"></textarea>
+            </div>
+            <div class="form-group">
+              <label>PDF File <span style="color:var(--red)">*</span></label>
+              <div class="file-drop" id="file-drop-zone" onclick="document.getElementById('up-file').click()">
+                <div class="file-icon">📎</div>
+                <div>Click or drag & drop to upload PDF</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:4px">PDF files only</div>
+                <div class="file-name" id="file-name-display"></div>
+                <input type="file" id="up-file" accept=".pdf,application/pdf"/>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:8px">
+              <button class="btn btn-primary" onclick="submitUpload()">⬆️ Upload Document</button>
+              <button class="btn btn-secondary" onclick="navigate('documents')">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Categories Page ─────────────────────────────────── -->
+    <div id="page-categories" class="hidden">
+      <div class="topbar">
+        <h1>Categories</h1>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" onclick="openCategoryModal()">+ Add Category</button>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Description</th>
+                  <th>Documents</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="categories-tbody">
+                <tr><td colspan="5"><div class="empty-state"><div class="icon">🏷️</div><p>No categories yet</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Users Page ──────────────────────────────────────── -->
+    <div id="page-users" class="hidden">
+      <div class="topbar">
+        <h1>User Management</h1>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" onclick="openUserModal()">+ Add User</button>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr><td colspan="6"><div class="empty-state"><div class="icon">👥</div><p>Loading…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Notifications Page ──────────────────────────────── -->
+    <div id="page-notifications" class="hidden">
+      <div class="topbar">
+        <h1>Notification Emails</h1>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary" onclick="checkAndSendExpiryNotifications()">🔔 Send Test Now</button>
+          <button class="btn btn-primary" onclick="openEmailModal()">+ Add Email</button>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="card" style="margin-bottom:20px;background:var(--accent-bg);border-color:rgba(91,106,240,0.3)">
+          <p style="font-size:13px;color:var(--text2)">
+            📧 Emails listed here will receive daily expiry alerts when any document is expiring within <strong style="color:var(--accent2)">${CONFIG.EXPIRY_WARNING_DAYS} days</strong>.
+            A single consolidated email is sent per day listing all expiring documents. No email is sent if no documents are expiring.
+          </p>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+          <div style="font-family:var(--font-head);font-weight:700;font-size:14px;margin-bottom:14px">📋 Expiring Documents (next 30 days)</div>
+          <div id="expiring-docs-notif"><div class="empty-state"><div class="icon">✅</div><p>No documents expiring soon</p></div></div>
+        </div>
+
+        <div class="card">
+          <div style="font-family:var(--font-head);font-weight:700;font-size:14px;margin-bottom:14px">Email Recipients</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Email Address</th><th>Status</th><th>Added</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="emails-tbody">
+                <tr><td colspan="4"><div class="empty-state"><div class="icon">📧</div><p>No emails added</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── Document View Modal ─────────────────────────────────── -->
+<div id="modal-doc-view" class="modal-overlay hidden">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2 id="view-doc-title">Document Details</h2>
+      <button class="btn-close" onclick="closeModal('modal-doc-view')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px" id="view-doc-details"></div>
+      <div style="font-family:var(--font-head);font-weight:700;font-size:13px;margin-bottom:12px">Version History</div>
+      <div id="view-versions-list"></div>
+    </div>
+    <div class="modal-footer" id="view-doc-actions"></div>
+  </div>
+</div>
+
+<!-- ── Edit Document Modal ─────────────────────────────────── -->
+<div id="modal-edit-doc" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Edit Document</h2>
+      <button class="btn-close" onclick="closeModal('modal-edit-doc')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-doc-id"/>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Document Name</label>
+          <input type="text" id="edit-doc-name"/>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="edit-doc-cat" class="category-select"><option value="">None</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Document Number</label>
+          <input type="text" id="edit-doc-num"/>
+        </div>
+        <div class="form-group">
+          <label>Expiry Date</label>
+          <input type="date" id="edit-doc-expiry"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Physical Store File Name</label>
+        <input type="text" id="edit-doc-physical"/>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="edit-doc-desc"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Notification Stopped</label>
+        <select id="edit-doc-notif">
+          <option value="false">No (Notify normally)</option>
+          <option value="true">Yes (Stop notifications for this doc)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-edit-doc')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditDoc()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Category Modal ──────────────────────────────────────── -->
+<div id="modal-category" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="cat-modal-title">Add Category</h2>
+      <button class="btn-close" onclick="closeModal('modal-category')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cat-id"/>
+      <div class="form-group">
+        <label>Category Name <span style="color:var(--red)">*</span></label>
+        <input type="text" id="cat-name" placeholder="e.g. Personal"/>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="cat-desc" placeholder="Optional description"/>
+      </div>
+      <div class="form-group">
+        <label>Color</label>
+        <div id="cat-color-swatches" style="margin-top:6px"></div>
+        <input type="hidden" id="cat-color" value="#5b6af0"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-category')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCategory()">Save Category</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── User Modal ──────────────────────────────────────────── -->
+<div id="modal-user" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="user-modal-title">Add User</h2>
+      <button class="btn-close" onclick="closeModal('modal-user')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="user-id"/>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="user-fullname" placeholder="John Doe"/>
+        </div>
+        <div class="form-group">
+          <label>Username <span style="color:var(--red)">*</span></label>
+          <input type="text" id="user-username" placeholder="johndoe"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Password <span style="color:var(--red)" id="pwd-required">*</span></label>
+          <input type="password" id="user-password" placeholder="Enter password"/>
+          <div class="form-hint" id="pwd-hint">Leave blank to keep existing password (edit mode)</div>
+        </div>
+        <div class="form-group">
+          <label>Role <span style="color:var(--red)">*</span></label>
+          <select id="user-role">
+            <option value="viewer">Viewer</option>
+            <option value="editor">Editor</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="user-email" placeholder="john@example.com"/>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="user-status">
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-user')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Email Modal ─────────────────────────────────────────── -->
+<div id="modal-email" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add Notification Email</h2>
+      <button class="btn-close" onclick="closeModal('modal-email')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Email Address <span style="color:var(--red)">*</span></label>
+        <input type="email" id="new-email" placeholder="alerts@example.com"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-email')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEmail()">Add Email</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="app.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>
