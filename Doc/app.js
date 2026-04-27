@@ -1,5 +1,4 @@
-const { data, error } = await sb.from('app_users').select('*').eq('username', 'admin').limit(1);
-console.log(error, data);
+
 
 // ============================================================
 // app.js — Core application logic
