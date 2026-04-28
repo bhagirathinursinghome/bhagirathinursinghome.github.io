@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocVault — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="layout.js"></script>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="hamburger-btn" id="hamburger-btn" onclick="toggleSidebar()" title="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="topbar-title" id="topbar-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="openUploadModal()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span class="btn-label-hide">Upload Document</span>
+        </button>
+      </div>
+    </header>
+    <main class="page-content" id="page-content">
+      <div class="empty-state"><div class="spinner-ring" style="margin:0 auto"></div></div>
+    </main>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<!-- ── Upload / Edit Document Modal ── -->
+<div class="modal-overlay" id="upload-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="upload-modal-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload Document
+      </div>
+      <button class="modal-close" onclick="closeModal('upload-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="upload-form-body">
+      <!-- filled by JS -->
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('upload-modal')">Cancel</button>
+      <button class="btn btn-primary" id="upload-submit-btn" onclick="submitDocument()">Save Document</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── View History Modal ── -->
+<div class="modal-overlay" id="history-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/></svg>
+        Version History
+      </div>
+      <button class="modal-close" onclick="closeModal('history-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="history-body"></div>
+  </div>
+</div>
+
+<!-- ── User Modal ── -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="user-modal-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Add User
+      </div>
+      <button class="modal-close" onclick="closeModal('user-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="user-form-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('user-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Category Modal ── -->
+<div class="modal-overlay" id="cat-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="cat-modal-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        Add Category
+      </div>
+      <button class="modal-close" onclick="closeModal('cat-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="cat-form-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('cat-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCategory()">Save Category</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Email Modal ── -->
+<div class="modal-overlay" id="email-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        Add Email Address
+      </div>
+      <button class="modal-close" onclick="closeModal('email-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Email Address *</label><input type="email" class="form-input" id="email-input" placeholder="notify@example.com"></div>
+      <div class="form-group"><label class="form-label">Label (optional)</label><input type="text" class="form-input" id="email-label-input" placeholder="Finance Team"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('email-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEmail()">Add Email</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="global-spinner"></div>
+
+<script>
+// ── State ──
+let allDocs = [], categories = [], editingDocId = null, editingUserId = null, editingCatId = null, isRenewal = false, renewParentId = null, currentTab = 'dashboard';
+
+// ── Modal helpers ──
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('active');
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const session = Auth.requireAuth(['admin']);
+  if (!session) return;
+
+  // Bind modal overlay clicks
+  document.querySelectorAll('.modal-overlay').forEach(o => {
+    o.addEventListener('click', e => { if (e.target === o) closeModal(o.id); });
+  });
+
+  renderSidebar('admin', 'dashboard');
+
+  // Check tab from URL
+  const params = new URLSearchParams(location.search);
+  const tab = params.get('tab') || 'dashboard';
+  await loadTab(tab);
+
+  // Check notifications daily
+  setTimeout(() => NotificationSystem.checkAndSendExpiryNotifications(), 3000);
+});
+
+async function loadTab(tab) {
+  currentTab = tab;
+  document.getElementById('topbar-title').innerHTML = getTabTitle(tab);
+
+  // Update sidebar active state
+  document.querySelectorAll('.nav-link[data-page]').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === tab);
+  });
+
+  const content = document.getElementById('page-content');
+  content.innerHTML = `<div class="empty-state"><div class="spinner-ring" style="margin:0 auto"></div></div>`;
+
+  try {
+    if (tab === 'dashboard') await renderDashboard();
+    else if (tab === 'browse') await renderBrowse();
+    else if (tab === 'upload') { await renderBrowse(); openUploadModal(); }
+    else if (tab === 'categories') await renderCategories();
+    else if (tab === 'users') await renderUsers();
+    else if (tab === 'emails') await renderEmails();
+  } catch(e) { content.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>Error loading page</h3><p>${e.message}</p></div>`; }
+}
+
+function getTabTitle(tab) {
+  const map = {
+    dashboard: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> Dashboard`,
+    browse: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Browse Documents`,
+    upload: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload Document`,
+    categories: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/></svg> Categories`,
+    users: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> User Management`,
+    emails: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg> Notification Emails`
+  };
+  return map[tab] || 'Admin';
+}
+
+// ══════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════
+async function renderDashboard() {
+  const [{ data: docs }, { data: users }, { data: cats }, { data: emails }] = await Promise.all([
+    db().from('dv_documents').select('*').eq('is_latest_version', true),
+    db().from('dv_users').select('*'),
+    db().from('dv_categories').select('*'),
+    db().from('dv_notification_emails').select('*').eq('is_active', true),
+  ]);
+
+  const total = docs?.length || 0;
+  const expiring30 = docs?.filter(d => { const days = UI.daysUntilExpiry(d.expiry_date); return days !== null && days >= 0 && days <= 30; }).length || 0;
+  const expired = docs?.filter(d => { const days = UI.daysUntilExpiry(d.expiry_date); return days !== null && days < 0; }).length || 0;
+  const noExpiry = docs?.filter(d => !d.expiry_date).length || 0;
+
+  const recentDocs = [...(docs||[])].sort((a,b) => new Date(b.created_at)-new Date(a.created_at)).slice(0,8);
+  const expiringDocs = (docs||[]).filter(d => { const days = UI.daysUntilExpiry(d.expiry_date); return days !== null && days >= 0 && days <= 30; }).sort((a,b) => new Date(a.expiry_date)-new Date(b.expiry_date));
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <div class="stats-grid">
+        <div class="stat-card gold">
+          <div class="stat-label">Total Documents</div>
+          <div class="stat-value">${total}</div>
+          <div class="stat-sub">${cats?.length||0} categories</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">Expiring Soon</div>
+          <div class="stat-value">${expiring30}</div>
+          <div class="stat-sub">within 30 days</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">Expired</div>
+          <div class="stat-value">${expired}</div>
+          <div class="stat-sub">need renewal</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Users</div>
+          <div class="stat-value">${users?.length||0}</div>
+          <div class="stat-sub">${emails?.length||0} notif. emails</div>
+        </div>
+      </div>
+
+      ${expiringDocs.length > 0 ? `
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" style="color:var(--amber)">⚠ Expiring Within 30 Days</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadTab('browse')">View All</button>
+        </div>
+        ${renderDocTable(expiringDocs.slice(0,5), { canEdit: true, canDelete: true, canStopAlert: true })}
+      </div>` : ''}
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Recent Documents</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadTab('browse')">View All</button>
+        </div>
+        ${renderDocTable(recentDocs, { canEdit: true, canDelete: true, canStopAlert: true })}
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════
+// BROWSE / SEARCH
+// ══════════════════════════════════
+async function renderBrowse() {
+  const { data: docs } = await db().from('dv_documents').select('*, dv_categories(name, color)').eq('is_latest_version', true).order('created_at', { ascending: false });
+  allDocs = docs || [];
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div id="filter-bar"></div>
+      <div id="doc-table-wrap"></div>
+    </div>`;
+
+  await buildFilters('filter-bar', renderFilteredDocs);
+  renderFilteredDocs();
+}
+
+function renderFilteredDocs() {
+  const filtered = applyLocalFilters(allDocs);
+  document.getElementById('doc-table-wrap').innerHTML = renderDocTable(filtered, { canEdit: true, canDelete: true, canStopAlert: true, showVersion: true });
+}
+
+// ══════════════════════════════════
+// UPLOAD / EDIT DOCUMENT
+// ══════════════════════════════════
+async function openUploadModal(docId = null, renewId = null) {
+  editingDocId = docId;
+  renewParentId = renewId;
+  isRenewal = !!renewId;
+  categories = await DocHelpers.getCategories();
+
+  let doc = null;
+  if (docId) {
+    const { data } = await db().from('dv_documents').select('*').eq('id', docId).single();
+    doc = data;
+  }
+  if (renewId && !doc) {
+    const { data } = await db().from('dv_documents').select('*').eq('id', renewId).single();
+    doc = data;
+  }
+
+  const title = isRenewal ? 'Renew Document' : (docId ? 'Edit Document' : 'Upload Document');
+  document.getElementById('upload-modal-title').innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    ${title}`;
+
+  const catOptions = categories.map(c => `<option value="${c.id}" ${doc?.category_id === c.id ? 'selected' : ''}>${escHtml(c.name)}</option>`).join('');
+
+  document.getElementById('upload-form-body').innerHTML = `
+    ${isRenewal ? `<div style="background:var(--amber-bg);border:1px solid rgba(232,160,64,0.3);border-radius:10px;padding:12px 16px;font-size:0.875rem;color:var(--amber)">
+      🔄 Renewing: <strong>${escHtml(doc?.document_name)}</strong> — a new version will be created and old version archived.
+    </div>` : ''}
+    <div class="form-row">
+      ${!isRenewal ? `<div class="form-group">
+        <label class="form-label">Document Name *</label>
+        <input type="text" class="form-input" id="doc-name" placeholder="e.g. Trade License" value="${escHtml(doc?.document_name||'')}">
+      </div>` : ''}
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-select" id="doc-cat"><option value="">— None —</option>${catOptions}</select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Document Number</label>
+        <input type="text" class="form-input" id="doc-number" placeholder="Optional reference number" value="${escHtml(doc?.document_number||'')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expiry Date</label>
+        <input type="date" class="form-input" id="doc-expiry" value="${doc?.expiry_date||''}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Physical Store File Name</label>
+      <input type="text" class="form-input" id="doc-physical" placeholder="e.g. Cabinet A / Folder 3" value="${escHtml(doc?.physical_store_name||'')}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" id="doc-desc" placeholder="Optional notes about this document">${escHtml(doc?.description||'')}</textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">PDF File ${docId && !isRenewal ? '(leave empty to keep existing)' : '*'}</label>
+      <div class="file-drop-zone" id="file-drop">
+        <input type="file" id="doc-file" accept=".pdf,application/pdf" onchange="handleFileSelect(this)">
+        <div class="file-drop-icon">📄</div>
+        <p>Click to select PDF or drag & drop here</p>
+        <div class="file-name-display" id="file-name-display"></div>
+      </div>
+    </div>`;
+
+  openModal('upload-modal');
+}
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (file) {
+    document.getElementById('file-name-display').textContent = `✓ ${file.name} (${UI.formatFileSize(file.size)})`;
+  }
+}
+
+async function submitDocument() {
+  const session = Auth.getSession();
+  const nameInput = document.getElementById('doc-name');
+  const name = isRenewal ? null : nameInput?.value.trim();
+  const catId = document.getElementById('doc-cat').value || null;
+  const number = document.getElementById('doc-number').value.trim() || null;
+  const expiry = document.getElementById('doc-expiry').value || null;
+  const physical = document.getElementById('doc-physical').value.trim() || null;
+  const desc = document.getElementById('doc-desc').value.trim() || null;
+  const fileInput = document.getElementById('doc-file');
+  const file = fileInput.files[0] || null;
+
+  if (!isRenewal && !editingDocId && !name) { UI.toast('Document name is required', 'error'); return; }
+  if (!editingDocId && !isRenewal && !file) { UI.toast('Please select a PDF file', 'error'); return; }
+  if (isRenewal && !file) { UI.toast('Please select the renewed PDF file', 'error'); return; }
+
+  UI.showSpinner(isRenewal ? 'Creating new version…' : 'Saving document…');
+
+  try {
+    if (isRenewal) {
+      // Get parent doc
+      const { data: parent } = await db().from('dv_documents').select('*').eq('id', renewParentId).single();
+      const newId = crypto.randomUUID();
+      let filePath = null;
+      if (file) filePath = await DocHelpers.uploadPDF(file, newId);
+
+      // Archive old version
+      await db().from('dv_documents').update({ is_latest_version: false }).eq('id', renewParentId);
+
+      // Insert new version
+      const { error } = await db().from('dv_documents').insert({
+        id: newId,
+        document_name: parent.document_name,
+        category_id: catId || parent.category_id,
+        document_number: number || parent.document_number,
+        expiry_date: expiry,
+        description: desc || parent.description,
+        physical_store_name: physical || parent.physical_store_name,
+        version: (parent.version || 1) + 1,
+        parent_document_id: parent.parent_document_id || parent.id,
+        is_latest_version: true,
+        notification_stopped: false,
+        file_path: filePath,
+        file_name: file?.name,
+        file_size: file?.size,
+        file_type: file?.type,
+        uploaded_by: session.user.id
+      });
+      if (error) throw error;
+      await AuditLog.log('RENEW_DOCUMENT', 'document', newId, { parent_id: renewParentId });
+      UI.toast('Document renewed successfully!', 'success');
+
+    } else if (editingDocId) {
+      // Edit existing
+      const updateData = { category_id: catId, document_number: number, expiry_date: expiry, physical_store_name: physical, description: desc };
+      if (!isRenewal && name) updateData.document_name = name;
+      if (file) {
+        const filePath = await DocHelpers.uploadPDF(file, editingDocId);
+        updateData.file_path = filePath; updateData.file_name = file.name; updateData.file_size = file.size; updateData.file_type = file.type;
+      }
+      const { error } = await db().from('dv_documents').update(updateData).eq('id', editingDocId);
+      if (error) throw error;
+      await AuditLog.log('EDIT_DOCUMENT', 'document', editingDocId);
+      UI.toast('Document updated!', 'success');
+
+    } else {
+      // New upload
+      const newId = crypto.randomUUID();
+      let filePath = null;
+      if (file) filePath = await DocHelpers.uploadPDF(file, newId);
+
+      const { error } = await db().from('dv_documents').insert({
+        id: newId, document_name: name, category_id: catId, document_number: number,
+        expiry_date: expiry, description: desc, physical_store_name: physical,
+        version: 1, is_latest_version: true, notification_stopped: false,
+        file_path: filePath, file_name: file?.name, file_size: file?.size, file_type: file?.type,
+        uploaded_by: session.user.id
+      });
+      if (error) throw error;
+      await AuditLog.log('UPLOAD_DOCUMENT', 'document', newId, { name });
+      UI.toast('Document uploaded!', 'success');
+    }
+
+    closeModal('upload-modal');
+    await loadTab(currentTab === 'upload' ? 'browse' : currentTab);
+
+  } catch (e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+async function editDoc(id) {
+  await openUploadModal(id);
+}
+
+async function renewDoc(id) {
+  await openUploadModal(null, id);
+}
+
+async function deleteDoc(id) {
+  const ok = await UI.confirm('Delete this document? This cannot be undone.');
+  if (!ok) return;
+  UI.showSpinner('Deleting…');
+  try {
+    const { data: doc } = await db().from('dv_documents').select('file_path').eq('id', id).single();
+    if (doc?.file_path) await DocHelpers.deleteFile(doc.file_path);
+    await db().from('dv_documents').delete().eq('id', id);
+    await AuditLog.log('DELETE_DOCUMENT', 'document', id);
+    UI.toast('Document deleted', 'success');
+    await loadTab(currentTab);
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+async function toggleNotification(id, stopped) {
+  await db().from('dv_documents').update({ notification_stopped: stopped }).eq('id', id);
+  UI.toast(stopped ? 'Alert stopped for this document' : 'Alert resumed', 'success');
+  await loadTab(currentTab);
+}
+
+async function viewHistory(parentId) {
+  UI.showSpinner('Loading history…');
+  try {
+    const { data: docs } = await db().from('dv_documents').select('*, dv_categories(name, color)').or(`id.eq.${parentId},parent_document_id.eq.${parentId}`).order('version', { ascending: false });
+    document.getElementById('history-body').innerHTML = renderDocTable(docs || [], { canEdit: false, canDelete: false, showVersion: true });
+    openModal('history-modal');
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+// ══════════════════════════════════
+// CATEGORIES
+// ══════════════════════════════════
+async function renderCategories() {
+  const { data: cats } = await db().from('dv_categories').select('*').order('name');
+  const { data: docs } = await db().from('dv_documents').select('category_id').eq('is_latest_version', true);
+  const docCount = {};
+  (docs||[]).forEach(d => { if(d.category_id) docCount[d.category_id] = (docCount[d.category_id]||0)+1; });
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn btn-primary" onclick="openCatModal()">+ Add Category</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Color</th><th>Category Name</th><th>Description</th><th>Documents</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${(cats||[]).map(c => `<tr>
+              <td><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:${c.color||'#c9933a'}"></span></td>
+              <td style="font-weight:500;color:var(--text-0)">${escHtml(c.name)}</td>
+              <td style="color:var(--text-2)">${escHtml(c.description||'')}</td>
+              <td><span class="badge badge-neutral">${docCount[c.id]||0}</span></td>
+              <td><div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm btn-icon" onclick="openCatModal('${c.id}')" title="Edit">${svgEdit()}</button>
+                <button class="btn btn-danger btn-sm btn-icon" onclick="deleteCat('${c.id}')" title="Delete">${svgTrash()}</button>
+              </div></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function openCatModal(id = null) {
+  editingCatId = id;
+  let cat = null;
+  if (id) {
+    const { data } = await db().from('dv_categories').select('*').eq('id', id).single();
+    cat = data;
+  }
+  document.getElementById('cat-modal-title').innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/></svg>
+    ${id ? 'Edit Category' : 'Add Category'}`;
+  document.getElementById('cat-form-body').innerHTML = `
+    <div class="form-group"><label class="form-label">Category Name *</label><input type="text" class="form-input" id="cat-name" value="${escHtml(cat?.name||'')}"></div>
+    <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="cat-desc">${escHtml(cat?.description||'')}</textarea></div>
+    <div class="form-group"><label class="form-label">Color</label><input type="color" class="form-input" id="cat-color" value="${cat?.color||'#c9933a'}" style="height:44px;padding:4px;cursor:pointer"></div>`;
+  openModal('cat-modal');
+}
+
+async function submitCategory() {
+  const name = document.getElementById('cat-name').value.trim();
+  const desc = document.getElementById('cat-desc').value.trim() || null;
+  const color = document.getElementById('cat-color').value;
+  const session = Auth.getSession();
+  if (!name) { UI.toast('Name is required', 'error'); return; }
+  UI.showSpinner('Saving…');
+  try {
+    if (editingCatId) {
+      await db().from('dv_categories').update({ name, description: desc, color }).eq('id', editingCatId);
+    } else {
+      await db().from('dv_categories').insert({ name, description: desc, color, created_by: session.user.id });
+    }
+    UI.toast('Category saved!', 'success');
+    closeModal('cat-modal');
+    await renderCategories();
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+async function deleteCat(id) {
+  const ok = await UI.confirm('Delete this category? Documents in this category will not be deleted but will be uncategorized.');
+  if (!ok) return;
+  UI.showSpinner('Deleting…');
+  try {
+    await db().from('dv_documents').update({ category_id: null }).eq('category_id', id);
+    await db().from('dv_categories').delete().eq('id', id);
+    UI.toast('Category deleted', 'success');
+    await renderCategories();
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+// ══════════════════════════════════
+// USERS
+// ══════════════════════════════════
+async function renderUsers() {
+  const { data: users } = await db().from('dv_users').select('id,username,full_name,email,role,is_active,created_at').order('created_at');
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn btn-primary" onclick="openUserModal()">+ Add User</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${(users||[]).map(u => `<tr>
+              <td style="font-weight:500;color:var(--text-0)">${escHtml(u.full_name||u.username)}</td>
+              <td><code>${escHtml(u.username)}</code></td>
+              <td style="color:var(--text-2)">${escHtml(u.email||'')}</td>
+              <td><span class="badge badge-${u.role}">${u.role}</span></td>
+              <td><span class="badge ${u.is_active ? 'badge-ok' : 'badge-expired'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+              <td><div style="display:flex;gap:4px">
+                <button class="btn btn-secondary btn-sm btn-icon" onclick="openUserModal('${u.id}')" title="Edit">${svgEdit()}</button>
+                <button class="btn btn-secondary btn-sm btn-icon" onclick="changePassword('${u.id}')" title="Change Password">${svgKey()}</button>
+                ${u.username !== 'admin' ? `<button class="btn btn-danger btn-sm btn-icon" onclick="deleteUser('${u.id}')" title="Delete">${svgTrash()}</button>` : ''}
+              </div></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function openUserModal(id = null) {
+  editingUserId = id;
+  let user = null;
+  if (id) {
+    const { data } = await db().from('dv_users').select('id,username,full_name,email,role,is_active').eq('id', id).single();
+    user = data;
+  }
+  document.getElementById('user-modal-title').innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    ${id ? 'Edit User' : 'Add User'}`;
+  document.getElementById('user-form-body').innerHTML = `
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="u-fullname" value="${escHtml(user?.full_name||'')}"></div>
+      <div class="form-group"><label class="form-label">Username *</label><input type="text" class="form-input" id="u-username" value="${escHtml(user?.username||'')}" ${id ? 'readonly style="opacity:0.5"' : ''}></div>
+    </div>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="u-email" value="${escHtml(user?.email||'')}"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Role *</label>
+        <select class="form-select" id="u-role">
+          <option value="viewer" ${user?.role==='viewer'?'selected':''}>Viewer</option>
+          <option value="editor" ${user?.role==='editor'?'selected':''}>Editor</option>
+          <option value="admin" ${user?.role==='admin'?'selected':''}>Admin</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="u-active">
+          <option value="true" ${user?.is_active!==false?'selected':''}>Active</option>
+          <option value="false" ${user?.is_active===false?'selected':''}>Inactive</option>
+        </select>
+      </div>
+    </div>
+    ${!id ? `<div class="form-group"><label class="form-label">Password *</label><input type="password" class="form-input" id="u-pass" placeholder="Set initial password"></div>` : ''}`;
+  openModal('user-modal');
+}
+
+async function submitUser() {
+  const username = document.getElementById('u-username').value.trim();
+  const fullName = document.getElementById('u-fullname').value.trim() || null;
+  const email = document.getElementById('u-email').value.trim() || null;
+  const role = document.getElementById('u-role').value;
+  const isActive = document.getElementById('u-active').value === 'true';
+
+  if (!username) { UI.toast('Username is required', 'error'); return; }
+  UI.showSpinner('Saving…');
+  try {
+    if (editingUserId) {
+      await db().from('dv_users').update({ full_name: fullName, email, role, is_active: isActive }).eq('id', editingUserId);
+    } else {
+      const passEl = document.getElementById('u-pass');
+      if (!passEl?.value) { UI.toast('Password is required', 'error'); UI.hideSpinner(); return; }
+      const hash = await Auth.hashPassword(passEl.value);
+      await db().from('dv_users').insert({ username, password_hash: hash, full_name: fullName, email, role, is_active: isActive });
+    }
+    UI.toast('User saved!', 'success');
+    closeModal('user-modal');
+    await renderUsers();
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+async function changePassword(id) {
+  const pass = prompt('Enter new password for this user:');
+  if (!pass) return;
+  if (pass.length < 6) { UI.toast('Password must be at least 6 characters', 'error'); return; }
+  UI.showSpinner('Updating…');
+  try {
+    const hash = await Auth.hashPassword(pass);
+    await db().from('dv_users').update({ password_hash: hash }).eq('id', id);
+    UI.toast('Password changed!', 'success');
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+async function deleteUser(id) {
+  const ok = await UI.confirm('Delete this user? This cannot be undone.');
+  if (!ok) return;
+  UI.showSpinner('Deleting…');
+  try {
+    await db().from('dv_sessions').delete().eq('user_id', id);
+    await db().from('dv_users').delete().eq('id', id);
+    UI.toast('User deleted', 'success');
+    await renderUsers();
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+// ══════════════════════════════════
+// NOTIFICATION EMAILS
+// ══════════════════════════════════
+async function renderEmails() {
+  const { data: emails } = await db().from('dv_notification_emails').select('*').order('created_at');
+
+  // Check upcoming expirations
+  const today = new Date().toISOString().split('T')[0];
+  const warningDate = new Date(); warningDate.setDate(warningDate.getDate() + 30);
+  const { data: expiringDocs } = await db().from('dv_documents').select('document_name,expiry_date').eq('is_latest_version', true).eq('notification_stopped', false).not('expiry_date', 'is', null).lte('expiry_date', warningDate.toISOString().split('T')[0]).gte('expiry_date', today);
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div class="card" style="border-color:rgba(201,147,58,0.2)">
+        <div class="card-header"><div class="card-title">📧 Notification System Status</div>
+          <button class="btn btn-secondary btn-sm" onclick="manualSendTest()">Send Test Now</button>
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:0.78rem;color:var(--text-2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Active Notification Emails</div>
+            <div style="font-size:1.8rem;font-weight:600;color:var(--gold-l);font-family:var(--font-mono)">${(emails||[]).filter(e=>e.is_active).length}</div>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:0.78rem;color:var(--text-2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Docs Expiring (30 days)</div>
+            <div style="font-size:1.8rem;font-weight:600;color:${(expiringDocs||[]).length>0?'var(--amber)':'var(--green)'};font-family:var(--font-mono)">${(expiringDocs||[]).length}</div>
+          </div>
+        </div>
+        ${(expiringDocs||[]).length>0 ? `
+        <div style="margin-top:14px;background:var(--amber-bg);border:1px solid rgba(232,160,64,0.2);border-radius:10px;padding:12px">
+          <div style="font-size:0.78rem;font-weight:600;color:var(--amber);margin-bottom:8px">📋 Documents triggering notifications:</div>
+          ${expiringDocs.map(d=>`<div style="font-size:0.82rem;color:var(--text-1);padding:3px 0">${escHtml(d.document_name)} — <span style="color:var(--amber)">${UI.formatDate(d.expiry_date)}</span></div>`).join('')}
+        </div>` : '<div style="margin-top:12px;color:var(--green);font-size:0.875rem">✓ No documents expiring within 30 days. No emails will be sent today.</div>'}
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Notification Email Addresses</div>
+          <button class="btn btn-primary btn-sm" onclick="openModal('email-modal')">+ Add Email</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Email</th><th>Label</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${(emails||[]).map(e=>`<tr>
+                <td style="color:var(--text-0)">${escHtml(e.email)}</td>
+                <td style="color:var(--text-2)">${escHtml(e.label||'')}</td>
+                <td><span class="badge ${e.is_active?'badge-ok':'badge-expired'}">${e.is_active?'Active':'Paused'}</span></td>
+                <td><div style="display:flex;gap:6px">
+                  <button class="btn btn-ghost btn-sm" onclick="toggleEmail('${e.id}',${!e.is_active})">${e.is_active?'Pause':'Activate'}</button>
+                  <button class="btn btn-danger btn-sm btn-icon" onclick="deleteEmail('${e.id}')">${svgTrash()}</button>
+                </div></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">ℹ EmailJS Setup Guide</div></div>
+        <div style="font-size:0.875rem;color:var(--text-2);line-height:1.8">
+          <p>To enable email notifications, set up <strong style="color:var(--text-0)">EmailJS</strong> (free tier available):</p>
+          <ol style="padding-left:20px;margin-top:8px">
+            <li>Sign up at <a href="https://www.emailjs.com" target="_blank">emailjs.com</a></li>
+            <li>Create a service (Gmail, Outlook, etc.) and note the <code>Service ID</code></li>
+            <li>Create an email template with variables: <code>{{to_emails}}</code>, <code>{{document_list}}</code>, <code>{{document_count}}</code></li>
+            <li>Get your <code>Public Key</code> from Account settings</li>
+            <li>Update <code>config.js</code> with these values</li>
+          </ol>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function submitEmail() {
+  const email = document.getElementById('email-input').value.trim();
+  const label = document.getElementById('email-label-input').value.trim() || null;
+  const session = Auth.getSession();
+  if (!email) { UI.toast('Email is required', 'error'); return; }
+  UI.showSpinner('Adding…');
+  try {
+    await db().from('dv_notification_emails').insert({ email, label, added_by: session.user.id });
+    UI.toast('Email added!', 'success');
+    closeModal('email-modal');
+    document.getElementById('email-input').value = '';
+    document.getElementById('email-label-input').value = '';
+    await renderEmails();
+  } catch(e) { UI.toast(e.message.includes('unique') ? 'Email already exists' : 'Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+async function toggleEmail(id, active) {
+  await db().from('dv_notification_emails').update({ is_active: active }).eq('id', id);
+  UI.toast(active ? 'Email activated' : 'Email paused', 'success');
+  await renderEmails();
+}
+
+async function deleteEmail(id) {
+  const ok = await UI.confirm('Remove this email from notifications?');
+  if (!ok) return;
+  await db().from('dv_notification_emails').delete().eq('id', id);
+  UI.toast('Email removed', 'success');
+  await renderEmails();
+}
+
+async function manualSendTest() {
+  UI.showSpinner('Checking and sending…');
+  try {
+    await NotificationSystem.checkAndSendExpiryNotifications();
+    UI.toast('Check complete. Check console for details.', 'info');
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+</script>
+</body>
+</html>
