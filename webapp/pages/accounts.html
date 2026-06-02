@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Accounts</title><link rel="stylesheet" href="../assets/style.css"/></head>
+<body>
+<div class="page">
+  <h1>💰 Accounts</h1>
+  <div class="page-card">
+    <p class="muted">This module is ready for you to build. Add your data-entry form, tables, or reports here.</p>
+    <p>Logged-in user: <b id="who"></b></p>
+    <p>This page is fully isolated — edit <code>pages/accounts.html</code> independently of other modules.</p>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant","manager"]);
+  document.getElementById('who').textContent = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.role + ')';
+</script>
+</body></html>
