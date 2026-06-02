@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sample Data Entry</title><link rel="stylesheet" href="../assets/style.css"/></head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>Sample Data Entry</h1>
+  <p class="muted">This is a template showing how the logged-in user gets auto-filled. See <code>HOW_TO_ADD_PAGES.md</code>.</p>
+
+  <div class="page-card">
+    <form id="f">
+      <label>Recorded By (auto)</label>
+      <input id="rec" readonly />
+
+      <label>Patient Name</label>
+      <input id="pname" required />
+
+      <label>Note</label>
+      <textarea id="note" rows="3"></textarea>
+
+      <div style="margin-top:1rem"><button class="btn-primary" style="width:auto">Submit</button></div>
+      <p class="info" id="msg" style="display:none"></p>
+    </form>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["*"]);
+  document.getElementById('rec').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+
+  document.getElementById('f').onsubmit = e => {
+    e.preventDefault();
+    const payload = BNH_PAGE.stamp({
+      patient_name: pname.value,
+      note: note.value
+    });
+    // Example only — wire to a Supabase table when you create one:
+    // await BNH_PAGE.sb.from('sample_entries').insert(payload);
+    const m = document.getElementById('msg');
+    m.style.display='block';
+    m.textContent = 'Saved (demo). Payload: ' + JSON.stringify(payload);
+  };
+</script>
+</body></html>

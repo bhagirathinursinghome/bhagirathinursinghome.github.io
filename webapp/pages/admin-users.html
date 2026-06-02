@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>User Management</title><link rel="stylesheet" href="../assets/style.css"/></head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>User Management</h1>
+  <p class="muted">Approve pending registrations, assign roles, deactivate accounts, or reset passwords.</p>
+
+  <div class="page-card" style="padding:0;overflow:auto">
+    <table>
+      <thead><tr>
+        <th>Name</th><th>User ID</th><th>Mobile</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th>
+      </tr></thead>
+      <tbody id="rows"><tr><td colspan="7" style="text-align:center;padding:2rem">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/auth.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin"]);
+  const spinner=document.getElementById('spinner');
+  const show=el=>el.classList.remove('hidden'); const hide=el=>el.classList.add('hidden');
+
+  function pill(status){
+    return `<span class="status-pill status-${status}">${status}</span>`;
+  }
+  function roleSelect(cur){
+    return `<select>${BNH.ROLES.map(r=>`<option ${r===cur?'selected':''}>${r}</option>`).join('')}</select>`;
+  }
+
+  async function load(){
+    show(spinner);
+    try{
+      const users = await BNH.listUsers();
+      const tbody = document.getElementById('rows');
+      if(!users.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center">No users</td></tr>'; return; }
+      tbody.innerHTML='';
+      users.forEach(u=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`
+          <td>${u.name}</td>
+          <td>${u.username}</td>
+          <td>${u.mobile||''}</td>
+          <td>${roleSelect(u.role||'other')}</td>
+          <td>${pill(u.status)}</td>
+          <td>${new Date(u.created_at).toLocaleDateString()}</td>
+          <td class="actions-row"></td>`;
+        const sel = tr.querySelector('select');
+        const actCell = tr.querySelector('.actions-row');
+
+        if(u.status==='pending'){
+          const b=document.createElement('button'); b.className='btn-success'; b.textContent='Approve';
+          b.onclick=async()=>{ show(spinner); try{ await BNH.approveUser(u.id, sel.value); await load();}catch(e){alert(e.message);} finally{hide(spinner);} };
+          actCell.appendChild(b);
+        } else {
+          const b=document.createElement('button'); b.className='btn-ghost'; b.textContent='Save Role';
+          b.onclick=async()=>{ show(spinner); try{ await BNH.setRole(u.id, sel.value); alert('Role updated');}catch(e){alert(e.message);} finally{hide(spinner);} };
+          actCell.appendChild(b);
+        }
+
+        if(u.status!=='deactivated'){
+          const d=document.createElement('button'); d.className='btn-danger'; d.textContent='Deactivate';
+          d.onclick=async()=>{ if(!confirm('Deactivate '+u.username+'?')) return; show(spinner); try{ await BNH.setStatus(u.id,'deactivated'); await load();}catch(e){alert(e.message);} finally{hide(spinner);} };
+          actCell.appendChild(d);
+        } else {
+          const r=document.createElement('button'); r.className='btn-success'; r.textContent='Reactivate';
+          r.onclick=async()=>{ show(spinner); try{ await BNH.setStatus(u.id,'active'); await load();}catch(e){alert(e.message);} finally{hide(spinner);} };
+          actCell.appendChild(r);
+        }
+
+        const rp=document.createElement('button'); rp.className='btn-ghost'; rp.textContent='Reset Pwd';
+        rp.onclick=async()=>{
+          const np=prompt('New password for '+u.username+' (min 6):'); if(!np) return;
+          show(spinner); try{ await BNH.resetPassword(u.id, np); alert('Password reset.'); }catch(e){alert(e.message);} finally{hide(spinner);}
+        };
+        actCell.appendChild(rp);
+
+        document.getElementById('rows').appendChild(tr);
+      });
+    } catch(e){ alert(e.message); }
+    finally{ hide(spinner); }
+  }
+  load();
+</script>
+</body></html>

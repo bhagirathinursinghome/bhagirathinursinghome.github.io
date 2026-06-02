@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Home</title><link rel="stylesheet" href="../assets/style.css"/></head>
+<body>
+<div class="page">
+  <h1>Welcome, <span id="who"></span> 👋</h1>
+  <p class="muted">You are signed in as <b id="role"></b> at Bhagirathy Nursing Home.</p>
+
+  <div class="stat-grid">
+    <div class="stat"><div class="stat-label">Today's Date</div><div class="stat-value" id="today"></div></div>
+    <div class="stat"><div class="stat-label">Your Role</div><div class="stat-value" id="srole" style="text-transform:capitalize"></div></div>
+    <div class="stat"><div class="stat-label">User ID</div><div class="stat-value" id="suser" style="font-size:1.2rem"></div></div>
+  </div>
+
+  <div class="page-card">
+    <h3>Quick tips</h3>
+    <ul>
+      <li>Use the sidebar to navigate. On mobile, tap the ☰ icon.</li>
+      <li>Change your password from the top-right button.</li>
+      <li>All your entries are stamped with your User ID automatically.</li>
+    </ul>
+  </div>
+</div>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["*"]);
+  const u = BNH_PAGE.user;
+  document.getElementById('who').textContent = u.name;
+  document.getElementById('role').textContent = u.role;
+  document.getElementById('srole').textContent = u.role;
+  document.getElementById('suser').textContent = u.username;
+  document.getElementById('today').textContent = new Date().toLocaleDateString();
+</script>
+</body></html>
