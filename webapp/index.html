@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bhagirathy Nursing Home — Login</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body class="auth-body">
+  <div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+  <div class="auth-wrap">
+    <div class="brand">
+      <div class="logo-circle">B</div>
+      <h1>Bhagirathy Nursing Home</h1>
+      <p class="tag">Staff Portal</p>
+    </div>
+
+    <div class="card" id="loginCard">
+      <h2>Sign in</h2>
+      <form id="loginForm">
+        <label>User ID</label>
+        <input type="text" id="loginUser" autocomplete="username" required />
+        <label>Password</label>
+        <input type="password" id="loginPass" autocomplete="current-password" required />
+        <button type="submit" class="btn-primary">Login</button>
+      </form>
+      <p class="muted">No account? <a href="#" id="goReg">Register</a></p>
+      <p class="err" id="loginErr"></p>
+    </div>
+
+    <div class="card hidden" id="regCard">
+      <h2>Register</h2>
+      <form id="regForm">
+        <label>Full Name</label>
+        <input type="text" id="regName" required />
+        <label>Mobile</label>
+        <input type="tel" id="regMobile" pattern="[0-9]{10}" maxlength="10" required />
+        <label>User ID</label>
+        <input type="text" id="regUser" required />
+        <label>Password</label>
+        <input type="password" id="regPass" minlength="6" required />
+        <button type="submit" class="btn-primary">Create account</button>
+      </form>
+      <p class="muted">Have an account? <a href="#" id="goLogin">Login</a></p>
+      <p class="info">Your profile will be activated after admin approval.</p>
+      <p class="err" id="regErr"></p>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script src="assets/auth.js"></script>
+<script>
+  const spinner = document.getElementById('spinner');
+  const show = el => el.classList.remove('hidden');
+  const hide = el => el.classList.add('hidden');
+
+  document.getElementById('goReg').onclick = e => { e.preventDefault(); hide(loginCard); show(regCard); };
+  document.getElementById('goLogin').onclick = e => { e.preventDefault(); hide(regCard); show(loginCard); };
+
+  // Auto-redirect if already logged in
+  const cur = BNH.getCurrentUser();
+  if (cur) location.href = 'app.html';
+
+  document.getElementById('loginForm').onsubmit = async e => {
+    e.preventDefault();
+    document.getElementById('loginErr').textContent = '';
+    show(spinner);
+    try {
+      const u = document.getElementById('loginUser').value.trim();
+      const p = document.getElementById('loginPass').value;
+      await BNH.login(u, p);
+      location.href = 'app.html';
+    } catch (err) {
+      document.getElementById('loginErr').textContent = err.message;
+    } finally { hide(spinner); }
+  };
+
+  document.getElementById('regForm').onsubmit = async e => {
+    e.preventDefault();
+    document.getElementById('regErr').textContent = '';
+    show(spinner);
+    try {
+      await BNH.register({
+        name: document.getElementById('regName').value.trim(),
+        mobile: document.getElementById('regMobile').value.trim(),
+        username: document.getElementById('regUser').value.trim(),
+        password: document.getElementById('regPass').value,
+      });
+      alert('Registration submitted. Wait for admin approval.');
+      hide(regCard); show(loginCard);
+    } catch (err) {
+      document.getElementById('regErr').textContent = err.message;
+    } finally { hide(spinner); }
+  };
+</script>
+</body>
+</html>
