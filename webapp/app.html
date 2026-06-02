@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bhagirathy Nursing Home</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<header class="topbar">
+  <button class="hamburger" id="hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="brand-row">
+    <div class="logo-circle small">B</div>
+    <div>
+      <div class="brand-title">Bhagirathy Nursing Home</div>
+      <div class="brand-sub" id="pageTitle">Dashboard</div>
+    </div>
+  </div>
+  <div class="user-chip">
+    <span id="uChipName"></span>
+    <span class="role-badge" id="uChipRole"></span>
+    <button class="btn-ghost" id="btnPwd">Change Password</button>
+    <button class="btn-ghost" id="btnLogout">Logout</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-user">
+      <div class="avatar" id="avatar">U</div>
+      <div>
+        <div class="side-name" id="sideName"></div>
+        <div class="side-role" id="sideRole"></div>
+      </div>
+    </div>
+    <nav id="menu"></nav>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+  <main class="content">
+    <iframe id="frame" src="pages/home.html" title="content"></iframe>
+  </main>
+</div>
+
+<!-- Password modal -->
+<div class="modal hidden" id="pwdModal">
+  <div class="modal-card">
+    <h3>Change Password</h3>
+    <form id="pwdForm">
+      <label>Current Password</label>
+      <input type="password" id="pwdCur" required />
+      <label>New Password</label>
+      <input type="password" id="pwdNew" minlength="6" required />
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="pwdCancel">Cancel</button>
+        <button type="submit" class="btn-primary">Update</button>
+      </div>
+      <p class="err" id="pwdErr"></p>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/menu.js"></script>
+<script>
+  const spinner = document.getElementById('spinner');
+  const show = el => el.classList.remove('hidden');
+  const hide = el => el.classList.add('hidden');
+
+  const user = BNH.getCurrentUser();
+  if (!user) { location.href = 'index.html'; }
+
+  // Header user
+  document.getElementById('uChipName').textContent = user.name;
+  document.getElementById('uChipRole').textContent = user.role;
+  document.getElementById('sideName').textContent = user.name;
+  document.getElementById('sideRole').textContent = user.role;
+  document.getElementById('avatar').textContent = (user.name || 'U').charAt(0).toUpperCase();
+
+  // Build menu
+  BNH_MENU.render(user.role, document.getElementById('menu'), (item) => {
+    document.getElementById('frame').src = item.page;
+    document.getElementById('pageTitle').textContent = item.label;
+    closeSidebar();
+  });
+
+  // Hamburger
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('backdrop');
+  const openSidebar = () => { sidebar.classList.add('open'); backdrop.classList.add('show'); };
+  const closeSidebar = () => { sidebar.classList.remove('open'); backdrop.classList.remove('show'); };
+  document.getElementById('hamburger').onclick = () => sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+  backdrop.onclick = closeSidebar;
+
+  // Logout
+  document.getElementById('btnLogout').onclick = () => {
+    BNH.logout();
+    location.href = 'index.html';
+  };
+
+  // Password modal
+  const pwdModal = document.getElementById('pwdModal');
+  document.getElementById('btnPwd').onclick = () => show(pwdModal);
+  document.getElementById('pwdCancel').onclick = () => hide(pwdModal);
+  document.getElementById('pwdForm').onsubmit = async e => {
+    e.preventDefault();
+    document.getElementById('pwdErr').textContent = '';
+    show(spinner);
+    try {
+      await BNH.changePassword(
+        document.getElementById('pwdCur').value,
+        document.getElementById('pwdNew').value
+      );
+      alert('Password updated.');
+      hide(pwdModal);
+      document.getElementById('pwdForm').reset();
+    } catch (err) {
+      document.getElementById('pwdErr').textContent = err.message;
+    } finally { hide(spinner); }
+  };
+</script>
+</body>
+</html>
