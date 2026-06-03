@@ -33,7 +33,8 @@
 { label: "Voucher",            icon: "🧾", page: "pages/pharmacy-voucher.html",        roles: ["admin","accountant","pharmacy","manager"] },
 { label: "Pharmacy Reports",   icon: "📊", page: "pages/pharmacy-reports.html",        roles: ["admin","accountant","pharmacy","manager","viewer"] },
 { label: "Pharmacy Setup",     icon: "⚙️", page: "pages/pharmacy-setup.html",          roles: ["admin","manager"] },
-{ label: "Extra Pay",          icon: "💰", page: "pages/pharmacy-extra-pay.html",      roles: ["admin","accountant","pharmacy","manager"] }
+{ label: "Extra Pay",          icon: "💰", page: "pages/pharmacy-extra-pay.html",      roles: ["admin","accountant","pharmacy","manager"] },
+{ label: "Manage Suppliers", icon: "🗂️", page: "pages/pharmacy-manage-suppliers.html", roles: ["admin","manager","accountant"] }
 
   ];
 
