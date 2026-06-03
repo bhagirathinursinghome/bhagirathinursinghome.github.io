@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Extra Pay – Pharmacy</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .tab-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+    .tab-btn { padding:.5rem 1.1rem; border:2px solid #6366f1; border-radius:8px; background:#fff;
+               color:#6366f1; font-weight:600; cursor:pointer; transition:all .2s; }
+    .tab-btn.active { background:#6366f1; color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .form-row > * { flex:1; min-width:160px; }
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; }
+    th { background:#f0f0f0; padding:7px 8px; text-align:left; font-size:.82rem; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; font-size:.82rem; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+    .due-badge { display:inline-block;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600;background:#fee2e2;color:#991b1b; }
+    @media print { .tab-bar,button { display:none!important; } }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>💰 Extra Pay</h1>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('t1',this)">Amount Given</button>
+    <button class="tab-btn" onclick="switchTab('t2',this);loadDueClearDropdown()">Due Clear</button>
+    <button class="tab-btn" onclick="switchTab('t3',this)">Report</button>
+  </div>
+
+  <!-- ============ TAB 1: AMOUNT GIVEN ============ -->
+  <div id="t1" class="tab-panel active page-card">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">➕ Amount Given</h2>
+    <form id="givenForm">
+      <label>Recorded By</label>
+      <input id="recBy1" readonly />
+
+      <div class="form-row">
+        <div>
+          <label>Date <span style="color:red">*</span></label>
+          <input id="givenDate" type="date" required />
+        </div>
+        <div>
+          <label>Pay To (Name) <span style="color:red">*</span></label>
+          <input id="payToName" type="text" placeholder="Person's name" required />
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Pay For <span style="color:red">*</span></label>
+          <input id="payFor" type="text" placeholder="Purpose" required />
+        </div>
+        <div>
+          <label>Amount (₹) <span style="color:red">*</span></label>
+          <input id="givenAmount" type="number" min="0.01" step="0.01" required />
+        </div>
+        <div>
+          <label>Mode <span style="color:red">*</span></label>
+          <select id="givenMode" required>
+            <option value="">-- Mode --</option>
+            <option value="Cash">Cash</option>
+            <option value="Bank">Bank</option>
+            <option value="PhonePe">PhonePe</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:1rem">
+        <button type="submit" class="btn-primary" style="width:auto">💾 Save</button>
+      </div>
+      <p class="err" id="err1"></p>
+      <p class="info" id="ok1" style="display:none"></p>
+    </form>
+
+    <div style="margin-top:1rem">
+      <strong style="font-size:.85rem">Recent Given</strong>
+      <div id="givenList" style="font-size:.82rem;color:#555;margin-top:.5rem">Loading…</div>
+    </div>
+  </div>
+
+  <!-- ============ TAB 2: DUE CLEAR ============ -->
+  <div id="t2" class="tab-panel page-card">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">✅ Due Clear</h2>
+    <form id="clearForm">
+      <label>Recorded By</label>
+      <input id="recBy2" readonly />
+
+      <div class="form-row">
+        <div>
+          <label>Date <span style="color:red">*</span></label>
+          <input id="clearDate" type="date" required />
+        </div>
+        <div>
+          <label>Name (Pending Due) <span style="color:red">*</span></label>
+          <select id="clearName" required>
+            <option value="">-- Select Person --</option>
+          </select>
+        </div>
+      </div>
+      <div id="dueInfo" style="font-size:.82rem;color:#dc2626;margin:.25rem 0 .5rem;font-weight:600"></div>
+
+      <div class="form-row">
+        <div>
+          <label>Voucher Amount (₹)</label>
+          <input id="clearVoucher" type="number" min="0" step="0.01" placeholder="0.00" />
+        </div>
+        <div>
+          <label>Cash Return (₹)</label>
+          <input id="clearCash" type="number" min="0" step="0.01" placeholder="0.00" />
+        </div>
+      </div>
+
+      <label>Remark</label>
+      <textarea id="clearRemark" rows="2" placeholder="Optional…"></textarea>
+
+      <div style="margin-top:1rem">
+        <button type="submit" class="btn-primary" style="width:auto">💾 Save Due Clear</button>
+      </div>
+      <p class="err" id="err2"></p>
+      <p class="info" id="ok2" style="display:none"></p>
+    </form>
+  </div>
+
+  <!-- ============ TAB 3: REPORT ============ -->
+  <div id="t3" class="tab-panel page-card">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">📊 Extra Pay Report</h2>
+    <div class="form-row" style="align-items:flex-end">
+      <div>
+        <label>From Date</label>
+        <input id="rptFrom" type="date" />
+      </div>
+      <div>
+        <label>To Date</label>
+        <input id="rptTo" type="date" />
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn-primary" style="width:auto" onclick="loadReport()">Show</button>
+        <button class="btn-primary" style="width:auto;background:#059669" onclick="downloadPDF()">⬇ PDF</button>
+      </div>
+    </div>
+
+    <!-- Pending dues summary -->
+    <div style="margin-top:1rem">
+      <strong style="font-size:.85rem">🔴 All Pending Dues</strong>
+      <div id="pendingDues" style="margin-top:.5rem">Loading…</div>
+    </div>
+    <div id="rptDetail" style="margin-top:1rem"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant","pharmacy","manager"]);
+
+  const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+  const today = new Date().toISOString().slice(0,10);
+  const monthStart = today.slice(0,7)+'-01';
+
+  document.getElementById('givenDate').value  = today;
+  document.getElementById('clearDate').value  = today;
+  document.getElementById('rptFrom').value    = monthStart;
+  document.getElementById('rptTo').value      = today;
+
+  ['recBy1','recBy2'].forEach(id => {
+    document.getElementById(id).value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+  });
+
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    btn.classList.add('active');
+    if (id === 't3') loadPendingDues();
+  }
+
+  // ---- Load given list ----
+  async function loadGiven() {
+    const { data } = await BNH_PAGE.sb.from('pharmacy_extra_pay_given')
+      .select('*').order('recorded_at', { ascending: false }).limit(10);
+    const div = document.getElementById('givenList');
+    if (!data||!data.length) { div.textContent='No records.'; return; }
+    div.innerHTML = `<table>
+      <thead><tr style="background:#f0f0f0">
+        <th>Date</th><th>Name</th><th>For</th><th class="r">Amount</th><th>Mode</th><th>By</th>
+      </tr></thead>
+      <tbody>${data.map(r=>`<tr>
+        <td>${r.given_date}</td><td>${r.pay_to_name}</td><td>${r.pay_for}</td>
+        <td class="r">${fmt(r.amount)}</td><td>${r.mode}</td>
+        <td>${r.recorded_by_name||r.recorded_by}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+  loadGiven();
+
+  // ---- Due clear dropdown: persons with outstanding balance ----
+  async function loadDueClearDropdown() {
+    const { data: given } = await BNH_PAGE.sb.from('pharmacy_extra_pay_given').select('pay_to_name, amount');
+    const { data: cleared } = await BNH_PAGE.sb.from('pharmacy_extra_pay_clear').select('clear_name, voucher_amount, cash_return');
+    const map = {};
+    (given||[]).forEach(r => {
+      if (!map[r.pay_to_name]) map[r.pay_to_name] = 0;
+      map[r.pay_to_name] += parseFloat(r.amount||0);
+    });
+    (cleared||[]).forEach(r => {
+      if (!map[r.clear_name]) map[r.clear_name] = 0;
+      map[r.clear_name] -= (parseFloat(r.voucher_amount||0) + parseFloat(r.cash_return||0));
+    });
+    const sel = document.getElementById('clearName');
+    sel.innerHTML = '<option value="">-- Select Person --</option>';
+    Object.entries(map).filter(([,v]) => v > 0).sort().forEach(([name, due]) => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name + ' (Due: ₹' + parseFloat(due).toLocaleString('en-IN',{minimumFractionDigits:2}) + ')';
+      opt.dataset.due = due;
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => {
+      const opt = sel.options[sel.selectedIndex];
+      document.getElementById('dueInfo').textContent = opt.dataset.due
+        ? 'Current Due: ' + fmt(opt.dataset.due)
+        : '';
+    };
+  }
+
+  // ---- Submit given ----
+  document.getElementById('givenForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const err=document.getElementById('err1'), ok=document.getElementById('ok1');
+    err.textContent=''; ok.style.display='none';
+    document.getElementById('spinner').classList.remove('hidden');
+    try {
+      const payload = BNH_PAGE.stamp({
+        given_date: document.getElementById('givenDate').value,
+        pay_to_name: document.getElementById('payToName').value.trim(),
+        pay_for: document.getElementById('payFor').value.trim(),
+        amount: parseFloat(document.getElementById('givenAmount').value),
+        mode: document.getElementById('givenMode').value
+      });
+      const { error } = await BNH_PAGE.sb.from('pharmacy_extra_pay_given').insert(payload);
+      if (error) throw error;
+      ok.style.display='block'; ok.textContent='✅ Saved!';
+      e.target.reset();
+      document.getElementById('givenDate').value=today;
+      document.getElementById('recBy1').value=BNH_PAGE.user.name+' ('+BNH_PAGE.user.username+')';
+      loadGiven();
+    } catch(ex) { err.textContent=ex.message; }
+    finally { document.getElementById('spinner').classList.add('hidden'); }
+  };
+
+  // ---- Submit due clear ----
+  document.getElementById('clearForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const err=document.getElementById('err2'), ok=document.getElementById('ok2');
+    err.textContent=''; ok.style.display='none';
+    const voucher = parseFloat(document.getElementById('clearVoucher').value||0);
+    const cash    = parseFloat(document.getElementById('clearCash').value||0);
+    if (voucher+cash <= 0) { err.textContent='Enter voucher amount or cash return.'; return; }
+    document.getElementById('spinner').classList.remove('hidden');
+    try {
+      const payload = BNH_PAGE.stamp({
+        clear_date: document.getElementById('clearDate').value,
+        clear_name: document.getElementById('clearName').value,
+        voucher_amount: voucher,
+        cash_return: cash,
+        remark: document.getElementById('clearRemark').value.trim()||null
+      });
+      const { error } = await BNH_PAGE.sb.from('pharmacy_extra_pay_clear').insert(payload);
+      if (error) throw error;
+      ok.style.display='block'; ok.textContent='✅ Due clear saved!';
+      e.target.reset();
+      document.getElementById('clearDate').value=today;
+      document.getElementById('recBy2').value=BNH_PAGE.user.name+' ('+BNH_PAGE.user.username+')';
+      document.getElementById('dueInfo').textContent='';
+      loadDueClearDropdown();
+    } catch(ex) { err.textContent=ex.message; }
+    finally { document.getElementById('spinner').classList.add('hidden'); }
+  };
+
+  // ---- Pending dues summary ----
+  async function loadPendingDues() {
+    const [{ data: given }, { data: cleared }] = await Promise.all([
+      BNH_PAGE.sb.from('pharmacy_extra_pay_given').select('pay_to_name, amount'),
+      BNH_PAGE.sb.from('pharmacy_extra_pay_clear').select('clear_name, voucher_amount, cash_return')
+    ]);
+    const map = {};
+    (given||[]).forEach(r => {
+      if (!map[r.pay_to_name]) map[r.pay_to_name]=0;
+      map[r.pay_to_name]+=parseFloat(r.amount||0);
+    });
+    (cleared||[]).forEach(r => {
+      if (!map[r.clear_name]) map[r.clear_name]=0;
+      map[r.clear_name]-=(parseFloat(r.voucher_amount||0)+parseFloat(r.cash_return||0));
+    });
+    const dues = Object.entries(map).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+    const div = document.getElementById('pendingDues');
+    if (!dues.length) { div.textContent='No pending dues. 🎉'; return; }
+    div.innerHTML = `<table>
+      <thead><tr style="background:#fee2e2"><th>#</th><th>Name</th><th class="r">Due Amount</th></tr></thead>
+      <tbody>${dues.map(([name,due],i)=>`<tr>
+        <td>${i+1}</td><td>${name}</td>
+        <td class="r" style="color:#dc2626;font-weight:600">${fmt(due)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+  loadPendingDues();
+
+  // ---- Detailed report ----
+  async function loadReport() {
+    const from = document.getElementById('rptFrom').value;
+    const to   = document.getElementById('rptTo').value;
+    document.getElementById('spinner').classList.remove('hidden');
+    const [{ data: given }, { data: cleared }] = await Promise.all([
+      BNH_PAGE.sb.from('pharmacy_extra_pay_given').select('*').gte('given_date',from).lte('given_date',to).order('given_date'),
+      BNH_PAGE.sb.from('pharmacy_extra_pay_clear').select('*').gte('clear_date',from).lte('clear_date',to).order('clear_date')
+    ]);
+    document.getElementById('spinner').classList.add('hidden');
+
+    const totalGiven   = (given||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const totalVoucher = (cleared||[]).reduce((a,r)=>a+parseFloat(r.voucher_amount||0),0);
+    const totalCash    = (cleared||[]).reduce((a,r)=>a+parseFloat(r.cash_return||0),0);
+
+    document.getElementById('rptDetail').innerHTML = `
+      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">💸 Amounts Given (${from} – ${to})</h3>
+      <table id="rptGiven">
+        <thead><tr><th>Date</th><th>Name</th><th>For</th><th class="r">Amount</th><th>Mode</th><th>By</th></tr></thead>
+        <tbody>${(given||[]).map(r=>`<tr>
+          <td>${r.given_date}</td><td>${r.pay_to_name}</td><td>${r.pay_for}</td>
+          <td class="r">${fmt(r.amount)}</td><td>${r.mode}</td>
+          <td>${r.recorded_by_name||r.recorded_by}</td>
+        </tr>`).join('') || '<tr><td colspan="6" style="text-align:center">None</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="3">Total</td><td class="r">${fmt(totalGiven)}</td><td colspan="2"></td></tr></tfoot>
+      </table>
+
+      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">✅ Due Cleared (${from} – ${to})</h3>
+      <table id="rptCleared">
+        <thead><tr><th>Date</th><th>Name</th><th class="r">Voucher</th><th class="r">Cash Return</th><th>Remark</th><th>By</th></tr></thead>
+        <tbody>${(cleared||[]).map(r=>`<tr>
+          <td>${r.clear_date}</td><td>${r.clear_name}</td>
+          <td class="r">${fmt(r.voucher_amount)}</td><td class="r">${fmt(r.cash_return)}</td>
+          <td>${r.remark||'-'}</td><td>${r.recorded_by_name||r.recorded_by}</td>
+        </tr>`).join('') || '<tr><td colspan="6" style="text-align:center">None</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="2">Total</td><td class="r">${fmt(totalVoucher)}</td><td class="r">${fmt(totalCash)}</td><td colspan="2"></td></tr></tfoot>
+      </table>`;
+  }
+
+  async function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    doc.setFontSize(14);
+    doc.text('Bhagirathy Nursing Home – Pharmacy', 15, 15);
+    doc.setFontSize(11);
+    doc.text('Extra Pay Report', 15, 22);
+    doc.setFontSize(8);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN'), 15, 28);
+    let y = 34;
+
+    const tables = ['pendingDues','rptGiven','rptCleared'];
+    for (const id of tables) {
+      const tbl = document.getElementById(id)?.querySelector('table') || document.getElementById(id);
+      if (tbl && tbl.tagName==='TABLE') {
+        doc.autoTable({ html: tbl, startY: y, styles:{fontSize:8}, headStyles:{fillColor:[99,102,241]}, margin:{left:15,right:15} });
+        y = doc.lastAutoTable.finalY + 6;
+      }
+    }
+    doc.save('Extra_Pay_Report_' + today + '.pdf');
+  }
+</script>
+</body>
+</html>

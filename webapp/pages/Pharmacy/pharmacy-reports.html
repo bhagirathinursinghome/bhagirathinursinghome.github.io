@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Reports – Pharmacy</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .tab-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+    .tab-btn { padding:.5rem 1.1rem; border:2px solid #6366f1; border-radius:8px; background:#fff;
+               color:#6366f1; font-weight:600; cursor:pointer; transition:all .2s; }
+    .tab-btn.active { background:#6366f1; color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; }
+    .form-row > * { flex:1; min-width:160px; }
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; }
+    th { background:#f0f0f0; padding:7px 8px; text-align:left; font-size:.82rem; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; font-size:.82rem; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+    .dl-btn { margin-top:.75rem; }
+    @media print { .tab-bar,.dl-btn,button { display:none!important; } }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>📊 Pharmacy Reports</h1>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('r1',this)">Supplier Due</button>
+    <button class="tab-btn" onclick="switchTab('r2',this)">Supplier Ledger</button>
+    <button class="tab-btn" onclick="switchTab('r3',this)">Sale &amp; Purchase</button>
+  </div>
+
+  <!-- ============ REPORT 1: SUPPLIER DUE ============ -->
+  <div id="r1" class="tab-panel active page-card">
+    <h2 style="font-size:1rem;margin-bottom:1rem">📑 Supplier Due Report</h2>
+    <button class="btn-primary dl-btn" style="width:auto" onclick="loadSupplierDue()">🔄 Refresh</button>
+    <button class="btn-primary dl-btn" style="width:auto;background:#059669;margin-left:.5rem" onclick="downloadPDF('supplierDueTable','Supplier Due Report')">⬇ Download PDF</button>
+    <div id="supplierDueOut" style="margin-top:1rem">Click Refresh to load.</div>
+  </div>
+
+  <!-- ============ REPORT 2: SUPPLIER LEDGER ============ -->
+  <div id="r2" class="tab-panel page-card">
+    <h2 style="font-size:1rem;margin-bottom:1rem">📒 Supplier Ledger</h2>
+    <div class="form-row">
+      <div>
+        <label>Supplier</label>
+        <select id="ledgerSupplier">
+          <option value="">-- Select Supplier --</option>
+        </select>
+      </div>
+      <div>
+        <label>From Date</label>
+        <input id="ledgerFrom" type="date" />
+      </div>
+      <div>
+        <label>To Date</label>
+        <input id="ledgerTo" type="date" />
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:.5rem">
+        <button class="btn-primary" style="width:auto" onclick="loadLedger()">Show</button>
+        <button class="btn-primary" style="width:auto;background:#059669" onclick="downloadPDF('ledgerTable','Supplier Ledger')">⬇ PDF</button>
+      </div>
+    </div>
+    <div id="ledgerOut" style="margin-top:1rem">Select supplier and date range, then click Show.</div>
+  </div>
+
+  <!-- ============ REPORT 3: SALE & PURCHASE ============ -->
+  <div id="r3" class="tab-panel page-card">
+    <h2 style="font-size:1rem;margin-bottom:1rem">📈 Sale &amp; Purchase Report (Trading Account)</h2>
+    <div class="form-row">
+      <div>
+        <label>From Date</label>
+        <input id="tradeFrom" type="date" />
+      </div>
+      <div>
+        <label>To Date</label>
+        <input id="tradeTo" type="date" />
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:.5rem">
+        <button class="btn-primary" style="width:auto" onclick="loadTrade()">Show</button>
+        <button class="btn-primary" style="width:auto;background:#059669" onclick="downloadPDF('tradeOut','Sale-Purchase Report')">⬇ PDF</button>
+      </div>
+    </div>
+    <div id="tradeOut" style="margin-top:1rem">Select date range, then click Show.</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant","pharmacy","manager","viewer"]);
+
+  const fmt = (n) => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+
+  // Tab switching
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // -------- Load suppliers into ledger dropdown --------
+  async function initDropdowns() {
+    const { data } = await BNH_PAGE.sb.from('pharmacy_suppliers')
+      .select('supplier_name').order('supplier_name');
+    const sel = document.getElementById('ledgerSupplier');
+    (data||[]).forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.supplier_name; o.textContent = s.supplier_name;
+      sel.appendChild(o);
+    });
+  }
+  initDropdowns();
+
+  // Default date range: this month
+  const today = new Date().toISOString().slice(0,10);
+  const monthStart = today.slice(0,7) + '-01';
+  ['ledgerFrom','ledgerTo','tradeFrom','tradeTo'].forEach(id => {
+    document.getElementById(id).value = id.endsWith('From') ? monthStart : today;
+  });
+
+  // -------- REPORT 1: Supplier Due --------
+  async function loadSupplierDue() {
+    document.getElementById('spinner').classList.remove('hidden');
+    const [{ data: suppliers }, { data: purchases }, { data: payments }] = await Promise.all([
+      BNH_PAGE.sb.from('pharmacy_suppliers').select('supplier_name, opening_balance').order('supplier_name'),
+      BNH_PAGE.sb.from('pharmacy_purchases').select('supplier_name, amount'),
+      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('supplier_name, amount')
+    ]);
+    document.getElementById('spinner').classList.add('hidden');
+
+    const rows = (suppliers||[]).map(s => {
+      const op = parseFloat(s.opening_balance||0);
+      const pur = (purchases||[]).filter(p=>p.supplier_name===s.supplier_name).reduce((a,p)=>a+parseFloat(p.amount||0),0);
+      const pay = (payments||[]).filter(p=>p.supplier_name===s.supplier_name).reduce((a,p)=>a+parseFloat(p.amount||0),0);
+      const due = op + pur - pay;
+      return { name: s.supplier_name, op, pur, pay, due };
+    });
+
+    const total = rows.reduce((a,r)=>({op:a.op+r.op,pur:a.pur+r.pur,pay:a.pay+r.pay,due:a.due+r.due}),{op:0,pur:0,pay:0,due:0});
+
+    document.getElementById('supplierDueOut').innerHTML = `
+      <table id="supplierDueTable">
+        <thead><tr><th>#</th><th>Supplier</th><th class="r">Op. Bal</th><th class="r">Purchase</th><th class="r">Payment</th><th class="r">Due</th></tr></thead>
+        <tbody>${rows.map((r,i)=>`<tr>
+          <td>${i+1}</td><td>${r.name}</td>
+          <td class="r">${fmt(r.op)}</td><td class="r">${fmt(r.pur)}</td>
+          <td class="r">${fmt(r.pay)}</td>
+          <td class="r" style="color:${r.due>0?'#dc2626':'#059669'};font-weight:600">${fmt(r.due)}</td>
+        </tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="2">Total</td>
+          <td class="r">${fmt(total.op)}</td><td class="r">${fmt(total.pur)}</td>
+          <td class="r">${fmt(total.pay)}</td><td class="r">${fmt(total.due)}</td>
+        </tr></tfoot>
+      </table>`;
+  }
+
+  // -------- REPORT 2: Supplier Ledger --------
+  async function loadLedger() {
+    const sup = document.getElementById('ledgerSupplier').value;
+    const from = document.getElementById('ledgerFrom').value;
+    const to   = document.getElementById('ledgerTo').value;
+    const out  = document.getElementById('ledgerOut');
+    if (!sup) { out.textContent = 'Please select a supplier.'; return; }
+
+    document.getElementById('spinner').classList.remove('hidden');
+    const [{ data: sData }, { data: purch }, { data: pymts }] = await Promise.all([
+      BNH_PAGE.sb.from('pharmacy_suppliers').select('opening_balance').eq('supplier_name', sup).single(),
+      BNH_PAGE.sb.from('pharmacy_purchases').select('*').eq('supplier_name', sup).gte('purchase_date', from).lte('purchase_date', to).order('purchase_date'),
+      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('*').eq('supplier_name', sup).gte('pay_date', from).lte('pay_date', to).order('pay_date')
+    ]);
+    document.getElementById('spinner').classList.add('hidden');
+
+    const opBal = parseFloat(sData?.opening_balance||0);
+    let rows = [];
+    (purch||[]).forEach(r => rows.push({ date: r.purchase_date, desc: 'Purchase', dr: parseFloat(r.amount), cr: 0, raw: r }));
+    (pymts||[]).forEach(r => rows.push({ date: r.pay_date, desc: 'Payment (' + r.mode + ')', dr: 0, cr: parseFloat(r.amount), raw: r }));
+    rows.sort((a,b) => a.date.localeCompare(b.date));
+
+    let bal = opBal;
+    let tableRows = '';
+    rows.forEach((r,i) => {
+      bal += r.dr - r.cr;
+      tableRows += `<tr>
+        <td>${i+1}</td><td>${r.date}</td><td>${r.desc}</td>
+        <td class="r">${r.dr ? fmt(r.dr) : '-'}</td>
+        <td class="r">${r.cr ? fmt(r.cr) : '-'}</td>
+        <td class="r" style="font-weight:600">${fmt(bal)}</td>
+      </tr>`;
+    });
+
+    out.innerHTML = `
+      <p style="font-size:.85rem;color:#555">Opening Balance: <strong>${fmt(opBal)}</strong> &nbsp;|&nbsp; Period: ${from} to ${to}</p>
+      <table id="ledgerTable">
+        <thead><tr><th>#</th><th>Date</th><th>Description</th><th class="r">Dr (Purchase)</th><th class="r">Cr (Payment)</th><th class="r">Balance</th></tr></thead>
+        <tbody>${tableRows || '<tr><td colspan="6" style="text-align:center">No transactions in this period.</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="5" style="text-align:right">Closing Balance</td><td class="r">${fmt(bal)}</td></tr></tfoot>
+      </table>`;
+  }
+
+  // -------- REPORT 3: Trading / Sale Purchase --------
+  async function loadTrade() {
+    const from = document.getElementById('tradeFrom').value;
+    const to   = document.getElementById('tradeTo').value;
+    const out  = document.getElementById('tradeOut');
+    document.getElementById('spinner').classList.remove('hidden');
+
+    const [{ data: setup }, { data: purch }, { data: sales }, { data: vouchers }, { data: payments }] = await Promise.all([
+      BNH_PAGE.sb.from('pharmacy_setup').select('*').single(),
+      BNH_PAGE.sb.from('pharmacy_purchases').select('amount').gte('purchase_date', from).lte('purchase_date', to),
+      BNH_PAGE.sb.from('pharmacy_sales').select('cost_price, sale_price, mode_of_payment').gte('sale_date', from).lte('sale_date', to),
+      BNH_PAGE.sb.from('pharmacy_vouchers').select('amount, mode').gte('voucher_date', from).lte('voucher_date', to),
+      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('amount, mode').gte('pay_date', from).lte('pay_date', to)
+    ]);
+    document.getElementById('spinner').classList.add('hidden');
+
+    const s = setup || {};
+    const opStock  = parseFloat(s.opening_stock||0);
+    const opCash   = parseFloat(s.opening_cash||0);
+    const opBank   = parseFloat(s.opening_bank||0);
+    const opPP     = parseFloat(s.opening_phonepe||0);
+    const opCred   = parseFloat(s.opening_creditor||0);
+
+    const totalPurch = (purch||[]).reduce((a,r) => a+parseFloat(r.amount||0), 0);
+    const totalSaleCost = (sales||[]).reduce((a,r) => a+parseFloat(r.cost_price||0), 0);
+    const totalSaleRev  = (sales||[]).reduce((a,r) => a+parseFloat(r.sale_price||0), 0);
+    const closingStock  = opStock + totalPurch - totalSaleCost;
+    const grossProfit   = totalSaleRev - totalSaleCost;
+
+    const vouchAmt = (vouchers||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const payAmt   = (payments||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const netProfit = grossProfit - vouchAmt - payAmt;
+
+    const saleByCash = (sales||[]).filter(r=>r.mode_of_payment==='Cash').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
+    const saleByBank = (sales||[]).filter(r=>r.mode_of_payment==='Bank').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
+    const saleByPP   = (sales||[]).filter(r=>r.mode_of_payment==='PhonePe').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
+
+    const vouchByCash = (vouchers||[]).filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const vouchByBank = (vouchers||[]).filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const vouchByPP   = (vouchers||[]).filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const payByCash   = (payments||[]).filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const payByBank   = (payments||[]).filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const payByPP     = (payments||[]).filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
+    const clCash = opCash + saleByCash - vouchByCash - payByCash;
+    const clBank = opBank + saleByBank - vouchByBank - payByBank;
+    const clPP   = opPP   + saleByPP   - vouchByPP   - payByPP;
+
+    // supplier due as closing creditor (approx)
+    const { data: allPurch } = await BNH_PAGE.sb.from('pharmacy_purchases').select('amount');
+    const { data: allPaymts } = await BNH_PAGE.sb.from('pharmacy_supplier_payments').select('amount');
+    const totalAllPurch = (allPurch||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const totalAllPaymts = (allPaymts||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const clCred = opCred + totalAllPurch - totalAllPaymts;
+
+    const row = (label, val, bold=false) => `<tr ${bold?'style="font-weight:700;background:#f9f9f9"':''}><td>${label}</td><td class="r">${fmt(val)}</td></tr>`;
+
+    out.innerHTML = `
+      <p style="font-size:.85rem;color:#555;margin-bottom:.75rem">Period: <strong>${from}</strong> to <strong>${to}</strong></p>
+      <div id="tradeOutPrint">
+      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">📦 Trading Account</h3>
+      <table><tbody>
+        ${row('Opening Stock', opStock)}
+        ${row('(+) Purchases', totalPurch)}
+        ${row('(–) Sale (Cost Price)', totalSaleCost)}
+        ${row('Closing Stock', closingStock, true)}
+        ${row('Sale Revenue', totalSaleRev)}
+        ${row('Gross Profit', grossProfit, true)}
+      </tbody></table>
+
+      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">💰 Profit & Loss</h3>
+      <table><tbody>
+        ${row('Gross Profit', grossProfit)}
+        ${row('(–) Voucher Expenses', vouchAmt)}
+        ${row('(–) Supplier Payments', payAmt)}
+        ${row('Net Profit', netProfit, true)}
+      </tbody></table>
+
+      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">🏦 Balance Summary</h3>
+      <table>
+        <thead><tr><th>Account</th><th class="r">Opening</th><th class="r">Closing</th></tr></thead>
+        <tbody>
+          <tr><td>Cash</td><td class="r">${fmt(opCash)}</td><td class="r">${fmt(clCash)}</td></tr>
+          <tr><td>Bank</td><td class="r">${fmt(opBank)}</td><td class="r">${fmt(clBank)}</td></tr>
+          <tr><td>PhonePe</td><td class="r">${fmt(opPP)}</td><td class="r">${fmt(clPP)}</td></tr>
+          <tr><td>Creditors</td><td class="r">${fmt(opCred)}</td><td class="r">${fmt(clCred)}</td></tr>
+          <tr><td>Stock</td><td class="r">${fmt(opStock)}</td><td class="r">${fmt(closingStock)}</td></tr>
+        </tbody>
+      </table>
+      </div>`;
+  }
+
+  // -------- PDF Download --------
+  function downloadPDF(elementId, title) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    doc.setFontSize(14);
+    doc.text('Bhagirathy Nursing Home – Pharmacy', 15, 15);
+    doc.setFontSize(11);
+    doc.text(title, 15, 22);
+    doc.setFontSize(8);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN'), 15, 28);
+
+    const tables = document.getElementById(elementId)?.querySelectorAll('table');
+    let y = 32;
+    if (tables && tables.length > 0) {
+      tables.forEach(tbl => {
+        doc.autoTable({ html: tbl, startY: y, styles:{ fontSize:8 }, headStyles:{ fillColor:[99,102,241] }, margin:{ left:15, right:15 } });
+        y = doc.lastAutoTable.finalY + 6;
+      });
+    }
+    doc.save(title.replace(/\s+/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+  }
+</script>
+</body>
+</html>
