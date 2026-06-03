@@ -26,14 +26,14 @@
 //  Place them in the order you want them in the sidebar
 // ============================================================
 
-{ label: "Pharmacy Purchase",  icon: "🛒", page: "pages/pharmacy/pharmacy-purchase-add.html",  roles: ["admin","accountant","pharmacy","manager"] },
-{ label: "Pharmacy Sale",      icon: "💊", page: "pages/pharmacy/pharmacy-sale-add.html",       roles: ["admin","accountant","pharmacy","manager"] },
-{ label: "Add Supplier",       icon: "🏭", page: "pages/pharmacy/pharmacy-add-supplier.html",   roles: ["admin","accountant","pharmacy","manager"] },
-{ label: "Supplier Payment",   icon: "💳", page: "pages/pharmacy/pharmacy-payment.html",        roles: ["admin","accountant","pharmacy","manager"] },
-{ label: "Voucher",            icon: "🧾", page: "pages/pharmacy/pharmacy-voucher.html",        roles: ["admin","accountant","pharmacy","manager"] },
-{ label: "Pharmacy Reports",   icon: "📊", page: "pages/pharmacy/pharmacy-reports.html",        roles: ["admin","accountant","pharmacy","manager","viewer"] },
-{ label: "Pharmacy Setup",     icon: "⚙️", page: "pages/pharmacy/pharmacy-setup.html",          roles: ["admin","manager"] },
-{ label: "Extra Pay",          icon: "💰", page: "pages/pharmacy/pharmacy-extra-pay.html",      roles: ["admin","accountant","pharmacy","manager"] }
+{ label: "Pharmacy Purchase",  icon: "🛒", page: "pages/Pharmacy/pharmacy-purchase-add.html",  roles: ["admin","accountant","pharmacy","manager"] },
+{ label: "Pharmacy Sale",      icon: "💊", page: "pages/Pharmacy/pharmacy-sale-add.html",       roles: ["admin","accountant","pharmacy","manager"] },
+{ label: "Add Supplier",       icon: "🏭", page: "pages/Pharmacy/pharmacy-add-supplier.html",   roles: ["admin","accountant","pharmacy","manager"] },
+{ label: "Supplier Payment",   icon: "💳", page: "pages/Pharmacy/pharmacy-payment.html",        roles: ["admin","accountant","pharmacy","manager"] },
+{ label: "Voucher",            icon: "🧾", page: "pages/Pharmacy/pharmacy-voucher.html",        roles: ["admin","accountant","pharmacy","manager"] },
+{ label: "Pharmacy Reports",   icon: "📊", page: "pages/Pharmacy/pharmacy-reports.html",        roles: ["admin","accountant","pharmacy","manager","viewer"] },
+{ label: "Pharmacy Setup",     icon: "⚙️", page: "pages/Pharmacy/pharmacy-setup.html",          roles: ["admin","manager"] },
+{ label: "Extra Pay",          icon: "💰", page: "pages/Pharmacy/pharmacy-extra-pay.html",      roles: ["admin","accountant","pharmacy","manager"] }
 
   ];
 
