@@ -214,59 +214,99 @@
     const out  = document.getElementById('tradeOut');
     document.getElementById('spinner').classList.remove('hidden');
 
-    const [{ data: setup }, { data: purch }, { data: sales }, { data: vouchers }, { data: payments }] = await Promise.all([
+    // Fetch everything needed in parallel
+    const [
+      { data: setup },
+      { data: suppliers },
+      { data: purch },
+      { data: sales },
+      { data: vouchers },
+      { data: payments },
+      { data: allPurch },   // ALL purchases ever (for creditor closing)
+      { data: allPaymts }   // ALL payments ever (for creditor closing)
+    ] = await Promise.all([
       BNH_PAGE.sb.from('pharmacy_setup').select('*').single(),
-      BNH_PAGE.sb.from('pharmacy_purchases').select('amount').gte('purchase_date', from).lte('purchase_date', to),
+      BNH_PAGE.sb.from('pharmacy_suppliers').select('supplier_name, opening_balance'),
+      BNH_PAGE.sb.from('pharmacy_purchases').select('amount, supplier_name').gte('purchase_date', from).lte('purchase_date', to),
       BNH_PAGE.sb.from('pharmacy_sales').select('cost_price, sale_price, mode_of_payment').gte('sale_date', from).lte('sale_date', to),
       BNH_PAGE.sb.from('pharmacy_vouchers').select('amount, mode').gte('voucher_date', from).lte('voucher_date', to),
-      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('amount, mode').gte('pay_date', from).lte('pay_date', to)
+      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('amount, mode, supplier_name').gte('pay_date', from).lte('pay_date', to),
+      BNH_PAGE.sb.from('pharmacy_purchases').select('amount, supplier_name, purchase_date'),
+      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('amount, supplier_name, pay_date')
     ]);
     document.getElementById('spinner').classList.add('hidden');
 
     const s = setup || {};
-    const opStock  = parseFloat(s.opening_stock||0);
-    const opCash   = parseFloat(s.opening_cash||0);
-    const opBank   = parseFloat(s.opening_bank||0);
-    const opPP     = parseFloat(s.opening_phonepe||0);
-    const opCred   = parseFloat(s.opening_creditor||0);
+    const opStock = parseFloat(s.opening_stock||0);
+    const opCash  = parseFloat(s.opening_cash||0);
+    const opBank  = parseFloat(s.opening_bank||0);
+    const opPP    = parseFloat(s.opening_phonepe||0);
 
-    const totalPurch = (purch||[]).reduce((a,r) => a+parseFloat(r.amount||0), 0);
+    // ── Trading Account ──────────────────────────────────
+    const totalPurch    = (purch||[]).reduce((a,r) => a+parseFloat(r.amount||0), 0);
     const totalSaleCost = (sales||[]).reduce((a,r) => a+parseFloat(r.cost_price||0), 0);
     const totalSaleRev  = (sales||[]).reduce((a,r) => a+parseFloat(r.sale_price||0), 0);
     const closingStock  = opStock + totalPurch - totalSaleCost;
     const grossProfit   = totalSaleRev - totalSaleCost;
 
-    const vouchAmt = (vouchers||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-    const payAmt   = (payments||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    // ── P&L ──────────────────────────────────────────────
+    const vouchAmt  = (vouchers||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const payAmt    = (payments||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const netProfit = grossProfit - vouchAmt - payAmt;
 
-    const saleByCash = (sales||[]).filter(r=>r.mode_of_payment==='Cash').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
-    const saleByBank = (sales||[]).filter(r=>r.mode_of_payment==='Bank').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
-    const saleByPP   = (sales||[]).filter(r=>r.mode_of_payment==='PhonePe').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
-
+    // ── Cash / Bank / PhonePe balances ───────────────────
+    const saleByCash  = (sales||[]).filter(r=>r.mode_of_payment==='Cash').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
+    const saleByBank  = (sales||[]).filter(r=>r.mode_of_payment==='Bank').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
+    const saleByPP    = (sales||[]).filter(r=>r.mode_of_payment==='PhonePe').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
     const vouchByCash = (vouchers||[]).filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const vouchByBank = (vouchers||[]).filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const vouchByPP   = (vouchers||[]).filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const payByCash   = (payments||[]).filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const payByBank   = (payments||[]).filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const payByPP     = (payments||[]).filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
-
     const clCash = opCash + saleByCash - vouchByCash - payByCash;
     const clBank = opBank + saleByBank - vouchByBank - payByBank;
     const clPP   = opPP   + saleByPP   - vouchByPP   - payByPP;
 
-    // supplier due as closing creditor (approx)
-    const { data: allPurch } = await BNH_PAGE.sb.from('pharmacy_purchases').select('amount');
-    const { data: allPaymts } = await BNH_PAGE.sb.from('pharmacy_supplier_payments').select('amount');
-    const totalAllPurch = (allPurch||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-    const totalAllPaymts = (allPaymts||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-    const clCred = opCred + totalAllPurch - totalAllPaymts;
+    // ── Creditors = Suppliers (opening + purchase - payment) ──
+    // Opening creditor = sum of each supplier's opening_balance
+    //   + all purchases BEFORE the selected from date
+    //   – all payments BEFORE the selected from date
+    const suppList = suppliers || [];
 
-    const row = (label, val, bold=false) => `<tr ${bold?'style="font-weight:700;background:#f9f9f9"':''}><td>${label}</td><td class="r">${fmt(val)}</td></tr>`;
+    // Total supplier opening balances
+    const totalSupOpBal = suppList.reduce((a,r)=>a+parseFloat(r.opening_balance||0), 0);
+
+    // Purchases and payments strictly BEFORE 'from' date (i.e. up to from-1)
+    const purchBeforeFrom = (allPurch||[]).filter(r => r.purchase_date < from).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const payBeforeFrom   = (allPaymts||[]).filter(r => r.pay_date   < from).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
+    // Opening creditor for the selected period
+    const opCred = totalSupOpBal + purchBeforeFrom - payBeforeFrom;
+
+    // Closing creditor = opening + purchases in period - payments in period
+    const clCred = opCred + totalPurch - payAmt;
+
+    // ── Per-supplier creditor breakdown ──────────────────
+    const suppRows = suppList.map(sup => {
+      const supOpBal   = parseFloat(sup.opening_balance||0);
+      const supPurBef  = (allPurch||[]).filter(r=>r.supplier_name===sup.supplier_name && r.purchase_date<from).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const supPayBef  = (allPaymts||[]).filter(r=>r.supplier_name===sup.supplier_name && r.pay_date<from).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const supOpCred  = supOpBal + supPurBef - supPayBef;
+
+      const supPurPer  = (purch||[]).filter(r=>r.supplier_name===sup.supplier_name).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const supPayPer  = (payments||[]).filter(r=>r.supplier_name===sup.supplier_name).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const supClCred  = supOpCred + supPurPer - supPayPer;
+      return { name: sup.supplier_name, opCred: supOpCred, pur: supPurPer, pay: supPayPer, clCred: supClCred };
+    }).filter(r => r.opCred !== 0 || r.pur !== 0 || r.pay !== 0 || r.clCred !== 0);
+
+    const row  = (label, val, bold=false, color='') =>
+      `<tr ${bold?'style="font-weight:700;background:#f9f9f9"':''}><td>${label}</td><td class="r" ${color?`style="color:${color};font-weight:700"`:''}>${fmt(val)}</td></tr>`;
 
     out.innerHTML = `
       <p style="font-size:.85rem;color:#555;margin-bottom:.75rem">Period: <strong>${from}</strong> to <strong>${to}</strong></p>
       <div id="tradeOutPrint">
+
       <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">📦 Trading Account</h3>
       <table><tbody>
         ${row('Opening Stock', opStock)}
@@ -274,15 +314,15 @@
         ${row('(–) Sale (Cost Price)', totalSaleCost)}
         ${row('Closing Stock', closingStock, true)}
         ${row('Sale Revenue', totalSaleRev)}
-        ${row('Gross Profit', grossProfit, true)}
+        ${row('Gross Profit', grossProfit, true, grossProfit>=0?'#059669':'#dc2626')}
       </tbody></table>
 
-      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">💰 Profit & Loss</h3>
+      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">💰 Profit &amp; Loss</h3>
       <table><tbody>
         ${row('Gross Profit', grossProfit)}
         ${row('(–) Voucher Expenses', vouchAmt)}
-        ${row('(–) Supplier Payments', payAmt)}
-        ${row('Net Profit', netProfit, true)}
+        ${row('(–) Supplier Payments (period)', payAmt)}
+        ${row('Net Profit', netProfit, true, netProfit>=0?'#059669':'#dc2626')}
       </tbody></table>
 
       <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">🏦 Balance Summary</h3>
@@ -292,10 +332,40 @@
           <tr><td>Cash</td><td class="r">${fmt(opCash)}</td><td class="r">${fmt(clCash)}</td></tr>
           <tr><td>Bank</td><td class="r">${fmt(opBank)}</td><td class="r">${fmt(clBank)}</td></tr>
           <tr><td>PhonePe</td><td class="r">${fmt(opPP)}</td><td class="r">${fmt(clPP)}</td></tr>
-          <tr><td>Creditors</td><td class="r">${fmt(opCred)}</td><td class="r">${fmt(clCred)}</td></tr>
+          <tr style="font-weight:700;background:#f9f9f9">
+            <td>Creditors (All Suppliers)</td>
+            <td class="r">${fmt(opCred)}</td>
+            <td class="r" style="color:${clCred>0?'#dc2626':'#059669'}">${fmt(clCred)}</td>
+          </tr>
           <tr><td>Stock</td><td class="r">${fmt(opStock)}</td><td class="r">${fmt(closingStock)}</td></tr>
         </tbody>
       </table>
+
+      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">🏭 Supplier-wise Creditor Breakup</h3>
+      <table id="supplierCreditorTable">
+        <thead><tr>
+          <th>#</th><th>Supplier</th>
+          <th class="r">Op. Due</th>
+          <th class="r">Purchase (period)</th>
+          <th class="r">Payment (period)</th>
+          <th class="r">Cl. Due</th>
+        </tr></thead>
+        <tbody>${suppRows.length ? suppRows.map((r,i)=>`<tr>
+          <td>${i+1}</td><td>${r.name}</td>
+          <td class="r">${fmt(r.opCred)}</td>
+          <td class="r">${fmt(r.pur)}</td>
+          <td class="r">${fmt(r.pay)}</td>
+          <td class="r" style="font-weight:700;color:${r.clCred>0?'#dc2626':'#059669'}">${fmt(r.clCred)}</td>
+        </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#9ca3af">No supplier activity in this period.</td></tr>'}</tbody>
+        <tfoot><tr>
+          <td colspan="2" style="text-align:right">Total</td>
+          <td class="r">${fmt(opCred)}</td>
+          <td class="r">${fmt(totalPurch)}</td>
+          <td class="r">${fmt(payAmt)}</td>
+          <td class="r" style="color:${clCred>0?'#dc2626':'#059669'}">${fmt(clCred)}</td>
+        </tr></tfoot>
+      </table>
+
       </div>`;
   }
 
@@ -323,3 +393,4 @@
 </script>
 </body>
 </html>
+
