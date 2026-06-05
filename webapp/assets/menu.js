@@ -15,7 +15,7 @@
 
 
      //---------------MARKETING------------------------------------
-     { label: "ENTER QUACK DOCTOR",       icon: "👨‍⚕️", page: "pages/gramin-visit.html",   roles: ["other"] },
+     { label: "Gramin Doctor Visit", icon: "🏥", page: "pages/gramin-visit.html",  roles: ["marketing", "manager", "admin", "other"] },
      { label: "QUACK DOCTOR",       icon: "👨‍⚕️", page: "pages/gramin-visit-manager.html",   roles: ["admin","accountant","manager"] },
 
  // ============================================================
