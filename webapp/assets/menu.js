@@ -12,6 +12,12 @@
     { label: "Pharmacy Setup",     icon: "⚙️", page: "pages/pharmacy-setup.html",          roles: ["admin"] },
     { label: "Admin Editor",       icon: "🔧", page: "pages/pharmacy-admin-editor.html",   roles: ["admin"] },
 
+
+
+     //---------------MARKETING------------------------------------
+     { label: "ENTER QUACK DOCTOR",       icon: "👨‍⚕️", page: "pages/gramin-visit.html",   roles: ["other"] },
+     { label: "QUACK DOCTOR",       icon: "👨‍⚕️", page: "pages/gramin-visit-manager.html",   roles: ["admin","accountant","manager"] },
+
  // ============================================================
 //  PHARMACY MODULE – menu.js entries
 //  Add these lines to the ITEMS array in assets/menu.js
