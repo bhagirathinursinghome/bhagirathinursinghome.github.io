@@ -18,6 +18,43 @@
      { label: "Gramin Doctor Visit", icon: "🏥", page: "pages/gramin-visit.html",  roles: ["marketing", "manager", "admin", "other"] },
      { label: "QUACK DOCTOR",       icon: "👨‍⚕️", page: "pages/gramin-visit-manager.html",   roles: ["admin","accountant","manager"] },
 
+
+//----=====ipd----===========---==---==-=---===
+      { label: "IPD – Refer Add",       icon: "🤝", page: "pages/ipd-refer-add.html",
+    roles: ["admin","accountant","reception","manager"] },
+
+  { label: "IPD – Admission",       icon: "🏥", page: "pages/ipd-admission.html",
+    roles: ["admin","accountant","reception","manager"] },
+
+  { label: "IPD – Doctor Entry",    icon: "👨‍⚕️", page: "pages/ipd-doctor-entry.html",
+    roles: ["admin","accountant","manager"] },
+
+  { label: "IPD – OT Entry",        icon: "🔬", page: "pages/ipd-ot-entry.html",
+    roles: ["admin","accountant","ot","manager"] },
+
+  { label: "IPD – Amount Entry",    icon: "💰", page: "pages/ipd-amount-entry.html",
+    roles: ["admin","accountant","manager"] },
+
+  { label: "IPD – Doctor Details",  icon: "📋", page: "pages/ipd-doctor-details.html",
+    roles: ["admin","accountant","manager","viewer"] },
+
+  { label: "IPD – Cash & Discharge",icon: "💵", page: "pages/ipd-cash-discharge.html",
+    roles: ["admin","accountant","manager"] },
+
+  { label: "IPD – Reports",         icon: "📊", page: "pages/ipd-reports.html",
+    roles: ["admin","accountant","manager","viewer"] },
+
+  { label: "IPD – Medicine Sale",   icon: "💊", page: "pages/ipd-medicine-sale.html",
+    roles: ["admin","accountant","pharmacy","manager"] },
+
+  { label: "IPD – Transactions",    icon: "🔄", page: "pages/ipd-transactions.html",
+    roles: ["admin","accountant","pharmacy","manager"] },
+     
+{ label: "IPD – Data Editor", icon: "🛠", page: "pages/ipd-data-editor.html",
+  roles: ["admin","manager"] },
+
+     
+
  // ============================================================
 //  PHARMACY MODULE – menu.js entries
 //  Add these lines to the ITEMS array in assets/menu.js
