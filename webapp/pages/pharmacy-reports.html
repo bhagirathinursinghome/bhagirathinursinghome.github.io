@@ -20,6 +20,11 @@
     .r { text-align:right; }
     tfoot td { font-weight:700; background:#f9f9f9; }
     .dl-btn { margin-top:.75rem; }
+    .summary-cards { display:flex; gap:.75rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .scard { flex:1; min-width:140px; background:#f8f9ff; border:1px solid #e0e7ff;
+             border-radius:8px; padding:.75rem; }
+    .scard .sc-label { font-size:.78rem; color:#6b7280; }
+    .scard .sc-val { font-size:1.1rem; font-weight:800; color:#312e81; margin-top:.2rem; }
     @media print { .tab-bar,.dl-btn,button { display:none!important; } }
   </style>
 </head>
@@ -33,13 +38,15 @@
     <button class="tab-btn active" onclick="switchTab('r1',this)">Supplier Due</button>
     <button class="tab-btn" onclick="switchTab('r2',this)">Supplier Ledger</button>
     <button class="tab-btn" onclick="switchTab('r3',this)">Sale &amp; Purchase</button>
+    <button class="tab-btn" onclick="switchTab('r4',this)">Bhagirathi (IPD Due)</button>
   </div>
 
   <!-- ============ REPORT 1: SUPPLIER DUE ============ -->
   <div id="r1" class="tab-panel active page-card">
     <h2 style="font-size:1rem;margin-bottom:1rem">📑 Supplier Due Report</h2>
     <button class="btn-primary dl-btn" style="width:auto" onclick="loadSupplierDue()">🔄 Refresh</button>
-    <button class="btn-primary dl-btn" style="width:auto;background:#059669;margin-left:.5rem" onclick="downloadPDF('supplierDueTable','Supplier Due Report')">⬇ Download PDF</button>
+    <button class="btn-primary dl-btn" style="width:auto;background:#059669;margin-left:.5rem"
+      onclick="downloadPDF('supplierDueTable','Supplier Due Report')">⬇ Download PDF</button>
     <div id="supplierDueOut" style="margin-top:1rem">Click Refresh to load.</div>
   </div>
 
@@ -49,21 +56,14 @@
     <div class="form-row">
       <div>
         <label>Supplier</label>
-        <select id="ledgerSupplier">
-          <option value="">-- Select Supplier --</option>
-        </select>
+        <select id="ledgerSupplier"><option value="">-- Select Supplier --</option></select>
       </div>
-      <div>
-        <label>From Date</label>
-        <input id="ledgerFrom" type="date" />
-      </div>
-      <div>
-        <label>To Date</label>
-        <input id="ledgerTo" type="date" />
-      </div>
+      <div><label>From Date</label><input id="ledgerFrom" type="date"/></div>
+      <div><label>To Date</label><input id="ledgerTo" type="date"/></div>
       <div style="display:flex;align-items:flex-end;gap:.5rem">
         <button class="btn-primary" style="width:auto" onclick="loadLedger()">Show</button>
-        <button class="btn-primary" style="width:auto;background:#059669" onclick="downloadPDF('ledgerTable','Supplier Ledger')">⬇ PDF</button>
+        <button class="btn-primary" style="width:auto;background:#059669"
+          onclick="downloadPDF('ledgerTable','Supplier Ledger')">⬇ PDF</button>
       </div>
     </div>
     <div id="ledgerOut" style="margin-top:1rem">Select supplier and date range, then click Show.</div>
@@ -73,20 +73,30 @@
   <div id="r3" class="tab-panel page-card">
     <h2 style="font-size:1rem;margin-bottom:1rem">📈 Sale &amp; Purchase Report (Trading Account)</h2>
     <div class="form-row">
-      <div>
-        <label>From Date</label>
-        <input id="tradeFrom" type="date" />
-      </div>
-      <div>
-        <label>To Date</label>
-        <input id="tradeTo" type="date" />
-      </div>
+      <div><label>From Date</label><input id="tradeFrom" type="date"/></div>
+      <div><label>To Date</label><input id="tradeTo" type="date"/></div>
       <div style="display:flex;align-items:flex-end;gap:.5rem">
         <button class="btn-primary" style="width:auto" onclick="loadTrade()">Show</button>
-        <button class="btn-primary" style="width:auto;background:#059669" onclick="downloadPDF('tradeOut','Sale-Purchase Report')">⬇ PDF</button>
+        <button class="btn-primary" style="width:auto;background:#059669"
+          onclick="downloadPDF('tradeOut','Sale-Purchase Report')">⬇ PDF</button>
       </div>
     </div>
     <div id="tradeOut" style="margin-top:1rem">Select date range, then click Show.</div>
+  </div>
+
+  <!-- ============ REPORT 4: BHAGIRATHI IPD DUE ============ -->
+  <div id="r4" class="tab-panel page-card">
+    <h2 style="font-size:1rem;margin-bottom:1rem">🏥 Bhagirathi Nursing Home – IPD Medicine Due</h2>
+    <p style="font-size:.83rem;color:#6b7280;margin-bottom:.75rem">
+      Shows total IPD medicine credit (Indens) minus cash received from Bhagirathi.
+      Pharmacy cash is NOT affected by IPD sales.
+    </p>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
+      <button class="btn-primary dl-btn" style="width:auto" onclick="loadBhagirathi()">🔄 Refresh</button>
+      <button class="btn-primary dl-btn" style="width:auto;background:#059669"
+        onclick="downloadPDF('bhagirathiWrap','Bhagirathi IPD Due')">⬇ PDF</button>
+    </div>
+    <div id="bhagirathiOut">Click Refresh to load.</div>
   </div>
 </div>
 
@@ -100,7 +110,6 @@
 
   const fmt = (n) => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
 
-  // Tab switching
   function switchTab(id, btn) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -108,7 +117,6 @@
     btn.classList.add('active');
   }
 
-  // -------- Load suppliers into ledger dropdown --------
   async function initDropdowns() {
     const { data } = await BNH_PAGE.sb.from('pharmacy_suppliers')
       .select('supplier_name').order('supplier_name');
@@ -121,14 +129,13 @@
   }
   initDropdowns();
 
-  // Default date range: this month
   const today = new Date().toISOString().slice(0,10);
   const monthStart = today.slice(0,7) + '-01';
   ['ledgerFrom','ledgerTo','tradeFrom','tradeTo'].forEach(id => {
     document.getElementById(id).value = id.endsWith('From') ? monthStart : today;
   });
 
-  // -------- REPORT 1: Supplier Due --------
+  // ──────────── REPORT 1: Supplier Due ────────────
   async function loadSupplierDue() {
     document.getElementById('spinner').classList.remove('hidden');
     const [{ data: suppliers }, { data: purchases }, { data: payments }] = await Promise.all([
@@ -139,18 +146,17 @@
     document.getElementById('spinner').classList.add('hidden');
 
     const rows = (suppliers||[]).map(s => {
-      const op = parseFloat(s.opening_balance||0);
+      const op  = parseFloat(s.opening_balance||0);
       const pur = (purchases||[]).filter(p=>p.supplier_name===s.supplier_name).reduce((a,p)=>a+parseFloat(p.amount||0),0);
       const pay = (payments||[]).filter(p=>p.supplier_name===s.supplier_name).reduce((a,p)=>a+parseFloat(p.amount||0),0);
-      const due = op + pur - pay;
-      return { name: s.supplier_name, op, pur, pay, due };
+      return { name: s.supplier_name, op, pur, pay, due: op+pur-pay };
     });
-
     const total = rows.reduce((a,r)=>({op:a.op+r.op,pur:a.pur+r.pur,pay:a.pay+r.pay,due:a.due+r.due}),{op:0,pur:0,pay:0,due:0});
 
     document.getElementById('supplierDueOut').innerHTML = `
       <table id="supplierDueTable">
-        <thead><tr><th>#</th><th>Supplier</th><th class="r">Op. Bal</th><th class="r">Purchase</th><th class="r">Payment</th><th class="r">Due</th></tr></thead>
+        <thead><tr><th>#</th><th>Supplier</th><th class="r">Op. Bal</th>
+          <th class="r">Purchase</th><th class="r">Payment</th><th class="r">Due</th></tr></thead>
         <tbody>${rows.map((r,i)=>`<tr>
           <td>${i+1}</td><td>${r.name}</td>
           <td class="r">${fmt(r.op)}</td><td class="r">${fmt(r.pur)}</td>
@@ -164,30 +170,30 @@
       </table>`;
   }
 
-  // -------- REPORT 2: Supplier Ledger --------
+  // ──────────── REPORT 2: Supplier Ledger ────────────
   async function loadLedger() {
-    const sup = document.getElementById('ledgerSupplier').value;
+    const sup  = document.getElementById('ledgerSupplier').value;
     const from = document.getElementById('ledgerFrom').value;
     const to   = document.getElementById('ledgerTo').value;
     const out  = document.getElementById('ledgerOut');
     if (!sup) { out.textContent = 'Please select a supplier.'; return; }
 
     document.getElementById('spinner').classList.remove('hidden');
-    const [{ data: sData }, { data: purch }, { data: pymts }] = await Promise.all([
-      BNH_PAGE.sb.from('pharmacy_suppliers').select('opening_balance').eq('supplier_name', sup).single(),
+    const [{ data: sDataArr }, { data: purch }, { data: pymts }] = await Promise.all([
+      BNH_PAGE.sb.from('pharmacy_suppliers').select('opening_balance').eq('supplier_name', sup),
       BNH_PAGE.sb.from('pharmacy_purchases').select('*').eq('supplier_name', sup).gte('purchase_date', from).lte('purchase_date', to).order('purchase_date'),
       BNH_PAGE.sb.from('pharmacy_supplier_payments').select('*').eq('supplier_name', sup).gte('pay_date', from).lte('pay_date', to).order('pay_date')
     ]);
     document.getElementById('spinner').classList.add('hidden');
 
+    const sData = sDataArr && sDataArr.length > 0 ? sDataArr[0] : null;
     const opBal = parseFloat(sData?.opening_balance||0);
     let rows = [];
-    (purch||[]).forEach(r => rows.push({ date: r.purchase_date, desc: 'Purchase', dr: parseFloat(r.amount), cr: 0, raw: r }));
-    (pymts||[]).forEach(r => rows.push({ date: r.pay_date, desc: 'Payment (' + r.mode + ')', dr: 0, cr: parseFloat(r.amount), raw: r }));
+    (purch||[]).forEach(r => rows.push({ date: r.purchase_date, desc: 'Purchase', dr: parseFloat(r.amount), cr: 0 }));
+    (pymts||[]).forEach(r => rows.push({ date: r.pay_date, desc: 'Payment (' + r.mode + ')', dr: 0, cr: parseFloat(r.amount) }));
     rows.sort((a,b) => a.date.localeCompare(b.date));
 
-    let bal = opBal;
-    let tableRows = '';
+    let bal = opBal, tableRows = '';
     rows.forEach((r,i) => {
       bal += r.dr - r.cr;
       tableRows += `<tr>
@@ -201,175 +207,173 @@
     out.innerHTML = `
       <p style="font-size:.85rem;color:#555">Opening Balance: <strong>${fmt(opBal)}</strong> &nbsp;|&nbsp; Period: ${from} to ${to}</p>
       <table id="ledgerTable">
-        <thead><tr><th>#</th><th>Date</th><th>Description</th><th class="r">Dr (Purchase)</th><th class="r">Cr (Payment)</th><th class="r">Balance</th></tr></thead>
+        <thead><tr><th>#</th><th>Date</th><th>Description</th>
+          <th class="r">Dr (Purchase)</th><th class="r">Cr (Payment)</th><th class="r">Balance</th></tr></thead>
         <tbody>${tableRows || '<tr><td colspan="6" style="text-align:center">No transactions in this period.</td></tr>'}</tbody>
-        <tfoot><tr><td colspan="5" style="text-align:right">Closing Balance</td><td class="r">${fmt(bal)}</td></tr></tfoot>
+        <tfoot><tr><td colspan="5" style="text-align:right">Closing Balance</td>
+          <td class="r">${fmt(bal)}</td></tr></tfoot>
       </table>`;
   }
 
-  // -------- REPORT 3: Trading / Sale Purchase --------
+  // ──────────── REPORT 3: Trading ────────────
   async function loadTrade() {
     const from = document.getElementById('tradeFrom').value;
     const to   = document.getElementById('tradeTo').value;
     const out  = document.getElementById('tradeOut');
     document.getElementById('spinner').classList.remove('hidden');
 
-    // Fetch everything needed in parallel
-    const [
-      { data: setup },
-      { data: suppliers },
-      { data: purch },
-      { data: sales },
-      { data: vouchers },
-      { data: payments },
-      { data: allPurch },   // ALL purchases ever (for creditor closing)
-      { data: allPaymts }   // ALL payments ever (for creditor closing)
-    ] = await Promise.all([
-      BNH_PAGE.sb.from('pharmacy_setup').select('*').single(),
-      BNH_PAGE.sb.from('pharmacy_suppliers').select('supplier_name, opening_balance'),
-      BNH_PAGE.sb.from('pharmacy_purchases').select('amount, supplier_name').gte('purchase_date', from).lte('purchase_date', to),
-      BNH_PAGE.sb.from('pharmacy_sales').select('cost_price, sale_price, mode_of_payment').gte('sale_date', from).lte('sale_date', to),
-      BNH_PAGE.sb.from('pharmacy_vouchers').select('amount, mode').gte('voucher_date', from).lte('voucher_date', to),
-      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('amount, mode, supplier_name').gte('pay_date', from).lte('pay_date', to),
-      BNH_PAGE.sb.from('pharmacy_purchases').select('amount, supplier_name, purchase_date'),
-      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('amount, supplier_name, pay_date')
+    const [{ data: setupArr }, { data: purch }, { data: sales }, { data: vouchers }, { data: payments }] = await Promise.all([
+      BNH_PAGE.sb.from('pharmacy_setup').select('*'),
+      BNH_PAGE.sb.from('pharmacy_purchases').select('amount').gte('purchase_date', from).lte('purchase_date', to),
+      // Only dispensary sales affect pharmacy cash
+      BNH_PAGE.sb.from('pharmacy_sales').select('cost_price,sale_price,mode_of_payment,mode_cash,mode_bank,mode_phonepe,sale_type').gte('sale_date', from).lte('sale_date', to),
+      BNH_PAGE.sb.from('pharmacy_vouchers').select('amount,mode').gte('voucher_date', from).lte('voucher_date', to),
+      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('amount,mode').gte('pay_date', from).lte('pay_date', to)
     ]);
     document.getElementById('spinner').classList.add('hidden');
 
+    const setup = setupArr && setupArr.length > 0 ? setupArr[0] : null;
     const s = setup || {};
     const opStock = parseFloat(s.opening_stock||0);
     const opCash  = parseFloat(s.opening_cash||0);
     const opBank  = parseFloat(s.opening_bank||0);
     const opPP    = parseFloat(s.opening_phonepe||0);
+    const opCred  = parseFloat(s.opening_creditor||0);
 
-    // ── Trading Account ──────────────────────────────────
-    const totalPurch    = (purch||[]).reduce((a,r) => a+parseFloat(r.amount||0), 0);
-    const totalSaleCost = (sales||[]).reduce((a,r) => a+parseFloat(r.cost_price||0), 0);
-    const totalSaleRev  = (sales||[]).reduce((a,r) => a+parseFloat(r.sale_price||0), 0);
-    const closingStock  = opStock + totalPurch - totalSaleCost;
-    const grossProfit   = totalSaleRev - totalSaleCost;
+    // Only dispensary affects cash
+    const disSales = (sales||[]).filter(r=>r.sale_type==='Dispensary');
+    const ipdSales = (sales||[]).filter(r=>r.sale_type==='IPD');
 
-    // ── P&L ──────────────────────────────────────────────
-    const vouchAmt  = (vouchers||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-    const payAmt    = (payments||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-    const netProfit = grossProfit - vouchAmt - payAmt;
+    const totalPurch        = (purch||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const totalSaleCost     = (sales||[]).reduce((a,r)=>a+parseFloat(r.cost_price||0),0);
+    const totalDisSaleRev   = disSales.reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
+    const totalIpdCredit    = ipdSales.reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
+    const closingStock      = opStock + totalPurch - totalSaleCost;
+    const grossProfit       = totalDisSaleRev - disSales.reduce((a,r)=>a+parseFloat(r.cost_price||0),0);
 
-    // ── Cash / Bank / PhonePe balances ───────────────────
-    const saleByCash  = (sales||[]).filter(r=>r.mode_of_payment==='Cash').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
-    const saleByBank  = (sales||[]).filter(r=>r.mode_of_payment==='Bank').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
-    const saleByPP    = (sales||[]).filter(r=>r.mode_of_payment==='PhonePe').reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
+    const vouchAmt = (vouchers||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const payAmt   = (payments||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
+    // Cash flows — use mode_cash/mode_bank/mode_phonepe if present, else fall back to mode_of_payment
+    const getSaleMode = (arr, mode) => arr.reduce((a,r)=>{
+      if (r.mode_cash !== undefined) {
+        if (mode==='Cash') return a+parseFloat(r.mode_cash||0);
+        if (mode==='Bank') return a+parseFloat(r.mode_bank||0);
+        if (mode==='PhonePe') return a+parseFloat(r.mode_phonepe||0);
+      }
+      return r.mode_of_payment===mode ? a+parseFloat(r.sale_price||0) : a;
+    }, 0);
+
+    const saleByCash = getSaleMode(disSales,'Cash');
+    const saleByBank = getSaleMode(disSales,'Bank');
+    const saleByPP   = getSaleMode(disSales,'PhonePe');
+
     const vouchByCash = (vouchers||[]).filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const vouchByBank = (vouchers||[]).filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const vouchByPP   = (vouchers||[]).filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const payByCash   = (payments||[]).filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const payByBank   = (payments||[]).filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const payByPP     = (payments||[]).filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
     const clCash = opCash + saleByCash - vouchByCash - payByCash;
     const clBank = opBank + saleByBank - vouchByBank - payByBank;
     const clPP   = opPP   + saleByPP   - vouchByPP   - payByPP;
 
-    // ── Creditors = Suppliers (opening + purchase - payment) ──
-    // Opening creditor = sum of each supplier's opening_balance
-    //   + all purchases BEFORE the selected from date
-    //   – all payments BEFORE the selected from date
-    const suppList = suppliers || [];
+    const { data: allPurch }  = await BNH_PAGE.sb.from('pharmacy_purchases').select('amount');
+    const { data: allPaymts } = await BNH_PAGE.sb.from('pharmacy_supplier_payments').select('amount');
+    const clCred = opCred
+      + (allPurch||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0)
+      - (allPaymts||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
 
-    // Total supplier opening balances
-    const totalSupOpBal = suppList.reduce((a,r)=>a+parseFloat(r.opening_balance||0), 0);
-
-    // Purchases and payments strictly BEFORE 'from' date (i.e. up to from-1)
-    const purchBeforeFrom = (allPurch||[]).filter(r => r.purchase_date < from).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-    const payBeforeFrom   = (allPaymts||[]).filter(r => r.pay_date   < from).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-
-    // Opening creditor for the selected period
-    const opCred = totalSupOpBal + purchBeforeFrom - payBeforeFrom;
-
-    // Closing creditor = opening + purchases in period - payments in period
-    const clCred = opCred + totalPurch - payAmt;
-
-    // ── Per-supplier creditor breakdown ──────────────────
-    const suppRows = suppList.map(sup => {
-      const supOpBal   = parseFloat(sup.opening_balance||0);
-      const supPurBef  = (allPurch||[]).filter(r=>r.supplier_name===sup.supplier_name && r.purchase_date<from).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-      const supPayBef  = (allPaymts||[]).filter(r=>r.supplier_name===sup.supplier_name && r.pay_date<from).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-      const supOpCred  = supOpBal + supPurBef - supPayBef;
-
-      const supPurPer  = (purch||[]).filter(r=>r.supplier_name===sup.supplier_name).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-      const supPayPer  = (payments||[]).filter(r=>r.supplier_name===sup.supplier_name).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-      const supClCred  = supOpCred + supPurPer - supPayPer;
-      return { name: sup.supplier_name, opCred: supOpCred, pur: supPurPer, pay: supPayPer, clCred: supClCred };
-    }).filter(r => r.opCred !== 0 || r.pur !== 0 || r.pay !== 0 || r.clCred !== 0);
-
-    const row  = (label, val, bold=false, color='') =>
-      `<tr ${bold?'style="font-weight:700;background:#f9f9f9"':''}><td>${label}</td><td class="r" ${color?`style="color:${color};font-weight:700"`:''}>${fmt(val)}</td></tr>`;
+    const row = (label, val, bold=false) =>
+      `<tr ${bold?'style="font-weight:700;background:#f9f9f9"':''}><td>${label}</td><td class="r">${fmt(val)}</td></tr>`;
 
     out.innerHTML = `
       <p style="font-size:.85rem;color:#555;margin-bottom:.75rem">Period: <strong>${from}</strong> to <strong>${to}</strong></p>
       <div id="tradeOutPrint">
+        <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">📦 Trading Account</h3>
+        <table><tbody>
+          ${row('Opening Stock', opStock)}
+          ${row('(+) Purchases', totalPurch)}
+          ${row('(–) Total Sale (Cost)', totalSaleCost)}
+          ${row('Closing Stock', closingStock, true)}
+          ${row('Dispensary Sale Revenue', totalDisSaleRev)}
+          ${row('IPD Medicine Credit (Bhagirathi)', totalIpdCredit)}
+          ${row('Gross Profit (Dispensary)', grossProfit, true)}
+        </tbody></table>
 
-      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">📦 Trading Account</h3>
-      <table><tbody>
-        ${row('Opening Stock', opStock)}
-        ${row('(+) Purchases', totalPurch)}
-        ${row('(–) Sale (Cost Price)', totalSaleCost)}
-        ${row('Closing Stock', closingStock, true)}
-        ${row('Sale Revenue', totalSaleRev)}
-        ${row('Gross Profit', grossProfit, true, grossProfit>=0?'#059669':'#dc2626')}
-      </tbody></table>
+        <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">💰 Profit & Loss</h3>
+        <table><tbody>
+          ${row('Gross Profit', grossProfit)}
+          ${row('(–) Voucher Expenses', vouchAmt)}
+          ${row('(–) Supplier Payments', payAmt)}
+          ${row('Net Profit', grossProfit - vouchAmt - payAmt, true)}
+        </tbody></table>
 
-      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">💰 Profit &amp; Loss</h3>
-      <table><tbody>
-        ${row('Gross Profit', grossProfit)}
-        ${row('(–) Voucher Expenses', vouchAmt)}
-        ${row('(–) Supplier Payments (period)', payAmt)}
-        ${row('Net Profit', netProfit, true, netProfit>=0?'#059669':'#dc2626')}
-      </tbody></table>
-
-      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">🏦 Balance Summary</h3>
-      <table>
-        <thead><tr><th>Account</th><th class="r">Opening</th><th class="r">Closing</th></tr></thead>
-        <tbody>
-          <tr><td>Cash</td><td class="r">${fmt(opCash)}</td><td class="r">${fmt(clCash)}</td></tr>
-          <tr><td>Bank</td><td class="r">${fmt(opBank)}</td><td class="r">${fmt(clBank)}</td></tr>
-          <tr><td>PhonePe</td><td class="r">${fmt(opPP)}</td><td class="r">${fmt(clPP)}</td></tr>
-          <tr style="font-weight:700;background:#f9f9f9">
-            <td>Creditors (All Suppliers)</td>
-            <td class="r">${fmt(opCred)}</td>
-            <td class="r" style="color:${clCred>0?'#dc2626':'#059669'}">${fmt(clCred)}</td>
-          </tr>
-          <tr><td>Stock</td><td class="r">${fmt(opStock)}</td><td class="r">${fmt(closingStock)}</td></tr>
-        </tbody>
-      </table>
-
-      <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">🏭 Supplier-wise Creditor Breakup</h3>
-      <table id="supplierCreditorTable">
-        <thead><tr>
-          <th>#</th><th>Supplier</th>
-          <th class="r">Op. Due</th>
-          <th class="r">Purchase (period)</th>
-          <th class="r">Payment (period)</th>
-          <th class="r">Cl. Due</th>
-        </tr></thead>
-        <tbody>${suppRows.length ? suppRows.map((r,i)=>`<tr>
-          <td>${i+1}</td><td>${r.name}</td>
-          <td class="r">${fmt(r.opCred)}</td>
-          <td class="r">${fmt(r.pur)}</td>
-          <td class="r">${fmt(r.pay)}</td>
-          <td class="r" style="font-weight:700;color:${r.clCred>0?'#dc2626':'#059669'}">${fmt(r.clCred)}</td>
-        </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#9ca3af">No supplier activity in this period.</td></tr>'}</tbody>
-        <tfoot><tr>
-          <td colspan="2" style="text-align:right">Total</td>
-          <td class="r">${fmt(opCred)}</td>
-          <td class="r">${fmt(totalPurch)}</td>
-          <td class="r">${fmt(payAmt)}</td>
-          <td class="r" style="color:${clCred>0?'#dc2626':'#059669'}">${fmt(clCred)}</td>
-        </tr></tfoot>
-      </table>
-
+        <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">🏦 Balance Summary (Pharmacy Only)</h3>
+        <table>
+          <thead><tr><th>Account</th><th class="r">Opening</th><th class="r">Closing</th></tr></thead>
+          <tbody>
+            <tr><td>Cash</td><td class="r">${fmt(opCash)}</td><td class="r">${fmt(clCash)}</td></tr>
+            <tr><td>Bank</td><td class="r">${fmt(opBank)}</td><td class="r">${fmt(clBank)}</td></tr>
+            <tr><td>PhonePe</td><td class="r">${fmt(opPP)}</td><td class="r">${fmt(clPP)}</td></tr>
+            <tr><td>Creditors (Suppliers)</td><td class="r">${fmt(opCred)}</td><td class="r">${fmt(clCred)}</td></tr>
+            <tr><td>Stock</td><td class="r">${fmt(opStock)}</td><td class="r">${fmt(closingStock)}</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:.78rem;color:#888;margin-top:.4rem">
+          ⚠ Pharmacy cash balances are isolated from IPD. IPD medicine amounts appear as Bhagirathi credit only.
+        </p>
       </div>`;
   }
 
-  // -------- PDF Download --------
+  // ──────────── REPORT 4: Bhagirathi IPD Due ────────────
+  async function loadBhagirathi() {
+    document.getElementById('spinner').classList.remove('hidden');
+    const [{ data: indens }, { data: txns }] = await Promise.all([
+      BNH_PAGE.sb.from('ipd_medicine_indens').select('*').order('inden_date'),
+      BNH_PAGE.sb.from('ipd_transactions').select('*').eq('txn_type','Receive').order('txn_date')
+    ]);
+    document.getElementById('spinner').classList.add('hidden');
+
+    const totalInden = (indens||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const totalRcvd  = (txns||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const due = totalInden - totalRcvd;
+
+    let ledgerRows = [];
+    (indens||[]).forEach(r => ledgerRows.push({ date:r.inden_date, desc:`Inden – ${r.patient_name} (${r.admission_no}) – ${r.inden_no}`, dr:parseFloat(r.amount||0), cr:0 }));
+    (txns||[]).forEach(r  => ledgerRows.push({ date:r.txn_date, desc:'Cash Received from Bhagirathi', dr:0, cr:parseFloat(r.amount||0) }));
+    ledgerRows.sort((a,b)=>a.date.localeCompare(b.date));
+
+    let bal = 0, rows = '';
+    ledgerRows.forEach((r,i) => {
+      bal += r.dr - r.cr;
+      rows += `<tr>
+        <td>${i+1}</td><td>${r.date}</td><td>${r.desc}</td>
+        <td class="r">${r.dr?fmt(r.dr):'-'}</td>
+        <td class="r">${r.cr?fmt(r.cr):'-'}</td>
+        <td class="r" style="font-weight:600">${fmt(bal)}</td>
+      </tr>`;
+    });
+
+    document.getElementById('bhagirathiOut').innerHTML = `
+      <div id="bhagirathiWrap">
+        <div class="summary-cards">
+          <div class="scard"><div class="sc-label">Total IPD Medicine (Indens)</div><div class="sc-val">${fmt(totalInden)}</div></div>
+          <div class="scard"><div class="sc-label">Cash Received from Bhagirathi</div><div class="sc-val" style="color:#059669">${fmt(totalRcvd)}</div></div>
+          <div class="scard"><div class="sc-label">Current Due (Bhagirathi owes)</div><div class="sc-val" style="color:${due>0?'#dc2626':'#059669'}">${fmt(due)}</div></div>
+        </div>
+        <table id="bhagirathiTable">
+          <thead><tr><th>#</th><th>Date</th><th>Description</th>
+            <th class="r">Dr (Inden)</th><th class="r">Cr (Received)</th><th class="r">Balance</th></tr></thead>
+          <tbody>${rows||'<tr><td colspan="6" style="text-align:center">No transactions yet.</td></tr>'}</tbody>
+          <tfoot><tr><td colspan="5" style="text-align:right">Closing Due</td>
+            <td class="r" style="color:${due>0?'#dc2626':'#059669'}">${fmt(due)}</td></tr></tfoot>
+        </table>
+      </div>`;
+  }
+
+  // ──────────── PDF Download ────────────
   function downloadPDF(elementId, title) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
@@ -379,12 +383,12 @@
     doc.text(title, 15, 22);
     doc.setFontSize(8);
     doc.text('Generated: ' + new Date().toLocaleString('en-IN'), 15, 28);
-
     const tables = document.getElementById(elementId)?.querySelectorAll('table');
     let y = 32;
     if (tables && tables.length > 0) {
       tables.forEach(tbl => {
-        doc.autoTable({ html: tbl, startY: y, styles:{ fontSize:8 }, headStyles:{ fillColor:[99,102,241] }, margin:{ left:15, right:15 } });
+        doc.autoTable({ html:tbl, startY:y, styles:{fontSize:8},
+          headStyles:{fillColor:[99,102,241]}, margin:{left:15,right:15} });
         y = doc.lastAutoTable.finalY + 6;
       });
     }
@@ -393,4 +397,3 @@
 </script>
 </body>
 </html>
-
