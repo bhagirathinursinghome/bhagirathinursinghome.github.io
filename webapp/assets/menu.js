@@ -13,17 +13,9 @@
     { label: "Admin Editor",       icon: "🔧", page: "pages/pharmacy-admin-editor.html",   roles: ["admin"] },
 
 //------------------opd-------------------------------------------
-     // OPD Sales Data Upload & Normalization
-{ label: "OPD Sales Upload", icon: "📊", page: "pages/opd_sales_upload.html",
-  roles: ["manager", "admin", "accountant"] }
-
-// OPD Refer Linker (Link to IPD & Add Refer Info)
-{ label: "OPD Refer Linker", icon: "🔗", page: "pages/opd_refer_linker.html",
-  roles: ["manager", "admin", "accountant"] }
-
-// OPD Records View (View All Records)
-{ label: "OPD Records", icon: "📋", page: "pages/opd_records_view.html",
-  roles: ["manager", "admin", "accountant", "viewer"] },
+{ label: "OPD Sales Upload", icon: "📊", page: "pages/opd_sales_upload.html",  roles: ["manager", "admin", "accountant"] },
+{ label: "OPD Refer Linker", icon: "🔗", page: "pages/opd_refer_linker.html",  roles: ["manager", "admin", "accountant"] },
+{ label: "OPD Records", icon: "📋", page: "pages/opd_records_view.html",  roles: ["manager", "admin", "accountant", "viewer"] },
 
      //---------------MARKETING------------------------------------
      { label: "Gramin Doctor Visit", icon: "🏥", page: "pages/gramin-visit.html",  roles: ["marketing", "manager", "admin", "other"] },
