@@ -23,7 +23,7 @@
 
 // OPD Records View (View All Records)
 { label: "OPD Records", icon: "📋", page: "pages/opd_records_view.html",
-  roles: ["manager", "admin", "accountant", "viewer"] }
+  roles: ["manager", "admin", "accountant", "viewer"] },
 
      //---------------MARKETING------------------------------------
      { label: "Gramin Doctor Visit", icon: "🏥", page: "pages/gramin-visit.html",  roles: ["marketing", "manager", "admin", "other"] },
