@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>OPD Sales Data Upload</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .upload-section { border: 2px dashed #ccc; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
+    .file-input-wrapper { position: relative; display: inline-block; width: 100%; margin-bottom: 0.75rem; }
+    .file-input-wrapper input[type="file"] { display: none; }
+    .file-btn { display: inline-block; padding: 0.75rem 1.5rem; background: #007bff; color: white; border-radius: 4px; cursor: pointer; width: 100%; text-align: center; box-sizing: border-box; }
+    .file-btn:hover { background: #0056b3; }
+    .file-name { margin-top: 0.5rem; font-size: 0.85rem; color: #666; }
+    .progress-section { margin-top: 1rem; display: none; }
+    .progress-bar { width: 100%; height: 30px; background: #f0f0f0; border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem; }
+    .progress-fill { height: 100%; background: #28a745; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem; }
+    .data-preview { margin-top: 1.5rem; }
+    .preview-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .preview-table th { background: #f0f0f0; padding: 8px; text-align: left; border-bottom: 1px solid #ccc; }
+    .preview-table td { padding: 8px; border-bottom: 1px solid #eee; }
+    .summary-box { background: #f8f9fa; padding: 1rem; border-radius: 4px; margin: 1rem 0; border-left: 4px solid #007bff; }
+    .summary-item { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+    .summary-label { font-weight: 500; }
+    .summary-value { color: #007bff; font-weight: bold; }
+    .warning-box { background: #fff3cd; border: 1px solid #ffc107; padding: 1rem; border-radius: 4px; margin: 1rem 0; }
+    .error-item { color: #dc3545; font-size: 0.85rem; }
+    .success-item { color: #28a745; font-size: 0.85rem; }
+    .case-match { color: #28a745; }
+    .case-nomatch { color: #dc3545; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>📊 OPD Sales Data Upload & Normalize</h1>
+
+  <div class="page-card">
+    <p style="margin-bottom: 1rem; color: #555; font-size: 0.9rem;">
+      Upload Sales Report and Cash Register Excel files. The system will normalize and cross-match case numbers, 
+      append financial years, and upload to Supabase.
+    </p>
+
+    <div class="upload-section">
+      <h3 style="margin-top: 0;">📋 Step 1: Upload Files</h3>
+      
+      <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Sales Report Detail (XLS)</label>
+      <div class="file-input-wrapper">
+        <input type="file" id="saleReportFile" accept=".xls,.xlsx"/>
+        <label for="saleReportFile" class="file-btn">Choose Sales Report File</label>
+      </div>
+      <div class="file-name" id="saleReportName">No file selected</div>
+
+      <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; margin-top: 1rem;">Cash Register (XLS)</label>
+      <div class="file-input-wrapper">
+        <input type="file" id="cashRegisterFile" accept=".xls,.xlsx"/>
+        <label for="cashRegisterFile" class="file-btn">Choose Cash Register File</label>
+      </div>
+      <div class="file-name" id="cashRegisterName">No file selected</div>
+
+      <button id="normalizeBtn" class="btn-primary" style="width: 100%; margin-top: 1.5rem;">
+        🔄 Parse & Normalize Files
+      </button>
+    </div>
+
+    <div class="progress-section" id="progressSection">
+      <label>Processing Progress</label>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
+      </div>
+      <p id="progressText" style="font-size: 0.85rem; color: #666;">Initializing...</p>
+    </div>
+
+    <div id="resultsSection" style="display: none;">
+      <h3 style="margin-top: 1.5rem;">📈 Normalization Results</h3>
+
+      <div class="summary-box">
+        <div class="summary-item">
+          <span class="summary-label">Sales Report Cases:</span>
+          <span class="summary-value" id="saleReportCount">0</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Cash Register Entries:</span>
+          <span class="summary-value" id="cashRegisterCount">0</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Matched Cases:</span>
+          <span class="summary-value case-match" id="matchedCount">0</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Old Dues (Unmatched):</span>
+          <span class="summary-value case-nomatch" id="oldDuesCount">0</span>
+        </div>
+      </div>
+
+      <div id="warningsSection" style="display: none;">
+        <div class="warning-box">
+          <strong>⚠️ Issues Found:</strong>
+          <div id="warningslist" style="margin-top: 0.5rem;"></div>
+        </div>
+      </div>
+
+      <h4 style="margin-top: 1.5rem;">Preview: Matched OPD Cases (First 10)</h4>
+      <div style="overflow-x: auto;">
+        <table class="preview-table" id="matchedPreviewTable">
+          <thead>
+            <tr>
+              <th>Case No</th>
+              <th>Date</th>
+              <th>Patient Name</th>
+              <th>Bill Amt</th>
+              <th>Tests</th>
+              <th>Paid</th>
+              <th>Discount</th>
+            </tr>
+          </thead>
+          <tbody id="matchedPreviewBody"></tbody>
+        </table>
+      </div>
+
+      <h4 style="margin-top: 1.5rem;">Preview: Old Dues / Unmatched (First 10)</h4>
+      <div style="overflow-x: auto;">
+        <table class="preview-table" id="oldDuesPreviewTable">
+          <thead>
+            <tr>
+              <th>Case No</th>
+              <th>Transaction Date</th>
+              <th>Patient Name</th>
+              <th>Income Amt</th>
+              <th>Discount</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="oldDuesPreviewBody"></tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 1.5rem;">
+        <button id="uploadBtn" class="btn-primary" style="width: 100%;">
+          💾 Upload Normalized Data to Supabase
+        </button>
+        <button id="resetBtn" class="btn-primary" style="width: 100%; margin-top: 0.5rem; background: #6c757d;">
+          🔄 Reset & Start Over
+        </button>
+      </div>
+    </div>
+
+    <p class="err" id="err"></p>
+    <p class="info" id="ok" style="display:none"></p>
+  </div>
+</div>
+
+<!-- SheetJS library for Excel parsing -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+  BNH_PAGE.requireRole(["manager", "admin", "accountant"]);
+  
+  let saleReportData = null;
+  let cashRegisterData = null;
+  let normalizedData = null;
+
+  // Helper: Get financial year from date
+  function getFinancialYear(dateStr) {
+    const date = new Date(dateStr);
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+    // Financial year: Apr-Mar (e.g., Apr 2026 = FY 2627)
+    if (month >= 4) {
+      return String(year).slice(2) + String(year + 1).slice(2);
+    } else {
+      return String(year - 1).slice(2) + String(year).slice(2);
+    }
+  }
+
+  // File input handlers
+  document.getElementById('saleReportFile').addEventListener('change', (e) => {
+    document.getElementById('saleReportName').textContent = e.target.files[0]?.name || 'No file selected';
+  });
+
+  document.getElementById('cashRegisterFile').addEventListener('change', (e) => {
+    document.getElementById('cashRegisterName').textContent = e.target.files[0]?.name || 'No file selected';
+  });
+
+  // Update progress
+  function updateProgress(percent, text) {
+    document.getElementById('progressFill').style.width = percent + '%';
+    document.getElementById('progressFill').textContent = percent + '%';
+    document.getElementById('progressText').textContent = text;
+  }
+
+  // Parse Sales Report
+  function parseSalesReport(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+          // Find headers (row 7 and 8)
+          let headerRow1 = null, headerRow2 = null, dataStartRow = null;
+          for (let i = 0; i < jsonData.length; i++) {
+            if (jsonData[i][0] === 'Case Dt') { headerRow1 = i; }
+            if (jsonData[i][0] === 'Case No') { headerRow2 = i; }
+            if (jsonData[i][0] && jsonData[i][0].toString().match(/^\d{4}-\d{2}-\d{2}/)) {
+              dataStartRow = i;
+              break;
+            }
+          }
+
+          if (!headerRow1) throw new Error('Sales Report: Could not find headers');
+
+          const cases = [];
+          let currentCaseNo = null, currentDate = null, currentPatient = null, currentTests = [], currentBillAmt = 0;
+
+          for (let i = dataStartRow || headerRow1 + 2; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            if (!row[0]) continue;
+
+            const isDate = row[0]?.toString().match(/^\d{4}-\d{2}-\d{2}/);
+            if (isDate) {
+              if (currentCaseNo && cases) {
+                cases.push({
+                  case_no: currentCaseNo,
+                  case_date: currentDate,
+                  patient_name: currentPatient,
+                  bill_amount: currentBillAmt,
+                  tests: currentTests.join(', ')
+                });
+              }
+              currentDate = row[0];
+              currentCaseNo = row[1] || null;
+              currentPatient = row[2] || null;
+              currentTests = [];
+              currentBillAmt = parseFloat(row[5]) || 0;
+            } else if (currentCaseNo) {
+              // This is a test detail line
+              if (row[0] && row[0].toString().length > 0) {
+                currentTests.push(row[0]);
+              }
+            }
+          }
+
+          // Add last case
+          if (currentCaseNo) {
+            cases.push({
+              case_no: currentCaseNo,
+              case_date: currentDate,
+              patient_name: currentPatient,
+              bill_amount: currentBillAmt,
+              tests: currentTests.join(', ')
+            });
+          }
+
+          resolve(cases);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // Parse Cash Register
+  function parseCashRegister(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+          // Find data start (skip headers and section markers)
+          let dataStartRow = null;
+          for (let i = 0; i < jsonData.length; i++) {
+            if (jsonData[i][0] === 'Sl No' || jsonData[i][1] === 'Case Dt') {
+              dataStartRow = i + 1;
+              break;
+            }
+          }
+
+          const entries = [];
+          for (let i = dataStartRow || 8; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            if (!row[0] || row[0].toString().match(/^(CASH|Cash Receipt|NaN)/i)) continue;
+            if (!row[4]) continue; // Skip if no Case No
+
+            const caseNo = row[4]?.toString().trim();
+            const transDate = row[1];
+            const remarks = row[10] || '';
+            
+            entries.push({
+              trans_no: row[2],
+              trans_date: transDate,
+              case_no: caseNo,
+              patient_name: row[3],
+              entry_by: row[6],
+              income: parseFloat(row[7]) || 0,
+              discount: parseFloat(row[8]) || 0,
+              remarks: remarks
+            });
+          }
+
+          resolve(entries);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // Normalize and match data
+  function normalizeAndMatch(sales, cashReg) {
+    const warnings = [];
+    const normalized = {
+      matched_opd: [],
+      old_dues: [],
+      warnings: warnings
+    };
+
+    // Create lookup for sales cases
+    const salesByRawCase = {};
+    sales.forEach(s => {
+      salesByRawCase[s.case_no] = s;
+    });
+
+    // Process cash register entries
+    const processedCashCases = new Set();
+    
+    cashReg.forEach(entry => {
+      processedCashCases.add(entry.case_no);
+      
+      // Determine financial year
+      let fy = null;
+      if (entry.remarks && entry.remarks.match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
+        const remarksDate = entry.remarks.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (remarksDate) {
+          fy = getFinancialYear(new Date(remarksDate[3], remarksDate[2] - 1, remarksDate[1]));
+        }
+      }
+      if (!fy) {
+        fy = getFinancialYear(entry.trans_date);
+      }
+
+      const fullCaseNo = fy + '/' + entry.case_no;
+
+      // Try to match in sales
+      let matched = false;
+      for (let key in salesByRawCase) {
+        if (key === fullCaseNo || key.endsWith('/' + entry.case_no)) {
+          const saleCase = salesByRawCase[key];
+          normalized.matched_opd.push({
+            case_no: fullCaseNo,
+            case_date: saleCase.case_date,
+            patient_name: entry.patient_name || saleCase.patient_name,
+            bill_amount: saleCase.bill_amount,
+            tests: saleCase.tests,
+            paid_amount: entry.income,
+            discount: entry.discount,
+            trans_no: entry.trans_no,
+            entered_by: entry.entry_by
+          });
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched) {
+        normalized.old_dues.push({
+          case_no: fullCaseNo,
+          trans_date: entry.trans_date,
+          patient_name: entry.patient_name,
+          income_amount: entry.income,
+          discount: entry.discount,
+          remarks: entry.remarks,
+          trans_no: entry.trans_no
+        });
+      }
+    });
+
+    return normalized;
+  }
+
+  // Display results
+  function displayResults(data) {
+    const matched = data.matched_opd;
+    const oldDues = data.old_dues;
+
+    document.getElementById('saleReportCount').textContent = saleReportData.length;
+    document.getElementById('cashRegisterCount').textContent = cashRegisterData.length;
+    document.getElementById('matchedCount').textContent = matched.length;
+    document.getElementById('oldDuesCount').textContent = oldDues.length;
+
+    if (data.warnings.length > 0) {
+      document.getElementById('warningsSection').style.display = 'block';
+      const warningsList = document.getElementById('warningslist');
+      warningsList.innerHTML = data.warnings.map(w => `<div class="error-item">⚠️ ${w}</div>`).join('');
+    }
+
+    // Matched preview
+    const matchedBody = document.getElementById('matchedPreviewBody');
+    matchedBody.innerHTML = matched.slice(0, 10).map(m => `
+      <tr>
+        <td><strong>${m.case_no}</strong></td>
+        <td>${m.case_date}</td>
+        <td>${m.patient_name}</td>
+        <td>${m.bill_amount}</td>
+        <td style="font-size: 0.75rem;">${m.tests.substring(0, 50)}...</td>
+        <td>₹${m.paid_amount}</td>
+        <td>₹${m.discount}</td>
+      </tr>
+    `).join('');
+
+    // Old dues preview
+    const oldDuesBody = document.getElementById('oldDuesPreviewBody');
+    oldDuesBody.innerHTML = oldDues.slice(0, 10).map(o => `
+      <tr>
+        <td><strong>${o.case_no}</strong></td>
+        <td>${o.trans_date}</td>
+        <td>${o.patient_name}</td>
+        <td>₹${o.income_amount}</td>
+        <td>₹${o.discount}</td>
+        <td style="font-size: 0.75rem;">${o.remarks || '-'}</td>
+      </tr>
+    `).join('');
+
+    document.getElementById('resultsSection').style.display = 'block';
+  }
+
+  // Parse and normalize
+  document.getElementById('normalizeBtn').addEventListener('click', async () => {
+    const saleFile = document.getElementById('saleReportFile').files[0];
+    const cashFile = document.getElementById('cashRegisterFile').files[0];
+    const err = document.getElementById('err');
+    const prog = document.getElementById('progressSection');
+
+    err.textContent = '';
+    if (!saleFile || !cashFile) {
+      err.textContent = 'Please select both files';
+      return;
+    }
+
+    prog.style.display = 'block';
+    document.getElementById('resultsSection').style.display = 'none';
+
+    try {
+      updateProgress(10, 'Parsing Sales Report...');
+      saleReportData = await parseSalesReport(saleFile);
+      updateProgress(50, 'Parsing Cash Register...');
+      cashRegisterData = await parseCashRegister(cashFile);
+      updateProgress(75, 'Normalizing and matching data...');
+      normalizedData = normalizeAndMatch(saleReportData, cashRegisterData);
+      updateProgress(100, 'Done!');
+      displayResults(normalizedData);
+    } catch (ex) {
+      err.textContent = 'Error parsing files: ' + ex.message;
+      prog.style.display = 'none';
+    }
+  });
+
+  // Upload to Supabase
+  document.getElementById('uploadBtn').addEventListener('click', async () => {
+    if (!normalizedData) return;
+    const spinner = document.getElementById('spinner');
+    const err = document.getElementById('err');
+    const ok = document.getElementById('ok');
+
+    spinner.classList.remove('hidden');
+    err.textContent = '';
+    ok.style.display = 'none';
+
+    try {
+      const payload = normalizedData.matched_opd.map(m => BNH_PAGE.stamp({
+        case_no: m.case_no,
+        case_date: m.case_date,
+        patient_name: m.patient_name,
+        bill_amount: m.bill_amount,
+        tests: m.tests,
+        paid_amount: m.paid_amount,
+        discount: m.discount,
+        trans_no: m.trans_no,
+        entered_by: m.entered_by,
+        status: 'pending_refer'  // Needs refer linking
+      }));
+
+      // Also upload old dues
+      const oldDuesPayload = normalizedData.old_dues.map(o => BNH_PAGE.stamp({
+        case_no: o.case_no,
+        trans_date: o.trans_date,
+        patient_name: o.patient_name,
+        income_amount: o.income_amount,
+        discount: o.discount,
+        remarks: o.remarks,
+        trans_no: o.trans_no,
+        type: 'old_dues'
+      }));
+
+      if (payload.length > 0) {
+        const { error } = await BNH_PAGE.sb.from('opd_cases').insert(payload);
+        if (error) throw error;
+      }
+
+      if (oldDuesPayload.length > 0) {
+        const { error } = await BNH_PAGE.sb.from('opd_old_dues').insert(oldDuesPayload);
+        if (error) throw error;
+      }
+
+      ok.style.display = 'block';
+      ok.textContent = `✅ Uploaded successfully! ${payload.length} OPD cases + ${oldDuesPayload.length} old dues`;
+      setTimeout(() => {
+        document.getElementById('saleReportFile').value = '';
+        document.getElementById('cashRegisterFile').value = '';
+        document.getElementById('saleReportName').textContent = 'No file selected';
+        document.getElementById('cashRegisterName').textContent = 'No file selected';
+        document.getElementById('resultsSection').style.display = 'none';
+      }, 2000);
+    } catch (ex) {
+      err.textContent = 'Upload error: ' + ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  });
+
+  // Reset
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    saleReportData = null;
+    cashRegisterData = null;
+    normalizedData = null;
+    document.getElementById('saleReportFile').value = '';
+    document.getElementById('cashRegisterFile').value = '';
+    document.getElementById('saleReportName').textContent = 'No file selected';
+    document.getElementById('cashRegisterName').textContent = 'No file selected';
+    document.getElementById('resultsSection').style.display = 'none';
+    document.getElementById('progressSection').style.display = 'none';
+    document.getElementById('err').textContent = '';
+  });
+</script>
+</body>
+</html>
