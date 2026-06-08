@@ -3,145 +3,159 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>OPD Sales Data Upload</title>
+  <title>OPD Excel Upload & Preview</title>
   <link rel="stylesheet" href="../assets/style.css"/>
   <style>
-    .upload-section { border: 2px dashed #ccc; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
-    .file-input-wrapper { position: relative; display: inline-block; width: 100%; margin-bottom: 0.75rem; }
+    .upload-section { border: 2px dashed #007bff; padding: 2rem; border-radius: 8px; text-align: center; margin-bottom: 1.5rem; }
+    .upload-section.dragover { background: #e7f3ff; border-color: #0056b3; }
+    .file-input-wrapper { position: relative; display: inline-block; }
     .file-input-wrapper input[type="file"] { display: none; }
-    .file-btn { display: inline-block; padding: 0.75rem 1.5rem; background: #007bff; color: white; border-radius: 4px; cursor: pointer; width: 100%; text-align: center; box-sizing: border-box; }
+    .file-btn { display: inline-block; padding: 0.75rem 2rem; background: #007bff; color: white; border-radius: 4px; cursor: pointer; font-weight: 500; }
     .file-btn:hover { background: #0056b3; }
-    .file-name { margin-top: 0.5rem; font-size: 0.85rem; color: #666; }
-    .progress-section { margin-top: 1rem; display: none; }
-    .progress-bar { width: 100%; height: 30px; background: #f0f0f0; border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem; }
-    .progress-fill { height: 100%; background: #28a745; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem; }
-    .data-preview { margin-top: 1.5rem; }
-    .preview-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-    .preview-table th { background: #f0f0f0; padding: 8px; text-align: left; border-bottom: 1px solid #ccc; }
-    .preview-table td { padding: 8px; border-bottom: 1px solid #eee; }
-    .summary-box { background: #f8f9fa; padding: 1rem; border-radius: 4px; margin: 1rem 0; border-left: 4px solid #007bff; }
-    .summary-item { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
-    .summary-label { font-weight: 500; }
-    .summary-value { color: #007bff; font-weight: bold; }
-    .warning-box { background: #fff3cd; border: 1px solid #ffc107; padding: 1rem; border-radius: 4px; margin: 1rem 0; }
-    .error-item { color: #dc3545; font-size: 0.85rem; }
-    .success-item { color: #28a745; font-size: 0.85rem; }
-    .case-match { color: #28a745; }
-    .case-nomatch { color: #dc3545; }
+    .file-name { margin-top: 1rem; font-size: 0.9rem; color: #666; }
+    .file-name strong { color: #007bff; }
+    .tabs { display: flex; gap: 0; border-bottom: 2px solid #e9ecef; margin-bottom: 1.5rem; }
+    .tab-btn { flex: 1; padding: 0.75rem 1.5rem; background: #f8f9fa; border: none; cursor: pointer; font-size: 0.95rem; border-bottom: 3px solid transparent; }
+    .tab-btn.active { background: white; color: #007bff; border-bottom-color: #007bff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .preview-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .preview-table th { background: #f0f0f0; padding: 10px; text-align: left; font-weight: 500; border-bottom: 2px solid #ddd; }
+    .preview-table td { padding: 10px; border-bottom: 1px solid #eee; }
+    .preview-table tbody tr:nth-child(even) { background: #f9f9f9; }
+    .summary-box { background: #f8f9fa; padding: 1rem; border-radius: 4px; border-left: 4px solid #007bff; margin-bottom: 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
+    .summary-item { }
+    .summary-label { font-size: 0.75rem; color: #999; text-transform: uppercase; }
+    .summary-value { font-size: 1.3rem; font-weight: bold; color: #007bff; }
+    .status-badge { display: inline-block; padding: 4px 10px; border-radius: 3px; font-size: 0.75rem; font-weight: 500; }
+    .status-matched { background: #d4edda; color: #155724; }
+    .status-dues { background: #fff3cd; color: #856404; }
+    .scroll-container { max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; }
+    .empty-state { text-align: center; padding: 2rem; color: #999; }
+    .empty-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .progress-section { display: none; margin: 1rem 0; }
+    .progress-bar { width: 100%; height: 30px; background: #f0f0f0; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #28a745, #20c997); transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.85rem; font-weight: 500; }
+    .action-buttons { display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap; }
+    .btn-lg { flex: 1; min-width: 150px; }
+    .warning-box { background: #fff3cd; border: 1px solid #ffc107; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+    .warning-box h4 { margin-top: 0; color: #856404; }
+    .warning-item { color: #856404; font-size: 0.9rem; margin: 0.25rem 0; }
+    .log-item { font-size: 0.85rem; padding: 0.5rem; border-bottom: 1px solid #eee; font-family: monospace; }
+    .log-success { color: #28a745; }
+    .log-warning { color: #ff9800; }
+    .log-error { color: #dc3545; }
   </style>
 </head>
 <body>
 <div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
 <div class="page">
-  <h1>📊 OPD Sales Data Upload & Normalize</h1>
+  <h1>📤 OPD Excel Upload & Preview</h1>
 
   <div class="page-card">
-    <p style="margin-bottom: 1rem; color: #555; font-size: 0.9rem;">
-      Upload Sales Report and Cash Register Excel files. The system will normalize and cross-match case numbers, 
-      append financial years, and upload to Supabase.
+    <p style="margin-bottom: 1rem; color: #555;">
+      Upload the normalized Excel file (created by Python script). Preview the data before uploading to Supabase.
     </p>
 
-    <div class="upload-section">
-      <h3 style="margin-top: 0;">📋 Step 1: Upload Files</h3>
-      
-      <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Sales Report Detail (XLS)</label>
-      <div class="file-input-wrapper">
-        <input type="file" id="saleReportFile" accept=".xls,.xlsx"/>
-        <label for="saleReportFile" class="file-btn">Choose Sales Report File</label>
+    <!-- Step 1: File Upload -->
+    <div style="margin-bottom: 2rem;">
+      <h3>Step 1️⃣: Upload Normalized Excel</h3>
+      <div class="upload-section" id="uploadSection" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+        <div class="file-input-wrapper">
+          <input type="file" id="excelFile" accept=".xlsx,.xls" onchange="handleFileSelect(event)"/>
+          <label for="excelFile" class="file-btn">📁 Choose Excel File or Drag & Drop</label>
+        </div>
+        <div class="file-name">
+          Expecting: opd_normalized.xlsx (from Python script)
+        </div>
+        <div class="file-name" id="selectedFileName"></div>
       </div>
-      <div class="file-name" id="saleReportName">No file selected</div>
-
-      <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; margin-top: 1rem;">Cash Register (XLS)</label>
-      <div class="file-input-wrapper">
-        <input type="file" id="cashRegisterFile" accept=".xls,.xlsx"/>
-        <label for="cashRegisterFile" class="file-btn">Choose Cash Register File</label>
-      </div>
-      <div class="file-name" id="cashRegisterName">No file selected</div>
-
-      <button id="normalizeBtn" class="btn-primary" style="width: 100%; margin-top: 1.5rem;">
-        🔄 Parse & Normalize Files
-      </button>
     </div>
 
-    <div class="progress-section" id="progressSection">
-      <label>Processing Progress</label>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
-      </div>
-      <p id="progressText" style="font-size: 0.85rem; color: #666;">Initializing...</p>
-    </div>
+    <!-- Preview Section -->
+    <div id="previewSection" style="display: none;">
+      <h3>Step 2️⃣: Preview Data</h3>
 
-    <div id="resultsSection" style="display: none;">
-      <h3 style="margin-top: 1.5rem;">📈 Normalization Results</h3>
-
+      <!-- Summary -->
       <div class="summary-box">
         <div class="summary-item">
-          <span class="summary-label">Sales Report Cases:</span>
-          <span class="summary-value" id="saleReportCount">0</span>
+          <div class="summary-label">Matched Cases</div>
+          <div class="summary-value" id="matchedCount">0</div>
         </div>
         <div class="summary-item">
-          <span class="summary-label">Cash Register Entries:</span>
-          <span class="summary-value" id="cashRegisterCount">0</span>
+          <div class="summary-label">Old Dues</div>
+          <div class="summary-value" id="oldDuesCount">0</div>
         </div>
         <div class="summary-item">
-          <span class="summary-label">Matched Cases:</span>
-          <span class="summary-value case-match" id="matchedCount">0</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">Old Dues (Unmatched):</span>
-          <span class="summary-value case-nomatch" id="oldDuesCount">0</span>
+          <div class="summary-label">Total Records</div>
+          <div class="summary-value" id="totalCount">0</div>
         </div>
       </div>
 
+      <!-- Warnings -->
       <div id="warningsSection" style="display: none;">
         <div class="warning-box">
-          <strong>⚠️ Issues Found:</strong>
-          <div id="warningslist" style="margin-top: 0.5rem;"></div>
+          <h4>⚠️ Warnings Found</h4>
+          <div id="warningsList"></div>
         </div>
       </div>
 
-      <h4 style="margin-top: 1.5rem;">Preview: Matched OPD Cases (First 10)</h4>
-      <div style="overflow-x: auto;">
-        <table class="preview-table" id="matchedPreviewTable">
-          <thead>
-            <tr>
-              <th>Case No</th>
-              <th>Date</th>
-              <th>Patient Name</th>
-              <th>Bill Amt</th>
-              <th>Tests</th>
-              <th>Paid</th>
-              <th>Discount</th>
-            </tr>
-          </thead>
-          <tbody id="matchedPreviewBody"></tbody>
-        </table>
+      <!-- Tabs for preview -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('matched')">✓ Matched OPD Cases</button>
+        <button class="tab-btn" onclick="switchTab('dues')">⚠️ Old Dues</button>
+        <button class="tab-btn" onclick="switchTab('log')">📋 Log</button>
       </div>
 
-      <h4 style="margin-top: 1.5rem;">Preview: Old Dues / Unmatched (First 10)</h4>
-      <div style="overflow-x: auto;">
-        <table class="preview-table" id="oldDuesPreviewTable">
-          <thead>
-            <tr>
-              <th>Case No</th>
-              <th>Transaction Date</th>
-              <th>Patient Name</th>
-              <th>Income Amt</th>
-              <th>Discount</th>
-              <th>Remarks</th>
-            </tr>
-          </thead>
-          <tbody id="oldDuesPreviewBody"></tbody>
-        </table>
+      <!-- Matched Cases Tab -->
+      <div id="matched-tab" class="tab-content active">
+        <div class="scroll-container">
+          <table class="preview-table">
+            <thead>
+              <tr id="matchedHeader"></tr>
+            </thead>
+            <tbody id="matchedBody">
+              <tr><td colspan="100" class="empty-state">📭 No matched cases</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div style="margin-top: 1.5rem;">
-        <button id="uploadBtn" class="btn-primary" style="width: 100%;">
-          💾 Upload Normalized Data to Supabase
+      <!-- Old Dues Tab -->
+      <div id="dues-tab" class="tab-content">
+        <div class="scroll-container">
+          <table class="preview-table">
+            <thead>
+              <tr id="duesHeader"></tr>
+            </thead>
+            <tbody id="duesBody">
+              <tr><td colspan="100" class="empty-state">📭 No old dues</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Log Tab -->
+      <div id="log-tab" class="tab-content">
+        <div class="scroll-container" id="logContainer">
+          <div class="empty-state">📭 No log data</div>
+        </div>
+      </div>
+
+      <!-- Upload to Supabase -->
+      <div class="action-buttons">
+        <button class="btn-primary btn-lg" onclick="uploadToSupabase()" style="background: #28a745;">
+          💾 Upload to Supabase
         </button>
-        <button id="resetBtn" class="btn-primary" style="width: 100%; margin-top: 0.5rem; background: #6c757d;">
-          🔄 Reset & Start Over
+        <button class="btn-primary btn-lg" onclick="resetUpload()" style="background: #6c757d;">
+          🔄 Reset
         </button>
+      </div>
+
+      <div class="progress-section" id="progressSection">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
+        </div>
       </div>
     </div>
 
@@ -158,391 +172,276 @@
 
 <script>
   BNH_PAGE.requireRole(["manager", "admin", "accountant"]);
-  
-  let saleReportData = null;
-  let cashRegisterData = null;
-  let normalizedData = null;
 
-  // Helper: Get financial year from date
-  function getFinancialYear(dateStr) {
-    const date = new Date(dateStr);
-    const month = date.getMonth() + 1;
-    const year = date.getFullYear();
-    // Financial year: Apr-Mar (e.g., Apr 2026 = FY 2627)
-    if (month >= 4) {
-      return String(year).slice(2) + String(year + 1).slice(2);
-    } else {
-      return String(year - 1).slice(2) + String(year).slice(2);
-    }
+  let workbookData = null;
+  let matchedData = [];
+  let oldDuesData = [];
+  let logData = null;
+
+  // File handling
+  function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    document.getElementById('selectedFileName').innerHTML = 
+      `<strong>✓ Selected:</strong> ${file.name}`;
+
+    parseExcelFile(file);
   }
 
-  // File input handlers
-  document.getElementById('saleReportFile').addEventListener('change', (e) => {
-    document.getElementById('saleReportName').textContent = e.target.files[0]?.name || 'No file selected';
-  });
-
-  document.getElementById('cashRegisterFile').addEventListener('change', (e) => {
-    document.getElementById('cashRegisterName').textContent = e.target.files[0]?.name || 'No file selected';
-  });
-
-  // Update progress
-  function updateProgress(percent, text) {
-    document.getElementById('progressFill').style.width = percent + '%';
-    document.getElementById('progressFill').textContent = percent + '%';
-    document.getElementById('progressText').textContent = text;
+  function handleDragOver(event) {
+    event.preventDefault();
+    document.getElementById('uploadSection').classList.add('dragover');
   }
 
-  // Parse Sales Report
-  function parseSalesReport(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-          // Find headers (row 7 and 8)
-          let headerRow1 = null, headerRow2 = null, dataStartRow = null;
-          for (let i = 0; i < jsonData.length; i++) {
-            if (jsonData[i][0] === 'Case Dt') { headerRow1 = i; }
-            if (jsonData[i][0] === 'Case No') { headerRow2 = i; }
-            if (jsonData[i][0] && jsonData[i][0].toString().match(/^\d{4}-\d{2}-\d{2}/)) {
-              dataStartRow = i;
-              break;
-            }
-          }
-
-          if (!headerRow1) throw new Error('Sales Report: Could not find headers');
-
-          const cases = [];
-          let currentCaseNo = null, currentDate = null, currentPatient = null, currentTests = [], currentBillAmt = 0;
-
-          for (let i = dataStartRow || headerRow1 + 2; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            if (!row[0]) continue;
-
-            const isDate = row[0]?.toString().match(/^\d{4}-\d{2}-\d{2}/);
-            if (isDate) {
-              if (currentCaseNo && cases) {
-                cases.push({
-                  case_no: currentCaseNo,
-                  case_date: currentDate,
-                  patient_name: currentPatient,
-                  bill_amount: currentBillAmt,
-                  tests: currentTests.join(', ')
-                });
-              }
-              currentDate = row[0];
-              currentCaseNo = row[1] || null;
-              currentPatient = row[2] || null;
-              currentTests = [];
-              currentBillAmt = parseFloat(row[5]) || 0;
-            } else if (currentCaseNo) {
-              // This is a test detail line
-              if (row[0] && row[0].toString().length > 0) {
-                currentTests.push(row[0]);
-              }
-            }
-          }
-
-          // Add last case
-          if (currentCaseNo) {
-            cases.push({
-              case_no: currentCaseNo,
-              case_date: currentDate,
-              patient_name: currentPatient,
-              bill_amount: currentBillAmt,
-              tests: currentTests.join(', ')
-            });
-          }
-
-          resolve(cases);
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    });
+  function handleDragLeave(event) {
+    event.preventDefault();
+    document.getElementById('uploadSection').classList.remove('dragover');
   }
 
-  // Parse Cash Register
-  function parseCashRegister(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-          // Find data start (skip headers and section markers)
-          let dataStartRow = null;
-          for (let i = 0; i < jsonData.length; i++) {
-            if (jsonData[i][0] === 'Sl No' || jsonData[i][1] === 'Case Dt') {
-              dataStartRow = i + 1;
-              break;
-            }
-          }
-
-          const entries = [];
-          for (let i = dataStartRow || 8; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            if (!row[0] || row[0].toString().match(/^(CASH|Cash Receipt|NaN)/i)) continue;
-            if (!row[4]) continue; // Skip if no Case No
-
-            const caseNo = row[4]?.toString().trim();
-            const transDate = row[1];
-            const remarks = row[10] || '';
-            
-            entries.push({
-              trans_no: row[2],
-              trans_date: transDate,
-              case_no: caseNo,
-              patient_name: row[3],
-              entry_by: row[6],
-              income: parseFloat(row[7]) || 0,
-              discount: parseFloat(row[8]) || 0,
-              remarks: remarks
-            });
-          }
-
-          resolve(entries);
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    });
-  }
-
-  // Normalize and match data
-  function normalizeAndMatch(sales, cashReg) {
-    const warnings = [];
-    const normalized = {
-      matched_opd: [],
-      old_dues: [],
-      warnings: warnings
-    };
-
-    // Create lookup for sales cases
-    const salesByRawCase = {};
-    sales.forEach(s => {
-      salesByRawCase[s.case_no] = s;
-    });
-
-    // Process cash register entries
-    const processedCashCases = new Set();
+  function handleDrop(event) {
+    event.preventDefault();
+    document.getElementById('uploadSection').classList.remove('dragover');
     
-    cashReg.forEach(entry => {
-      processedCashCases.add(entry.case_no);
-      
-      // Determine financial year
-      let fy = null;
-      if (entry.remarks && entry.remarks.match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-        const remarksDate = entry.remarks.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-        if (remarksDate) {
-          fy = getFinancialYear(new Date(remarksDate[3], remarksDate[2] - 1, remarksDate[1]));
-        }
-      }
-      if (!fy) {
-        fy = getFinancialYear(entry.trans_date);
-      }
-
-      const fullCaseNo = fy + '/' + entry.case_no;
-
-      // Try to match in sales
-      let matched = false;
-      for (let key in salesByRawCase) {
-        if (key === fullCaseNo || key.endsWith('/' + entry.case_no)) {
-          const saleCase = salesByRawCase[key];
-          normalized.matched_opd.push({
-            case_no: fullCaseNo,
-            case_date: saleCase.case_date,
-            patient_name: entry.patient_name || saleCase.patient_name,
-            bill_amount: saleCase.bill_amount,
-            tests: saleCase.tests,
-            paid_amount: entry.income,
-            discount: entry.discount,
-            trans_no: entry.trans_no,
-            entered_by: entry.entry_by
-          });
-          matched = true;
-          break;
-        }
-      }
-
-      if (!matched) {
-        normalized.old_dues.push({
-          case_no: fullCaseNo,
-          trans_date: entry.trans_date,
-          patient_name: entry.patient_name,
-          income_amount: entry.income,
-          discount: entry.discount,
-          remarks: entry.remarks,
-          trans_no: entry.trans_no
-        });
-      }
-    });
-
-    return normalized;
+    const file = event.dataTransfer.files[0];
+    if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+      document.getElementById('excelFile').files = event.dataTransfer.files;
+      document.getElementById('selectedFileName').innerHTML = 
+        `<strong>✓ Selected:</strong> ${file.name}`;
+      parseExcelFile(file);
+    } else {
+      document.getElementById('err').textContent = 'Please drop an Excel file (.xlsx or .xls)';
+    }
   }
 
-  // Display results
-  function displayResults(data) {
-    const matched = data.matched_opd;
-    const oldDues = data.old_dues;
+  // Parse Excel
+  function parseExcelFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        console.log('Sheet names:', workbook.SheetNames);
 
-    document.getElementById('saleReportCount').textContent = saleReportData.length;
-    document.getElementById('cashRegisterCount').textContent = cashRegisterData.length;
-    document.getElementById('matchedCount').textContent = matched.length;
-    document.getElementById('oldDuesCount').textContent = oldDues.length;
+        // Read matched_opd_cases sheet
+        if (workbook.SheetNames.includes('matched_opd_cases')) {
+          const sheet = workbook.Sheets['matched_opd_cases'];
+          const jsonData = XLSX.utils.sheet_to_json(sheet);
+          matchedData = jsonData.filter(row => Object.values(row).some(v => v !== null && v !== undefined));
+          console.log('Matched cases:', matchedData.length);
+        }
 
-    if (data.warnings.length > 0) {
-      document.getElementById('warningsSection').style.display = 'block';
-      const warningsList = document.getElementById('warningslist');
-      warningsList.innerHTML = data.warnings.map(w => `<div class="error-item">⚠️ ${w}</div>`).join('');
+        // Read old_dues sheet
+        if (workbook.SheetNames.includes('old_dues')) {
+          const sheet = workbook.Sheets['old_dues'];
+          const jsonData = XLSX.utils.sheet_to_json(sheet);
+          oldDuesData = jsonData.filter(row => Object.values(row).some(v => v !== null && v !== undefined));
+          console.log('Old dues:', oldDuesData.length);
+        }
+
+        // Read normalization_log sheet
+        if (workbook.SheetNames.includes('normalization_log')) {
+          const sheet = workbook.Sheets['normalization_log'];
+          const jsonData = XLSX.utils.sheet_to_json(sheet);
+          logData = jsonData[0] || null;
+          console.log('Log data:', logData);
+        }
+
+        displayPreview();
+        document.getElementById('previewSection').style.display = 'block';
+        document.getElementById('err').textContent = '';
+
+      } catch (error) {
+        document.getElementById('err').textContent = 'Error parsing Excel file: ' + error.message;
+        document.getElementById('previewSection').style.display = 'none';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // Display preview
+  function displayPreview() {
+    // Update summary
+    document.getElementById('matchedCount').textContent = matchedData.length;
+    document.getElementById('oldDuesCount').textContent = oldDuesData.length;
+    document.getElementById('totalCount').textContent = matchedData.length + oldDuesData.length;
+
+    // Display matched cases
+    if (matchedData.length > 0) {
+      const headers = Object.keys(matchedData[0]);
+      const headerRow = document.getElementById('matchedHeader');
+      headerRow.innerHTML = headers.map(h => `<th>${h}</th>`).join('');
+
+      const tbody = document.getElementById('matchedBody');
+      tbody.innerHTML = matchedData.slice(0, 50).map(row => `
+        <tr>
+          ${headers.map(h => `<td>${row[h] !== null ? row[h] : '-'}</td>`).join('')}
+        </tr>
+      `).join('');
+
+      if (matchedData.length > 50) {
+        tbody.innerHTML += `
+          <tr style="background: #f0f0f0;">
+            <td colspan="${headers.length}" style="text-align: center; padding: 1rem; color: #999;">
+              ... and ${matchedData.length - 50} more records
+            </td>
+          </tr>
+        `;
+      }
     }
 
-    // Matched preview
-    const matchedBody = document.getElementById('matchedPreviewBody');
-    matchedBody.innerHTML = matched.slice(0, 10).map(m => `
-      <tr>
-        <td><strong>${m.case_no}</strong></td>
-        <td>${m.case_date}</td>
-        <td>${m.patient_name}</td>
-        <td>${m.bill_amount}</td>
-        <td style="font-size: 0.75rem;">${m.tests.substring(0, 50)}...</td>
-        <td>₹${m.paid_amount}</td>
-        <td>₹${m.discount}</td>
-      </tr>
-    `).join('');
+    // Display old dues
+    if (oldDuesData.length > 0) {
+      const headers = Object.keys(oldDuesData[0]);
+      const headerRow = document.getElementById('duesHeader');
+      headerRow.innerHTML = headers.map(h => `<th>${h}</th>`).join('');
 
-    // Old dues preview
-    const oldDuesBody = document.getElementById('oldDuesPreviewBody');
-    oldDuesBody.innerHTML = oldDues.slice(0, 10).map(o => `
-      <tr>
-        <td><strong>${o.case_no}</strong></td>
-        <td>${o.trans_date}</td>
-        <td>${o.patient_name}</td>
-        <td>₹${o.income_amount}</td>
-        <td>₹${o.discount}</td>
-        <td style="font-size: 0.75rem;">${o.remarks || '-'}</td>
-      </tr>
-    `).join('');
+      const tbody = document.getElementById('duesBody');
+      tbody.innerHTML = oldDuesData.slice(0, 50).map(row => `
+        <tr style="background: #fffbf0;">
+          ${headers.map(h => `<td>${row[h] !== null ? row[h] : '-'}</td>`).join('')}
+        </tr>
+      `).join('');
 
-    document.getElementById('resultsSection').style.display = 'block';
+      if (oldDuesData.length > 50) {
+        tbody.innerHTML += `
+          <tr style="background: #f0f0f0;">
+            <td colspan="${headers.length}" style="text-align: center; padding: 1rem; color: #999;">
+              ... and ${oldDuesData.length - 50} more records
+            </td>
+          </tr>
+        `;
+      }
+    } else {
+      document.getElementById('duesBody').innerHTML = 
+        '<tr><td colspan="100" class="empty-state">✅ No old dues found!</td></tr>';
+    }
+
+    // Display log
+    if (logData) {
+      const logHtml = `
+        <div class="log-item log-success">✓ Normalization Status: ${logData['Status'] || 'Complete'}</div>
+        <div class="log-item">📊 Matched Cases: ${logData['Matched Cases'] || 0}</div>
+        <div class="log-item">⚠️  Old Dues: ${logData['Old Dues'] || 0}</div>
+        <div class="log-item">📈 Total Entries: ${logData['Total Entries'] || 0}</div>
+        <div class="log-item">⏱️ Timestamp: ${logData['Timestamp'] || 'N/A'}</div>
+        ${logData['Warnings'] ? `<div class="log-item log-warning">⚠️ Warnings:\n${logData['Warnings']}</div>` : ''}
+      `;
+      document.getElementById('logContainer').innerHTML = logHtml;
+    }
+
+    // Show warnings if any
+    if (logData && logData['Warnings']) {
+      document.getElementById('warningsSection').style.display = 'block';
+      document.getElementById('warningsList').innerHTML = 
+        `<div class="warning-item">⚠️ ${logData['Warnings']}</div>`;
+    }
   }
 
-  // Parse and normalize
-  document.getElementById('normalizeBtn').addEventListener('click', async () => {
-    const saleFile = document.getElementById('saleReportFile').files[0];
-    const cashFile = document.getElementById('cashRegisterFile').files[0];
-    const err = document.getElementById('err');
-    const prog = document.getElementById('progressSection');
+  // Tab switching
+  function switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
 
-    err.textContent = '';
-    if (!saleFile || !cashFile) {
-      err.textContent = 'Please select both files';
+    event.target.classList.add('active');
+    document.getElementById(tabName + '-tab').classList.add('active');
+  }
+
+  // Upload to Supabase
+  async function uploadToSupabase() {
+    if (matchedData.length === 0 && oldDuesData.length === 0) {
+      document.getElementById('err').textContent = 'No data to upload';
       return;
     }
 
-    prog.style.display = 'block';
-    document.getElementById('resultsSection').style.display = 'none';
-
-    try {
-      updateProgress(10, 'Parsing Sales Report...');
-      saleReportData = await parseSalesReport(saleFile);
-      updateProgress(50, 'Parsing Cash Register...');
-      cashRegisterData = await parseCashRegister(cashFile);
-      updateProgress(75, 'Normalizing and matching data...');
-      normalizedData = normalizeAndMatch(saleReportData, cashRegisterData);
-      updateProgress(100, 'Done!');
-      displayResults(normalizedData);
-    } catch (ex) {
-      err.textContent = 'Error parsing files: ' + ex.message;
-      prog.style.display = 'none';
-    }
-  });
-
-  // Upload to Supabase
-  document.getElementById('uploadBtn').addEventListener('click', async () => {
-    if (!normalizedData) return;
     const spinner = document.getElementById('spinner');
     const err = document.getElementById('err');
     const ok = document.getElementById('ok');
+    const progress = document.getElementById('progressSection');
 
-    spinner.classList.remove('hidden');
     err.textContent = '';
     ok.style.display = 'none';
+    progress.style.display = 'block';
+    spinner.classList.remove('hidden');
 
     try {
-      const payload = normalizedData.matched_opd.map(m => BNH_PAGE.stamp({
-        case_no: m.case_no,
-        case_date: m.case_date,
-        patient_name: m.patient_name,
-        bill_amount: m.bill_amount,
-        tests: m.tests,
-        paid_amount: m.paid_amount,
-        discount: m.discount,
-        trans_no: m.trans_no,
-        entered_by: m.entered_by,
-        status: 'pending_refer'  // Needs refer linking
+      // Prepare payloads
+      const matchedPayload = matchedData.map(m => BNH_PAGE.stamp({
+        case_no: m['case_no'],
+        case_date: m['case_date'],
+        patient_name: m['patient_name'],
+        bill_amount: parseFloat(m['bill_amount'] || 0),
+        paid_amount: parseFloat(m['paid_amount'] || 0),
+        discount: parseFloat(m['discount'] || 0),
+        tests: m['tests'],
+        trans_no: m['trans_no'],
+        entered_by: m['entry_by'],
+        status: 'pending_refer'
       }));
 
-      // Also upload old dues
-      const oldDuesPayload = normalizedData.old_dues.map(o => BNH_PAGE.stamp({
-        case_no: o.case_no,
-        trans_date: o.trans_date,
-        patient_name: o.patient_name,
-        income_amount: o.income_amount,
-        discount: o.discount,
-        remarks: o.remarks,
-        trans_no: o.trans_no,
+      const oldDuesPayload = oldDuesData.map(o => BNH_PAGE.stamp({
+        case_no: o['case_no'],
+        trans_date: o['trans_date'],
+        trans_no: o['trans_no'],
+        patient_name: o['patient_name'],
+        income_amount: parseFloat(o['income_amount'] || 0),
+        discount: parseFloat(o['discount'] || 0),
+        remarks: o['remarks'],
         type: 'old_dues'
       }));
 
-      if (payload.length > 0) {
-        const { error } = await BNH_PAGE.sb.from('opd_cases').insert(payload);
-        if (error) throw error;
+      // Upload matched cases
+      if (matchedPayload.length > 0) {
+        document.getElementById('progressFill').style.width = '40%';
+        document.getElementById('progressFill').textContent = '40%';
+
+        const { error } = await BNH_PAGE.sb.from('opd_cases').insert(matchedPayload);
+        if (error) throw new Error(`OPD cases upload error: ${error.message}`);
+
+        console.log(`✓ Uploaded ${matchedPayload.length} matched cases`);
       }
 
+      // Upload old dues
       if (oldDuesPayload.length > 0) {
+        document.getElementById('progressFill').style.width = '70%';
+        document.getElementById('progressFill').textContent = '70%';
+
         const { error } = await BNH_PAGE.sb.from('opd_old_dues').insert(oldDuesPayload);
-        if (error) throw error;
+        if (error) throw new Error(`Old dues upload error: ${error.message}`);
+
+        console.log(`✓ Uploaded ${oldDuesPayload.length} old dues entries`);
       }
+
+      document.getElementById('progressFill').style.width = '100%';
+      document.getElementById('progressFill').textContent = '100%';
 
       ok.style.display = 'block';
-      ok.textContent = `✅ Uploaded successfully! ${payload.length} OPD cases + ${oldDuesPayload.length} old dues`;
+      ok.textContent = `✅ Success! Uploaded ${matchedPayload.length} OPD cases + ${oldDuesPayload.length} old dues to Supabase`;
+
       setTimeout(() => {
-        document.getElementById('saleReportFile').value = '';
-        document.getElementById('cashRegisterFile').value = '';
-        document.getElementById('saleReportName').textContent = 'No file selected';
-        document.getElementById('cashRegisterName').textContent = 'No file selected';
-        document.getElementById('resultsSection').style.display = 'none';
-      }, 2000);
-    } catch (ex) {
-      err.textContent = 'Upload error: ' + ex.message;
+        ok.style.display = 'none';
+        resetUpload();
+      }, 3000);
+
+    } catch (error) {
+      err.textContent = 'Upload error: ' + error.message;
+      console.error('Upload error:', error);
     } finally {
       spinner.classList.add('hidden');
+      progress.style.display = 'none';
     }
-  });
+  }
 
   // Reset
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    saleReportData = null;
-    cashRegisterData = null;
-    normalizedData = null;
-    document.getElementById('saleReportFile').value = '';
-    document.getElementById('cashRegisterFile').value = '';
-    document.getElementById('saleReportName').textContent = 'No file selected';
-    document.getElementById('cashRegisterName').textContent = 'No file selected';
-    document.getElementById('resultsSection').style.display = 'none';
-    document.getElementById('progressSection').style.display = 'none';
-    document.getElementById('err').textContent = '';
-  });
+  function resetUpload() {
+    document.getElementById('excelFile').value = '';
+    document.getElementById('selectedFileName').innerHTML = '';
+    document.getElementById('previewSection').style.display = 'none';
+    matchedData = [];
+    oldDuesData = [];
+    logData = null;
+  }
 </script>
 </body>
 </html>
