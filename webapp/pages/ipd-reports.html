@@ -156,7 +156,7 @@
         BNH_PAGE.sb.from('ipd_cash_receipts').select('*').eq('admission_id', admId).order('receipt_date'),
         BNH_PAGE.sb.from('ipd_additional_charges').select('*').eq('admission_id', admId),
         BNH_PAGE.sb.from('ipd_medicine_indens').select('*').eq('admission_id', admId),
-        BNH_PAGE.sb.from('ipd_opd_bills').select('*').eq('admission_no', adm.admission_no),
+        BNH_PAGE.sb.from('opd_cases').select('*').eq('ipd_admission_id', admId),
         adm.refer_id
           ? BNH_PAGE.sb.from('ipd_refer_payments').select('*').eq('refer_id', adm.refer_id)
           : Promise.resolve({ data: [] })
