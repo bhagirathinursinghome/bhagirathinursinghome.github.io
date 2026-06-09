@@ -75,7 +75,7 @@
       label: "QUACK DOCTOR",
       icon: "👨‍⚕️",
       page: "pages/gramin-visit-manager.html",
-      roles: ["admin", "accountant", "manager"]
+      roles: ["admin", "accountant", "manager", "viewer"]
     },
 
     // =====================
