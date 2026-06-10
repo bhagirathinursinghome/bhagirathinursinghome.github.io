@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Edit Employee</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .search-bar{display:flex;gap:.75rem;margin-bottom:1.25rem;align-items:center;}
+    .search-bar input{flex:1;padding:.55rem .9rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;}
+    .emp-list{display:grid;gap:.6rem;margin-bottom:1.5rem;}
+    .emp-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:.85rem 1.1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color .15s;}
+    .emp-card:hover{border-color:#1a56db;}
+    .emp-card.selected{border-color:#1a56db;background:#eef2ff;}
+    .emp-card .emp-name{font-weight:600;font-size:.97rem;}
+    .emp-card .emp-meta{font-size:.82rem;color:#6b7280;}
+    .badge{display:inline-block;padding:.15rem .65rem;border-radius:20px;font-size:.78rem;font-weight:600;}
+    .badge.active{background:#d1fae5;color:#065f46;}
+    .badge.inactive{background:#fee2e2;color:#991b1b;}
+    .section-title{font-weight:700;font-size:1rem;margin:1.25rem 0 .75rem;padding-bottom:.4rem;border-bottom:2px solid #e5e7eb;}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.25rem;}
+    @media(max-width:600px){.form-grid{grid-template-columns:1fr;}}
+    .span2{grid-column:1/-1;}
+    select{width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;background:#fff;}
+    .inline-row{display:flex;gap:.75rem;align-items:flex-end;}
+    .inline-row select{flex:1;}
+    .btn-sm{padding:.4rem .9rem;font-size:.85rem;border-radius:7px;border:none;cursor:pointer;background:#1a56db;color:#fff;}
+    .btn-danger{background:#dc2626;color:#fff;padding:.5rem 1.2rem;border:none;border-radius:8px;cursor:pointer;font-size:.9rem;}
+    .btn-warning{background:#d97706;color:#fff;padding:.5rem 1.2rem;border:none;border-radius:8px;cursor:pointer;font-size:.9rem;}
+    .salary-hist{margin-top:.5rem;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;}
+    .salary-hist table{width:100%;border-collapse:collapse;font-size:.87rem;}
+    .salary-hist th{background:#f3f4f6;padding:.5rem .75rem;text-align:left;font-weight:600;}
+    .salary-hist td{padding:.5rem .75rem;border-top:1px solid #e5e7eb;}
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;align-items:center;justify-content:center;}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:#fff;border-radius:12px;padding:2rem;min-width:320px;max-width:440px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.18);}
+    .modal-box h3{margin:0 0 1rem;}
+    .modal-actions{display:flex;gap:.75rem;margin-top:1.25rem;justify-content:flex-end;}
+    .appraisal-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:1rem 1.25rem;margin-top:.5rem;}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<!-- Appraisal Modal -->
+<div class="modal-overlay" id="appraisalModal">
+  <div class="modal-box">
+    <h3>📈 Salary Appraisal</h3>
+    <p id="appraisalCurrentSalary" style="font-size:.9rem;color:#6b7280;margin-bottom:.75rem;"></p>
+    <label>New Salary (₹) <span style="color:red">*</span></label>
+    <input id="newSalary" type="number" min="0" step="1" placeholder="Enter new salary"/>
+    <label style="margin-top:.75rem;">Effective Date <span style="color:red">*</span></label>
+    <input id="appraisalDate" type="date"/>
+    <label style="margin-top:.75rem;">Remarks</label>
+    <input id="appraisalRemarks" placeholder="e.g. Annual increment"/>
+    <p class="err" id="appraisalErr" style="margin:.5rem 0 0;"></p>
+    <div class="modal-actions">
+      <button class="btn-sm" style="background:#6b7280;" onclick="closeAppraisalModal()">Cancel</button>
+      <button class="btn-sm" onclick="saveAppraisal()">Save Appraisal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Inactive Confirm Modal -->
+<div class="modal-overlay" id="inactiveModal">
+  <div class="modal-box">
+    <h3>⚠️ Mark Employee Inactive</h3>
+    <p>Are you sure you want to mark <strong id="inactiveName"></strong> as inactive?</p>
+    <label>Inactive Date <span style="color:red">*</span></label>
+    <input id="inactiveDate" type="date"/>
+    <label style="margin-top:.75rem;">Reason</label>
+    <input id="inactiveReason" placeholder="Resignation / Termination etc."/>
+    <p class="err" id="inactiveErr" style="margin:.5rem 0 0;"></p>
+    <div class="modal-actions">
+      <button class="btn-sm" style="background:#6b7280;" onclick="closeInactiveModal()">Cancel</button>
+      <button class="btn-sm" style="background:#dc2626;" onclick="confirmInactive()">Mark Inactive</button>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <h1>✏️ Edit Employee</h1>
+
+  <!-- Employee Picker -->
+  <div class="page-card">
+    <div class="search-bar">
+      <input id="searchInput" placeholder="🔍 Search by name or designation…" oninput="filterList()"/>
+    </div>
+    <div class="emp-list" id="empList"><p style="color:#9ca3af;font-size:.9rem;">Loading…</p></div>
+  </div>
+
+  <!-- Edit Form (hidden until employee selected) -->
+  <div class="page-card" id="editSection" style="display:none;">
+    <div class="section-title">📋 Employee Details</div>
+    <form id="editForm">
+      <div class="form-grid">
+        <div>
+          <label>Employee Name <span style="color:red">*</span></label>
+          <input id="eName" required/>
+        </div>
+        <div>
+          <label>Designation <span style="color:red">*</span></label>
+          <div class="inline-row">
+            <select id="eDesignation" required><option value="">— Select —</option></select>
+          </div>
+        </div>
+        <div>
+          <label>Mobile</label>
+          <input id="eMobile" type="tel"/>
+        </div>
+        <div>
+          <label>Gender</label>
+          <select id="eGender">
+            <option value="">— Select —</option>
+            <option>Male</option><option>Female</option><option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label>Joining Date</label>
+          <input id="eJoiningDate" type="date"/>
+        </div>
+        <div>
+          <label>Current Salary (₹)</label>
+          <input id="eSalary" type="number" readonly style="background:#f3f4f6;cursor:not-allowed;"/>
+        </div>
+        <div class="span2">
+          <label>Address</label>
+          <input id="eAddress"/>
+        </div>
+        <div class="span2" style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.25rem;">
+          <button type="submit" class="btn-primary" style="width:auto;padding:.6rem 1.75rem;">💾 Update Details</button>
+          <button type="button" class="btn-sm" style="background:#059669;padding:.6rem 1.25rem;font-size:.9rem;" onclick="openAppraisalModal()">📈 Salary Appraisal</button>
+          <button type="button" class="btn-danger" id="inactiveBtn" onclick="openInactiveModal()">🚫 Mark Inactive</button>
+        </div>
+        <div class="span2">
+          <p class="err" id="editErr"></p>
+          <p class="info" id="editOk" style="display:none;"></p>
+        </div>
+      </div>
+    </form>
+
+    <!-- Salary History -->
+    <div class="section-title" style="margin-top:1.5rem;">💰 Salary History</div>
+    <div class="salary-hist">
+      <table>
+        <thead><tr><th>Date</th><th>Salary (₹)</th><th>Remarks</th><th>By</th></tr></thead>
+        <tbody id="salaryHistBody"><tr><td colspan="4" style="color:#9ca3af;text-align:center;padding:.75rem;">Select an employee</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","manager"]);
+
+  let allEmployees = [], selectedEmp = null;
+
+  async function loadDesignations(){
+    const {data} = await BNH_PAGE.sb.from('designations').select('*').order('name');
+    const sel = document.getElementById('eDesignation');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Select —</option>';
+    (data||[]).forEach(d=>{
+      const o=document.createElement('option');
+      o.value=d.id; o.textContent=d.name; sel.appendChild(o);
+    });
+    if(cur) sel.value=cur;
+  }
+
+  async function loadEmployees(){
+    const {data} = await BNH_PAGE.sb.from('employees')
+      .select('*, designations(name)')
+      .order('name');
+    allEmployees = data||[];
+    renderList(allEmployees);
+  }
+
+  function renderList(list){
+    const el = document.getElementById('empList');
+    if(!list.length){ el.innerHTML='<p style="color:#9ca3af;font-size:.9rem;">No employees found.</p>'; return; }
+    el.innerHTML = list.map(e=>`
+      <div class="emp-card ${selectedEmp?.id===e.id?'selected':''}" onclick="selectEmp('${e.id}')">
+        <div>
+          <div class="emp-name">${e.name}</div>
+          <div class="emp-meta">${e.designations?.name||'—'} &nbsp;|&nbsp; ₹${(e.salary||0).toLocaleString('en-IN')}</div>
+        </div>
+        <span class="badge ${e.is_active?'active':'inactive'}">${e.is_active?'Active':'Inactive'}</span>
+      </div>`).join('');
+  }
+
+  function filterList(){
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    renderList(allEmployees.filter(e=>
+      e.name.toLowerCase().includes(q) || (e.designations?.name||'').toLowerCase().includes(q)
+    ));
+  }
+
+  async function selectEmp(id){
+    selectedEmp = allEmployees.find(e=>e.id===id);
+    if(!selectedEmp) return;
+    await loadDesignations();
+    document.getElementById('eName').value = selectedEmp.name||'';
+    document.getElementById('eDesignation').value = selectedEmp.designation_id||'';
+    document.getElementById('eMobile').value = selectedEmp.mobile||'';
+    document.getElementById('eGender').value = selectedEmp.gender||'';
+    document.getElementById('eJoiningDate').value = selectedEmp.joining_date||'';
+    document.getElementById('eSalary').value = selectedEmp.salary||'';
+    document.getElementById('eAddress').value = selectedEmp.address||'';
+    const inactiveBtn = document.getElementById('inactiveBtn');
+    if(selectedEmp.is_active){
+      inactiveBtn.style.display=''; inactiveBtn.textContent='🚫 Mark Inactive';
+    } else {
+      inactiveBtn.style.display='none';
+    }
+    document.getElementById('editSection').style.display='';
+    document.getElementById('editErr').textContent='';
+    document.getElementById('editOk').style.display='none';
+    await loadSalaryHistory();
+    renderList(allEmployees);
+    document.getElementById('editSection').scrollIntoView({behavior:'smooth'});
+  }
+
+  async function loadSalaryHistory(){
+    if(!selectedEmp) return;
+    const {data} = await BNH_PAGE.sb.from('salary_history')
+      .select('*').eq('employee_id',selectedEmp.id).order('effective_date',{ascending:false});
+    const tbody = document.getElementById('salaryHistBody');
+    if(!data?.length){ tbody.innerHTML='<tr><td colspan="4" style="color:#9ca3af;text-align:center;padding:.75rem;">No history yet.</td></tr>'; return; }
+    tbody.innerHTML = data.map(r=>`
+      <tr>
+        <td>${r.effective_date||''}</td>
+        <td>₹${(r.salary||0).toLocaleString('en-IN')}</td>
+        <td>${r.remarks||'—'}</td>
+        <td>${r.recorded_by_name||r.recorded_by||'—'}</td>
+      </tr>`).join('');
+  }
+
+  document.getElementById('editForm').onsubmit = async (e)=>{
+    e.preventDefault();
+    if(!selectedEmp) return;
+    const spinner=document.getElementById('spinner'); spinner.classList.remove('hidden');
+    document.getElementById('editErr').textContent='';
+    document.getElementById('editOk').style.display='none';
+    try{
+      const payload = BNH_PAGE.stamp({
+        name: document.getElementById('eName').value.trim(),
+        designation_id: document.getElementById('eDesignation').value,
+        mobile: document.getElementById('eMobile').value.trim(),
+        gender: document.getElementById('eGender').value,
+        joining_date: document.getElementById('eJoiningDate').value,
+        address: document.getElementById('eAddress').value.trim(),
+      });
+      const {error} = await BNH_PAGE.sb.from('employees').update(payload).eq('id',selectedEmp.id);
+      if(error) throw error;
+      document.getElementById('editOk').style.display='block';
+      document.getElementById('editOk').textContent='✅ Employee updated.';
+      await loadEmployees();
+      selectedEmp = allEmployees.find(e=>e.id===selectedEmp.id);
+    } catch(err){
+      document.getElementById('editErr').textContent=err.message;
+    } finally{ spinner.classList.add('hidden'); }
+  };
+
+  // --- Appraisal ---
+  function openAppraisalModal(){
+    if(!selectedEmp) return;
+    document.getElementById('appraisalCurrentSalary').textContent='Current salary: ₹'+(selectedEmp.salary||0).toLocaleString('en-IN');
+    document.getElementById('newSalary').value='';
+    document.getElementById('appraisalDate').value=new Date().toISOString().split('T')[0];
+    document.getElementById('appraisalRemarks').value='';
+    document.getElementById('appraisalErr').textContent='';
+    document.getElementById('appraisalModal').classList.add('open');
+  }
+  function closeAppraisalModal(){ document.getElementById('appraisalModal').classList.remove('open'); }
+
+  async function saveAppraisal(){
+    const newSal = parseFloat(document.getElementById('newSalary').value);
+    const date = document.getElementById('appraisalDate').value;
+    const remarks = document.getElementById('appraisalRemarks').value.trim();
+    if(!newSal||newSal<=0){ document.getElementById('appraisalErr').textContent='Enter a valid salary.'; return; }
+    if(!date){ document.getElementById('appraisalErr').textContent='Effective date is required.'; return; }
+    const spinner=document.getElementById('spinner'); spinner.classList.remove('hidden');
+    try{
+      // Update employee current salary
+      const {error:e1} = await BNH_PAGE.sb.from('employees').update(BNH_PAGE.stamp({salary:newSal})).eq('id',selectedEmp.id);
+      if(e1) throw e1;
+      // Insert history record
+      const {error:e2} = await BNH_PAGE.sb.from('salary_history').insert(BNH_PAGE.stamp({
+        employee_id: selectedEmp.id,
+        salary: newSal,
+        effective_date: date,
+        remarks: remarks||'Salary appraisal'
+      }));
+      if(e2) throw e2;
+      closeAppraisalModal();
+      await loadEmployees();
+      selectedEmp = allEmployees.find(e=>e.id===selectedEmp.id);
+      document.getElementById('eSalary').value = selectedEmp.salary;
+      await loadSalaryHistory();
+      document.getElementById('editOk').style.display='block';
+      document.getElementById('editOk').textContent='✅ Appraisal saved. New salary: ₹'+newSal.toLocaleString('en-IN');
+    } catch(err){
+      document.getElementById('appraisalErr').textContent=err.message;
+    } finally{ spinner.classList.add('hidden'); }
+  }
+
+  // --- Inactive ---
+  function openInactiveModal(){
+    if(!selectedEmp) return;
+    document.getElementById('inactiveName').textContent=selectedEmp.name;
+    document.getElementById('inactiveDate').value=new Date().toISOString().split('T')[0];
+    document.getElementById('inactiveReason').value='';
+    document.getElementById('inactiveErr').textContent='';
+    document.getElementById('inactiveModal').classList.add('open');
+  }
+  function closeInactiveModal(){ document.getElementById('inactiveModal').classList.remove('open'); }
+
+  async function confirmInactive(){
+    const date = document.getElementById('inactiveDate').value;
+    const reason = document.getElementById('inactiveReason').value.trim();
+    if(!date){ document.getElementById('inactiveErr').textContent='Date is required.'; return; }
+    const spinner=document.getElementById('spinner'); spinner.classList.remove('hidden');
+    try{
+      const {error} = await BNH_PAGE.sb.from('employees').update(BNH_PAGE.stamp({
+        is_active: false,
+        inactive_date: date,
+        inactive_reason: reason
+      })).eq('id',selectedEmp.id);
+      if(error) throw error;
+      closeInactiveModal();
+      await loadEmployees();
+      selectedEmp = allEmployees.find(e=>e.id===selectedEmp.id);
+      document.getElementById('inactiveBtn').style.display='none';
+      document.getElementById('editOk').style.display='block';
+      document.getElementById('editOk').textContent='Employee marked inactive.';
+      renderList(allEmployees);
+    } catch(err){
+      document.getElementById('inactiveErr').textContent=err.message;
+    } finally{ spinner.classList.add('hidden'); }
+  }
+
+  loadDesignations();
+  loadEmployees();
+</script>
+</body>
+</html>

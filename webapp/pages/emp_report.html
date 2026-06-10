@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Employees</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .filter-row{display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-bottom:1.25rem;}
+    .filter-row label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:.25rem;display:block;}
+    .filter-row input,.filter-row select{padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;background:#fff;min-width:140px;}
+    .btn-sm{padding:.45rem 1rem;font-size:.85rem;border-radius:7px;border:none;cursor:pointer;background:#1a56db;color:#fff;}
+    .btn-outline{background:#fff;border:1px solid #d1d5db;color:#374151;}
+    table{width:100%;border-collapse:collapse;font-size:.9rem;}
+    th{background:#f3f4f6;padding:.6rem .85rem;text-align:left;font-weight:600;font-size:.84rem;border-bottom:2px solid #e5e7eb;}
+    td{padding:.6rem .85rem;border-bottom:1px solid #f3f4f6;}
+    tr:hover td{background:#f9fafb;}
+    .badge{display:inline-block;padding:.15rem .65rem;border-radius:20px;font-size:.78rem;font-weight:600;}
+    .badge.active{background:#d1fae5;color:#065f46;}
+    .badge.inactive{background:#fee2e2;color:#991b1b;}
+    .badge.due{background:#fef3c7;color:#92400e;}
+    .badge.paid{background:#d1fae5;color:#065f46;}
+    .row-link{cursor:pointer;}
+    /* Detail drawer */
+    .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:900;}
+    .drawer-overlay.open{display:block;}
+    .drawer{position:fixed;right:0;top:0;bottom:0;width:min(420px,100vw);background:#fff;box-shadow:-4px 0 24px rgba(0,0,0,.15);z-index:901;overflow-y:auto;padding:1.5rem;transition:transform .25s;}
+    .drawer h2{margin:0 0 .25rem;font-size:1.15rem;}
+    .drawer .sub{color:#6b7280;font-size:.85rem;margin-bottom:1rem;}
+    .detail-row{display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid #f3f4f6;font-size:.9rem;}
+    .detail-row span:first-child{color:#6b7280;}
+    .detail-row span:last-child{font-weight:600;text-align:right;}
+    .section-title{font-weight:700;font-size:.95rem;margin:1.1rem 0 .6rem;padding-bottom:.3rem;border-bottom:2px solid #e5e7eb;}
+    .hist-table{width:100%;border-collapse:collapse;font-size:.85rem;}
+    .hist-table th{background:#f3f4f6;padding:.4rem .6rem;font-weight:600;text-align:left;}
+    .hist-table td{padding:.4rem .6rem;border-top:1px solid #f0f0f0;}
+    .stats-row{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;}
+    .stat-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:.7rem 1rem;flex:1;min-width:110px;text-align:center;}
+    .stat-box .val{font-size:1.3rem;font-weight:700;color:#1a56db;}
+    .stat-box .lbl{font-size:.78rem;color:#6b7280;margin-top:.1rem;}
+    .close-btn{float:right;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6b7280;margin-top:-.25rem;}
+    .empty{text-align:center;color:#9ca3af;padding:2rem;font-size:.92rem;}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<!-- Detail Drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <button class="close-btn" onclick="closeDrawer()">✕</button>
+  <h2 id="dName">—</h2>
+  <div class="sub" id="dDesig">—</div>
+  <div id="dDetails"></div>
+  <div class="section-title">💰 Salary History</div>
+  <table class="hist-table"><thead><tr><th>Date</th><th>Salary (₹)</th><th>Remarks</th></tr></thead>
+    <tbody id="dSalaryHist"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
+  </table>
+</div>
+
+<div class="page">
+  <h1>👥 Employees</h1>
+
+  <!-- Stats -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-box"><div class="val" id="statTotal">—</div><div class="lbl">Total</div></div>
+    <div class="stat-box"><div class="val" id="statActive">—</div><div class="lbl">Active</div></div>
+    <div class="stat-box"><div class="val" id="statInactive">—</div><div class="lbl">Inactive</div></div>
+    <div class="stat-box"><div class="val" id="statDue">—</div><div class="lbl">Salary Due</div></div>
+  </div>
+
+  <div class="page-card">
+    <!-- Filters -->
+    <div class="filter-row">
+      <div>
+        <label>Search Name</label>
+        <input id="fName" placeholder="Employee name…" oninput="applyFilters()"/>
+      </div>
+      <div>
+        <label>Designation</label>
+        <select id="fDesig" onchange="applyFilters()">
+          <option value="">All Designations</option>
+        </select>
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="fStatus" onchange="applyFilters()">
+          <option value="">All</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div>
+        <label>Month</label>
+        <select id="fMonth" onchange="applyFilters()">
+          <option value="">All Months</option>
+          <option value="1">January</option><option value="2">February</option>
+          <option value="3">March</option><option value="4">April</option>
+          <option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option>
+          <option value="9">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div>
+        <label>Year</label>
+        <input id="fYear" type="number" min="2000" max="2100" placeholder="e.g. 2025" style="width:100px;" oninput="applyFilters()"/>
+      </div>
+      <div>
+        <label>Salary Due Only</label>
+        <select id="fDue" onchange="applyFilters()">
+          <option value="">All</option>
+          <option value="due">Due Only</option>
+          <option value="paid">Paid Only</option>
+        </select>
+      </div>
+      <div style="align-self:flex-end;">
+        <button class="btn-sm btn-outline" onclick="clearFilters()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div style="overflow-x:auto;">
+      <table id="empTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Designation</th>
+            <th>Salary (₹)</th>
+            <th>Joining Date</th>
+            <th>Status</th>
+            <th>Salary Status</th>
+          </tr>
+        </thead>
+        <tbody id="empTbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["*"]);
+
+  let allEmployees=[], salaryPayments={}, designationMap={};
+
+  const MONTHS = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  async function init(){
+    const spinner=document.getElementById('spinner'); spinner.classList.remove('hidden');
+    try{
+      const [{data:emps},{data:desigs},{data:payments}] = await Promise.all([
+        BNH_PAGE.sb.from('employees').select('*, designations(id,name)').order('name'),
+        BNH_PAGE.sb.from('designations').select('*').order('name'),
+        BNH_PAGE.sb.from('salary_payments').select('*')
+      ]);
+      allEmployees = emps||[];
+      // Populate designation filter
+      const sel=document.getElementById('fDesig');
+      (desigs||[]).forEach(d=>{
+        designationMap[d.id]=d.name;
+        const o=document.createElement('option'); o.value=d.id; o.textContent=d.name; sel.appendChild(o);
+      });
+      // Build payment map: key = empId_YYYY_MM
+      (payments||[]).forEach(p=>{ salaryPayments[`${p.employee_id}_${p.year}_${p.month}`]=(p.amount_paid||0); });
+      // Set current month/year defaults
+      const now=new Date();
+      document.getElementById('fMonth').value=now.getMonth()+1;
+      document.getElementById('fYear').value=now.getFullYear();
+      applyFilters();
+    } finally{ spinner.classList.add('hidden'); }
+  }
+
+  function getSalaryStatus(emp, month, year){
+    if(!month||!year) return null;
+    // Check if employee was active in this month
+    const firstDay=new Date(year,month-1,1), lastDay=new Date(year,month,0);
+    const joinDate=emp.joining_date?new Date(emp.joining_date):null;
+    const inactiveDate=emp.inactive_date?new Date(emp.inactive_date):null;
+    if(joinDate && joinDate>lastDay) return null; // not joined yet
+    if(inactiveDate && inactiveDate<firstDay) return null; // already inactive
+    const paid=salaryPayments[`${emp.id}_${year}_${month}`]||0;
+    return paid>=emp.salary?'paid':'due';
+  }
+
+  function applyFilters(){
+    const name=(document.getElementById('fName').value||'').toLowerCase();
+    const desig=document.getElementById('fDesig').value;
+    const status=document.getElementById('fStatus').value;
+    const month=parseInt(document.getElementById('fMonth').value)||null;
+    const year=parseInt(document.getElementById('fYear').value)||null;
+    const dueFilter=document.getElementById('fDue').value;
+
+    let list=allEmployees.filter(e=>{
+      if(name && !e.name.toLowerCase().includes(name)) return false;
+      if(desig && e.designation_id!==desig) return false;
+      if(status==='active' && !e.is_active) return false;
+      if(status==='inactive' && e.is_active) return false;
+      if(month&&year){
+        const salStatus=getSalaryStatus(e,month,year);
+        if(dueFilter==='due' && salStatus!=='due') return false;
+        if(dueFilter==='paid' && salStatus!=='paid') return false;
+      }
+      return true;
+    });
+
+    // Stats
+    document.getElementById('statTotal').textContent=allEmployees.length;
+    document.getElementById('statActive').textContent=allEmployees.filter(e=>e.is_active).length;
+    document.getElementById('statInactive').textContent=allEmployees.filter(e=>!e.is_active).length;
+    const dueCount=month&&year?allEmployees.filter(e=>getSalaryStatus(e,month,year)==='due').length:'—';
+    document.getElementById('statDue').textContent=dueCount;
+
+    renderTable(list, month, year);
+  }
+
+  function renderTable(list, month, year){
+    const tbody=document.getElementById('empTbody');
+    if(!list.length){ tbody.innerHTML='<tr><td colspan="7" class="empty">No employees match the filters.</td></tr>'; return; }
+    tbody.innerHTML=list.map((e,i)=>{
+      const ss=getSalaryStatus(e,month,year);
+      const ssBadge=ss?`<span class="badge ${ss}">${ss==='paid'?'✅ Paid':'⚠️ Due'}</span>`:'<span style="color:#9ca3af;font-size:.82rem;">—</span>';
+      return `<tr class="row-link" onclick="openDrawer('${e.id}')">
+        <td>${i+1}</td>
+        <td style="font-weight:600;">${e.name}</td>
+        <td>${e.designations?.name||'—'}</td>
+        <td>₹${(e.salary||0).toLocaleString('en-IN')}</td>
+        <td>${e.joining_date||'—'}</td>
+        <td><span class="badge ${e.is_active?'active':'inactive'}">${e.is_active?'Active':'Inactive'}</span></td>
+        <td>${ssBadge}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function clearFilters(){
+    document.getElementById('fName').value='';
+    document.getElementById('fDesig').value='';
+    document.getElementById('fStatus').value='';
+    const now=new Date();
+    document.getElementById('fMonth').value=now.getMonth()+1;
+    document.getElementById('fYear').value=now.getFullYear();
+    document.getElementById('fDue').value='';
+    applyFilters();
+  }
+
+  async function openDrawer(id){
+    const emp=allEmployees.find(e=>e.id===id);
+    if(!emp) return;
+    document.getElementById('dName').textContent=emp.name;
+    document.getElementById('dDesig').textContent=(emp.designations?.name||'—')+' · '+(emp.is_active?'Active':'Inactive');
+    document.getElementById('dDetails').innerHTML=`
+      <div class="detail-row"><span>Salary</span><span>₹${(emp.salary||0).toLocaleString('en-IN')}</span></div>
+      <div class="detail-row"><span>Joining Date</span><span>${emp.joining_date||'—'}</span></div>
+      <div class="detail-row"><span>Inactive Date</span><span>${emp.inactive_date||'—'}</span></div>
+      <div class="detail-row"><span>Inactive Reason</span><span>${emp.inactive_reason||'—'}</span></div>
+      <div class="detail-row"><span>Mobile</span><span>${emp.mobile||'—'}</span></div>
+      <div class="detail-row"><span>Gender</span><span>${emp.gender||'—'}</span></div>
+      <div class="detail-row"><span>Address</span><span>${emp.address||'—'}</span></div>
+    `;
+    document.getElementById('dSalaryHist').innerHTML='<tr><td colspan="3" class="empty">Loading…</td></tr>';
+    document.getElementById('drawerOverlay').classList.add('open');
+    document.getElementById('drawer').style.transform='translateX(0)';
+
+    const {data} = await BNH_PAGE.sb.from('salary_history')
+      .select('*').eq('employee_id',id).order('effective_date',{ascending:false});
+    const tbody=document.getElementById('dSalaryHist');
+    if(!data?.length){ tbody.innerHTML='<tr><td colspan="3" class="empty">No salary history.</td></tr>'; return; }
+    tbody.innerHTML=data.map(r=>`
+      <tr>
+        <td>${r.effective_date||'—'}</td>
+        <td>₹${(r.salary||0).toLocaleString('en-IN')}</td>
+        <td>${r.remarks||'—'}</td>
+      </tr>`).join('');
+  }
+
+  function closeDrawer(){
+    document.getElementById('drawerOverlay').classList.remove('open');
+  }
+
+  init();
+</script>
+</body>
+</html>

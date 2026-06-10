@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Add Employee</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;align-items:center;justify-content:center;}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:#fff;border-radius:12px;padding:2rem;min-width:320px;max-width:440px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.18);}
+    .modal-box h3{margin:0 0 1rem;font-size:1.1rem;}
+    .modal-actions{display:flex;gap:.75rem;margin-top:1.25rem;justify-content:flex-end;}
+    .tag-row{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem;}
+    .tag{background:#e8f0fe;color:#1a56db;border-radius:20px;padding:.2rem .75rem;font-size:.82rem;display:flex;align-items:center;gap:.4rem;}
+    .tag button{background:none;border:none;cursor:pointer;font-size:.9rem;color:#555;padding:0;line-height:1;}
+    select{width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;background:#fff;}
+    .inline-row{display:flex;gap:.75rem;align-items:flex-end;}
+    .inline-row select{flex:1;}
+    .btn-sm{padding:.4rem .9rem;font-size:.85rem;border-radius:7px;border:none;cursor:pointer;background:#1a56db;color:#fff;}
+    .btn-sm:hover{background:#1648c0;}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.25rem;}
+    @media(max-width:600px){.form-grid{grid-template-columns:1fr;}}
+    .span2{grid-column:1/-1;}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<!-- New Designation Modal -->
+<div class="modal-overlay" id="desgModal">
+  <div class="modal-box">
+    <h3>➕ Create New Designation</h3>
+    <label>Designation Name</label>
+    <input id="newDesgName" placeholder="e.g. Senior Nurse" style="width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;box-sizing:border-box;"/>
+    <p class="err" id="desgErr" style="margin:.5rem 0 0;"></p>
+    <div class="modal-actions">
+      <button class="btn-sm" style="background:#6b7280;" onclick="closeDesgModal()">Cancel</button>
+      <button class="btn-sm" onclick="saveNewDesignation()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <h1>👤 Add New Employee</h1>
+  <div class="page-card">
+    <form id="empForm">
+      <div class="form-grid">
+
+        <div class="span2">
+          <label>Recorded By</label>
+          <input id="recBy" readonly/>
+        </div>
+
+        <div>
+          <label>Employee Name <span style="color:red">*</span></label>
+          <input id="empName" placeholder="Full name" required/>
+        </div>
+
+        <div>
+          <label>Designation <span style="color:red">*</span></label>
+          <div class="inline-row">
+            <select id="designation" required>
+              <option value="">— Select —</option>
+            </select>
+            <button type="button" class="btn-sm" onclick="openDesgModal()" title="Create new designation">+ New</button>
+          </div>
+        </div>
+
+        <div>
+          <label>Salary (₹) <span style="color:red">*</span></label>
+          <input id="salary" type="number" min="0" step="1" placeholder="e.g. 18000" required/>
+        </div>
+
+        <div>
+          <label>Joining Date <span style="color:red">*</span></label>
+          <input id="joiningDate" type="date" required/>
+        </div>
+
+        <div>
+          <label>Mobile</label>
+          <input id="mobile" type="tel" placeholder="10-digit number"/>
+        </div>
+
+        <div>
+          <label>Gender</label>
+          <select id="gender">
+            <option value="">— Select —</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
+          </select>
+        </div>
+
+        <div class="span2">
+          <label>Address</label>
+          <input id="address" placeholder="Optional address"/>
+        </div>
+
+        <div class="span2" style="margin-top:.5rem;">
+          <button class="btn-primary" style="width:auto;padding:.6rem 2rem;">💾 Save Employee</button>
+        </div>
+
+        <div class="span2">
+          <p class="err" id="err"></p>
+          <p class="info" id="ok" style="display:none;"></p>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","manager"]);
+  document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+
+  async function loadDesignations() {
+    const { data } = await BNH_PAGE.sb.from('designations').select('*').order('name');
+    const sel = document.getElementById('designation');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Select —</option>';
+    (data||[]).forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.id; o.textContent = d.name;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+  loadDesignations();
+
+  function openDesgModal(){ document.getElementById('desgModal').classList.add('open'); document.getElementById('newDesgName').focus(); }
+  function closeDesgModal(){ document.getElementById('desgModal').classList.remove('open'); document.getElementById('newDesgName').value=''; document.getElementById('desgErr').textContent=''; }
+
+  async function saveNewDesignation(){
+    const name = document.getElementById('newDesgName').value.trim();
+    if(!name){ document.getElementById('desgErr').textContent='Name is required.'; return; }
+    const {data,error} = await BNH_PAGE.sb.from('designations').insert({name, created_by: BNH_PAGE.user.username}).select().single();
+    if(error){ document.getElementById('desgErr').textContent=error.message; return; }
+    await loadDesignations();
+    document.getElementById('designation').value = data.id;
+    closeDesgModal();
+  }
+
+  document.getElementById('empForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    document.getElementById('err').textContent='';
+    document.getElementById('ok').style.display='none';
+    try {
+      const payload = BNH_PAGE.stamp({
+        name:        document.getElementById('empName').value.trim(),
+        designation_id: document.getElementById('designation').value,
+        salary:      parseFloat(document.getElementById('salary').value),
+        joining_date: document.getElementById('joiningDate').value,
+        mobile:      document.getElementById('mobile').value.trim(),
+        gender:      document.getElementById('gender').value,
+        address:     document.getElementById('address').value.trim(),
+        is_active:   true
+      });
+      const { error } = await BNH_PAGE.sb.from('employees').insert(payload);
+      if (error) throw error;
+      // Record initial salary in salary_history
+      const { data: emp } = await BNH_PAGE.sb.from('employees').select('id').order('recorded_at',{ascending:false}).limit(1).single();
+      if(emp){
+        await BNH_PAGE.sb.from('salary_history').insert(BNH_PAGE.stamp({
+          employee_id: emp.id,
+          salary:      parseFloat(document.getElementById('salary').value),
+          effective_date: document.getElementById('joiningDate').value,
+          remarks:     'Initial salary on joining'
+        }));
+      }
+      document.getElementById('ok').style.display='block';
+      document.getElementById('ok').textContent='✅ Employee added successfully.';
+      e.target.reset();
+      document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+    } catch(err) {
+      document.getElementById('err').textContent = err.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  };
+</script>
+</body>
+</html>
