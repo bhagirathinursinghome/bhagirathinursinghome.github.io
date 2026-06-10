@@ -198,7 +198,13 @@
       icon: "🗂️",
       page: "pages/pharmacy-manage-suppliers.html",
       roles: ["admin", "accountant"]
-    }
+    },
+    { label: "Add Employee",   icon: "👤", page: "pages/emp_add.html",     roles: ["admin","manager"] },
+{ label: "Edit Employee",  icon: "✏️", page: "pages/emp_edit.html",    roles: ["admin","manager"] },
+{ label: "Employees",      icon: "👥", page: "pages/emp_report.html",  roles: ["admin","manager"] },
+{ label: "Salary Sheet",   icon: "💰", page: "pages/salary_sheet.html",roles: ["admin","manager","accountant"] }
+
+
 
   ];
 
