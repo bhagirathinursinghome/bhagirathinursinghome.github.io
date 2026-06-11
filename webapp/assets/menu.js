@@ -72,6 +72,12 @@
     // MARKETING
     // =====================
     {
+      label: "Gramin Doctor Visit Edit",
+      icon: "🛠️",
+      page: "pages/gramin-visit-editor.html",
+      roles: ["marketing", "manager", "admin"]
+    },
+    {
       label: "Gramin Doctor Visit",
       icon: "🏥",
       page: "pages/gramin-visit.html",
