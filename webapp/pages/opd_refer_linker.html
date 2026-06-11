@@ -24,8 +24,8 @@
       font-size: 0.9rem;
       box-sizing: border-box;
     }
-    .refer-display { background: #e7f3ff; padding: 0.75rem; border-radius: 3px; border-left: 3px solid #007bff; font-size: 0.9rem; }
-    .refer-display strong { display: block; color: #007bff; }
+    .quack-display { background: #fff3e0; padding: 0.75rem; border-radius: 3px; border-left: 3px solid #ff9800; font-size: 0.9rem; margin-top: 0.5rem; }
+    .quack-display strong { display: block; color: #e65100; }
     .case-actions { display: flex; gap: 0.5rem; }
     .btn-sm { padding: 0.5rem 1rem; font-size: 0.85rem; }
     .btn-success { background: #28a745; }
@@ -43,6 +43,9 @@
     .summary-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
     .empty-state { text-align: center; padding: 2rem; color: #999; }
     .empty-state-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .refer-type-toggle { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .refer-type-btn { padding: 0.4rem 0.9rem; border: 1px solid #ccc; background: #f8f9fa; border-radius: 3px; cursor: pointer; font-size: 0.85rem; }
+    .refer-type-btn.active { background: #007bff; color: white; border-color: #007bff; }
   </style>
 </head>
 <body>
@@ -98,18 +101,25 @@
   let pendingCases = [];
   let completedCases = [];
   let ipdPatients = [];
-  let refers = [];
+  let quackDoctors = [];
 
-  // Load refers
-  async function loadRefers() {
+  // Load quack doctors (unique by doctor_name+mobile, with team info)
+  async function loadQuackDoctors() {
     try {
-      const { data, error } = await BNH_PAGE.sb.from('ipd_refers')
-        .select('*').eq('is_active', true);
+      const { data, error } = await BNH_PAGE.sb.from('gramin_doctor_visits')
+        .select('id,doctor_name,mobile,recorded_by_name').order('doctor_name');
       if (!error && data) {
-        refers = data;
+        // Deduplicate by mobile, keep first entry per unique doctor mobile
+        const seen = new Set();
+        quackDoctors = data.filter(d => {
+          const key = d.mobile || d.doctor_name;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
       }
     } catch (e) {
-      console.error('Error loading refers:', e);
+      console.error('Error loading quack doctors:', e);
     }
   }
 
@@ -155,10 +165,17 @@
     }
   }
 
+  // Build quack doctor options HTML
+  function quackOptions() {
+    return quackDoctors.map(d =>
+      `<option value="quack|${d.doctor_name}|${d.mobile}|${d.recorded_by_name||''}">${d.doctor_name} — 📞 ${d.mobile} (${d.recorded_by_name||'Unknown Team'})</option>`
+    ).join('');
+  }
+
   // Render pending cases
   function renderPendingCases() {
     const container = document.getElementById('pendingCasesContainer');
-    
+
     if (pendingCases.length === 0) {
       container.innerHTML = `
         <div class="empty-state">
@@ -185,17 +202,27 @@
         </div>
 
         <form class="case-form" data-case-id="${caseData.id}" style="margin-top: 1rem;">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Select Refer <span style="color: red;">*</span></label>
-              <select name="refer_id" required>
-                <option value="">Choose Refer...</option>
-                <option value="not_applicable">Not Applicable</option>
-                ${refers.map(r => `<option value="${r.id}">${r.refer_name} (${r.refer_code})</option>`).join('')}
-              </select>
-              <div class="refer-display" id="refer-display-${caseData.id}" style="display: none; margin-top: 0.5rem;"></div>
-            </div>
 
+          <!-- Refer Type Toggle -->
+          <div class="form-group">
+            <label>Refer <span style="color:red">*</span></label>
+            <div class="refer-type-toggle">
+              <button type="button" class="refer-type-btn active" data-case="${caseData.id}" data-type="quack" onclick="switchReferType('${caseData.id}','quack')">👨‍⚕️ Refer</button>
+              <button type="button" class="refer-type-btn" data-case="${caseData.id}" data-type="none" onclick="switchReferType('${caseData.id}','none')">🚫 Not Applicable</button>
+            </div>
+          </div>
+
+          <!-- Quack Doctor Select -->
+          <div class="form-group" id="refer-quack-${caseData.id}">
+            <label>Select Quack Doctor</label>
+            <select name="quack_doctor" onchange="showQuackInfo('${caseData.id}', this.value)">
+              <option value="">Choose Refer...</option>
+              ${quackOptions()}
+            </select>
+            <div class="quack-display" id="quack-display-${caseData.id}" style="display:none; margin-top: 0.5rem;"></div>
+          </div>
+
+          <div class="form-row">
             <div class="form-group">
               <label>Linked to IPD Case?</label>
               <select name="ipd_link" required>
@@ -234,28 +261,9 @@
       </div>
     `).join('');
 
-    // Attach event listeners
+    // Attach event listeners for ipd_link toggle + refer_id display
     document.querySelectorAll('.case-form').forEach(form => {
       form.addEventListener('change', (e) => {
-        if (e.target.name === 'refer_id') {
-          const caseId = form.dataset.caseId;
-          const referId = e.target.value;
-          const display = document.getElementById(`refer-display-${caseId}`);
-          
-          if (referId && referId !== 'not_applicable') {
-            const refer = refers.find(r => r.id === referId);
-            if (refer) {
-              display.style.display = 'block';
-              display.innerHTML = `<strong>Refer:</strong> ${refer.refer_name}<br><strong>Code:</strong> ${refer.refer_code}`;
-            }
-          } else if (referId === 'not_applicable') {
-            display.style.display = 'block';
-            display.innerHTML = `<strong>Refer:</strong> Not Applicable`;
-          } else {
-            display.style.display = 'none';
-          }
-        }
-
         if (e.target.name === 'ipd_link') {
           const caseId = form.dataset.caseId;
           const row = document.getElementById(`ipd-patient-row-${caseId}`);
@@ -275,22 +283,28 @@
         const caseData = pendingCases.find(c => c.id === caseId);
         const formData = new FormData(form);
 
-        const referId = formData.get('refer_id');
+        // Determine active refer type
+        const activeType = form.querySelector('.refer-type-btn.active')?.dataset.type || 'none';
         const ipdLink = formData.get('ipd_link') === 'yes' ? formData.get('ipd_patient_id') : null;
         const caseType = formData.get('case_type');
+
+        let referId = null;
+        let referName = null;
+
+        if (activeType === 'quack') {
+          const qval = formData.get('quack_doctor') || '';
+          if (qval) {
+            const parts = qval.split('|');
+            referName = `👨‍⚕️ ${parts[1]} (📞${parts[2]}, Team: ${parts[3] || 'N/A'})`;
+          }
+        }
 
         const spinner = document.getElementById('spinner');
         spinner.classList.remove('hidden');
 
         try {
-          let referName = null;
-          if (referId && referId !== 'not_applicable') {
-            const refer = refers.find(r => r.id === referId);
-            referName = refer?.refer_name;
-          }
-
           const updatePayload = {
-            refer_id: referId && referId !== 'not_applicable' ? referId : null,
+            refer_id: referId,
             refer_name: referName,
             ipd_admission_id: ipdLink,
             case_type: caseType,
@@ -302,13 +316,12 @@
 
           if (error) throw error;
 
-          // Remove from pending and reload
           pendingCases = pendingCases.filter(c => c.id !== caseId);
           completedCases.push({ ...caseData, ...updatePayload });
-          
+
           document.getElementById(`case-${caseId}`).remove();
           renderCompletedCases();
-          
+
           const ok = document.getElementById('ok');
           ok.style.display = 'block';
           ok.textContent = '✅ Case linked successfully!';
@@ -322,6 +335,33 @@
         }
       });
     });
+  }
+
+  // Switch refer type for a case card
+  function switchReferType(caseId, type) {
+    const form = document.querySelector(`[data-case-id="${caseId}"]`);
+    form.querySelectorAll('.refer-type-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.type === type);
+    });
+    // Show quack panel only when type is quack
+    document.getElementById(`refer-quack-${caseId}`).style.display = type === 'quack' ? '' : 'none';
+    // Clear quack display when switching away
+    const qd = document.getElementById(`quack-display-${caseId}`);
+    if (qd) qd.style.display = 'none';
+  }
+
+  // Show quack doctor info card
+  function showQuackInfo(caseId, val) {
+    const display = document.getElementById(`quack-display-${caseId}`);
+    if (!val || !val.startsWith('quack|')) { display.style.display = 'none'; return; }
+    const parts = val.split('|');
+    display.style.display = 'block';
+    display.innerHTML = `
+      <strong>👨‍⚕️ Quack Doctor</strong>
+      <span>Name: <b>${parts[1]}</b></span><br>
+      <span>📞 Mobile: <b>${parts[2]}</b></span><br>
+      <span>🏷️ Team: <b>${parts[3] || 'N/A'}</b></span>
+    `;
   }
 
   // Render completed cases
@@ -362,7 +402,7 @@
     const spinner = document.getElementById('spinner');
     spinner.classList.remove('hidden');
     try {
-      await loadRefers();
+      await loadQuackDoctors();
       await loadIPDPatients();
       await loadPendingCases();
       await loadCompletedCases();
@@ -377,3 +417,4 @@
 </script>
 </body>
 </html>
+
