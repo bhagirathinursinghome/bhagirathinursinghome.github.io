@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>System Health</title>
+
+<link rel="stylesheet" href="../assets/style.css"/>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+gap:15px;
+margin-top:15px;
+}
+
+.card{
+background:#fff;
+padding:15px;
+border-radius:10px;
+box-shadow:0 2px 5px rgba(0,0,0,.1);
+}
+
+.big{
+font-size:28px;
+font-weight:bold;
+margin-top:8px;
+}
+
+canvas{
+margin-top:20px;
+max-height:350px;
+}
+</style>
+</head>
+<body>
+
+<div id="spinner" class="spinner-overlay hidden">
+<div class="spinner"></div>
+</div>
+
+<div class="page">
+
+<h1>📊 System Health Dashboard</h1>
+
+<div style="margin-bottom:15px">
+<button id="refreshBtn" class="btn-primary">
+Refresh
+</button>
+</div>
+
+<div class="grid">
+
+<div class="card">
+<h3>Database Size</h3>
+<div class="big" id="dbSize">--</div>
+</div>
+
+<div class="card">
+<h3>Storage Used</h3>
+<div class="big" id="storageSize">--</div>
+</div>
+
+<div class="card">
+<h3>Total Users</h3>
+<div class="big" id="userCount">--</div>
+</div>
+
+<div class="card">
+<h3>Total Files</h3>
+<div class="big" id="fileCount">--</div>
+</div>
+
+</div>
+
+<div class="card" style="margin-top:20px">
+<h3>Usage Overview</h3>
+<canvas id="usageChart"></canvas>
+</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+
+BNH_PAGE.requireRole(["admin"]);
+
+let chart;
+
+async function loadDashboard(){
+
+const spinner=document.getElementById("spinner");
+spinner.classList.remove("hidden");
+
+try{
+
+/*
+Create these SQL functions in Supabase first
+*/
+
+const dbRes=await BNH_PAGE.sb.rpc("get_database_size");
+const storageRes=await BNH_PAGE.sb.rpc("get_storage_usage");
+
+const userRes=await BNH_PAGE.sb
+.from("profiles")
+.select("*",{count:"exact",head:true});
+
+const fileRes=await BNH_PAGE.sb
+.from("storage.objects")
+.select("*",{count:"exact",head:true});
+
+const dbMB=dbRes.data || 0;
+const storageMB=storageRes.data || 0;
+
+const users=userRes.count || 0;
+const files=fileRes.count || 0;
+
+document.getElementById("dbSize").textContent=
+dbMB.toFixed(2)+" MB";
+
+document.getElementById("storageSize").textContent=
+storageMB.toFixed(2)+" MB";
+
+document.getElementById("userCount").textContent=
+users;
+
+document.getElementById("fileCount").textContent=
+files;
+
+drawChart(
+dbMB,
+storageMB
+);
+
+}catch(err){
+
+alert(err.message);
+
+}finally{
+spinner.classList.add("hidden");
+}
+
+}
+
+function drawChart(db,storage){
+
+const ctx=document.getElementById("usageChart");
+
+if(chart){
+chart.destroy();
+}
+
+chart=new Chart(ctx,{
+type:"bar",
+data:{
+labels:[
+"Database MB",
+"Storage MB"
+],
+datasets:[{
+label:"Usage",
+data:[
+db,
+storage
+]
+}]
+},
+options:{
+responsive:true,
+maintainAspectRatio:false
+}
+});
+
+}
+
+document
+.getElementById("refreshBtn")
+.addEventListener(
+"click",
+loadDashboard
+);
+
+loadDashboard();
+
+</script>
+
+</body>
+</html>
