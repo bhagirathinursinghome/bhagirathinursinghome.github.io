@@ -61,6 +61,12 @@
       page: "pages/opd_records_view.html",
       roles: ["manager", "admin", "accountant", "viewer"]
     },
+    {
+      label: "OPD Data Editor",
+      icon: "✏️",
+      page: "pages/opd_edit.html",
+      roles: ["manager", "admin", "accountant"]
+    },
 
     // =====================
     // MARKETING
