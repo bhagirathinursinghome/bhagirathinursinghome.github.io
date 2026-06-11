@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>OPD Data Editor</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .form-row > * { flex:1; min-width:180px; }
+    .hidden { display:none!important; }
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; }
+    th { background:#f0f0f0; padding:7px 8px; text-align:left; font-size:.82rem; white-space:nowrap; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; font-size:.82rem; vertical-align:middle; }
+    tr:hover td { background:#fafafa; }
+    .action-btns { display:flex; gap:0.4rem; }
+    .btn-edit { background:#007bff; color:white; border:none; padding:4px 10px; border-radius:3px; cursor:pointer; font-size:.78rem; }
+    .btn-del { background:#dc3545; color:white; border:none; padding:4px 10px; border-radius:3px; cursor:pointer; font-size:.78rem; }
+    .btn-edit:hover { background:#0056b3; }
+    .btn-del:hover { background:#a71d2a; }
+    .tabs { display:flex; gap:0; margin-bottom:1.2rem; border-bottom:2px solid #e9ecef; overflow-x:auto; }
+    .tab-btn { padding:.65rem 1.2rem; background:none; border:none; cursor:pointer; border-bottom:3px solid transparent; font-size:.9rem; color:#666; white-space:nowrap; }
+    .tab-btn.active { color:#007bff; border-bottom-color:#007bff; font-weight:600; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+    .filter-bar { display:flex; gap:.75rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem; }
+    .filter-bar input, .filter-bar select { padding:.45rem .7rem; border:1px solid #ccc; border-radius:3px; font-size:.85rem; }
+    .filter-bar input { flex:1; min-width:160px; }
+    .badge { display:inline-block; padding:2px 7px; border-radius:3px; font-size:.75rem; font-weight:600; }
+    .badge-pending { background:#fff3cd; color:#856404; }
+    .badge-completed { background:#d1e7dd; color:#0a3622; }
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; display:flex; align-items:center; justify-content:center; }
+    .modal-box { background:white; border-radius:6px; padding:1.5rem; width:min(95vw,560px); max-height:90vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+    .modal-title { font-size:1.1rem; font-weight:700; margin-bottom:1.1rem; padding-bottom:.6rem; border-bottom:1px solid #eee; }
+    .modal-footer { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.2rem; padding-top:.8rem; border-top:1px solid #eee; }
+    .form-group { margin-bottom:.9rem; }
+    .form-group label { display:block; margin-bottom:.35rem; font-weight:500; font-size:.87rem; }
+    .form-group input, .form-group select, .form-group textarea {
+      width:100%; padding:.45rem .7rem; border:1px solid #ccc; border-radius:3px; font-size:.87rem; box-sizing:border-box;
+    }
+    .stats-row { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .stat-box { background:#f8f9fa; border-radius:4px; padding:.7rem 1rem; flex:1; min-width:120px; border-left:3px solid #007bff; }
+    .stat-box .val { font-size:1.3rem; font-weight:700; color:#007bff; }
+    .stat-box .lbl { font-size:.78rem; color:#666; margin-top:2px; }
+    .empty-state { text-align:center; padding:2rem; color:#aaa; }
+    .records-table-wrap { overflow-x:auto; }
+    .upload-row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .upload-info { font-size:.8rem; color:#666; }
+    .del-confirm { background:#fff3cd; border:1px solid #ffc107; padding:.75rem 1rem; border-radius:4px; margin-top:.75rem; font-size:.88rem; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>✏️ OPD Data Editor</h1>
+
+  <div class="page-card">
+    <div class="tabs" id="mainTabs">
+      <button class="tab-btn active" data-tab="cases">📋 OPD Cases</button>
+      <button class="tab-btn" data-tab="uploads">📁 Uploaded Records</button>
+      <button class="tab-btn" data-tab="payments">💰 OPD Payments</button>
+      <button class="tab-btn" data-tab="dues">📂 Old Dues</button>
+    </div>
+
+    <!-- ── OPD CASES ── -->
+    <div class="tab-content active" id="tab-cases">
+      <div class="stats-row" id="caseStats"></div>
+      <div class="filter-bar">
+        <input id="caseSearch" placeholder="🔍 Search case no, patient…" oninput="filterCases()"/>
+        <select id="caseStatusFilter" onchange="filterCases()">
+          <option value="">All Status</option>
+          <option value="pending_refer">Pending Refer</option>
+          <option value="completed">Completed</option>
+        </select>
+        <input id="caseDateFrom" type="date" onchange="filterCases()" title="From date"/>
+        <input id="caseDateTo" type="date" onchange="filterCases()" title="To date"/>
+      </div>
+      <div class="records-table-wrap">
+        <div id="casesTable"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ── UPLOADS (opd_sales_upload → opd_old_dues) ── -->
+    <div class="tab-content" id="tab-uploads">
+      <p style="font-size:.85rem;color:#555;margin-bottom:1rem;">
+        Uploaded OPD records (old dues / batch uploads). Edit amounts, status or delete rows.
+      </p>
+      <div class="filter-bar">
+        <input id="dueSearch" placeholder="🔍 Search case no, patient…" oninput="filterUploads()"/>
+        <select id="dueStatusFilter" onchange="filterUploads()">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="cleared">Cleared</option>
+          <option value="partial">Partial</option>
+        </select>
+      </div>
+      <div class="records-table-wrap">
+        <div id="uploadsTable"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ── OPD PAYMENTS ── -->
+    <div class="tab-content" id="tab-payments">
+      <div class="filter-bar">
+        <input id="paySearch" placeholder="🔍 Search case no, remark…" oninput="filterPayments()"/>
+        <input id="payDateFrom" type="date" onchange="filterPayments()" title="From"/>
+        <input id="payDateTo" type="date" onchange="filterPayments()" title="To"/>
+      </div>
+      <div class="records-table-wrap">
+        <div id="paymentsTable"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ── OLD DUES (opd_old_dues) ── -->
+    <div class="tab-content" id="tab-dues">
+      <div class="filter-bar">
+        <input id="oldDueSearch" placeholder="🔍 Search case no, patient…" oninput="filterOldDues()"/>
+      </div>
+      <div class="records-table-wrap">
+        <div id="oldDuesTable"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+    <p class="err" id="err"></p>
+    <p class="info" id="ok" style="display:none"></p>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay hidden" id="editModal">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle">Edit Record</div>
+    <div id="modalBody"></div>
+    <div class="modal-footer">
+      <button class="btn-primary" style="background:#6c757d;width:auto;" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" style="width:auto;" id="modalSaveBtn" onclick="saveModal()">💾 Save Changes</button>
+    </div>
+    <p class="err" id="modalErr"></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","manager","accountant"]);
+
+  // Data stores
+  let allCases = [], filteredCases = [];
+  let allUploads = [], filteredUploads = [];
+  let allPayments = [], filteredPayments = [];
+  let allOldDues = [], filteredOldDues = [];
+  let allRefers = [];
+
+  // Modal state
+  let modalMode = null; // 'case' | 'upload' | 'payment' | 'olddues'
+  let modalRecordId = null;
+
+  // ── Tab switching ──
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Helpers ──
+  function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmt(n) { return n != null ? '₹' + Number(n).toLocaleString('en-IN') : '—'; }
+  function fmtDate(d) { return d ? d.slice(0,10) : '—'; }
+  function showSpinner(v) { document.getElementById('spinner').classList.toggle('hidden', !v); }
+  function showErr(msg) { const e = document.getElementById('err'); e.textContent = msg; setTimeout(()=>e.textContent='',4000); }
+  function showOk(msg) { const o = document.getElementById('ok'); o.style.display='block'; o.textContent=msg; setTimeout(()=>o.style.display='none',3000); }
+
+  // ── Load Refers (for dropdowns) ──
+  async function loadRefers() {
+    const { data } = await BNH_PAGE.sb.from('ipd_refers').select('id,refer_name,refer_code').eq('is_active',true).order('refer_name');
+    allRefers = data || [];
+  }
+
+  // ══════════════════════════════════════
+  // OPD CASES
+  // ══════════════════════════════════════
+  async function loadCases() {
+    const { data, error } = await BNH_PAGE.sb.from('opd_cases').select('*').order('case_date',{ascending:false});
+    if (error) { showErr('Load cases error: '+error.message); return; }
+    allCases = data || [];
+    renderCaseStats();
+    filterCases();
+  }
+
+  function renderCaseStats() {
+    const total = allCases.length;
+    const pending = allCases.filter(c=>c.status==='pending_refer').length;
+    const completed = allCases.filter(c=>c.status==='completed').length;
+    const totalBill = allCases.reduce((s,c)=>s+Number(c.bill_amount||0),0);
+    const totalPaid = allCases.reduce((s,c)=>s+Number(c.paid_amount||0),0);
+    document.getElementById('caseStats').innerHTML = `
+      <div class="stat-box"><div class="val">${total}</div><div class="lbl">Total Cases</div></div>
+      <div class="stat-box"><div class="val" style="color:#dc3545">${pending}</div><div class="lbl">Pending</div></div>
+      <div class="stat-box"><div class="val" style="color:#28a745">${completed}</div><div class="lbl">Completed</div></div>
+      <div class="stat-box"><div class="val">${fmt(totalBill)}</div><div class="lbl">Total Bill</div></div>
+      <div class="stat-box"><div class="val" style="color:#28a745">${fmt(totalPaid)}</div><div class="lbl">Total Paid</div></div>
+      <div class="stat-box"><div class="val" style="color:#dc3545">${fmt(totalBill-totalPaid)}</div><div class="lbl">Total Due</div></div>
+    `;
+  }
+
+  function filterCases() {
+    const q = (document.getElementById('caseSearch').value||'').toLowerCase();
+    const st = document.getElementById('caseStatusFilter').value;
+    const df = document.getElementById('caseDateFrom').value;
+    const dt = document.getElementById('caseDateTo').value;
+    filteredCases = allCases.filter(c => {
+      if (q && !c.case_no?.toLowerCase().includes(q) && !c.patient_name?.toLowerCase().includes(q)) return false;
+      if (st && c.status !== st) return false;
+      if (df && c.case_date < df) return false;
+      if (dt && c.case_date > dt) return false;
+      return true;
+    });
+    renderCasesTable();
+  }
+
+  function renderCasesTable() {
+    const div = document.getElementById('casesTable');
+    if (!filteredCases.length) { div.innerHTML = '<div class="empty-state">No cases found.</div>'; return; }
+    div.innerHTML = `<table>
+      <thead><tr>
+        <th>Case No</th><th>Date</th><th>Patient</th><th>Bill</th><th>Paid</th><th>Due</th><th>Refer</th><th>Status</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${filteredCases.map(c=>`<tr>
+        <td><strong>${esc(c.case_no)}</strong></td>
+        <td>${fmtDate(c.case_date)}</td>
+        <td>${esc(c.patient_name)}</td>
+        <td>${fmt(c.bill_amount)}</td>
+        <td>${fmt(c.paid_amount)}</td>
+        <td style="color:${(c.bill_amount-c.paid_amount)>0?'#dc3545':'#28a745'}">${fmt(c.bill_amount-c.paid_amount)}</td>
+        <td>${esc(c.refer_name||'—')}</td>
+        <td><span class="badge ${c.status==='completed'?'badge-completed':'badge-pending'}">${c.status==='completed'?'✓ Done':'⏳ Pending'}</span></td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-edit" onclick="editCase('${c.id}')">✏️ Edit</button>
+            <button class="btn-del" onclick="deleteRecord('cases','opd_cases','${c.id}')">🗑 Del</button>
+          </div>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  function editCase(id) {
+    const c = allCases.find(x=>x.id===id);
+    if (!c) return;
+    modalMode = 'case';
+    modalRecordId = id;
+    document.getElementById('modalTitle').textContent = `✏️ Edit OPD Case — ${c.case_no}`;
+    document.getElementById('modalErr').textContent = '';
+    const referOpts = allRefers.map(r=>`<option value="${r.id}" data-name="${r.refer_name}" ${c.refer_id===r.id?'selected':''}>${r.refer_name} (${r.refer_code})</option>`).join('');
+    document.getElementById('modalBody').innerHTML = `
+      <div class="form-row">
+        <div class="form-group">
+          <label>Case No</label>
+          <input id="mc_case_no" value="${esc(c.case_no)}" required/>
+        </div>
+        <div class="form-group">
+          <label>Case Date</label>
+          <input id="mc_case_date" type="date" value="${c.case_date}" required/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Patient Name</label>
+        <input id="mc_patient_name" value="${esc(c.patient_name)}" required/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Bill Amount (₹)</label>
+          <input id="mc_bill_amount" type="number" min="0" step="0.01" value="${c.bill_amount||0}"/>
+        </div>
+        <div class="form-group">
+          <label>Paid Amount (₹)</label>
+          <input id="mc_paid_amount" type="number" min="0" step="0.01" value="${c.paid_amount||0}"/>
+        </div>
+        <div class="form-group">
+          <label>Discount (₹)</label>
+          <input id="mc_discount" type="number" min="0" step="0.01" value="${c.discount||0}"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Case Type</label>
+          <select id="mc_case_type">
+            <option value="">-- None --</option>
+            <option value="lab_sample" ${c.case_type==='lab_sample'?'selected':''}>Lab Sample</option>
+            <option value="sport_sample" ${c.case_type==='sport_sample'?'selected':''}>Sport Sample</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="mc_status">
+            <option value="pending_refer" ${c.status==='pending_refer'?'selected':''}>Pending Refer</option>
+            <option value="completed" ${c.status==='completed'?'selected':''}>Completed</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Refer</label>
+        <select id="mc_refer_id">
+          <option value="">-- Not Applicable --</option>
+          ${referOpts}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Tests</label>
+        <textarea id="mc_tests" rows="2">${esc(c.tests||'')}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Trans No</label>
+        <input id="mc_trans_no" value="${esc(c.trans_no||'')}"/>
+      </div>
+      <div class="form-group">
+        <label>Entered By</label>
+        <input id="mc_entered_by" value="${esc(c.entered_by||'')}"/>
+      </div>
+    `;
+    document.getElementById('editModal').classList.remove('hidden');
+  }
+
+  // ══════════════════════════════════════
+  // UPLOADS (opd_old_dues — from upload)
+  // ══════════════════════════════════════
+  async function loadUploads() {
+    // opd_old_dues are the batch-uploaded records from opd_sales_upload
+    const { data, error } = await BNH_PAGE.sb.from('opd_old_dues').select('*').order('trans_date',{ascending:false});
+    if (error) { showErr('Load uploads error: '+error.message); return; }
+    allUploads = data || [];
+    filterUploads();
+  }
+
+  function filterUploads() {
+    const q = (document.getElementById('dueSearch').value||'').toLowerCase();
+    const st = document.getElementById('dueStatusFilter').value;
+    filteredUploads = allUploads.filter(r => {
+      if (q && !r.case_no?.toLowerCase().includes(q) && !r.patient_name?.toLowerCase().includes(q)) return false;
+      if (st && r.payment_status !== st) return false;
+      return true;
+    });
+    renderUploadsTable();
+  }
+
+  function renderUploadsTable() {
+    const div = document.getElementById('uploadsTable');
+    if (!filteredUploads.length) { div.innerHTML = '<div class="empty-state">No uploaded records found.</div>'; return; }
+    div.innerHTML = `<table>
+      <thead><tr>
+        <th>Case No</th><th>Date</th><th>Patient</th><th>Income</th><th>Discount</th><th>Cleared</th><th>Status</th><th>Remark</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${filteredUploads.map(r=>`<tr>
+        <td><strong>${esc(r.case_no)}</strong></td>
+        <td>${fmtDate(r.trans_date)}</td>
+        <td>${esc(r.patient_name||'—')}</td>
+        <td>${fmt(r.income_amount)}</td>
+        <td>${fmt(r.discount)}</td>
+        <td>${fmt(r.amount_cleared)}</td>
+        <td><span class="badge ${r.payment_status==='cleared'?'badge-completed':r.payment_status==='partial'?'':' badge-pending'}">${esc(r.payment_status||'—')}</span></td>
+        <td style="font-size:.78rem;color:#666">${esc(r.remarks||'—')}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-edit" onclick="editUpload('${r.id}')">✏️ Edit</button>
+            <button class="btn-del" onclick="deleteRecord('uploads','opd_old_dues','${r.id}')">🗑 Del</button>
+          </div>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  function editUpload(id) {
+    const r = allUploads.find(x=>x.id===id);
+    if (!r) return;
+    modalMode = 'upload';
+    modalRecordId = id;
+    document.getElementById('modalTitle').textContent = `✏️ Edit Uploaded Record — ${r.case_no}`;
+    document.getElementById('modalErr').textContent = '';
+    document.getElementById('modalBody').innerHTML = `
+      <div class="form-row">
+        <div class="form-group">
+          <label>Case No</label>
+          <input id="mu_case_no" value="${esc(r.case_no)}"/>
+        </div>
+        <div class="form-group">
+          <label>Trans Date</label>
+          <input id="mu_trans_date" type="date" value="${r.trans_date}"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Trans No</label>
+          <input id="mu_trans_no" value="${esc(r.trans_no||'')}"/>
+        </div>
+        <div class="form-group">
+          <label>Patient Name</label>
+          <input id="mu_patient_name" value="${esc(r.patient_name||'')}"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Income Amount (₹)</label>
+          <input id="mu_income" type="number" min="0" step="0.01" value="${r.income_amount||0}"/>
+        </div>
+        <div class="form-group">
+          <label>Discount (₹)</label>
+          <input id="mu_discount" type="number" min="0" step="0.01" value="${r.discount||0}"/>
+        </div>
+        <div class="form-group">
+          <label>Amount Cleared (₹)</label>
+          <input id="mu_cleared" type="number" min="0" step="0.01" value="${r.amount_cleared||0}"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Payment Status</label>
+          <select id="mu_status">
+            <option value="pending" ${r.payment_status==='pending'?'selected':''}>Pending</option>
+            <option value="partial" ${r.payment_status==='partial'?'selected':''}>Partial</option>
+            <option value="cleared" ${r.payment_status==='cleared'?'selected':''}>Cleared</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cleared Date</label>
+          <input id="mu_cleared_date" type="date" value="${r.cleared_date||''}"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Remarks</label>
+        <textarea id="mu_remarks" rows="2">${esc(r.remarks||'')}</textarea>
+      </div>
+    `;
+    document.getElementById('editModal').classList.remove('hidden');
+  }
+
+  // ══════════════════════════════════════
+  // OPD PAYMENTS
+  // ══════════════════════════════════════
+  async function loadPayments() {
+    const { data, error } = await BNH_PAGE.sb.from('opd_payments').select('*').order('payment_date',{ascending:false});
+    if (error) { showErr('Load payments error: '+error.message); return; }
+    allPayments = data || [];
+    filterPayments();
+  }
+
+  function filterPayments() {
+    const q = (document.getElementById('paySearch').value||'').toLowerCase();
+    const df = document.getElementById('payDateFrom').value;
+    const dt = document.getElementById('payDateTo').value;
+    filteredPayments = allPayments.filter(r => {
+      if (q && !r.case_no?.toLowerCase().includes(q) && !r.remark?.toLowerCase().includes(q)) return false;
+      if (df && r.payment_date < df) return false;
+      if (dt && r.payment_date > dt) return false;
+      return true;
+    });
+    renderPaymentsTable();
+  }
+
+  function renderPaymentsTable() {
+    const div = document.getElementById('paymentsTable');
+    if (!filteredPayments.length) { div.innerHTML = '<div class="empty-state">No payment records found.</div>'; return; }
+    div.innerHTML = `<table>
+      <thead><tr>
+        <th>Case No</th><th>Date</th><th>Amount</th><th>Mode</th><th>Receipt No</th><th>Remark</th><th>By</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${filteredPayments.map(r=>`<tr>
+        <td><strong>${esc(r.case_no)}</strong></td>
+        <td>${fmtDate(r.payment_date)}</td>
+        <td>${fmt(r.amount)}</td>
+        <td>${esc(r.mode||'—')}</td>
+        <td>${esc(r.receipt_no||'—')}</td>
+        <td style="font-size:.78rem">${esc(r.remark||'—')}</td>
+        <td style="font-size:.78rem;color:#666">${esc(r.recorded_by_name||'—')}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-edit" onclick="editPayment('${r.id}')">✏️ Edit</button>
+            <button class="btn-del" onclick="deleteRecord('payments','opd_payments','${r.id}')">🗑 Del</button>
+          </div>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  function editPayment(id) {
+    const r = allPayments.find(x=>x.id===id);
+    if (!r) return;
+    modalMode = 'payment';
+    modalRecordId = id;
+    document.getElementById('modalTitle').textContent = `✏️ Edit OPD Payment — ${r.case_no}`;
+    document.getElementById('modalErr').textContent = '';
+    document.getElementById('modalBody').innerHTML = `
+      <div class="form-row">
+        <div class="form-group">
+          <label>Case No</label>
+          <input id="mp_case_no" value="${esc(r.case_no)}"/>
+        </div>
+        <div class="form-group">
+          <label>Payment Date</label>
+          <input id="mp_payment_date" type="date" value="${r.payment_date}"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input id="mp_amount" type="number" min="0" step="0.01" value="${r.amount||0}"/>
+        </div>
+        <div class="form-group">
+          <label>Mode</label>
+          <select id="mp_mode">
+            <option value="Cash" ${r.mode==='Cash'?'selected':''}>Cash</option>
+            <option value="Bank" ${r.mode==='Bank'?'selected':''}>Bank</option>
+            <option value="PhonePe" ${r.mode==='PhonePe'?'selected':''}>PhonePe</option>
+            <option value="Other" ${r.mode==='Other'?'selected':''}>Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Receipt No</label>
+        <input id="mp_receipt_no" value="${esc(r.receipt_no||'')}"/>
+      </div>
+      <div class="form-group">
+        <label>Remark</label>
+        <input id="mp_remark" value="${esc(r.remark||'')}"/>
+      </div>
+    `;
+    document.getElementById('editModal').classList.remove('hidden');
+  }
+
+  // ══════════════════════════════════════
+  // OLD DUES (opd_old_dues from dues tab)
+  // ══════════════════════════════════════
+  async function loadOldDues() {
+    // Same table as uploads but shown separately for clarity — reuse allUploads
+    allOldDues = allUploads;
+    filterOldDues();
+  }
+
+  function filterOldDues() {
+    const q = (document.getElementById('oldDueSearch').value||'').toLowerCase();
+    filteredOldDues = allOldDues.filter(r => {
+      if (q && !r.case_no?.toLowerCase().includes(q) && !r.patient_name?.toLowerCase().includes(q) && !r.trans_no?.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    renderOldDuesTable();
+  }
+
+  function renderOldDuesTable() {
+    const div = document.getElementById('oldDuesTable');
+    if (!filteredOldDues.length) { div.innerHTML = '<div class="empty-state">No old due records.</div>'; return; }
+    div.innerHTML = `<table>
+      <thead><tr>
+        <th>Case No</th><th>Trans No</th><th>Date</th><th>Patient</th><th>Income</th><th>Cleared</th><th>Status</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${filteredOldDues.map(r=>`<tr>
+        <td>${esc(r.case_no)}</td>
+        <td>${esc(r.trans_no||'—')}</td>
+        <td>${fmtDate(r.trans_date)}</td>
+        <td>${esc(r.patient_name||'—')}</td>
+        <td>${fmt(r.income_amount)}</td>
+        <td>${fmt(r.amount_cleared)}</td>
+        <td><span class="badge ${r.payment_status==='cleared'?'badge-completed':'badge-pending'}">${esc(r.payment_status||'—')}</span></td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-edit" onclick="editUpload('${r.id}')">✏️ Edit</button>
+            <button class="btn-del" onclick="deleteRecord('uploads','opd_old_dues','${r.id}')">🗑 Del</button>
+          </div>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  // ══════════════════════════════════════
+  // DELETE
+  // ══════════════════════════════════════
+  async function deleteRecord(type, tableName, id) {
+    const labels = { cases:'OPD case', uploads:'uploaded record', payments:'payment record', olddues:'old due' };
+    if (!confirm(`⚠️ Delete this ${labels[type]||'record'}?\n\nThis action CANNOT be undone.`)) return;
+    showSpinner(true);
+    try {
+      const { error } = await BNH_PAGE.sb.from(tableName).delete().eq('id', id);
+      if (error) throw error;
+      showOk('🗑 Record deleted.');
+      // Reload the affected data
+      if (type === 'cases') await loadCases();
+      else if (type === 'uploads') { await loadUploads(); loadOldDues(); }
+      else if (type === 'payments') await loadPayments();
+    } catch(e) {
+      showErr('Delete error: ' + e.message);
+    } finally {
+      showSpinner(false);
+    }
+  }
+
+  // ══════════════════════════════════════
+  // MODAL SAVE
+  // ══════════════════════════════════════
+  function closeModal() {
+    document.getElementById('editModal').classList.add('hidden');
+    modalMode = null; modalRecordId = null;
+  }
+
+  async function saveModal() {
+    const modalErr = document.getElementById('modalErr');
+    modalErr.textContent = '';
+    showSpinner(true);
+    try {
+      if (modalMode === 'case') {
+        const referSel = document.getElementById('mc_refer_id');
+        const referId = referSel.value || null;
+        const referName = referId ? referSel.options[referSel.selectedIndex].dataset.name : null;
+        const payload = {
+          case_no: document.getElementById('mc_case_no').value.trim(),
+          case_date: document.getElementById('mc_case_date').value,
+          patient_name: document.getElementById('mc_patient_name').value.trim(),
+          bill_amount: parseFloat(document.getElementById('mc_bill_amount').value)||0,
+          paid_amount: parseFloat(document.getElementById('mc_paid_amount').value)||0,
+          discount: parseFloat(document.getElementById('mc_discount').value)||0,
+          case_type: document.getElementById('mc_case_type').value||null,
+          status: document.getElementById('mc_status').value,
+          refer_id: referId,
+          refer_name: referName,
+          tests: document.getElementById('mc_tests').value.trim()||null,
+          trans_no: document.getElementById('mc_trans_no').value.trim()||null,
+          entered_by: document.getElementById('mc_entered_by').value.trim()||null,
+          updated_at: new Date().toISOString()
+        };
+        const { error } = await BNH_PAGE.sb.from('opd_cases').update(payload).eq('id', modalRecordId);
+        if (error) throw error;
+        await loadCases();
+
+      } else if (modalMode === 'upload') {
+        const payload = {
+          case_no: document.getElementById('mu_case_no').value.trim(),
+          trans_date: document.getElementById('mu_trans_date').value,
+          trans_no: document.getElementById('mu_trans_no').value.trim()||null,
+          patient_name: document.getElementById('mu_patient_name').value.trim()||null,
+          income_amount: parseFloat(document.getElementById('mu_income').value)||0,
+          discount: parseFloat(document.getElementById('mu_discount').value)||0,
+          amount_cleared: parseFloat(document.getElementById('mu_cleared').value)||0,
+          payment_status: document.getElementById('mu_status').value,
+          cleared_date: document.getElementById('mu_cleared_date').value||null,
+          remarks: document.getElementById('mu_remarks').value.trim()||null,
+          updated_at: new Date().toISOString()
+        };
+        const { error } = await BNH_PAGE.sb.from('opd_old_dues').update(payload).eq('id', modalRecordId);
+        if (error) throw error;
+        await loadUploads();
+        loadOldDues();
+
+      } else if (modalMode === 'payment') {
+        const payload = {
+          case_no: document.getElementById('mp_case_no').value.trim(),
+          payment_date: document.getElementById('mp_payment_date').value,
+          amount: parseFloat(document.getElementById('mp_amount').value)||0,
+          mode: document.getElementById('mp_mode').value,
+          receipt_no: document.getElementById('mp_receipt_no').value.trim()||null,
+          remark: document.getElementById('mp_remark').value.trim()||null
+        };
+        const { error } = await BNH_PAGE.sb.from('opd_payments').update(payload).eq('id', modalRecordId);
+        if (error) throw error;
+        await loadPayments();
+      }
+
+      showOk('✅ Record updated successfully!');
+      closeModal();
+    } catch(e) {
+      modalErr.textContent = 'Error: ' + e.message;
+    } finally {
+      showSpinner(false);
+    }
+  }
+
+  // Close modal on overlay click
+  document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // ── Init ──
+  async function init() {
+    showSpinner(true);
+    try {
+      await loadRefers();
+      await Promise.all([loadCases(), loadUploads(), loadPayments()]);
+      loadOldDues();
+    } catch(e) {
+      showErr('Init error: ' + e.message);
+    } finally {
+      showSpinner(false);
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
