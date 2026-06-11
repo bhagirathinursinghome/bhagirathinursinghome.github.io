@@ -17,13 +17,8 @@
       page: "pages/profile.html",
       roles: ["*"]
     },
-    {
-label:"System Health",
-icon:"📊",
-page:"pages/system-health.html",
-roles:["admin"]
-    },
-
+    
+{ label: "DB Analytics", icon: "🗄️", page: "pages/supabase_analytics.html", roles: ["admin"] },
     // =====================
     // ADMIN
     // =====================
