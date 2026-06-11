@@ -403,7 +403,7 @@ async function fetchTableStats() {
     FROM pg_tables t
     JOIN pg_class c ON c.relname = t.tablename
     WHERE t.schemaname = 'public'
-    ORDER BY total_bytes DESC;
+    ORDER BY total_bytes DESC
   `);
 }
 
@@ -413,7 +413,7 @@ async function fetchDbSize() {
       pg_database_size(current_database())  AS db_bytes,
       (SELECT setting::bigint * 1024 * 1024
        FROM pg_settings WHERE name='max_wal_size')         AS wal_max_bytes
-    LIMIT 1;
+    LIMIT 1
   `);
 }
 
@@ -425,7 +425,7 @@ async function fetchConnections() {
       count(*) FILTER (WHERE state='idle')   AS idle,
       count(*) FILTER (WHERE state='active') AS running
     FROM pg_stat_activity
-    WHERE datname = current_database();
+    WHERE datname = current_database()
   `);
 }
 
@@ -455,7 +455,7 @@ async function fetchRecentActivity(tables) {
   const cols = await execSQL(`
     SELECT table_name FROM information_schema.columns
     WHERE table_schema='public' AND column_name='recorded_at'
-    LIMIT 5;
+    LIMIT 5
   `).catch(() => []);
 
   for (const row of cols) {
@@ -463,7 +463,7 @@ async function fetchRecentActivity(tables) {
       SELECT date_trunc('day', recorded_at)::date::text AS day, count(*)::int AS cnt
       FROM public."${row.table_name}"
       WHERE recorded_at >= now() - interval '7 days'
-      GROUP BY 1;
+      GROUP BY 1
     `).catch(() => []);
     for (const r of res) {
       if (days[r.day] !== undefined) days[r.day] += r.cnt;
