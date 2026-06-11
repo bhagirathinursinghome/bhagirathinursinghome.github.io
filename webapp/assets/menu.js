@@ -17,6 +17,12 @@
       page: "pages/profile.html",
       roles: ["*"]
     },
+    {
+label:"System Health",
+icon:"📊",
+page:"pages/system-health.html",
+roles:["admin"]
+    },
 
     // =====================
     // ADMIN
