@@ -12,6 +12,10 @@
     table { width:100%; border-collapse:collapse; margin-top:.75rem; }
     th { background:#f0f0f0; padding:7px 8px; text-align:left; font-size:.82rem; }
     td { padding:7px 8px; border-bottom:1px solid #eee; font-size:.82rem; }
+    .refer-type-toggle { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.5rem; }
+    .refer-type-btn { padding:0.4rem 0.9rem; border:1px solid #ccc; background:#f8f9fa; border-radius:3px; cursor:pointer; font-size:0.85rem; }
+    .refer-type-btn.active { background:#007bff; color:white; border-color:#007bff; }
+    .quack-info-box { background:#fff3e0; padding:0.6rem 0.9rem; border-radius:3px; border-left:3px solid #ff9800; font-size:0.85rem; margin-top:0.5rem; }
   </style>
 </head>
 <body>
@@ -79,12 +83,23 @@
         </div>
       </div>
 
-      <label>Refer Name</label>
-      <select id="referName">
-        <option value="">Loading refers…</option>
-      </select>
+      <!-- Refer / Doctor Source -->
+      <label style="font-weight:600; margin-bottom:0.4rem; display:block;">Refer / Doctor Source</label>
+      <div class="refer-type-toggle" id="referTypeToggle">
+        <button type="button" class="refer-type-btn active" data-type="quack" onclick="switchAdmReferType('quack')">👨‍⚕️ Refer</button>
+        <button type="button" class="refer-type-btn" data-type="none" onclick="switchAdmReferType('none')">🚫 Not Applicable</button>
+      </div>
 
-      <label>Remark</label>
+      <!-- Quack Doctor -->
+      <div id="referQuackSection">
+        <label>Select Refer</label>
+        <select id="quackDoctor" onchange="onQuackSelect()">
+          <option value="">Loading Refer…</option>
+        </select>
+        <div id="quackInfoBox" class="quack-info-box" style="display:none;"></div>
+      </div>
+
+      <label style="margin-top:1rem;">Remark</label>
       <textarea id="remark" rows="2" placeholder="Optional…"></textarea>
 
       <div style="margin-top:1rem">
@@ -109,6 +124,18 @@
   document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
   document.getElementById('admDate').value = new Date().toISOString().slice(0,10);
 
+  let currentReferType = 'quack';
+  let quackData = [];
+
+  // Refer type toggle
+  function switchAdmReferType(type) {
+    currentReferType = type;
+    document.querySelectorAll('#referTypeToggle .refer-type-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.type === type);
+    });
+    document.getElementById('referQuackSection').style.display = type === 'quack' ? '' : 'none';
+    document.getElementById('quackInfoBox').style.display = 'none';
+  }
   // Case mode Other toggle
   document.getElementById('caseMode').addEventListener('change', function() {
     const w = document.getElementById('caseModeOtherWrap');
@@ -125,17 +152,35 @@
     else { w.classList.add('hidden'); f.required = false; f.value=''; }
   });
 
-  // Load refers
-  let refersData = [];
-  async function loadRefers() {
-    const { data } = await BNH_PAGE.sb.from('ipd_refers')
-      .select('id,refer_name').eq('is_active',true).order('refer_name');
-    refersData = data || [];
-    const sel = document.getElementById('referName');
-    sel.innerHTML = '<option value="">-- Not Applicable --</option>' +
-      refersData.map(r=>`<option value="${r.id}" data-name="${r.refer_name}">${r.refer_name}</option>`).join('');
+  // Show quack doctor info
+  function onQuackSelect() {
+    const sel = document.getElementById('quackDoctor');
+    const val = sel.value;
+    const box = document.getElementById('quackInfoBox');
+    if (!val) { box.style.display = 'none'; return; }
+    const parts = val.split('|');
+    box.style.display = 'block';
+    box.innerHTML = `<strong>👨‍⚕️ ${parts[0]}</strong><br>📞 Mobile: <b>${parts[1]}</b> | 🏷️ Team: <b>${parts[2] || 'N/A'}</b>`;
   }
-  loadRefers();
+
+  // Load quack doctors from gramin_doctor_visits
+  async function loadQuackDoctors() {
+    const { data } = await BNH_PAGE.sb.from('gramin_doctor_visits')
+      .select('doctor_name,mobile,recorded_by_name').order('doctor_name');
+    if (!data) return;
+    const seen = new Set();
+    quackData = data.filter(d => {
+      const key = d.mobile || d.doctor_name;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const sel = document.getElementById('quackDoctor');
+    sel.innerHTML = '<option value="">-- Select Quack Doctor --</option>' +
+      quackData.map(d =>
+        `<option value="${d.doctor_name}|${d.mobile}|${d.recorded_by_name||''}">${d.doctor_name} — 📞 ${d.mobile} (${d.recorded_by_name||'Unknown Team'})</option>`
+      ).join('');
+  }
 
   async function loadAdmissions() {
     const div = document.getElementById('admList');
@@ -144,7 +189,7 @@
     if (error || !data || data.length === 0) { div.textContent = 'No admissions yet.'; return; }
     div.innerHTML = `<table>
       <thead><tr>
-        <th>Date</th><th>Adm No.</th><th>Patient</th><th>Mode</th><th>Type</th><th>Refer</th>
+        <th>Date</th><th>Adm No.</th><th>Patient</th><th>Mode</th><th>Type</th><th>Refer / Doctor</th>
       </tr></thead>
       <tbody>${data.map(r=>`<tr>
         <td>${r.admission_date}</td>
@@ -156,6 +201,8 @@
       </tr>`).join('')}</tbody>
     </table>`;
   }
+
+  loadQuackDoctors();
   loadAdmissions();
 
   document.getElementById('admForm').onsubmit = async (e) => {
@@ -174,9 +221,17 @@
       err.textContent = 'Please specify the Case Type.'; return;
     }
 
-    const referSel = document.getElementById('referName');
-    const referId  = referSel.value || null;
-    const referNm  = referId ? referSel.options[referSel.selectedIndex].dataset.name : null;
+    let referId = null;
+    let referNm = null;
+
+    if (currentReferType === 'quack') {
+      const qsel = document.getElementById('quackDoctor');
+      const qval = qsel.value;
+      if (qval) {
+        const parts = qval.split('|');
+        referNm = `👨‍⚕️ ${parts[0]} (📞${parts[1]}, Team: ${parts[2] || 'N/A'})`;
+      }
+    }
 
     spinner.classList.remove('hidden');
     try {
@@ -189,7 +244,6 @@
         case_mode_other: caseMode === 'Other' ? document.getElementById('caseModeOther').value.trim() : null,
         case_type:       caseType,
         case_type_other: caseType === 'Other' ? document.getElementById('caseTypeOther').value.trim() : null,
-        refer_id:        referId,
         refer_name:      referNm,
         remark:          document.getElementById('remark').value.trim() || null
       });
@@ -200,6 +254,8 @@
       e.target.reset();
       document.getElementById('admDate').value = new Date().toISOString().slice(0,10);
       document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+      currentReferType = 'quack';
+      switchAdmReferType('quack');
       loadAdmissions();
     } catch(ex) {
       err.textContent = ex.message;
