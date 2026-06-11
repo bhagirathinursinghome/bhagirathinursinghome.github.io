@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Gramin Records – Edit & Conflicts</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    /* ── Tabs ── */
+    .tab-bar {
+      display: flex;
+      gap: 0.25rem;
+      border-bottom: 2px solid var(--border, #e2e8f0);
+      margin-bottom: 1.1rem;
+    }
+    .tab-btn {
+      padding: 0.55rem 1.1rem;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-muted, #888);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      border-radius: 6px 6px 0 0;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn.active {
+      color: var(--primary, #2563eb);
+      border-bottom-color: var(--primary, #2563eb);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Filter row ── */
+    .filter-row {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.85rem;
+      align-items: center;
+    }
+    .filter-row select,
+    .filter-row input {
+      padding: 0.45rem 0.75rem;
+      border: 1px solid var(--border, #e2e8f0);
+      border-radius: 8px;
+      font-size: 0.86rem;
+      background: var(--input-bg, #fff);
+      color: var(--text, #1e293b);
+      flex: 1;
+      min-width: 160px;
+    }
+    .filter-row select { flex: 0 0 auto; min-width: 180px; }
+
+    /* ── Table ── */
+    .records-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.87rem;
+    }
+    .records-table th {
+      text-align: left;
+      padding: 0.5rem 0.7rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--text-muted, #888);
+      border-bottom: 1px solid var(--border, #e2e8f0);
+      white-space: nowrap;
+    }
+    .records-table td {
+      padding: 0.6rem 0.7rem;
+      border-bottom: 1px solid var(--border, #e2e8f0);
+      vertical-align: middle;
+    }
+    .records-table tr:last-child td { border-bottom: none; }
+    .records-table tr:hover td { background: var(--hover-bg, #f8fafc); }
+
+    /* ── Action buttons ── */
+    .action-btns { display: flex; gap: 0.35rem; }
+    .btn-edit {
+      background: #eff6ff;
+      color: #2563eb;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.28rem 0.6rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-edit:hover { background: #dbeafe; }
+    .btn-del {
+      background: #fff1f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.28rem 0.6rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-del:hover { background: #fee2e2; }
+
+    /* ── Conflict groups ── */
+    .conflict-group {
+      background: var(--card-bg, #fff);
+      border: 1.5px solid #f59e0b;
+      border-radius: 12px;
+      margin-bottom: 1.1rem;
+      overflow: hidden;
+    }
+    .conflict-header {
+      background: #fffbeb;
+      padding: 0.7rem 1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+    }
+    .conflict-badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: #f59e0b;
+      color: #fff;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      margin-top: 0.1rem;
+    }
+    .conflict-meta { flex: 1; }
+    .conflict-mobile { font-weight: 700; font-size: 0.96rem; }
+    .conflict-sub { color: var(--text-muted, #888); font-size: 0.83rem; margin-top: 0.1rem; }
+    .conflict-entries { padding: 0 0.75rem 0.65rem; }
+
+    /* ── Member badge ── */
+    .member-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.16rem 0.5rem;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    /* ── Summary pills ── */
+    .summary-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .summary-pill {
+      background: var(--card-bg, #f8fafc);
+      border: 1px solid var(--border, #e2e8f0);
+      border-radius: 8px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.82rem;
+    }
+    .summary-pill strong { display: block; font-size: 1.1rem; }
+
+    .records-count { font-size: 0.8rem; color: var(--text-muted, #888); margin-bottom: 0.5rem; }
+    .section-title {
+      font-size: 0.77rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-muted, #888); margin: 0 0 0.75rem;
+    }
+    .empty-state {
+      text-align: center; padding: 2.5rem 1rem;
+      color: var(--text-muted, #888); font-size: 0.9rem;
+    }
+    .empty-state .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      padding: 0.75rem 1.2rem; border-radius: 10px;
+      font-size: 0.88rem; font-weight: 600; color: #fff;
+      z-index: 9999; opacity: 0; transform: translateY(10px);
+      transition: opacity 0.25s, transform 0.25s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: #16a34a; }
+    .toast.error { background: #dc2626; }
+
+    /* ── Edit Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15,23,42,0.45);
+      z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal-box {
+      background: var(--card-bg, #fff);
+      border-radius: 14px;
+      width: 100%; max-width: 440px;
+      padding: 1.5rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+      transform: translateY(18px);
+      transition: transform 0.2s;
+    }
+    .modal-overlay.open .modal-box { transform: translateY(0); }
+    .modal-title {
+      font-size: 1rem; font-weight: 700;
+      margin: 0 0 1.1rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .modal-box label {
+      display: block; font-size: 0.78rem; font-weight: 600;
+      color: var(--text-muted, #888); margin: 0.75rem 0 0.3rem;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .modal-box input {
+      width: 100%; padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border, #e2e8f0);
+      border-radius: 8px; font-size: 0.9rem;
+      background: var(--input-bg, #fff); color: var(--text, #1e293b);
+      box-sizing: border-box;
+    }
+    .modal-box input:focus { outline: 2px solid var(--primary, #2563eb); border-color: transparent; }
+    .modal-actions { display: flex; gap: 0.6rem; margin-top: 1.3rem; }
+    .btn-primary {
+      flex: 1; padding: 0.6rem 1rem;
+      background: var(--primary, #2563eb); color: #fff;
+      border: none; border-radius: 8px; font-size: 0.9rem;
+      font-weight: 600; cursor: pointer; transition: background 0.15s;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-cancel {
+      flex: 1; padding: 0.6rem 1rem;
+      background: var(--hover-bg, #f1f5f9); color: var(--text, #1e293b);
+      border: 1px solid var(--border, #e2e8f0); border-radius: 8px;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    }
+    .modal-err { color: #dc2626; font-size: 0.82rem; margin-top: 0.5rem; min-height: 1.1em; }
+
+    /* ── Confirm Modal ── */
+    .confirm-box { max-width: 360px; text-align: center; }
+    .confirm-icon { font-size: 2.4rem; margin-bottom: 0.6rem; }
+    .confirm-title { font-size: 1rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .confirm-msg { font-size: 0.87rem; color: var(--text-muted, #888); margin-bottom: 1.2rem; }
+    .btn-danger {
+      flex: 1; padding: 0.6rem 1rem;
+      background: #dc2626; color: #fff;
+      border: none; border-radius: 8px; font-size: 0.9rem;
+      font-weight: 600; cursor: pointer;
+    }
+    .btn-danger:hover { background: #b91c1c; }
+
+    @media (max-width: 600px) {
+      .filter-row { flex-direction: column; }
+      .records-table { font-size: 0.82rem; }
+    }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>✏️ Edit Gramin Records</h1>
+  <p style="color:var(--text-muted,#888);font-size:0.9rem;margin-top:-0.25rem;margin-bottom:1.25rem;">
+    Edit or delete any record, and resolve conflicting entries entered by multiple team members.
+  </p>
+
+  <div class="page-card">
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('all',this)">📋 All Records</button>
+      <button class="tab-btn" onclick="switchTab('conflicts',this)">
+        ⚠️ Conflicts
+        <span id="conflictBadge"
+          style="background:#f59e0b;color:#fff;font-size:0.68rem;padding:0.1rem 0.45rem;border-radius:999px;margin-left:0.3rem">0</span>
+      </button>
+    </div>
+
+    <!-- ── ALL RECORDS TAB ── -->
+    <div id="tab-all" class="tab-panel active">
+      <div class="summary-pills" id="summaryPills"></div>
+
+      <div class="filter-row">
+        <select id="memberFilter" onchange="applyFilters()">
+          <option value="">👤 All Team Members</option>
+        </select>
+        <input id="searchAll" placeholder="🔍 Search name, address, mobile…" oninput="applyFilters()" />
+      </div>
+
+      <div class="records-count" id="allCount">Loading…</div>
+      <div style="overflow-x:auto" id="allContainer">
+        <div class="empty-state"><div class="icon">⏳</div>Loading records…</div>
+      </div>
+    </div>
+
+    <!-- ── CONFLICTS TAB ── -->
+    <div id="tab-conflicts" class="tab-panel">
+      <p style="font-size:0.85rem;color:var(--text-muted,#888);margin-bottom:1rem;">
+        Doctors whose mobile number was entered by <strong>2 or more</strong> different team members.
+        Delete the duplicate entry to resolve the conflict.
+      </p>
+      <div id="conflictContainer">
+        <div class="empty-state"><div class="icon">⏳</div>Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Edit Modal ── -->
+<div class="modal-overlay" id="editOverlay">
+  <div class="modal-box">
+    <div class="modal-title">✏️ Edit Doctor Record</div>
+    <input type="hidden" id="editId" />
+
+    <label>Doctor Name</label>
+    <input id="editName" placeholder="Dr. Ramesh Kumar" />
+
+    <label>Address</label>
+    <input id="editAddress" placeholder="Village, Block, District" />
+
+    <label>Mobile Number</label>
+    <input id="editMobile" type="tel" placeholder="10-digit mobile" maxlength="10" />
+
+    <div class="modal-err" id="editErr"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
+      <button class="btn-primary" onclick="saveEdit()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm Delete Modal ── -->
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal-box confirm-box">
+    <div class="confirm-icon">🗑️</div>
+    <div class="confirm-title">Delete this record?</div>
+    <div class="confirm-msg" id="confirmMsg">This action cannot be undone.</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-danger" onclick="confirmDeleteNow()">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+  BNH_PAGE.requireRole(["manager", "admin"]);
+
+  let allRecords = [];
+  let conflictGroups = [];
+  let pendingDeleteId = null;
+
+  /* ══════════════════════════════
+     TAB SWITCH
+  ══════════════════════════════ */
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  /* ══════════════════════════════
+     TOAST
+  ══════════════════════════════ */
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    setTimeout(() => t.className = 'toast', 2800);
+  }
+
+  /* ══════════════════════════════
+     LOAD DATA
+  ══════════════════════════════ */
+  async function loadAll() {
+    document.getElementById('spinner').classList.remove('hidden');
+    const { data, error } = await BNH_PAGE.sb
+      .from('gramin_doctor_visits')
+      .select('*')
+      .order('recorded_at', { ascending: false });
+    document.getElementById('spinner').classList.add('hidden');
+
+    if (error) { showToast(error.message, 'error'); return; }
+    allRecords = data || [];
+
+    buildMemberFilter();
+    buildSummary();
+    applyFilters();
+    buildConflicts();
+  }
+
+  /* ══════════════════════════════
+     MEMBER FILTER
+  ══════════════════════════════ */
+  function buildMemberFilter() {
+    const sel = document.getElementById('memberFilter');
+    const prev = sel.value;
+    const members = [...new Set(allRecords.map(r => (r.recorded_by_name || r.recorded_by) + '|' + r.recorded_by))];
+    sel.innerHTML = '<option value="">👤 All Team Members</option>' +
+      members.map(m => {
+        const [name, uname] = m.split('|');
+        return `<option value="${esc(uname)}" ${prev === uname ? 'selected' : ''}>${esc(name)}</option>`;
+      }).join('');
+  }
+
+  /* ══════════════════════════════
+     SUMMARY PILLS
+  ══════════════════════════════ */
+  function buildSummary() {
+    const byMember = {};
+    allRecords.forEach(r => {
+      const k = r.recorded_by_name || r.recorded_by;
+      byMember[k] = (byMember[k] || 0) + 1;
+    });
+    document.getElementById('summaryPills').innerHTML =
+      `<div class="summary-pill"><strong>${allRecords.length}</strong> Total</div>` +
+      `<div class="summary-pill"><strong>${Object.keys(byMember).length}</strong> Members</div>` +
+      Object.entries(byMember).map(([n, c]) =>
+        `<div class="summary-pill"><strong>${c}</strong> ${esc(n)}</div>`
+      ).join('');
+  }
+
+  /* ══════════════════════════════
+     FILTER + RENDER ALL RECORDS
+  ══════════════════════════════ */
+  function applyFilters() {
+    const member = document.getElementById('memberFilter').value;
+    const q = document.getElementById('searchAll').value.toLowerCase();
+    let filtered = allRecords;
+    if (member) filtered = filtered.filter(r => r.recorded_by === member);
+    if (q) filtered = filtered.filter(r =>
+      r.doctor_name?.toLowerCase().includes(q) ||
+      r.address?.toLowerCase().includes(q) ||
+      r.mobile?.includes(q) ||
+      (r.recorded_by_name || r.recorded_by)?.toLowerCase().includes(q)
+    );
+    document.getElementById('allCount').textContent = filtered.length + ' record(s)';
+    renderAllTable(filtered);
+  }
+
+  function renderAllTable(records) {
+    const container = document.getElementById('allContainer');
+    if (!records.length) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">📭</div>No records match.</div>';
+      return;
+    }
+    container.innerHTML = `
+      <table class="records-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Doctor Name</th>
+            <th>Address</th>
+            <th>Mobile</th>
+            <th>Team Member</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${records.map((r, i) => `
+            <tr>
+              <td style="color:var(--text-muted,#888);font-size:0.78rem">${i + 1}</td>
+              <td><strong>${esc(r.doctor_name)}</strong></td>
+              <td style="color:var(--text-muted,#888);font-size:0.83rem">${esc(r.address)}</td>
+              <td>${esc(r.mobile)}</td>
+              <td><span class="member-badge">${esc(r.recorded_by_name || r.recorded_by)}</span></td>
+              <td style="font-size:0.78rem;color:var(--text-muted,#888);white-space:nowrap">${fmtDate(r.recorded_at)}</td>
+              <td>
+                <div class="action-btns">
+                  <button class="btn-edit" onclick="openEdit('${r.id}')">✏️ Edit</button>
+                  <button class="btn-del"  onclick="askDelete('${r.id}', '${esc(r.doctor_name)}')">🗑 Del</button>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  /* ══════════════════════════════
+     CONFLICT DETECTION
+  ══════════════════════════════ */
+  function buildConflicts() {
+    const byMobile = {};
+    allRecords.forEach(r => {
+      if (!r.mobile) return;
+      if (!byMobile[r.mobile]) byMobile[r.mobile] = [];
+      byMobile[r.mobile].push(r);
+    });
+
+    conflictGroups = Object.entries(byMobile)
+      .filter(([, entries]) => new Set(entries.map(e => e.recorded_by)).size >= 2)
+      .map(([mobile, entries]) => ({ mobile, entries }));
+
+    document.getElementById('conflictBadge').textContent = conflictGroups.length;
+    renderConflicts();
+  }
+
+  function renderConflicts() {
+    const container = document.getElementById('conflictContainer');
+    if (!conflictGroups.length) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">✅</div>No conflicts found — great teamwork!</div>';
+      return;
+    }
+
+    container.innerHTML = conflictGroups.map(g => {
+      const docName = g.entries[0]?.doctor_name || '—';
+      const memberNames = [...new Set(g.entries.map(e => e.recorded_by_name || e.recorded_by))];
+      return `
+        <div class="conflict-group">
+          <div class="conflict-header">
+            <span class="conflict-badge">⚠️ CONFLICT</span>
+            <div class="conflict-meta">
+              <div class="conflict-mobile">📞 ${esc(g.mobile)}</div>
+              <div class="conflict-sub">${esc(docName)} — entered by ${memberNames.map(m => `<strong>${esc(m)}</strong>`).join(', ')}</div>
+            </div>
+          </div>
+          <div class="conflict-entries">
+            <table class="records-table" style="margin-top:0.4rem">
+              <thead>
+                <tr>
+                  <th>Doctor Name</th>
+                  <th>Address</th>
+                  <th>Team Member</th>
+                  <th>Date</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${g.entries.map(r => `
+                  <tr>
+                    <td><strong>${esc(r.doctor_name)}</strong></td>
+                    <td style="color:var(--text-muted,#888);font-size:0.82rem">${esc(r.address)}</td>
+                    <td><span class="member-badge">${esc(r.recorded_by_name || r.recorded_by)}</span></td>
+                    <td style="font-size:0.78rem;color:var(--text-muted,#888)">${fmtDate(r.recorded_at)}</td>
+                    <td>
+                      <button class="btn-del" onclick="askDelete('${r.id}', '${esc(r.doctor_name)} (${esc(r.recorded_by_name || r.recorded_by)})')">
+                        🗑 Delete
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  /* ══════════════════════════════
+     EDIT MODAL
+  ══════════════════════════════ */
+  function openEdit(id) {
+    const r = allRecords.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('editId').value = id;
+    document.getElementById('editName').value = r.doctor_name || '';
+    document.getElementById('editAddress').value = r.address || '';
+    document.getElementById('editMobile').value = r.mobile || '';
+    document.getElementById('editErr').textContent = '';
+    document.getElementById('editOverlay').classList.add('open');
+  }
+
+  function closeEdit() {
+    document.getElementById('editOverlay').classList.remove('open');
+  }
+
+  async function saveEdit() {
+    const id      = document.getElementById('editId').value;
+    const name    = document.getElementById('editName').value.trim();
+    const address = document.getElementById('editAddress').value.trim();
+    const mobile  = document.getElementById('editMobile').value.trim();
+    const errEl   = document.getElementById('editErr');
+
+    if (!name || !address || !mobile) {
+      errEl.textContent = 'All fields are required.'; return;
+    }
+    if (!/^[6-9][0-9]{9}$/.test(mobile)) {
+      errEl.textContent = 'Enter a valid 10-digit mobile number.'; return;
+    }
+    errEl.textContent = '';
+
+    document.getElementById('spinner').classList.remove('hidden');
+    const { error } = await BNH_PAGE.sb
+      .from('gramin_doctor_visits')
+      .update({ doctor_name: name, address, mobile })
+      .eq('id', id);
+    document.getElementById('spinner').classList.add('hidden');
+
+    if (error) { errEl.textContent = error.message; return; }
+    showToast('Record updated ✅');
+    closeEdit();
+    loadAll();
+  }
+
+  // Close edit modal on overlay click
+  document.getElementById('editOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeEdit();
+  });
+
+  /* ══════════════════════════════
+     DELETE CONFIRM MODAL
+  ══════════════════════════════ */
+  function askDelete(id, label) {
+    pendingDeleteId = id;
+    document.getElementById('confirmMsg').textContent =
+      `Delete record for "${label}"? This cannot be undone.`;
+    document.getElementById('confirmOverlay').classList.add('open');
+  }
+
+  function closeConfirm() {
+    pendingDeleteId = null;
+    document.getElementById('confirmOverlay').classList.remove('open');
+  }
+
+  async function confirmDeleteNow() {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    closeConfirm();
+
+    document.getElementById('spinner').classList.remove('hidden');
+    const { error } = await BNH_PAGE.sb
+      .from('gramin_doctor_visits')
+      .delete()
+      .eq('id', id);
+    document.getElementById('spinner').classList.add('hidden');
+
+    if (error) { showToast(error.message, 'error'); return; }
+    showToast('Record deleted.');
+    loadAll();
+  }
+
+  // Close confirm modal on overlay click
+  document.getElementById('confirmOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeConfirm();
+  });
+
+  /* ══════════════════════════════
+     UTILS
+  ══════════════════════════════ */
+  function esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
+  }
+  function fmtDate(ts) {
+    if (!ts) return '—';
+    return new Date(ts).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  loadAll();
+</script>
+</body>
+</html>
