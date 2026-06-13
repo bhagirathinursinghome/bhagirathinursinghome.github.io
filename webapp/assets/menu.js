@@ -180,7 +180,7 @@
       label: "Add Supplier",
       icon: "🏭",
       page: "pages/pharmacy-add-supplier.html",
-      roles: ["admin", "accountant", "pharmacy"]
+      roles: ["admin", "accountant"]
     },
     {
       label: "Supplier Payment",
