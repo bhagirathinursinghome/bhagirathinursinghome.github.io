@@ -40,7 +40,10 @@
       page: "pages/pharmacy-admin-editor.html",
       roles: ["admin"]
     },
-
+{ label: "Credit Management", 
+ icon: "💳", 
+ page: "pages/add-credit.html",
+  roles: ["admin","accountant","manager"] },
     // =====================
     // OPD
     // =====================
