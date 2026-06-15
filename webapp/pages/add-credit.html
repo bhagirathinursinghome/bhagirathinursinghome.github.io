@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Credit Management</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    /* ── Tab navigation ── */
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid #e2e8f0;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      padding: .6rem 1.2rem;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: .9rem;
+      font-weight: 600;
+      color: #64748b;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .tab-btn.active {
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+    }
+    .tab-btn:hover:not(.active) { color: #334155; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Table styles ── */
+    .data-table { width:100%; border-collapse:collapse; font-size:.88rem; }
+    .data-table th {
+      background:#f1f5f9; color:#475569; font-weight:700;
+      padding:.55rem .75rem; text-align:left; border-bottom:2px solid #e2e8f0;
+    }
+    .data-table td {
+      padding:.55rem .75rem; border-bottom:1px solid #f1f5f9; vertical-align:middle;
+    }
+    .data-table tr:last-child td { border-bottom:none; }
+    .data-table tr:hover td { background:#f8fafc; }
+    .table-wrap { overflow-x:auto; }
+
+    /* ── Inline edit cell ── */
+    .inline-input {
+      border:1px solid #cbd5e1; border-radius:5px; padding:.3rem .5rem;
+      font-size:.85rem; width:100%; box-sizing:border-box;
+    }
+    .inline-input:focus { outline:none; border-color:#2563eb; }
+
+    /* ── Action buttons ── */
+    .btn-sm {
+      padding:.25rem .65rem; font-size:.78rem; border-radius:5px;
+      border:none; cursor:pointer; font-weight:600;
+    }
+    .btn-edit  { background:#dbeafe; color:#1d4ed8; }
+    .btn-save  { background:#dcfce7; color:#15803d; }
+    .btn-del   { background:#fee2e2; color:#b91c1c; }
+    .btn-cancel{ background:#f1f5f9; color:#475569; }
+    .btn-sm:hover { opacity:.85; }
+
+    /* ── Report cards ── */
+    .report-grid {
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px,1fr));
+      gap:1rem;
+      margin-top:1rem;
+    }
+    .creditor-card {
+      background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+      padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.35rem;
+    }
+    .creditor-card .cat-badge {
+      font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+      background:#eff6ff; color:#2563eb; border-radius:4px; padding:.15rem .45rem;
+      align-self:flex-start;
+    }
+    .creditor-card .c-name { font-weight:700; font-size:1rem; color:#1e293b; }
+    .creditor-card .c-balance {
+      font-size:1.25rem; font-weight:800;
+      color:#dc2626;
+    }
+    .creditor-card .c-remark { font-size:.8rem; color:#64748b; font-style:italic; }
+
+    /* ── Totals bar ── */
+    .totals-bar {
+      background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;
+      padding:.75rem 1rem; display:flex; gap:2rem; flex-wrap:wrap;
+      margin-bottom:1rem; align-items:center;
+    }
+    .totals-bar span { font-size:.9rem; color:#1e3a8a; }
+    .totals-bar strong { font-size:1.05rem; }
+
+    /* ── Category tag pill ── */
+    .cat-pill {
+      display:inline-block; background:#f0fdf4; color:#15803d;
+      border:1px solid #bbf7d0; border-radius:20px;
+      padding:.2rem .7rem; font-size:.78rem; font-weight:600;
+    }
+
+    /* ── Empty state ── */
+    .empty-state { text-align:center; padding:2.5rem 1rem; color:#94a3b8; font-size:.9rem; }
+    .empty-state .es-icon { font-size:2.5rem; display:block; margin-bottom:.5rem; }
+
+    /* ── Section sub-heading ── */
+    .section-title {
+      font-size:.8rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:.06em; color:#94a3b8; margin:1.25rem 0 .6rem;
+    }
+
+    /* ── Existing style overrides ── */
+    .page-card { padding:1.25rem; }
+
+    select.inline-input { cursor:pointer; }
+
+    .form-row { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; }
+    .form-row > * { flex:1; min-width:160px; }
+    .form-row label { display:block; font-size:.8rem; font-weight:600;
+      color:#475569; margin-bottom:.3rem; }
+    .form-row input, .form-row select {
+      width:100%; box-sizing:border-box;
+      border:1px solid #cbd5e1; border-radius:6px; padding:.45rem .65rem;
+      font-size:.88rem;
+    }
+    .form-row input:focus, .form-row select:focus {
+      outline:none; border-color:#2563eb;
+    }
+
+    .info { color:#15803d; font-size:.85rem; margin-top:.5rem; }
+    .err  { color:#dc2626; font-size:.85rem; margin-top:.5rem; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>💳 Credit Management</h1>
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('tab-category',this)">🗂 Categories</button>
+    <button class="tab-btn" onclick="switchTab('tab-creditors',this)">👤 Creditors</button>
+    <button class="tab-btn" onclick="switchTab('tab-addcredit',this)">➕ Add Credit</button>
+    <button class="tab-btn" onclick="switchTab('tab-report',this)">📊 Balance Report</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       TAB 1 — CATEGORIES
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-category" class="tab-panel active">
+    <div class="page-card">
+      <p class="section-title">Add New Category</p>
+      <div class="form-row" style="max-width:480px">
+        <div>
+          <label>Category Name</label>
+          <input id="catName" placeholder="e.g. Supplier, Contractor…"/>
+        </div>
+        <div style="flex:0">
+          <label>&nbsp;</label>
+          <button class="btn-primary" style="width:auto;white-space:nowrap"
+            onclick="saveCategory()">Add Category</button>
+        </div>
+      </div>
+      <p class="err" id="catErr"></p>
+      <p class="info" id="catOk"></p>
+
+      <p class="section-title">Existing Categories</p>
+      <div class="table-wrap">
+        <table class="data-table" id="catTable">
+          <thead>
+            <tr><th>#</th><th>Category Name</th><th>Creditors</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="catBody">
+            <tr><td colspan="4"><div class="empty-state"><span class="es-icon">🗂</span>Loading…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       TAB 2 — CREDITORS
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-creditors" class="tab-panel">
+    <div class="page-card">
+      <p class="section-title">Add New Creditor</p>
+      <div class="form-row" style="max-width:760px">
+        <div>
+          <label>Category</label>
+          <select id="credCat"><option value="">— select —</option></select>
+        </div>
+        <div>
+          <label>Creditor Name</label>
+          <input id="credName" placeholder="Full name or firm"/>
+        </div>
+        <div>
+          <label>Opening Balance (₹)</label>
+          <input id="credOpening" type="number" min="0" step="0.01" placeholder="0"/>
+        </div>
+        <div>
+          <label>Remark <span style="font-weight:400;color:#94a3b8">(optional)</span></label>
+          <input id="credRemark" placeholder="e.g. Vendor #42"/>
+        </div>
+        <div style="flex:0">
+          <label>&nbsp;</label>
+          <button class="btn-primary" style="width:auto;white-space:nowrap"
+            onclick="saveCreditor()">Add Creditor</button>
+        </div>
+      </div>
+      <p class="err" id="credErr"></p>
+      <p class="info" id="credOk"></p>
+
+      <p class="section-title">Existing Creditors</p>
+      <div class="table-wrap">
+        <table class="data-table" id="credTable">
+          <thead>
+            <tr><th>#</th><th>Category</th><th>Name</th><th>Opening Bal (₹)</th><th>Remark</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="credBody">
+            <tr><td colspan="6"><div class="empty-state"><span class="es-icon">👤</span>Loading…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       TAB 3 — ADD CREDIT ENTRY
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-addcredit" class="tab-panel">
+    <div class="page-card">
+      <p class="section-title">Record a Credit (Due Amount)</p>
+      <div class="form-row" style="max-width:680px">
+        <div>
+          <label>Date</label>
+          <input id="txDate" type="date"/>
+        </div>
+        <div>
+          <label>Creditor</label>
+          <select id="txCreditor"><option value="">— select —</option></select>
+        </div>
+        <div>
+          <label>Due Amount (₹)</label>
+          <input id="txAmount" type="number" min="0.01" step="0.01" placeholder="0.00"/>
+        </div>
+        <div>
+          <label>Note <span style="font-weight:400;color:#94a3b8">(optional)</span></label>
+          <input id="txNote" placeholder="Invoice #, description…"/>
+        </div>
+        <div style="flex:0">
+          <label>&nbsp;</label>
+          <button class="btn-primary" style="width:auto;white-space:nowrap"
+            onclick="saveCredit()">Add Credit</button>
+        </div>
+      </div>
+      <p class="err" id="txErr"></p>
+      <p class="info" id="txOk"></p>
+
+      <p class="section-title">Recent Credit Entries</p>
+      <div class="table-wrap">
+        <table class="data-table" id="txTable">
+          <thead>
+            <tr><th>Date</th><th>Creditor</th><th>Category</th><th>Amount (₹)</th><th>Note</th><th>Added By</th></tr>
+          </thead>
+          <tbody id="txBody">
+            <tr><td colspan="6"><div class="empty-state"><span class="es-icon">📋</span>Loading…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       TAB 4 — BALANCE REPORT
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-report" class="tab-panel">
+    <div class="page-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem">
+        <p class="section-title" style="margin:0">Outstanding Balances (non-zero)</p>
+        <button class="btn-sm btn-edit" onclick="loadReport()">🔄 Refresh</button>
+      </div>
+      <div id="reportTotals"></div>
+      <div id="reportGrid" class="report-grid">
+        <div class="empty-state"><span class="es-icon">📊</span>Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REQUIRED SCRIPTS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+// ── Role guard ──────────────────────────────────────────
+BNH_PAGE.requireRole(["admin","accountant","manager"]);
+
+const sb = BNH_PAGE.sb;
+
+// ── In-memory caches ────────────────────────────────────
+let categories  = [];  // [{id, name, creditor_count}]
+let creditors   = [];  // [{id, category_id, category_name, name, opening_balance, remark}]
+
+// ── Tab switching ────────────────────────────────────────
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'tab-report')   loadReport();
+  if (id === 'tab-creditors') populateCreditorCatSelect();
+  if (id === 'tab-addcredit') { populateTxSelect(); loadRecentTx(); }
+}
+
+// ════════════════════════════════════════════════════════
+// INIT — load all reference data on page load
+// ════════════════════════════════════════════════════════
+(async () => {
+  await Promise.all([loadCategories(), loadCreditors()]);
+  renderCategoryTable();
+  renderCreditorTable();
+  setTodayDate();
+})();
+
+function setTodayDate() {
+  const d = new Date();
+  const iso = d.toISOString().split('T')[0];
+  document.getElementById('txDate').value = iso;
+}
+
+// ════════════════════════════════════════════════════════
+// CATEGORIES
+// ════════════════════════════════════════════════════════
+async function loadCategories() {
+  const { data, error } = await sb.from('credit_categories').select('*').order('name');
+  if (!error && data) categories = data;
+}
+
+function renderCategoryTable() {
+  const tbody = document.getElementById('catBody');
+  if (!categories.length) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><span class="es-icon">🗂</span>No categories yet. Add one above.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = categories.map((c, i) => {
+    const count = creditors.filter(cr => cr.category_id === c.id).length;
+    return `<tr id="catRow-${c.id}">
+      <td>${i+1}</td>
+      <td id="catNameCell-${c.id}">${esc(c.name)}</td>
+      <td><span class="cat-pill">${count} creditor${count!==1?'s':''}</span></td>
+      <td>
+        <button class="btn-sm btn-edit" onclick="editCat('${c.id}')">Edit</button>
+        <button class="btn-sm btn-del" onclick="deleteCat('${c.id}')" style="margin-left:.3rem">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function saveCategory() {
+  const name = document.getElementById('catName').value.trim();
+  const err  = document.getElementById('catErr');
+  const ok   = document.getElementById('catOk');
+  err.textContent = ''; ok.textContent = '';
+  if (!name) { err.textContent = 'Category name is required.'; return; }
+
+  showSpinner(true);
+  try {
+    const payload = BNH_PAGE.stamp({ name });
+    const { data, error } = await sb.from('credit_categories').insert(payload).select().single();
+    if (error) throw error;
+    categories.push(data);
+    categories.sort((a,b) => a.name.localeCompare(b.name));
+    renderCategoryTable();
+    populateCreditorCatSelect();
+    document.getElementById('catName').value = '';
+    ok.textContent = `Category "${name}" added.`;
+  } catch(e) { err.textContent = e.message; }
+  finally { showSpinner(false); }
+}
+
+function editCat(id) {
+  const cell = document.getElementById(`catNameCell-${id}`);
+  const orig = cell.textContent;
+  cell.innerHTML = `<input class="inline-input" id="catEditInput-${id}" value="${esc(orig)}"/>`;
+  const row = document.getElementById(`catRow-${id}`);
+  const actionCell = row.querySelector('td:last-child');
+  actionCell.innerHTML = `
+    <button class="btn-sm btn-save" onclick="saveCatEdit('${id}','${esc(orig)}')">Save</button>
+    <button class="btn-sm btn-cancel" onclick="cancelCatEdit('${id}','${esc(orig)}')" style="margin-left:.3rem">Cancel</button>`;
+}
+
+function cancelCatEdit(id, orig) {
+  document.getElementById(`catNameCell-${id}`).textContent = orig;
+  renderCategoryTable(); // re-render restores buttons
+}
+
+async function saveCatEdit(id, orig) {
+  const name = document.getElementById(`catEditInput-${id}`).value.trim();
+  if (!name) { alert('Name cannot be empty.'); return; }
+  showSpinner(true);
+  try {
+    const { error } = await sb.from('credit_categories').update({ name }).eq('id', id);
+    if (error) throw error;
+    const cat = categories.find(c => c.id === id);
+    if (cat) cat.name = name;
+    creditors.forEach(cr => { if (cr.category_id === id) cr.category_name = name; });
+    renderCategoryTable();
+    renderCreditorTable();
+  } catch(e) { alert(e.message); }
+  finally { showSpinner(false); }
+}
+
+async function deleteCat(id) {
+  const count = creditors.filter(cr => cr.category_id === id).length;
+  if (count > 0) { alert(`Cannot delete: ${count} creditor(s) use this category.`); return; }
+  if (!confirm('Delete this category?')) return;
+  showSpinner(true);
+  try {
+    const { error } = await sb.from('credit_categories').delete().eq('id', id);
+    if (error) throw error;
+    categories = categories.filter(c => c.id !== id);
+    renderCategoryTable();
+  } catch(e) { alert(e.message); }
+  finally { showSpinner(false); }
+}
+
+// ════════════════════════════════════════════════════════
+// CREDITORS
+// ════════════════════════════════════════════════════════
+async function loadCreditors() {
+  const { data, error } = await sb
+    .from('creditors')
+    .select('*, credit_categories(name)')
+    .order('name');
+  if (!error && data) {
+    creditors = data.map(r => ({
+      ...r,
+      category_name: r.credit_categories?.name || '—'
+    }));
+  }
+}
+
+function renderCreditorTable() {
+  const tbody = document.getElementById('credBody');
+  if (!creditors.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><span class="es-icon">👤</span>No creditors yet. Add one above.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = creditors.map((c, i) => `
+    <tr id="crRow-${c.id}">
+      <td>${i+1}</td>
+      <td><span class="cat-pill">${esc(c.category_name)}</span></td>
+      <td id="crName-${c.id}">${esc(c.name)}</td>
+      <td id="crOp-${c.id}">₹${fmt(c.opening_balance||0)}</td>
+      <td id="crRem-${c.id}">${esc(c.remark||'')}</td>
+      <td>
+        <button class="btn-sm btn-edit" onclick="editCreditor('${c.id}')">Edit</button>
+      </td>
+    </tr>`).join('');
+}
+
+function populateCreditorCatSelect() {
+  const sel = document.getElementById('credCat');
+  sel.innerHTML = '<option value="">— select category —</option>' +
+    categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+}
+
+async function saveCreditor() {
+  const catId   = document.getElementById('credCat').value;
+  const name    = document.getElementById('credName').value.trim();
+  const opening = parseFloat(document.getElementById('credOpening').value) || 0;
+  const remark  = document.getElementById('credRemark').value.trim();
+  const err     = document.getElementById('credErr');
+  const ok      = document.getElementById('credOk');
+  err.textContent = ''; ok.textContent = '';
+
+  if (!catId) { err.textContent = 'Select a category.'; return; }
+  if (!name)  { err.textContent = 'Creditor name is required.'; return; }
+
+  showSpinner(true);
+  try {
+    const payload = BNH_PAGE.stamp({ category_id: catId, name, opening_balance: opening, remark });
+    const { data, error } = await sb.from('creditors').insert(payload).select('*, credit_categories(name)').single();
+    if (error) throw error;
+    creditors.push({ ...data, category_name: data.credit_categories?.name || '—' });
+    creditors.sort((a,b) => a.name.localeCompare(b.name));
+    renderCreditorTable();
+    renderCategoryTable();
+    populateTxSelect();
+    document.getElementById('credCat').value    = '';
+    document.getElementById('credName').value   = '';
+    document.getElementById('credOpening').value= '';
+    document.getElementById('credRemark').value = '';
+    ok.textContent = `Creditor "${name}" added.`;
+  } catch(e) { err.textContent = e.message; }
+  finally { showSpinner(false); }
+}
+
+function editCreditor(id) {
+  const cr = creditors.find(c => c.id === id);
+  if (!cr) return;
+
+  const catOptions = categories.map(c =>
+    `<option value="${c.id}" ${c.id === cr.category_id?'selected':''}>${esc(c.name)}</option>`).join('');
+
+  document.getElementById(`crName-${id}`).innerHTML =
+    `<input class="inline-input" id="crEditName-${id}" value="${esc(cr.name)}" style="min-width:120px"/>`;
+  document.getElementById(`crOp-${id}`).innerHTML =
+    `<input class="inline-input" id="crEditOp-${id}" type="number" value="${cr.opening_balance||0}" style="min-width:90px"/>`;
+  document.getElementById(`crRem-${id}`).innerHTML =
+    `<input class="inline-input" id="crEditRem-${id}" value="${esc(cr.remark||'')}" style="min-width:120px"/>`;
+
+  const row = document.getElementById(`crRow-${id}`);
+  row.querySelector('td:nth-child(2)').innerHTML =
+    `<select class="inline-input" id="crEditCat-${id}" style="min-width:120px">${catOptions}</select>`;
+  row.querySelector('td:last-child').innerHTML = `
+    <button class="btn-sm btn-save" onclick="saveCreditorEdit('${id}')">Save</button>
+    <button class="btn-sm btn-cancel" onclick="renderCreditorTable()" style="margin-left:.3rem">Cancel</button>`;
+}
+
+async function saveCreditorEdit(id) {
+  const name    = document.getElementById(`crEditName-${id}`).value.trim();
+  const catId   = document.getElementById(`crEditCat-${id}`).value;
+  const opening = parseFloat(document.getElementById(`crEditOp-${id}`).value) || 0;
+  const remark  = document.getElementById(`crEditRem-${id}`).value.trim();
+  if (!name || !catId) { alert('Name and category are required.'); return; }
+
+  showSpinner(true);
+  try {
+    const { error } = await sb.from('creditors')
+      .update({ name, category_id: catId, opening_balance: opening, remark })
+      .eq('id', id);
+    if (error) throw error;
+    const cr = creditors.find(c => c.id === id);
+    const cat = categories.find(c => c.id === catId);
+    Object.assign(cr, { name, category_id: catId, opening_balance: opening, remark, category_name: cat?.name||'—' });
+    renderCreditorTable();
+    renderCategoryTable();
+  } catch(e) { alert(e.message); }
+  finally { showSpinner(false); }
+}
+
+// ════════════════════════════════════════════════════════
+// ADD CREDIT ENTRIES
+// ════════════════════════════════════════════════════════
+function populateTxSelect() {
+  const sel = document.getElementById('txCreditor');
+  sel.innerHTML = '<option value="">— select creditor —</option>' +
+    creditors.map(c => `<option value="${c.id}">${esc(c.name)} (${esc(c.category_name)})</option>`).join('');
+}
+
+async function saveCredit() {
+  const date   = document.getElementById('txDate').value;
+  const credId = document.getElementById('txCreditor').value;
+  const amount = parseFloat(document.getElementById('txAmount').value);
+  const note   = document.getElementById('txNote').value.trim();
+  const err    = document.getElementById('txErr');
+  const ok     = document.getElementById('txOk');
+  err.textContent = ''; ok.textContent = '';
+
+  if (!date)          { err.textContent = 'Select a date.'; return; }
+  if (!credId)        { err.textContent = 'Select a creditor.'; return; }
+  if (!amount || amount <= 0) { err.textContent = 'Enter a valid amount.'; return; }
+
+  showSpinner(true);
+  try {
+    const creditor = creditors.find(c => c.id === credId);
+    const payload = BNH_PAGE.stamp({
+      creditor_id: credId,
+      creditor_name: creditor?.name,
+      category_id: creditor?.category_id,
+      category_name: creditor?.category_name,
+      entry_date: date,
+      amount,
+      note,
+      entry_type: 'credit'
+    });
+    const { error } = await sb.from('credit_entries').insert(payload);
+    if (error) throw error;
+
+    ok.textContent = `₹${fmt(amount)} added for ${creditor?.name}.`;
+    document.getElementById('txAmount').value = '';
+    document.getElementById('txNote').value   = '';
+    await loadRecentTx();
+  } catch(e) { err.textContent = e.message; }
+  finally { showSpinner(false); }
+}
+
+async function loadRecentTx() {
+  const { data, error } = await sb
+    .from('credit_entries')
+    .select('*')
+    .order('entry_date', { ascending: false })
+    .limit(30);
+
+  const tbody = document.getElementById('txBody');
+  if (error || !data || !data.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><span class="es-icon">📋</span>No credit entries yet.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td>${r.entry_date}</td>
+      <td>${esc(r.creditor_name||'')}</td>
+      <td><span class="cat-pill">${esc(r.category_name||'')}</span></td>
+      <td style="font-weight:700;color:#dc2626">₹${fmt(r.amount)}</td>
+      <td>${esc(r.note||'—')}</td>
+      <td style="font-size:.78rem;color:#64748b">${esc(r.recorded_by_name||r.recorded_by||'')}</td>
+    </tr>`).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// BALANCE REPORT
+// ════════════════════════════════════════════════════════
+async function loadReport() {
+  showSpinner(true);
+  const grid   = document.getElementById('reportGrid');
+  const totDiv = document.getElementById('reportTotals');
+  grid.innerHTML = '<div class="empty-state"><span class="es-icon">📊</span>Loading…</div>';
+
+  try {
+    // Load all creditors with their opening balances
+    const { data: creds, error: e1 } = await sb
+      .from('creditors')
+      .select('id, name, opening_balance, remark, credit_categories(name)');
+    if (e1) throw e1;
+
+    // Sum all credit entries per creditor
+    const { data: entries, error: e2 } = await sb
+      .from('credit_entries')
+      .select('creditor_id, amount, entry_type');
+    if (e2) throw e2;
+
+    // Sum credit entries (type='credit') and payment entries (type='payment') per creditor
+    const totals = {};
+    for (const e of (entries||[])) {
+      if (!totals[e.creditor_id]) totals[e.creditor_id] = { credit: 0, payment: 0 };
+      if (e.entry_type === 'credit')  totals[e.creditor_id].credit  += parseFloat(e.amount)||0;
+      if (e.entry_type === 'payment') totals[e.creditor_id].payment += parseFloat(e.amount)||0;
+    }
+
+    // Compute balance = opening + credits − payments
+    const results = (creds||[]).map(c => {
+      const t = totals[c.id] || { credit: 0, payment: 0 };
+      const balance = (parseFloat(c.opening_balance)||0) + t.credit - t.payment;
+      return { ...c, balance, category_name: c.credit_categories?.name||'—' };
+    }).filter(c => Math.abs(c.balance) > 0.001)
+      .sort((a,b) => b.balance - a.balance);
+
+    if (!results.length) {
+      grid.innerHTML = '<div class="empty-state"><span class="es-icon">✅</span>All balances are zero.</div>';
+      totDiv.innerHTML = '';
+      return;
+    }
+
+    const grandTotal = results.reduce((s,c) => s + c.balance, 0);
+    totDiv.innerHTML = `
+      <div class="totals-bar">
+        <span>Outstanding Creditors: <strong>${results.length}</strong></span>
+        <span>Total Due: <strong style="color:#dc2626">₹${fmt(grandTotal)}</strong></span>
+      </div>`;
+
+    grid.innerHTML = results.map(c => `
+      <div class="creditor-card">
+        <span class="cat-badge">${esc(c.category_name)}</span>
+        <span class="c-name">${esc(c.name)}</span>
+        <span class="c-balance">₹${fmt(c.balance)}</span>
+        ${c.remark ? `<span class="c-remark">${esc(c.remark)}</span>` : ''}
+      </div>`).join('');
+
+  } catch(e) {
+    grid.innerHTML = `<div class="empty-state" style="color:#dc2626">${esc(e.message)}</div>`;
+  } finally { showSpinner(false); }
+}
+
+// ════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════
+function showSpinner(on) {
+  document.getElementById('spinner').classList.toggle('hidden', !on);
+}
+function esc(str) {
+  return String(str||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmt(n) {
+  return parseFloat(n||0).toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+</script>
+</body>
+</html>
