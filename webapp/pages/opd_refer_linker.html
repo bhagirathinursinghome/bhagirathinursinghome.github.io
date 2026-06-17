@@ -3,418 +3,775 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>OPD Refer Linker</title>
+  <title>OPD Data Upload & Reconciliation</title>
   <link rel="stylesheet" href="../assets/style.css"/>
   <style>
-    .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
-    .form-row > * { flex: 1; min-width: 200px; }
-    .case-card { background: #f9f9f9; border: 1px solid #ddd; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
-    .case-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
-    .case-info { flex: 1; }
-    .case-no { font-weight: bold; color: #007bff; font-size: 1.1rem; }
-    .case-detail { font-size: 0.85rem; color: #666; margin-top: 0.25rem; }
-    .case-tests { background: white; padding: 0.5rem; border-radius: 3px; font-size: 0.8rem; color: #555; max-height: 80px; overflow-y: auto; }
-    .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; }
-    .form-group input, .form-group select, .form-group textarea {
-      width: 100%;
-      padding: 0.5rem;
-      border: 1px solid #ccc;
-      border-radius: 3px;
-      font-size: 0.9rem;
-      box-sizing: border-box;
+    /* ── layout ── */
+    .step-container { margin-bottom: 2rem; }
+    .step-header { display: flex; align-items: center; margin-bottom: 1rem; }
+    .step-number {
+      background: #007bff; color: white; width: 36px; height: 36px;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-weight: bold; margin-right: 1rem; font-size: 1rem; flex-shrink: 0;
     }
-    .quack-display { background: #fff3e0; padding: 0.75rem; border-radius: 3px; border-left: 3px solid #ff9800; font-size: 0.9rem; margin-top: 0.5rem; }
-    .quack-display strong { display: block; color: #e65100; }
-    .case-actions { display: flex; gap: 0.5rem; }
-    .btn-sm { padding: 0.5rem 1rem; font-size: 0.85rem; }
-    .btn-success { background: #28a745; }
-    .btn-success:hover { background: #218838; }
-    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e9ecef; }
-    .tab-btn { padding: 0.75rem 1.5rem; background: none; border: none; cursor: pointer; border-bottom: 3px solid transparent; font-size: 0.95rem; color: #666; }
-    .tab-btn.active { color: #007bff; border-bottom-color: #007bff; }
+    .step-number.done    { background: #28a745; }
+    .step-number.pending { background: #adb5bd; }
+    .step-header h3 { margin: 0; }
+
+    /* ── dual upload zone ── */
+    .upload-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 600px) { .upload-pair { grid-template-columns: 1fr; } }
+
+    .upload-zone {
+      border: 2px dashed #007bff; padding: 1.5rem 1rem; border-radius: 8px;
+      text-align: center; cursor: pointer; transition: all 0.2s;
+      background: #f8fbff;
+    }
+    .upload-zone.dragover   { background: #e7f3ff; border-color: #0056b3; }
+    .upload-zone.has-file   { border-color: #28a745; background: #f0fff4; }
+    .upload-zone.has-error  { border-color: #dc3545; background: #fff5f5; }
+    .upload-zone input[type="file"] { display: none; }
+    .upload-zone label { cursor: pointer; display: block; }
+    .upload-icon { font-size: 2rem; margin-bottom: 0.4rem; }
+    .upload-label { font-size: 0.82rem; color: #555; margin-top: 0.5rem; }
+    .upload-label strong { color: #007bff; display: block; margin-bottom: 2px; }
+
+    /* ── api url row ── */
+    .api-row {
+      display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;
+      background: #fff8e1; border: 1px solid #ffc107; border-radius: 6px;
+      padding: 0.75rem 1rem;
+    }
+    .api-row label { font-weight: 600; font-size: 0.88rem; white-space: nowrap; }
+    .api-row input {
+      flex: 1; padding: 0.4rem 0.6rem; border: 1px solid #ccc; border-radius: 4px;
+      font-size: 0.88rem;
+    }
+    .api-row .api-status { font-size: 0.78rem; white-space: nowrap; }
+
+    /* ── normalize button ── */
+    .btn-normalize {
+      width: 100%; margin-top: 1rem; padding: 0.9rem;
+      background: #0056b3; color: white; border: none;
+      border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-normalize:hover:not(:disabled) { background: #004494; }
+    .btn-normalize:disabled { background: #adb5bd; cursor: not-allowed; }
+
+    /* ── progress / log ── */
+    .normalize-log {
+      background: #0d1b2a; color: #7dd3fc; font-family: monospace;
+      font-size: 0.82rem; padding: 0.75rem; border-radius: 4px;
+      max-height: 120px; overflow-y: auto; margin-top: 0.75rem;
+      display: none;
+    }
+    .normalize-log .log-ok   { color: #4ade80; }
+    .normalize-log .log-warn { color: #fbbf24; }
+    .normalize-log .log-err  { color: #f87171; }
+
+    /* ── tabs ── */
+    .tabs { display: flex; border-bottom: 2px solid #e9ecef; margin-bottom: 1.5rem; }
+    .tab-btn {
+      flex: 1; padding: 0.85rem; background: #f8f9fa; border: none;
+      cursor: pointer; font-size: 0.9rem; font-weight: 500;
+      border-bottom: 3px solid transparent; transition: all 0.2s;
+    }
+    .tab-btn:hover { background: #e9ecef; }
+    .tab-btn.active { background: white; color: #007bff; border-bottom-color: #007bff; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
-    .completed-list { list-style: none; padding: 0; }
-    .completed-item { background: #f0f0f0; padding: 0.75rem; border-radius: 4px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
-    .completed-item .case-info { margin: 0; }
-    .completed-item .status-badge { background: #28a745; color: white; padding: 0.25rem 0.75rem; border-radius: 3px; font-size: 0.75rem; }
-    .summary-box { background: #f8f9fa; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border-left: 4px solid #007bff; }
-    .summary-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
-    .empty-state { text-align: center; padding: 2rem; color: #999; }
-    .empty-state-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-    .refer-type-toggle { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
-    .refer-type-btn { padding: 0.4rem 0.9rem; border: 1px solid #ccc; background: #f8f9fa; border-radius: 3px; cursor: pointer; font-size: 0.85rem; }
-    .refer-type-btn.active { background: #007bff; color: white; border-color: #007bff; }
+
+    /* ── summary cards ── */
+    .summary-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .summary-card { padding: 1.25rem; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .summary-card.success { background: linear-gradient(135deg, #d4edda, #b8dfc4); }
+    .summary-card.warning { background: linear-gradient(135deg, #fff3cd, #fde68a); }
+    .summary-card.info    { background: linear-gradient(135deg, #cfe2ff, #b6d4fe); }
+    .summary-card.muted   { background: linear-gradient(135deg, #f5f5f5, #e0e0e0); }
+    .summary-label { font-size: 0.75rem; color: #555; text-transform: uppercase; font-weight: 600; margin-bottom: 0.4rem; }
+    .summary-value { font-size: 1.6rem; font-weight: bold; color: #333; }
+
+    /* ── tables ── */
+    .table-container { max-height: 460px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 1rem; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    .data-table th { background: #f0f0f0; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #ddd; position: sticky; top: 0; }
+    .data-table td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+    .data-table tbody tr:hover { background: #f9f9f9; }
+
+    /* ── badges ── */
+    .badge { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 0.73rem; font-weight: 600; }
+    .badge-success  { background: #d4edda; color: #155724; }
+    .badge-warning  { background: #fff3cd; color: #856404; }
+    .badge-danger   { background: #f8d7da; color: #721c24; }
+    .badge-info     { background: #cfe2ff; color: #084298; }
+    .badge-dup      { background: #e2d9f3; color: #432874; }
+
+    /* ── reconciliation ── */
+    .reconciliation-box {
+      background: #f8f9fa; padding: 1.25rem; border-radius: 4px;
+      border-left: 4px solid #007bff; margin-bottom: 1.5rem;
+    }
+    .reconciliation-box h4 { margin: 0 0 0.75rem; }
+    .reconciliation-item { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1.5rem; }
+    .reconciliation-label { font-size: 0.75rem; color: #888; text-transform: uppercase; }
+    .reconciliation-value { font-size: 1.15rem; font-weight: bold; color: #007bff; margin-top: 0.3rem; }
+
+    /* ── duplicate warning banner ── */
+    .dup-banner {
+      display: none; background: #e2d9f3; border: 1px solid #9b59b6;
+      border-radius: 6px; padding: 0.85rem 1rem; margin-bottom: 1rem;
+      font-size: 0.88rem; color: #432874;
+    }
+    .dup-banner strong { display: block; margin-bottom: 0.25rem; }
+
+    /* ── progress bar ── */
+    .progress-bar { width: 100%; height: 28px; background: #f0f0f0; border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem; display: none; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #007bff, #0056b3); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.83rem; font-weight: 500; transition: width 0.4s; }
+
+    /* ── action bar ── */
+    .action-bar { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #eee; }
+    .action-bar button { flex: 1; min-width: 180px; }
+
+    .success-box { background: #d4edda; border: 1px solid #c3e6cb; padding: 1rem; border-radius: 4px; }
+    .success-box h4 { margin-top: 0; color: #155724; }
+
+    .info-box { background: #cfe2ff; border: 1px solid #b6d4fe; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+    .info-box h4 { margin-top: 0; color: #084298; }
+
+    .text-muted { color: #888; }
   </style>
 </head>
 <body>
 <div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
 <div class="page">
-  <h1>🔗 OPD Refer & IPD Linker</h1>
+  <h1>📊 OPD Sales Data Upload & Reconciliation</h1>
 
   <div class="page-card">
-    <p style="margin-bottom: 1rem; color: #555; font-size: 0.9rem;">
-      Link OPD cases to IPD admissions and add referral information. Complete each case before moving to next.
-    </p>
 
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="pending">📋 Pending Cases</button>
-      <button class="tab-btn" data-tab="completed">✅ Completed</button>
+    <!-- ═══ STEP 1: Upload Raw Excels + API URL ══════════════════════════ -->
+    <div class="step-container">
+      <div class="step-header">
+        <div class="step-number" id="step1Number">1</div>
+        <h3>Upload Raw Excel Files</h3>
+      </div>
+      <p style="color:#666; margin:0 0 1rem;">Select both the Sales Report and Cash Register exports — the Python normalizer will process them automatically.</p>
+
+      <!-- API URL config -->
+      <div class="api-row">
+        <label>🔗 Normalizer API:</label>
+        <input type="text" id="apiUrl" placeholder="https://web-production-89b45b.up.railway.app"
+               value="" oninput="saveApiUrl()"/>
+        <span class="api-status" id="apiStatus">⚠️ Not set</span>
+      </div>
+      <p style="font-size:0.8rem;color:#888;margin:-0.5rem 0 1rem;">
+        Deploy <code>opd-normalizer-api/</code> to Railway (free) and paste the URL above.
+        <a href="#deploy-guide" onclick="showDeployGuide()" style="color:#007bff;">How to deploy?</a>
+      </p>
+
+      <!-- Dual upload zones -->
+      <div class="upload-pair">
+        <!-- Sales Report -->
+        <div>
+          <p style="font-weight:600;margin:0 0 0.5rem;">📈 Sales Report</p>
+          <div class="upload-zone" id="salesZone"
+               ondrop="handleDrop(event,'sales')" ondragover="dndOver(event,'sales')" ondragleave="dndLeave('sales')">
+            <input type="file" id="salesFile" accept=".xls,.xlsx" onchange="fileSelected('sales',event)"/>
+            <label for="salesFile">
+              <div class="upload-icon">📊</div>
+              <div><strong>Click or drag & drop</strong></div>
+              <div class="upload-label">Sales_Report.xls / .xlsx</div>
+            </label>
+            <div id="salesName" class="upload-label" style="display:none;color:#28a745;margin-top:0.5rem;"></div>
+          </div>
+        </div>
+
+        <!-- Cash Register -->
+        <div>
+          <p style="font-weight:600;margin:0 0 0.5rem;">💰 Cash Register</p>
+          <div class="upload-zone" id="cashZone"
+               ondrop="handleDrop(event,'cash')" ondragover="dndOver(event,'cash')" ondragleave="dndLeave('cash')">
+            <input type="file" id="cashFile" accept=".xls,.xlsx" onchange="fileSelected('cash',event)"/>
+            <label for="cashFile">
+              <div class="upload-icon">🧾</div>
+              <div><strong>Click or drag & drop</strong></div>
+              <div class="upload-label">Cash_Register.xls / .xlsx</div>
+            </label>
+            <div id="cashName" class="upload-label" style="display:none;color:#28a745;margin-top:0.5rem;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Normalize button -->
+      <button class="btn-normalize" id="btnNormalize" disabled onclick="runNormalizer()">
+        ⚡ Normalize via Python API
+      </button>
+
+      <!-- Log output -->
+      <div class="normalize-log" id="normalizeLog"></div>
     </div>
 
-    <!-- Pending Cases Tab -->
-    <div class="tab-content active" id="pending-tab">
-      <div id="pendingCasesContainer">
-        <div class="empty-state">
-          <div class="empty-state-icon">📭</div>
-          <p>Loading OPD cases...</p>
+    <!-- ═══ STEP 2: Preview ══════════════════════════════════════════════ -->
+    <div class="step-container" id="step2" style="display:none;">
+      <div class="step-header">
+        <div class="step-number pending" id="step2Number">2</div>
+        <h3>Review Data & Reconciliation</h3>
+      </div>
+
+      <!-- Duplicate warning -->
+      <div class="dup-banner" id="dupBanner">
+        <strong>⚠️ Duplicate Cases Detected</strong>
+        <span id="dupDetail"></span> — these already exist in Supabase and will be <strong>skipped</strong> during upload.
+      </div>
+
+      <div class="summary-grid" id="summaryGrid"></div>
+      <div class="reconciliation-box" id="reconciliationBox"></div>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab(event,'cases')">📋 OPD Cases</button>
+        <button class="tab-btn" onclick="switchTab(event,'payment')">💰 Payment Details</button>
+        <button class="tab-btn" onclick="switchTab(event,'summary')">📊 Summary</button>
+      </div>
+
+      <!-- Cases Tab -->
+      <div id="cases-tab" class="tab-content active">
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Case No</th><th>Date</th><th>Patient Name</th>
+                <th>Tests</th><th>Bill</th><th>Paid</th><th>Discount</th><th>Due</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="casesBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Payment Tab -->
+      <div id="payment-tab" class="tab-content">
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Case No</th><th>Patient</th><th>Bill</th><th>Paid</th>
+                <th>Discount</th><th>Due</th><th>Status</th><th>Upload</th>
+              </tr>
+            </thead>
+            <tbody id="paymentBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Summary Tab -->
+      <div id="summary-tab" class="tab-content">
+        <div class="info-box">
+          <h4>📊 Summary Statistics</h4>
+          <div class="reconciliation-item">
+            <div><div class="reconciliation-label">Total Cases</div><div class="reconciliation-value" id="summaryTotalCases">0</div></div>
+            <div><div class="reconciliation-label">Total Bill</div><div class="reconciliation-value" id="summaryTotalBill">₹0</div></div>
+            <div><div class="reconciliation-label">Total Paid</div><div class="reconciliation-value" id="summaryTotalPaid">₹0</div></div>
+            <div><div class="reconciliation-label">Total Discount</div><div class="reconciliation-value" id="summaryTotalDiscount">₹0</div></div>
+            <div><div class="reconciliation-label">Total Due</div><div class="reconciliation-value" id="summaryTotalDue">₹0</div></div>
+          </div>
+          <div class="reconciliation-item" style="margin-top:1rem;padding-top:1rem;border-top:1px solid #b6d4fe;">
+            <div><div class="reconciliation-label">Fully Paid</div><div class="reconciliation-value" id="summaryPaidCount">0</div></div>
+            <div><div class="reconciliation-label">Partial</div><div class="reconciliation-value" id="summaryPartialCount">0</div></div>
+            <div><div class="reconciliation-label">Outstanding</div><div class="reconciliation-value" id="summaryDueCount">0</div></div>
+            <div><div class="reconciliation-label">Collection Rate</div><div class="reconciliation-value" id="summaryCollectionRate">0%</div></div>
+            <div><div class="reconciliation-label">Duplicates Skipped</div><div class="reconciliation-value" id="summaryDupCount" style="color:#9b59b6;">0</div></div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Completed Cases Tab -->
-    <div class="tab-content" id="completed-tab">
-      <div class="summary-box">
-        <div class="summary-row">
-          <span>Completed Cases:</span>
-          <strong id="completedCount">0</strong>
-        </div>
+    <!-- ═══ STEP 3: Upload to Supabase ══════════════════════════════════ -->
+    <div class="step-container" id="step3" style="display:none;">
+      <div class="step-header">
+        <div class="step-number pending" id="step3Number">3</div>
+        <h3>Upload to Supabase</h3>
       </div>
-      <ul class="completed-list" id="completedList">
-        <li style="text-align: center; color: #999; padding: 2rem;">No completed cases yet</li>
-      </ul>
+      <div class="progress-bar" id="progressBar">
+        <div class="progress-fill" id="progressFill" style="width:0%">0%</div>
+      </div>
+      <div class="success-box" id="successBox" style="display:none;">
+        <h4>✅ Upload Complete!</h4>
+        <p id="successMessage"></p>
+      </div>
+    </div>
+
+    <!-- ═══ Action Buttons ═══════════════════════════════════════════════ -->
+    <div class="action-bar">
+      <button class="btn-primary" onclick="uploadToSupabase()" id="uploadBtn"
+              style="display:none;background:#28a745;">
+        💾 Upload to Supabase
+      </button>
+      <button class="btn-primary" onclick="proceedToReferLinker()" id="proceedBtn"
+              style="display:none;background:#007bff;">
+        ➜ Proceed to Refer Linker
+      </button>
+      <button class="btn-primary" onclick="resetUpload()" style="background:#6c757d;">
+        🔄 Reset
+      </button>
     </div>
 
     <p class="err" id="err"></p>
-    <p class="info" id="ok" style="display:none"></p>
-  </div>
-</div>
+    <p class="info" id="ok" style="display:none;"></p>
+
+    <!-- Deploy guide (inline) -->
+    <div id="deployGuide" style="display:none;margin-top:1.5rem;padding:1rem;background:#fff8e1;border:1px solid #ffc107;border-radius:6px;">
+      <h4 style="margin-top:0;">🚀 How to deploy the Python normalizer API (free)</h4>
+      <ol style="margin:0;padding-left:1.3rem;font-size:0.88rem;line-height:1.8;">
+        <li>Download <strong>opd-normalizer-api.zip</strong> from the files shared with this page</li>
+        <li>Go to <a href="https://github.com" target="_blank">github.com</a> → New repository → <code>opd-normalizer-api</code> (public)</li>
+        <li>Upload all files from the ZIP into that repo</li>
+        <li>Go to <a href="https://railway.app" target="_blank">railway.app</a> → sign up with GitHub (free)</li>
+        <li>New Project → <strong>Deploy from GitHub repo</strong> → select <code>opd-normalizer-api</code></li>
+        <li>Wait ~2 min → Railway gives you a URL like <code>https://opd-normalizer-api-production.up.railway.app</code></li>
+        <li>Paste that URL into the <strong>Normalizer API</strong> field above ✅</li>
+      </ol>
+      <button onclick="document.getElementById('deployGuide').style.display='none'"
+              style="margin-top:0.75rem;padding:0.4rem 1rem;border:1px solid #aaa;border-radius:4px;background:#fff;cursor:pointer;">
+        Close
+      </button>
+    </div>
+  </div><!-- /page-card -->
+</div><!-- /page -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
 
 <script>
-  BNH_PAGE.requireRole(["manager", "admin", "accountant"]);
+BNH_PAGE.requireRole(["manager", "admin", "accountant"]);
 
-  let pendingCases = [];
-  let completedCases = [];
-  let ipdPatients = [];
-  let quackDoctors = [];
+// ─── state ────────────────────────────────────────────────────────────────
+let salesFileObj  = null;
+let cashFileObj   = null;
+let mergedData    = [];      // final merged + reconciled rows
+let existingCases = new Set(); // case_no already in Supabase
 
-  // Load quack doctors (unique by doctor_name+mobile, with team info)
-  async function loadQuackDoctors() {
-    try {
-      const { data, error } = await BNH_PAGE.sb.from('gramin_doctor_visits')
-        .select('id,doctor_name,mobile,recorded_by_name').order('doctor_name');
-      if (!error && data) {
-        // Deduplicate by mobile, keep first entry per unique doctor mobile
-        const seen = new Set();
-        quackDoctors = data.filter(d => {
-          const key = d.mobile || d.doctor_name;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-      }
-    } catch (e) {
-      console.error('Error loading quack doctors:', e);
-    }
+// ─── API URL persistence ──────────────────────────────────────────────────
+function saveApiUrl() {
+  const v = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
+  localStorage.setItem('opd_normalizer_api', v);
+  updateApiStatus(v);
+}
+
+function updateApiStatus(url) {
+  const el = document.getElementById('apiStatus');
+  if (!url) { el.textContent = '⚠️ Not set'; el.style.color = '#dc3545'; return; }
+  el.textContent = '✓ Saved'; el.style.color = '#28a745';
+}
+
+(function loadSavedApiUrl() {
+  const saved = localStorage.getItem('opd_normalizer_api') || '';
+  if (saved) {
+    document.getElementById('apiUrl').value = saved;
+    updateApiStatus(saved);
+  }
+})();
+
+function showDeployGuide() {
+  document.getElementById('deployGuide').style.display = 'block';
+  document.getElementById('deployGuide').scrollIntoView({ behavior: 'smooth' });
+  return false;
+}
+
+// ─── file selection ────────────────────────────────────────────────────────
+function fileSelected(which, event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  setFile(which, file);
+}
+
+function setFile(which, file) {
+  if (which === 'sales') {
+    salesFileObj = file;
+    document.getElementById('salesZone').classList.add('has-file');
+    document.getElementById('salesName').textContent = '✓ ' + file.name;
+    document.getElementById('salesName').style.display = 'block';
+  } else {
+    cashFileObj = file;
+    document.getElementById('cashZone').classList.add('has-file');
+    document.getElementById('cashName').textContent = '✓ ' + file.name;
+    document.getElementById('cashName').style.display = 'block';
+  }
+  document.getElementById('btnNormalize').disabled = !(salesFileObj && cashFileObj);
+}
+
+// ─── drag and drop ────────────────────────────────────────────────────────
+function dndOver(event, which) {
+  event.preventDefault();
+  document.getElementById(which + 'Zone').classList.add('dragover');
+}
+function dndLeave(which) {
+  document.getElementById(which + 'Zone').classList.remove('dragover');
+}
+function handleDrop(event, which) {
+  event.preventDefault();
+  dndLeave(which);
+  const file = event.dataTransfer.files[0];
+  if (file && (file.name.endsWith('.xls') || file.name.endsWith('.xlsx'))) {
+    setFile(which, file);
+  }
+}
+
+// ─── logging helper ────────────────────────────────────────────────────────
+function log(msg, cls) {
+  const box = document.getElementById('normalizeLog');
+  box.style.display = 'block';
+  const span = document.createElement('span');
+  if (cls) span.className = cls;
+  span.textContent = msg + '\n';
+  box.appendChild(span);
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() {
+  const box = document.getElementById('normalizeLog');
+  box.innerHTML = '';
+  box.style.display = 'none';
+}
+
+// ─── call Python normalizer API ────────────────────────────────────────────
+async function runNormalizer() {
+  const apiUrl = (document.getElementById('apiUrl').value.trim()).replace(/\/$/, '');
+  if (!apiUrl) {
+    document.getElementById('err').textContent =
+      '⚠️ Please enter your Normalizer API URL above. Deploy the Python API first — see "How to deploy?"';
+    return;
   }
 
-  // Load IPD current patients
-  async function loadIPDPatients() {
-    try {
-      const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
-        .select('*').eq('is_discharged', false);
-      if (!error && data) {
-        ipdPatients = data;
-      }
-    } catch (e) {
-      console.error('Error loading IPD patients:', e);
-    }
-  }
+  clearLog();
+  document.getElementById('err').textContent = '';
+  document.getElementById('btnNormalize').disabled = true;
+  document.getElementById('step2').style.display = 'none';
+  document.getElementById('step3').style.display = 'none';
+  document.getElementById('uploadBtn').style.display = 'none';
 
-  // Load pending OPD cases
-  async function loadPendingCases() {
-    try {
-      const { data, error } = await BNH_PAGE.sb.from('opd_cases')
-        .select('*').eq('status', 'pending_refer').order('case_date', { ascending: false });
-      if (!error && data) {
-        pendingCases = data;
-        renderPendingCases();
-      }
-    } catch (e) {
-      console.error('Error loading cases:', e);
-      document.getElementById('err').textContent = 'Error loading cases: ' + e.message;
-    }
-  }
+  log('📡 Connecting to normalizer API…');
 
-  // Load completed cases
-  async function loadCompletedCases() {
-    try {
-      const { data, error } = await BNH_PAGE.sb.from('opd_cases')
-        .select('*').neq('status', 'pending_refer').order('case_date', { ascending: false });
-      if (!error && data) {
-        completedCases = data;
-        renderCompletedCases();
-      }
-    } catch (e) {
-      console.error('Error loading completed:', e);
-    }
-  }
+  const formData = new FormData();
+  formData.append('sales_file', salesFileObj);
+  formData.append('cash_file', cashFileObj);
 
-  // Build quack doctor options HTML
-  function quackOptions() {
-    return quackDoctors.map(d =>
-      `<option value="quack|${d.doctor_name}|${d.mobile}|${d.recorded_by_name||''}">${d.doctor_name} — 📞 ${d.mobile} (${d.recorded_by_name||'Unknown Team'})</option>`
-    ).join('');
-  }
-
-  // Render pending cases
-  function renderPendingCases() {
-    const container = document.getElementById('pendingCasesContainer');
-
-    if (pendingCases.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">🎉</div>
-          <p>All OPD cases have been linked!</p>
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = pendingCases.map((caseData, idx) => `
-      <div class="case-card" id="case-${caseData.id}">
-        <div class="case-header">
-          <div class="case-info">
-            <div class="case-no">${caseData.case_no}</div>
-            <div class="case-detail">📅 ${caseData.case_date} | 👤 ${caseData.patient_name}</div>
-            <div class="case-detail">💰 Bill: ₹${caseData.bill_amount} | Paid: ₹${caseData.paid_amount} | Due: ₹${caseData.bill_amount - caseData.paid_amount}</div>
-          </div>
-        </div>
-
-        <div class="case-tests" title="Tests performed">
-          <strong style="display: block; margin-bottom: 0.25rem;">Tests:</strong>
-          ${caseData.tests}
-        </div>
-
-        <form class="case-form" data-case-id="${caseData.id}" style="margin-top: 1rem;">
-
-          <!-- Refer Type Toggle -->
-          <div class="form-group">
-            <label>Refer <span style="color:red">*</span></label>
-            <div class="refer-type-toggle">
-              <button type="button" class="refer-type-btn active" data-case="${caseData.id}" data-type="quack" onclick="switchReferType('${caseData.id}','quack')">👨‍⚕️ Refer</button>
-              <button type="button" class="refer-type-btn" data-case="${caseData.id}" data-type="none" onclick="switchReferType('${caseData.id}','none')">🚫 Not Applicable</button>
-            </div>
-          </div>
-
-          <!-- Quack Doctor Select -->
-          <div class="form-group" id="refer-quack-${caseData.id}">
-            <label>Select Quack Doctor</label>
-            <select name="quack_doctor" onchange="showQuackInfo('${caseData.id}', this.value)">
-              <option value="">Choose Refer...</option>
-              ${quackOptions()}
-            </select>
-            <div class="quack-display" id="quack-display-${caseData.id}" style="display:none; margin-top: 0.5rem;"></div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Linked to IPD Case?</label>
-              <select name="ipd_link" required>
-                <option value="no">No (Not Applicable)</option>
-                <option value="yes">Yes (Select Patient)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row" id="ipd-patient-row-${caseData.id}" style="display: none;">
-            <div class="form-group">
-              <label>Select IPD Patient</label>
-              <select name="ipd_patient_id">
-                <option value="">Choose IPD Patient...</option>
-                ${ipdPatients.map(p => `<option value="${p.id}">${p.patient_name} (${p.admission_no})</option>`).join('')}
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Case Type <span style="color: red;">*</span></label>
-              <select name="case_type" required>
-                <option value="">Choose Type...</option>
-                <option value="lab_sample">Lab Sample</option>
-                <option value="sport_sample">Sport Sample</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="case-actions" style="margin-top: 1rem;">
-            <button type="submit" class="btn-primary btn-sm btn-success">✅ Complete & Save</button>
-            <button type="button" class="btn-primary btn-sm" style="background: #6c757d;" onclick="this.closest('.case-card').remove();">Skip</button>
-          </div>
-        </form>
-      </div>
-    `).join('');
-
-    // Attach event listeners for ipd_link toggle + refer_id display
-    document.querySelectorAll('.case-form').forEach(form => {
-      form.addEventListener('change', (e) => {
-        if (e.target.name === 'ipd_link') {
-          const caseId = form.dataset.caseId;
-          const row = document.getElementById(`ipd-patient-row-${caseId}`);
-          if (e.target.value === 'yes') {
-            row.style.display = 'flex';
-            form.querySelector('[name="ipd_patient_id"]').required = true;
-          } else {
-            row.style.display = 'none';
-            form.querySelector('[name="ipd_patient_id"]').required = false;
-          }
-        }
-      });
-
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const caseId = form.dataset.caseId;
-        const caseData = pendingCases.find(c => c.id === caseId);
-        const formData = new FormData(form);
-
-        // Determine active refer type
-        const activeType = form.querySelector('.refer-type-btn.active')?.dataset.type || 'none';
-        const ipdLink = formData.get('ipd_link') === 'yes' ? formData.get('ipd_patient_id') : null;
-        const caseType = formData.get('case_type');
-
-        let referId = null;
-        let referName = null;
-
-        if (activeType === 'quack') {
-          const qval = formData.get('quack_doctor') || '';
-          if (qval) {
-            const parts = qval.split('|');
-            referName = `👨‍⚕️ ${parts[1]} (📞${parts[2]}, Team: ${parts[3] || 'N/A'})`;
-          }
-        }
-
-        const spinner = document.getElementById('spinner');
-        spinner.classList.remove('hidden');
-
-        try {
-          const updatePayload = {
-            refer_id: referId,
-            refer_name: referName,
-            ipd_admission_id: ipdLink,
-            case_type: caseType,
-            status: 'completed'
-          };
-
-          const { error } = await BNH_PAGE.sb.from('opd_cases')
-            .update(updatePayload).eq('id', caseId);
-
-          if (error) throw error;
-
-          pendingCases = pendingCases.filter(c => c.id !== caseId);
-          completedCases.push({ ...caseData, ...updatePayload });
-
-          document.getElementById(`case-${caseId}`).remove();
-          renderCompletedCases();
-
-          const ok = document.getElementById('ok');
-          ok.style.display = 'block';
-          ok.textContent = '✅ Case linked successfully!';
-          setTimeout(() => { ok.style.display = 'none'; }, 3000);
-
-          renderPendingCases();
-        } catch (err) {
-          document.getElementById('err').textContent = 'Error: ' + err.message;
-        } finally {
-          spinner.classList.add('hidden');
-        }
-      });
+  try {
+    log('📤 Uploading files to ' + apiUrl + '/normalize …');
+    const resp = await fetch(apiUrl + '/normalize', {
+      method: 'POST',
+      body: formData
     });
-  }
 
-  // Switch refer type for a case card
-  function switchReferType(caseId, type) {
-    const form = document.querySelector(`[data-case-id="${caseId}"]`);
-    form.querySelectorAll('.refer-type-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.type === type);
-    });
-    // Show quack panel only when type is quack
-    document.getElementById(`refer-quack-${caseId}`).style.display = type === 'quack' ? '' : 'none';
-    // Clear quack display when switching away
-    const qd = document.getElementById(`quack-display-${caseId}`);
-    if (qd) qd.style.display = 'none';
-  }
-
-  // Show quack doctor info card
-  function showQuackInfo(caseId, val) {
-    const display = document.getElementById(`quack-display-${caseId}`);
-    if (!val || !val.startsWith('quack|')) { display.style.display = 'none'; return; }
-    const parts = val.split('|');
-    display.style.display = 'block';
-    display.innerHTML = `
-      <strong>👨‍⚕️ Quack Doctor</strong>
-      <span>Name: <b>${parts[1]}</b></span><br>
-      <span>📞 Mobile: <b>${parts[2]}</b></span><br>
-      <span>🏷️ Team: <b>${parts[3] || 'N/A'}</b></span>
-    `;
-  }
-
-  // Render completed cases
-  function renderCompletedCases() {
-    const list = document.getElementById('completedList');
-    document.getElementById('completedCount').textContent = completedCases.length;
-
-    if (completedCases.length === 0) {
-      list.innerHTML = '<li style="text-align: center; color: #999; padding: 2rem;">No completed cases yet</li>';
-      return;
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error('API returned ' + resp.status + ': ' + errText.substring(0, 200));
     }
 
-    list.innerHTML = completedCases.map(c => `
-      <li class="completed-item">
-        <div class="case-info">
-          <div class="case-no">${c.case_no}</div>
-          <div class="case-detail">👤 ${c.patient_name} | 📅 ${c.case_date}</div>
-          <div class="case-detail">📌 Refer: ${c.refer_name || 'N/A'} | 🏥 IPD: ${c.ipd_admission_id ? 'Linked' : 'No'} | 📂 ${c.case_type}</div>
-        </div>
-        <span class="status-badge">✓ Done</span>
-      </li>
-    `).join('');
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error || 'Unknown API error');
+
+    log(`✅ Sales: ${result.sales_count} test rows  |  Cash: ${result.cash_count} entries`, 'log-ok');
+    log('🔗 Merging and reconciling…');
+
+    await mergeAndReconcile(result.data.sales, result.data.cash);
+
+    log(`✅ Done — ${mergedData.length} cases ready for review`, 'log-ok');
+
+    document.getElementById('step2').style.display = 'block';
+    document.getElementById('step3').style.display = 'block';
+    document.getElementById('uploadBtn').style.display  = 'block';
+    document.getElementById('step2Number').classList.remove('pending');
+
+  } catch (ex) {
+    log('❌ Error: ' + ex.message, 'log-err');
+    document.getElementById('err').textContent = 'Normalizer error: ' + ex.message;
+  } finally {
+    document.getElementById('btnNormalize').disabled = false;
+  }
+}
+
+// ─── merge + reconcile (discount-aware) ────────────────────────────────────
+async function mergeAndReconcile(salesRows, cashRows) {
+  // fetch existing case_no from Supabase for duplicate detection
+  try {
+    const { data: existing } = await BNH_PAGE.sb
+      .from('opd_cases')
+      .select('case_no');
+    existingCases = new Set((existing || []).map(r => r.case_no));
+    if (existingCases.size > 0) {
+      log(`ℹ️ Found ${existingCases.size} existing cases in Supabase (duplicates will be skipped)`, 'log-warn');
+    }
+  } catch (e) {
+    log('⚠️ Could not check duplicates: ' + e.message, 'log-warn');
   }
 
-  // Tab switching
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      btn.classList.add('active');
-      const tabId = btn.dataset.tab + '-tab';
-      document.getElementById(tabId).classList.add('active');
+  // aggregate sales by case
+  const salesByCase = {};
+  const testsByCase = {};
+  salesRows.forEach(row => {
+    const cn = row.case_number;
+    if (!salesByCase[cn]) {
+      salesByCase[cn] = { case_no: cn, case_date: row.case_date, patient_name: row.patient_name, bill_amount: 0, tests: [] };
+      testsByCase[cn] = [];
+    }
+    salesByCase[cn].bill_amount += (parseFloat(row.test_amount) || 0);
+    if (row.test_name && !testsByCase[cn].includes(row.test_name)) testsByCase[cn].push(row.test_name);
+  });
+  Object.keys(testsByCase).forEach(cn => { salesByCase[cn].tests = testsByCase[cn]; });
+
+  // aggregate cash by case
+  const cashByCase = {};
+  cashRows.forEach(row => {
+    const cn = row.case_number;
+    if (!cashByCase[cn]) {
+      cashByCase[cn] = { trans_dates: [], trans_nos: [], entry_by: row.entry_by || '', paid_amount: 0, discount: 0 };
+    }
+    cashByCase[cn].trans_dates.push(row.trans_date);
+    cashByCase[cn].trans_nos.push(row.trans_number);
+    cashByCase[cn].paid_amount += (parseFloat(row.income)   || 0);
+    cashByCase[cn].discount   += (parseFloat(row.discount)  || 0);  // ✅ discount fix
+  });
+
+  mergedData = [];
+  Object.keys(salesByCase).forEach(cn => {
+    const sale = salesByCase[cn];
+    const cash = cashByCase[cn] || { trans_dates: [], trans_nos: [], entry_by: '', paid_amount: 0, discount: 0 };
+
+    // ✅ FIX: due = bill − (paid + discount)  — discount is an allowed reduction
+    const effectivePaid = cash.paid_amount + cash.discount;
+    const due = Math.max(0, sale.bill_amount - effectivePaid);
+
+    let status;
+    if (due <= 0)               status = 'paid';
+    else if (cash.paid_amount > 0 || cash.discount > 0) status = 'partial';
+    else                         status = 'due';
+
+    const isDuplicate = existingCases.has(cn);
+
+    mergedData.push({
+      case_no:      sale.case_no,
+      case_date:    sale.case_date,
+      patient_name: sale.patient_name,
+      tests:        sale.tests.join(', '),
+      bill_amount:  sale.bill_amount,
+      paid_amount:  cash.paid_amount,
+      discount:     cash.discount,
+      due_amount:   due,
+      trans_nos:    cash.trans_nos.join(', '),
+      entry_by:     cash.entry_by,
+      status,
+      is_duplicate: isDuplicate
     });
   });
 
-  // Initialize
-  async function init() {
-    const spinner = document.getElementById('spinner');
-    spinner.classList.remove('hidden');
-    try {
-      await loadQuackDoctors();
-      await loadIPDPatients();
-      await loadPendingCases();
-      await loadCompletedCases();
-    } catch (e) {
-      document.getElementById('err').textContent = 'Initialization error: ' + e.message;
-    } finally {
-      spinner.classList.add('hidden');
-    }
+  displayPreview();
+}
+
+// ─── display preview ────────────────────────────────────────────────────────
+function displayPreview() {
+  const newData  = mergedData.filter(c => !c.is_duplicate);
+  const dupData  = mergedData.filter(c =>  c.is_duplicate);
+
+  const totalBill    = newData.reduce((s, c) => s + c.bill_amount, 0);
+  const totalPaid    = newData.reduce((s, c) => s + c.paid_amount, 0);
+  const totalDisc    = newData.reduce((s, c) => s + c.discount, 0);
+  const totalDue     = newData.reduce((s, c) => s + c.due_amount, 0);
+  const paidCount    = newData.filter(c => c.status === 'paid').length;
+  const partialCount = newData.filter(c => c.status === 'partial').length;
+  const dueCount     = newData.filter(c => c.status === 'due').length;
+  const collRate     = totalBill > 0 ? Math.round(((totalPaid + totalDisc) / totalBill) * 100) : 0;
+
+  // duplicate banner
+  if (dupData.length > 0) {
+    document.getElementById('dupBanner').style.display = 'block';
+    document.getElementById('dupDetail').textContent =
+      `${dupData.length} case(s) (${dupData.map(d => d.case_no).join(', ')})`;
   }
 
-  init();
+  // summary cards
+  document.getElementById('summaryGrid').innerHTML = `
+    <div class="summary-card success">
+      <div class="summary-label">✓ New Cases</div>
+      <div class="summary-value">${newData.length}</div>
+    </div>
+    <div class="summary-card info">
+      <div class="summary-label">💰 Bill</div>
+      <div class="summary-value">₹${fmt(totalBill)}</div>
+    </div>
+    <div class="summary-card info">
+      <div class="summary-label">✓ Paid</div>
+      <div class="summary-value">₹${fmt(totalPaid)}</div>
+    </div>
+    <div class="summary-card muted">
+      <div class="summary-label">🏷️ Discount</div>
+      <div class="summary-value">₹${fmt(totalDisc)}</div>
+    </div>
+    <div class="summary-card warning">
+      <div class="summary-label">⏳ Due</div>
+      <div class="summary-value">₹${fmt(totalDue)}</div>
+    </div>
+    <div class="summary-card info">
+      <div class="summary-label">📊 Collection</div>
+      <div class="summary-value">${collRate}%</div>
+    </div>
+  `;
+
+  // reconciliation box
+  document.getElementById('reconciliationBox').innerHTML = `
+    <h4>📋 Reconciliation (new cases only)</h4>
+    <div class="reconciliation-item">
+      <div><div class="reconciliation-label">Fully Paid</div><div class="reconciliation-value" style="color:#28a745">${paidCount}</div></div>
+      <div><div class="reconciliation-label">Partial</div><div class="reconciliation-value" style="color:#ffc107">${partialCount}</div></div>
+      <div><div class="reconciliation-label">Outstanding</div><div class="reconciliation-value" style="color:#dc3545">${dueCount}</div></div>
+      <div><div class="reconciliation-label">Duplicates Skipped</div><div class="reconciliation-value" style="color:#9b59b6">${dupData.length}</div></div>
+    </div>
+  `;
+
+  // cases table (all rows, show dup badge)
+  document.getElementById('casesBody').innerHTML = mergedData.map(c => `
+    <tr style="${c.is_duplicate ? 'opacity:0.5;' : ''}">
+      <td><strong>${c.case_no}</strong></td>
+      <td>${c.case_date}</td>
+      <td>${c.patient_name}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+          title="${escHtml(c.tests)}">${c.tests.substring(0, 35)}${c.tests.length > 35 ? '…' : ''}</td>
+      <td>₹${fmt(c.bill_amount)}</td>
+      <td>₹${fmt(c.paid_amount)}</td>
+      <td>₹${fmt(c.discount)}</td>
+      <td><span class="badge ${c.due_amount === 0 ? 'badge-success' : 'badge-danger'}">₹${fmt(c.due_amount)}</span></td>
+      <td>${c.is_duplicate
+        ? '<span class="badge badge-dup">⚠️ Duplicate</span>'
+        : `<span class="badge ${c.status === 'paid' ? 'badge-success' : c.status === 'partial' ? 'badge-warning' : 'badge-danger'}">
+            ${c.status === 'paid' ? '✓ Paid' : c.status === 'partial' ? '⚠ Partial' : '⏳ Due'}
+           </span>`
+      }</td>
+    </tr>
+  `).join('');
+
+  // payment table
+  document.getElementById('paymentBody').innerHTML = mergedData.map(c => `
+    <tr style="${c.is_duplicate ? 'opacity:0.5;' : ''}">
+      <td><strong>${c.case_no}</strong></td>
+      <td>${c.patient_name}</td>
+      <td>₹${fmt(c.bill_amount)}</td>
+      <td>₹${fmt(c.paid_amount)}</td>
+      <td>₹${fmt(c.discount)}</td>
+      <td>₹${fmt(c.due_amount)}</td>
+      <td>${c.is_duplicate
+        ? '<span class="badge badge-dup">Duplicate — skip</span>'
+        : `<span class="badge ${c.status === 'paid' ? 'badge-success' : c.status === 'partial' ? 'badge-warning' : 'badge-danger'}">
+            ${c.status === 'paid' ? '✓ Paid' : c.status === 'partial' ? '⚠ Partial' : '⏳ Due'}
+           </span>`
+      }</td>
+      <td>${c.is_duplicate ? '—' : '✓ Will upload'}</td>
+    </tr>
+  `).join('');
+
+  // summary tab
+  document.getElementById('summaryTotalCases').textContent   = newData.length;
+  document.getElementById('summaryTotalBill').textContent    = '₹' + fmt(totalBill);
+  document.getElementById('summaryTotalPaid').textContent    = '₹' + fmt(totalPaid);
+  document.getElementById('summaryTotalDiscount').textContent= '₹' + fmt(totalDisc);
+  document.getElementById('summaryTotalDue').textContent     = '₹' + fmt(totalDue);
+  document.getElementById('summaryPaidCount').textContent    = paidCount;
+  document.getElementById('summaryPartialCount').textContent = partialCount;
+  document.getElementById('summaryDueCount').textContent     = dueCount;
+  document.getElementById('summaryCollectionRate').textContent = collRate + '%';
+  document.getElementById('summaryDupCount').textContent     = dupData.length;
+}
+
+function fmt(n) { return (Math.round(n * 100) / 100).toLocaleString('en-IN'); }
+
+// Convert DD-MM-YYYY (from Python normalizer) → YYYY-MM-DD (Postgres)
+function toISODate(d) {
+  if (!d) return null;
+  // Already ISO?
+  if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.substring(0, 10);
+  // DD-MM-YYYY or DD/MM/YYYY
+  const m = d.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  return d;
+}
+function escHtml(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ─── tabs ──────────────────────────────────────────────────────────────────
+function switchTab(event, name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(name + '-tab').classList.add('active');
+}
+
+// ─── upload to Supabase (skip duplicates) ─────────────────────────────────
+async function uploadToSupabase() {
+  const newCases = mergedData.filter(c => !c.is_duplicate);
+  if (newCases.length === 0) {
+    document.getElementById('err').textContent = 'No new cases to upload (all are duplicates)';
+    return;
+  }
+
+  const spinner = document.getElementById('spinner');
+  const err     = document.getElementById('err');
+  const bar     = document.getElementById('progressBar');
+  const fill    = document.getElementById('progressFill');
+
+  err.textContent = '';
+  spinner.classList.remove('hidden');
+  bar.style.display = 'block';
+  fill.style.width  = '10%';
+  fill.textContent  = '10%';
+
+  try {
+    document.getElementById('step3Number').classList.replace('pending', 'done');
+    document.getElementById('step3Number').textContent = '✓';
+
+    const payload = newCases.map(c => BNH_PAGE.stamp({
+      case_no:       c.case_no,
+      case_date:     toISODate(c.case_date),
+      patient_name:  c.patient_name,
+      bill_amount:   c.bill_amount,
+      paid_amount:   c.paid_amount,
+      discount:      c.discount,          // ✅ included
+      // due_amount not stored — calculated dynamically as bill_amount - paid_amount - discount
+      tests:         c.tests,
+      trans_no:      c.trans_nos,
+      entered_by:    c.entry_by,
+      status:        'pending_refer'
+    }));
+
+    fill.style.width = '50%'; fill.textContent = '50%';
+
+    // Batch insert (upsert with ignore to be safe against race conditions)
+    const { error } = await BNH_PAGE.sb
+      .from('opd_cases')
+      .upsert(payload, { onConflict: 'case_no', ignoreDuplicates: true });
+
+    if (error) throw error;
+
+    fill.style.width = '100%'; fill.textContent = '100%';
+
+    const skipped = mergedData.length - newCases.length;
+    document.getElementById('successBox').style.display = 'block';
+    document.getElementById('successMessage').innerHTML = `
+      ✅ Successfully uploaded <strong>${payload.length} new OPD case(s)</strong> to Supabase.<br>
+      ${skipped > 0 ? `⚠️ <strong>${skipped} duplicate(s)</strong> were skipped.<br>` : ''}
+      Ready for refer linking in the next step.
+    `;
+
+    document.getElementById('uploadBtn').style.display  = 'none';
+    document.getElementById('proceedBtn').style.display = 'block';
+
+  } catch (ex) {
+    err.textContent = 'Upload error: ' + ex.message;
+  } finally {
+    spinner.classList.add('hidden');
+  }
+}
+
+function proceedToReferLinker() { window.location.href = '../pages/opd_refer_linker.html'; }
+function resetUpload()          { location.reload(); }
 </script>
 </body>
 </html>
-
