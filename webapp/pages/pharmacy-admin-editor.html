@@ -664,6 +664,22 @@ async function confirmDel() {
   const { tableKey, id } = delContext;
   document.getElementById('spinner').classList.remove('hidden');
   try {
+    // If deleting an IPD sale, also remove the matching record from ipd_medicine_indens
+    if (tableKey === 'sales') {
+      const saleRecord = state.sales.find(r => r.id === id);
+      if (saleRecord && saleRecord.sale_type === 'IPD') {
+        // Match by admission_no, amount, and sale_date via the remark field (inden no is embedded)
+        // Most reliable: match by admission_no + sale_date + amount
+        const { error: ipdErr } = await BNH_PAGE.sb
+          .from('ipd_medicine_indens')
+          .delete()
+          .eq('admission_no', saleRecord.admission_no || null)
+          .eq('inden_date', saleRecord.sale_date)
+          .eq('amount', saleRecord.sale_price);
+        if (ipdErr) throw ipdErr;
+      }
+    }
+
     const { error } = await BNH_PAGE.sb.from(DEL_TABLE[tableKey]).delete().eq('id', id);
     if (error) throw error;
     state[tableKey] = state[tableKey].filter(r=>r.id!==id);
