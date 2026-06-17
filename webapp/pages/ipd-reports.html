@@ -281,17 +281,17 @@
         html += `<div class="detail-section">
           <h3>📄 OPD Bills</h3>
           <table><thead><tr>
-            <th>Date</th><th>Patient</th><th class="r">Bill</th>
+            <th>Case No.</th><th>Date</th><th>Patient</th><th class="r">Bill</th>
             <th class="r">Paid</th><th class="r">Discount</th><th class="r">Due</th>
           </tr></thead>
           <tbody>${opdBills.map(b=>{
             const d=parseFloat(b.bill_amount||0)-parseFloat(b.paid_amount||0)-parseFloat(b.discount||0);
-            return `<tr><td>${b.bill_date}</td><td>${b.patient_name}</td>
+            return `<tr><td>${b.case_no||'-'}</td><td>${b.case_date||'-'}</td><td>${b.patient_name}</td>
               <td class="r">${fmt(b.bill_amount)}</td><td class="r">${fmt(b.paid_amount)}</td>
               <td class="r">${fmt(b.discount)}</td>
               <td class="r" style="color:${d>0?'#dc2626':'#059669'}">${fmt(d)}</td></tr>`;
           }).join('')}</tbody>
-          <tfoot><tr><td colspan="2">Total</td>
+          <tfoot><tr><td colspan="3">Total</td>
             <td class="r">${fmt(totalOpd)}</td><td class="r">${fmt(paidOpd)}</td>
             <td></td><td class="r">${fmt(opdDue)}</td>
           </tr></tfoot></table>
