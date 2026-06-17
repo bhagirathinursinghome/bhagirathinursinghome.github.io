@@ -57,7 +57,7 @@
       label: "OPD Refer Linker",
       icon: "🔗",
       page: "pages/opd_refer_linker.html",
-      roles: ["manager", "admin", "accountant"]
+      roles: ["manager", "admin", "accountant",  "reception"]
     },
     {
       label: "OPD Records",
@@ -85,7 +85,7 @@
       label: "Gramin Doctor Visit",
       icon: "🏥",
       page: "pages/gramin-visit.html",
-      roles: ["marketing", "manager", "admin", "other"]
+      roles: ["marketing", "manager", "admin", "other", "reception"]
     },
     {
       label: "QUACK DOCTOR",
@@ -101,7 +101,7 @@
       label: "IPD - Refer Add",
       icon: "🤝",
       page: "pages/ipd-refer-add.html",
-      roles: ["admin", "accountant", "reception", "manager"]
+      roles: ["admin", "accountant", "manager"]
     },
     {
       label: "IPD - Admission",
