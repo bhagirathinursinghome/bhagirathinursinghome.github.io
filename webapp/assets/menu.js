@@ -137,7 +137,7 @@
       label: "IPD - Cash & Discharge",
       icon: "💵",
       page: "pages/ipd-cash-discharge.html",
-      roles: ["admin", "accountant", "manager"]
+      roles: ["admin", "accountant", "manager",  "reception"]
     },
     {
       label: "IPD - Reports",
