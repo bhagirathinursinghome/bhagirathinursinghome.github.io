@@ -214,10 +214,12 @@
             <th>Date</th>
             <th>Patient Name</th>
             <th>Bill Amount</th>
+            <th>Discount</th>
             <th>Paid</th>
             <th>Due</th>
             <th>Refer</th>
             <th>Status</th>
+            <th>Refer Payment</th>
           </tr>
         </thead>
         <tbody>
@@ -231,10 +233,17 @@
                 <td>${record.case_date}</td>
                 <td>${record.patient_name}</td>
                 <td>₹${record.bill_amount}</td>
+                <td>${discount > 0 ? '₹' + discount : '-'}</td>
                 <td>₹${record.paid_amount}</td>
                 <td>₹${due}</td>
                 <td>${record.refer_name || '-'}</td>
                 <td><span class="status-badge status-${paymentStatus.status}">${paymentStatus.text}</span></td>
+                <td>${record.refer_name
+                  ? record.refer_payment_status === 'paid'
+                    ? '<span class="status-badge status-paid">✅ Paid</span>'
+                    : '<span class="status-badge status-due">⏳ Pending</span>'
+                  : '<span style="color:#ccc;">—</span>'
+                }</td>
               </tr>
             `;
           }).join('')}
