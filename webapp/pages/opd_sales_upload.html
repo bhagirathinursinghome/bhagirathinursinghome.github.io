@@ -158,11 +158,13 @@
         <h3>Upload Raw Excel Files</h3>
       </div>
       <p style="color:#666; margin:0 0 1rem;">Select both the Sales Report and Cash Register exports — the Python normalizer will process them automatically.</p>
+<H6>https://web-production-89b45b.up.railway.app</H6>
 
       <!-- API URL config -->
       <div class="api-row">
         <label>🔗 Normalizer API:</label>
-        <input type="text" id="apiUrl" placeholder="web-production-89b45b.up.railway.app"
+
+        <input type="text" id="apiUrl" placeholder="https://web-production-89b45b.up.railway.app"
                value="" oninput="saveApiUrl()"/>
         <span class="api-status" id="apiStatus">⚠️ Not set</span>
       </div>
@@ -723,7 +725,7 @@ async function uploadToSupabase() {
       bill_amount:   c.bill_amount,
       paid_amount:   c.paid_amount,
       discount:      c.discount,          // ✅ included
-      due_amount:    c.due_amount,        // ✅ included
+      // due_amount not stored — calculated dynamically as bill_amount - paid_amount - discount
       tests:         c.tests,
       trans_no:      c.trans_nos,
       entered_by:    c.entry_by,
