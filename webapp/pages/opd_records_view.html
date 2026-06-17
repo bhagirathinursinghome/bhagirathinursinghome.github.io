@@ -162,10 +162,11 @@
 
       // Status filter
       if (status) {
-        const due = record.bill_amount - record.paid_amount;
+        const discount = record.discount || 0;
+        const due = record.bill_amount - discount - record.paid_amount;
         let recordStatus = 'paid';
         if (due > 0 && record.paid_amount > 0) recordStatus = 'partial';
-        if (due === record.bill_amount) recordStatus = 'due';
+        if (due > 0 && record.paid_amount === 0) recordStatus = 'due';
         
         if (recordStatus !== status) return false;
       }
@@ -179,9 +180,10 @@
 
   // Determine payment status
   function getPaymentStatus(record) {
-    const due = record.bill_amount - record.paid_amount;
-    if (due === 0) return { status: 'paid', text: '✅ Paid' };
-    if (due === record.bill_amount) return { status: 'due', text: '⏳ Due' };
+    const discount = record.discount || 0;
+    const due = record.bill_amount - discount - record.paid_amount;
+    if (due <= 0) return { status: 'paid', text: '✅ Paid' };
+    if (record.paid_amount === 0) return { status: 'due', text: '⏳ Due' };
     return { status: 'partial', text: '⚠️ Partial' };
   }
 
@@ -221,7 +223,8 @@
         <tbody>
           ${pageRecords.map(record => {
             const paymentStatus = getPaymentStatus(record);
-            const due = record.bill_amount - record.paid_amount;
+            const discount = record.discount || 0;
+            const due = record.bill_amount - discount - record.paid_amount;
             return `
               <tr onclick="openDetail('${record.id}')">
                 <td class="case-no">${record.case_no}</td>
@@ -285,7 +288,7 @@
         tests = record.tests.split(',').map(t => t.trim());
       }
 
-      const due = record.bill_amount - record.paid_amount;
+      const due = record.bill_amount - (record.discount || 0) - record.paid_amount;
       const paymentStatus = getPaymentStatus(record);
 
       let ipdInfo = '';
