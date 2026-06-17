@@ -158,12 +158,10 @@
         <h3>Upload Raw Excel Files</h3>
       </div>
       <p style="color:#666; margin:0 0 1rem;">Select both the Sales Report and Cash Register exports — the Python normalizer will process them automatically.</p>
-<H6>https://web-production-89b45b.up.railway.app</H6>
 
       <!-- API URL config -->
       <div class="api-row">
         <label>🔗 Normalizer API:</label>
-
         <input type="text" id="apiUrl" placeholder="https://web-production-89b45b.up.railway.app"
                value="" oninput="saveApiUrl()"/>
         <span class="api-status" id="apiStatus">⚠️ Not set</span>
@@ -685,6 +683,17 @@ function displayPreview() {
 }
 
 function fmt(n) { return (Math.round(n * 100) / 100).toLocaleString('en-IN'); }
+
+// Convert DD-MM-YYYY (from Python normalizer) → YYYY-MM-DD (Postgres)
+function toISODate(d) {
+  if (!d) return null;
+  // Already ISO?
+  if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.substring(0, 10);
+  // DD-MM-YYYY or DD/MM/YYYY
+  const m = d.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  return d;
+}
 function escHtml(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // ─── tabs ──────────────────────────────────────────────────────────────────
@@ -720,7 +729,7 @@ async function uploadToSupabase() {
 
     const payload = newCases.map(c => BNH_PAGE.stamp({
       case_no:       c.case_no,
-      case_date:     c.case_date,
+      case_date:     toISODate(c.case_date),
       patient_name:  c.patient_name,
       bill_amount:   c.bill_amount,
       paid_amount:   c.paid_amount,
