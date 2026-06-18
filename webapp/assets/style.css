@@ -109,8 +109,9 @@ tr:hover td{background:#fafbfc}
 /* ===== Responsive ===== */
 @media(max-width:820px){
   .hamburger{display:flex}
-  .sidebar{position:fixed;top:0;left:0;height:100vh;transform:translateX(-100%);z-index:50;padding-top:4rem;box-shadow:4px 0 16px rgba(0,0,0,.1)}
+  .sidebar{position:fixed;top:0;left:0;height:100vh;transform:translateX(-100%);z-index:50;padding-top:4rem;box-shadow:4px 0 16px rgba(0,0,0,.1);overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column}
   .sidebar.open{transform:translateX(0)}
+  .sidebar nav#menu{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .user-chip #uChipName,.user-chip #uChipRole{display:none}
   .brand-title{font-size:.95rem}
   .user-chip .btn-ghost{padding:.35rem .55rem;font-size:.75rem}
