@@ -1,10 +1,11 @@
 /* menu.js */
 (function () {
+
   const ITEMS = [
 
-    // =====================
+    // ==========================================
     // COMMON
-    // =====================
+    // ==========================================
     {
       label: "Home",
       icon: "🏠",
@@ -17,70 +18,88 @@
       page: "pages/profile.html",
       roles: ["*"]
     },
-    
-{ label: "DB Analytics", icon: "🗄️", page: "pages/supabase_analytics.html", roles: ["admin"] },
-    // =====================
+
+    // ==========================================
     // ADMIN
-    // =====================
+    // ==========================================
+    {
+      label: "DB Analytics",
+      icon: "🗄️",
+      page: "pages/supabase_analytics.html",
+      roles: ["admin"]
+    },
     {
       label: "User Management",
       icon: "🛡️",
       page: "pages/admin-users.html",
       roles: ["admin"]
     },
+
+    // ==========================================
+    // HR & ACCOUNTS
+    // ==========================================
     {
-      label: "Pharmacy Setup",
-      icon: "⚙️",
-      page: "pages/pharmacy-setup.html",
-      roles: ["admin"]
+      label: "Pay Salary",
+      icon: "💵",
+      page: "pages/pay_salary.html",
+      roles: ["admin", "accountant"]
     },
     {
-      label: "Admin Editor",
-      icon: "🔧",
-      page: "pages/pharmacy-admin-editor.html",
-      roles: ["admin"]
+      label: "Employees",
+      icon: "👥",
+      page: "pages/employees.html",
+      roles: ["admin", "accountant"]
     },
-{ label: "Credit Management", 
- icon: "💳", 
- page: "pages/add-credit.html",
-  roles: ["admin","accountant","manager"] },
-    // =====================
+    {
+      label: "Salary Sheet",
+      icon: "💰",
+      page: "pages/salary_sheet.html",
+      roles: ["admin", "accountant"]
+    },
+    {
+      label: "Credit Management",
+      icon: "💳",
+      page: "pages/add-credit.html",
+      roles: ["admin", "accountant"]
+    },
+
+    // ==========================================
     // OPD
-    // =====================
+    // ==========================================
     {
       label: "OPD Sales Upload",
       icon: "📊",
       page: "pages/opd_sales_upload.html",
-      roles: ["manager", "admin", "accountant"]
+      roles: ["admin", "accountant"]
     },
     {
       label: "OPD Refer Linker",
       icon: "🔗",
       page: "pages/opd_refer_linker.html",
-      roles: ["manager", "admin", "accountant",  "reception"]
+      roles: ["admin", "manager", "accountant", "reception"]
     },
     {
       label: "OPD Records",
       icon: "📋",
-      page: "pages/opd_records_view.html",
-      roles: ["manager", "admin", "accountant", "viewer"]
+      page: "pages/opd_records.html",
+      roles: ["admin", "manager", "accountant", "reception", "viewer"]
     },
     {
-      label: "OPD Data Editor",
-      icon: "✏️",
-      page: "pages/opd_edit.html",
-      roles: ["manager", "admin", "accountant"]
+      label: "Refer Amt Entry",
+      icon: "💊",
+      page: "pages/opd_refer_amount.html",
+      roles: ["admin", "manager", "accountant"]
+    },
+    {
+      label: "Refer Paid",
+      icon: "✅",
+      page: "pages/opd_refer_paid.html",
+      roles: ["admin", "accountant"]
     },
 
-    // =====================
+    // ==========================================
     // MARKETING
-    // =====================
-    {
-      label: "Gramin Doctor Visit Edit",
-      icon: "🛠️",
-      page: "pages/gramin-visit-editor.html",
-      roles: ["marketing", "manager", "admin"]
-    },
+    // ==========================================
     {
       label: "Gramin Doctor Visit",
       icon: "🏥",
@@ -94,15 +113,9 @@
       roles: ["admin", "accountant", "manager", "viewer"]
     },
 
-    // =====================
+    // ==========================================
     // IPD
-    // =====================
-    {
-      label: "IPD - Refer Add",
-      icon: "🤝",
-      page: "pages/ipd-refer-add.html",
-      roles: ["admin", "accountant", "manager"]
-    },
+    // ==========================================
     {
       label: "IPD - Admission",
       icon: "🏥",
@@ -137,7 +150,7 @@
       label: "IPD - Cash & Discharge",
       icon: "💵",
       page: "pages/ipd-cash-discharge.html",
-      roles: ["admin", "accountant", "manager",  "reception"]
+      roles: ["admin", "accountant", "manager", "reception"]
     },
     {
       label: "IPD - Reports",
@@ -149,24 +162,30 @@
       label: "IPD - Medicine Sale",
       icon: "💊",
       page: "pages/ipd-medicine-sale.html",
-      roles: ["admin", "accountant", "pharmacy", "manager"]
+      roles: ["admin", "accountant", "pharmacy"]
     },
     {
       label: "IPD - Transactions",
       icon: "🔄",
       page: "pages/ipd-transactions.html",
-      roles: ["admin", "accountant", "pharmacy", "manager"]
+      roles: ["admin", "accountant", "pharmacy"]
     },
     {
       label: "IPD - Data Editor",
       icon: "🛠",
       page: "pages/ipd-data-editor.html",
-      roles: ["admin", "manager"]
+      roles: ["admin"]
     },
 
-    // =====================
+    // ==========================================
     // PHARMACY
-    // =====================
+    // ==========================================
+    {
+      label: "Pharmacy Setup",
+      icon: "⚙️",
+      page: "pages/pharmacy-setup.html",
+      roles: ["admin"]
+    },
     {
       label: "Pharmacy Purchase",
       icon: "🛒",
@@ -180,19 +199,13 @@
       roles: ["admin", "accountant", "pharmacy"]
     },
     {
-      label: "Add Supplier",
-      icon: "🏭",
-      page: "pages/pharmacy-add-supplier.html",
-      roles: ["admin", "accountant"]
-    },
-    {
-      label: "Supplier Payment",
+      label: "Pharmacy Supplier",
       icon: "💳",
-      page: "pages/pharmacy-payment.html",
+      page: "pages/pharmacy-suppliers.html",
       roles: ["admin", "accountant", "pharmacy"]
     },
     {
-      label: "Voucher",
+      label: "Pharmacy Voucher",
       icon: "🧾",
       page: "pages/pharmacy-voucher.html",
       roles: ["admin", "accountant", "pharmacy"]
@@ -204,27 +217,16 @@
       roles: ["admin", "accountant", "pharmacy", "manager", "viewer"]
     },
     {
-      label: "Extra Pay",
+      label: "Pharmacy Extra Pay",
       icon: "💰",
       page: "pages/pharmacy-extra-pay.html",
       roles: ["admin", "accountant", "pharmacy"]
-    },
-    {
-      label: "Manage Suppliers",
-      icon: "🗂️",
-      page: "pages/pharmacy-manage-suppliers.html",
-      roles: ["admin", "accountant"]
-    },
-    { label: "Add Employee",   icon: "👤", page: "pages/emp_add.html",     roles: ["admin","manager"] },
-{ label: "Edit Employee",  icon: "✏️", page: "pages/emp_edit.html",    roles: ["admin","manager"] },
-{ label: "Employees",      icon: "👥", page: "pages/emp_report.html",  roles: ["admin","manager"] },
-{ label: "Salary Sheet",   icon: "💰", page: "pages/salary_sheet.html",roles: ["admin","manager","accountant"] }
-
-
+    }
 
   ];
 
   function render(role, container, onClick) {
+
     if (!container) {
       console.error("Menu container not found");
       return;
@@ -232,15 +234,17 @@
 
     container.innerHTML = "";
 
-    const visibleItems = ITEMS.filter(
-      item => item.roles.includes("*") || item.roles.includes(role)
+    const visibleItems = ITEMS.filter(item =>
+      item.roles.includes("*") ||
+      item.roles.includes(role)
     );
 
     visibleItems.forEach((item, index) => {
+
       const link = document.createElement("a");
 
       link.href = "#";
-      link.className = "menu-item" + (index === 0 ? " active" : "");
+      link.className = `menu-item${index === 0 ? " active" : ""}`;
 
       link.innerHTML = `
         <span class="mi-icon">${item.icon}</span>
@@ -248,6 +252,7 @@
       `;
 
       link.addEventListener("click", (e) => {
+
         e.preventDefault();
 
         container
@@ -259,12 +264,13 @@
         if (typeof onClick === "function") {
           onClick(item);
         }
+
       });
 
       container.appendChild(link);
     });
 
-    console.log("Menu loaded:", visibleItems.length, "items");
+    console.log(`Menu loaded: ${visibleItems.length} items`);
   }
 
   window.BNH_MENU = {
@@ -273,4 +279,5 @@
   };
 
   console.log("BNH_MENU loaded successfully");
+
 })();
