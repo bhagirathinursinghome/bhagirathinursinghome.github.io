@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Sale – Pharmacy</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    #roleBadge {
+      display:inline-flex; align-items:center; gap:.4rem;
+      padding:.3rem .9rem; border-radius:20px; font-size:.78rem; font-weight:700;
+      letter-spacing:.03em; margin-bottom:1.1rem;
+    }
+    .role-full    { background:#ede9fe; color:#5b21b6; border:1.5px solid #c4b5fd; }
+    .role-limited { background:#dcfce7; color:#166534; border:1.5px solid #86efac; }
+
+    .tab-bar {
+      display:flex; gap:.4rem; flex-wrap:wrap;
+      margin-bottom:1.5rem; border-bottom:2px solid #e5e7eb; padding-bottom:.55rem;
+    }
+    .tab-btn {
+      padding:.48rem 1.05rem; border:2px solid transparent; border-radius:8px 8px 0 0;
+      background:#f3f4f6; color:#374151; font-weight:600; cursor:pointer;
+      font-size:.84rem; transition:all .18s; position:relative; bottom:-2px;
+    }
+    .tab-btn:hover  { background:#e0e7ff; color:#4338ca; }
+    .tab-btn.active { background:#fff; border-color:#e5e7eb #e5e7eb #fff #e5e7eb; color:#4f46e5; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .form-row > * { flex:1; min-width:180px; }
+    .mode-row { display:flex; gap:1rem; flex-wrap:wrap; margin-top:.5rem; }
+    .mode-row > * { flex:1; min-width:130px; }
+    .mode-title { font-size:.85rem; font-weight:700; color:#312e81; margin:.75rem 0 .25rem; }
+    .info-note { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;
+                 padding:.6rem .9rem; font-size:.82rem; margin-bottom:.75rem; }
+
+    .filter-bar { display:flex; gap:.75rem; align-items:flex-end; flex-wrap:wrap; margin-bottom:1rem; }
+    .filter-bar > * { flex:1; min-width:140px; }
+    .filter-bar label { display:block; font-size:.8rem; font-weight:600; color:#374151; margin-bottom:.2rem; }
+
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f0f4ff; padding:9px 10px; text-align:left; font-size:.82rem;
+         color:#4338ca; font-weight:700; border-bottom:2px solid #e0e7ff; cursor:pointer; white-space:nowrap; }
+    th:hover { background:#e0e7ff; }
+    th .sort-icon { margin-left:.3rem; color:#9ca3af; }
+    td { padding:8px 10px; border-bottom:1px solid #f0f0f0; font-size:.83rem; vertical-align:middle; }
+    tr:hover td { background:#fafafe; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+
+    .btn-sm { padding:4px 11px; border-radius:6px; font-size:.77rem; font-weight:600;
+              cursor:pointer; border:none; transition:all .15s; white-space:nowrap; }
+    .btn-edit       { background:#e0e7ff; color:#3730a3; }
+    .btn-edit:hover { background:#c7d2fe; }
+    .btn-del        { background:#fee2e2; color:#991b1b; }
+    .btn-del:hover  { background:#fecaca; }
+
+    .modal-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+      z-index:1000; align-items:center; justify-content:center;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal {
+      background:#fff; border-radius:14px; padding:1.75rem; width:min(94vw,500px);
+      box-shadow:0 20px 60px rgba(0,0,0,.2); max-height:90vh; overflow-y:auto;
+    }
+    .modal h2 { font-size:1.05rem; margin:0 0 1.1rem; color:#1e1b4b; }
+    .modal label { display:block; font-size:.82rem; font-weight:600; color:#374151; margin:.65rem 0 .2rem; }
+    .modal input, .modal select, .modal textarea {
+      width:100%; padding:.45rem .7rem; border:1.5px solid #d1d5db;
+      border-radius:8px; font-size:.9rem; box-sizing:border-box; outline:none;
+    }
+    .modal input:focus, .modal select:focus { border-color:#6366f1; }
+    .modal-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.25rem; }
+    .btn-cancel { padding:.45rem 1.1rem; border-radius:8px; background:#f3f4f6; color:#374151; font-weight:600; cursor:pointer; border:none; }
+    .btn-save   { padding:.45rem 1.1rem; border-radius:8px; background:#6366f1; color:#fff; font-weight:600; cursor:pointer; border:none; }
+    .btn-save:hover { background:#4f46e5; }
+    .confirm-modal {
+      background:#fff; border-radius:14px; padding:1.75rem; width:min(94vw,400px);
+      box-shadow:0 20px 60px rgba(0,0,0,.2); text-align:center;
+    }
+    .confirm-modal .ci { font-size:2.5rem; margin-bottom:.4rem; }
+    .confirm-modal p { font-size:.9rem; color:#374151; margin:.4rem 0 1.1rem; }
+    .btn-danger       { padding:.45rem 1.2rem; border-radius:8px; background:#dc2626; color:#fff; font-weight:600; cursor:pointer; border:none; }
+    .btn-danger:hover { background:#b91c1c; }
+
+    .empty-state { text-align:center; padding:2.5rem 1rem; color:#9ca3af; font-size:.9rem; }
+    .results-count { font-size:.8rem; color:#6b7280; margin-bottom:.5rem; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2>✏️ Edit Sale</h2>
+    <label>Date <span style="color:red">*</span></label>
+    <input id="editDate" type="date" required />
+    <label>Customer Name</label>
+    <input id="editCustomer" type="text" placeholder="Optional" />
+    <label>Cost Price (₹) <span style="color:red">*</span></label>
+    <input id="editCost" type="number" min="0" step="0.01" required />
+    <label>Sale Price (₹) <span style="color:red">*</span></label>
+    <input id="editSalePrice" type="number" min="0" step="0.01" required oninput="editUpdateSplit()" />
+    <div class="mode-title">💳 Payment Mode Split</div>
+    <div class="mode-row">
+      <div><label>Cash (₹)</label><input id="editCash" type="number" min="0" step="0.01" value="0" oninput="editCheckSplit()" /></div>
+      <div><label>Bank (₹)</label><input id="editBank" type="number" min="0" step="0.01" value="0" oninput="editCheckSplit()" /></div>
+      <div><label>PhonePe (₹)</label><input id="editPP" type="number" min="0" step="0.01" value="0" oninput="editCheckSplit()" /></div>
+    </div>
+    <p id="editSplitWarn" style="font-size:.8rem;color:#dc2626;margin-top:.25rem"></p>
+    <label>Remark</label>
+    <textarea id="editRemark" rows="2"></textarea>
+    <p class="err" id="editErr"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
+      <button class="btn-save" onclick="saveEdit()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="delModal">
+  <div class="confirm-modal">
+    <div class="ci">🗑️</div>
+    <strong id="delDesc" style="font-size:1rem;display:block;margin-bottom:.3rem"></strong>
+    <p>This will permanently delete this sale entry.<br>This action cannot be undone.</p>
+    <div style="display:flex;gap:.75rem;justify-content:center">
+      <button class="btn-cancel" onclick="closeDelete()">Cancel</button>
+      <button class="btn-danger" onclick="confirmDelete()">Yes, Delete</button>
+    </div>
+    <p class="err" id="delErr" style="margin-top:.6rem"></p>
+  </div>
+</div>
+
+<div class="page">
+  <h1>💊 Dispensary Sales</h1>
+  <div id="roleBadge"></div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="btnAdd"  onclick="switchTab('tabAdd',this)">➕ Add Sale</button>
+    <button class="tab-btn"        id="btnList" onclick="switchTab('tabList',this)">📋 Sale List</button>
+  </div>
+
+  <!-- TAB: ADD SALE -->
+  <div id="tabAdd" class="tab-panel active">
+    <div class="page-card">
+      <div class="info-note">All sales here are <strong>Dispensary sales</strong>. For IPD medicine, use the IPD Medicine Sale page.</div>
+      <form id="saleForm">
+        <label>Recorded By</label>
+        <input id="recBy" readonly/>
+        <div class="form-row">
+          <div>
+            <label>Date <span style="color:red">*</span></label>
+            <input id="saleDate" type="date" required/>
+          </div>
+          <div>
+            <label>Customer Name</label>
+            <input id="customerName" placeholder="Optional"/>
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label>Cost Price (₹) <span style="color:red">*</span></label>
+            <input id="costPrice" type="number" min="0" step="0.01" required placeholder="0.00"/>
+          </div>
+          <div>
+            <label>Sale Price (₹) <span style="color:red">*</span></label>
+            <input id="salePrice" type="number" min="0" step="0.01" required placeholder="0.00" oninput="updateModeSplit()"/>
+          </div>
+        </div>
+        <div class="mode-title">💳 Payment Mode Split <span style="color:red">*</span></div>
+        <p style="font-size:.78rem;color:#6b7280;margin:0 0 .5rem">Enter amounts per mode. Total must equal Sale Price.</p>
+        <div class="mode-row">
+          <div><label>Cash (₹)</label><input id="modeCash" type="number" min="0" step="0.01" value="0" oninput="checkSplit()"/></div>
+          <div><label>Bank (₹)</label><input id="modeBank" type="number" min="0" step="0.01" value="0" oninput="checkSplit()"/></div>
+          <div><label>PhonePe (₹)</label><input id="modePP" type="number" min="0" step="0.01" value="0" oninput="checkSplit()"/></div>
+        </div>
+        <p id="splitWarn" style="font-size:.8rem;color:#dc2626;margin-top:.25rem"></p>
+        <label>Remark</label>
+        <textarea id="remark" rows="2" placeholder="Optional…"></textarea>
+        <div style="margin-top:1rem">
+          <button type="submit" class="btn-primary" style="width:auto">💾 Save Sale</button>
+        </div>
+        <p class="err" id="err"></p>
+        <p class="info" id="ok" style="display:none"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- TAB: SALE LIST -->
+  <div id="tabList" class="tab-panel">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.9rem">📋 All Dispensary Sales</h2>
+      <div class="filter-bar">
+        <div>
+          <label>From Date</label>
+          <input type="date" id="filterFrom" onchange="applyFilters()" />
+        </div>
+        <div>
+          <label>To Date</label>
+          <input type="date" id="filterTo" onchange="applyFilters()" />
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:.5rem">
+          <button class="btn-primary" style="width:auto" onclick="applyFilters()">🔍 Filter</button>
+          <button class="btn-primary" style="width:auto;background:#6b7280" onclick="clearFilters()">✕ Clear</button>
+        </div>
+      </div>
+      <div class="results-count" id="resultsCount"></div>
+      <div id="saleListWrap"><div class="empty-state">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+const FULL_ACCESS_ROLES    = ["admin"];
+const LIMITED_ACCESS_ROLES = ["manager","pharmacy","accountant"];
+const ALL_ALLOWED = [...new Set([...FULL_ACCESS_ROLES,...LIMITED_ACCESS_ROLES])];
+BNH_PAGE.requireRole(ALL_ALLOWED);
+
+const currentRole  = BNH_PAGE.user.role;
+const isFullAccess = FULL_ACCESS_ROLES.includes(currentRole);
+
+const badge = document.getElementById('roleBadge');
+badge.textContent = isFullAccess ? '🔓 Full Access — '+currentRole : '🔒 Limited Access — '+currentRole;
+badge.classList.add(isFullAccess ? 'role-full' : 'role-limited');
+
+const fmt = n => '₹'+parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+const spin = show => document.getElementById('spinner').classList[show?'remove':'add']('hidden');
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+document.getElementById('recBy').value = BNH_PAGE.user.name+' ('+BNH_PAGE.user.username+')';
+document.getElementById('saleDate').value = new Date().toISOString().slice(0,10);
+
+let allSales = [];
+let editingId=null, deletingId=null;
+let sortCol='sale_date', sortDir=-1;
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id==='tabList') renderList();
+}
+
+// ── Add form helpers ─────────────────────────────────────────
+function updateModeSplit() {
+  const sale=parseFloat(document.getElementById('salePrice').value||0);
+  const bank=parseFloat(document.getElementById('modeBank').value||0);
+  const pp  =parseFloat(document.getElementById('modePP').value||0);
+  document.getElementById('modeCash').value=Math.max(0,sale-bank-pp).toFixed(2);
+  checkSplit();
+}
+function checkSplit() {
+  const sale=parseFloat(document.getElementById('salePrice').value||0);
+  const total=parseFloat(document.getElementById('modeCash').value||0)+
+              parseFloat(document.getElementById('modeBank').value||0)+
+              parseFloat(document.getElementById('modePP').value||0);
+  document.getElementById('splitWarn').textContent =
+    Math.abs(total-sale)>0.01 ? `⚠ Mode split total ${fmt(total)} ≠ Sale price ${fmt(sale)}` : '';
+}
+
+// ── Edit modal helpers ───────────────────────────────────────
+function editUpdateSplit() {
+  const sale=parseFloat(document.getElementById('editSalePrice').value||0);
+  const bank=parseFloat(document.getElementById('editBank').value||0);
+  const pp  =parseFloat(document.getElementById('editPP').value||0);
+  document.getElementById('editCash').value=Math.max(0,sale-bank-pp).toFixed(2);
+  editCheckSplit();
+}
+function editCheckSplit() {
+  const sale=parseFloat(document.getElementById('editSalePrice').value||0);
+  const total=parseFloat(document.getElementById('editCash').value||0)+
+              parseFloat(document.getElementById('editBank').value||0)+
+              parseFloat(document.getElementById('editPP').value||0);
+  document.getElementById('editSplitWarn').textContent =
+    Math.abs(total-sale)>0.01 ? `⚠ Mode split total ${fmt(total)} ≠ Sale price ${fmt(sale)}` : '';
+}
+
+// ── Load ─────────────────────────────────────────────────────
+async function loadSales() {
+  const { data, error } = await BNH_PAGE.sb.from('pharmacy_sales')
+    .select('*').eq('sale_type','Dispensary').order('sale_date',{ascending:false});
+  if (error) { document.getElementById('saleListWrap').innerHTML=`<p class="err">${esc(error.message)}</p>`; return; }
+  allSales = data||[];
+  renderList();
+}
+
+// ── Filters & Sort ───────────────────────────────────────────
+function applyFilters() { renderList(); }
+function clearFilters() {
+  document.getElementById('filterFrom').value='';
+  document.getElementById('filterTo').value='';
+  renderList();
+}
+function getFiltered() {
+  const from=document.getElementById('filterFrom').value;
+  const to  =document.getElementById('filterTo').value;
+  return allSales.filter(r=>{
+    if (from && r.sale_date<from) return false;
+    if (to   && r.sale_date>to)   return false;
+    return true;
+  });
+}
+function sortData(arr) {
+  return [...arr].sort((a,b)=>{
+    let av=a[sortCol]||'', bv=b[sortCol]||'';
+    if(['sale_price','cost_price'].includes(sortCol)){ av=parseFloat(av); bv=parseFloat(bv); }
+    if(av<bv) return sortDir; if(av>bv) return -sortDir; return 0;
+  });
+}
+function setSort(col) {
+  if(sortCol===col) sortDir*=-1; else { sortCol=col; sortDir=-1; }
+  renderList();
+}
+function sortIcon(col) {
+  if(sortCol!==col) return '<span class="sort-icon">⇅</span>';
+  return sortDir===-1?'<span class="sort-icon" style="color:#4f46e5">↓</span>':'<span class="sort-icon" style="color:#4f46e5">↑</span>';
+}
+
+function renderList() {
+  const filtered=getFiltered();
+  const sorted=sortData(filtered);
+  const wrap=document.getElementById('saleListWrap');
+  const totalSale=sorted.reduce((a,r)=>a+parseFloat(r.sale_price||0),0);
+  const totalCost=sorted.reduce((a,r)=>a+parseFloat(r.cost_price||0),0);
+
+  document.getElementById('resultsCount').textContent =
+    sorted.length+' record'+(sorted.length!==1?'s':'')+
+    (sorted.length!==allSales.length?' (filtered from '+allSales.length+' total)':'');
+
+  if (!sorted.length) { wrap.innerHTML='<div class="empty-state">No sales found.</div>'; return; }
+
+  const actionsCol = isFullAccess ? '<th>Actions</th>' : '';
+  const rows = sorted.map(r=>{
+    const actions = isFullAccess ? `<td>
+      <div style="display:flex;gap:.35rem">
+        <button class="btn-sm btn-edit" onclick="openEdit('${r.id}')">✏️ Edit</button>
+        <button class="btn-sm btn-del"  onclick="openDelete('${r.id}','${esc(r.sale_date)} – ${esc(r.remark||'Sale')}')">🗑️</button>
+      </div></td>` : '';
+    return `<tr>
+      <td>${esc(r.sale_date)}</td>
+      <td>${r.remark?esc(r.remark):'<span style="color:#ccc">—</span>'}</td>
+      <td class="r">${fmt(r.cost_price)}</td>
+      <td class="r">${fmt(r.sale_price)}</td>
+      <td class="r">${fmt(r.mode_cash)}</td>
+      <td class="r">${fmt(r.mode_bank)}</td>
+      <td class="r">${fmt(r.mode_phonepe)}</td>
+      <td>${esc(r.recorded_by_name||r.recorded_by||'—')}</td>
+      ${actions}
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<div style="overflow-x:auto"><table>
+    <thead><tr>
+      <th onclick="setSort('sale_date')">Date${sortIcon('sale_date')}</th>
+      <th>Customer</th>
+      <th class="r" onclick="setSort('cost_price')">Cost${sortIcon('cost_price')}</th>
+      <th class="r" onclick="setSort('sale_price')">Sale${sortIcon('sale_price')}</th>
+      <th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th>
+      <th>By</th>${actionsCol}
+    </tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr>
+      <td colspan="2" style="text-align:right">Total</td>
+      <td class="r">${fmt(totalCost)}</td>
+      <td class="r">${fmt(totalSale)}</td>
+      <td colspan="${isFullAccess?5:4}"></td>
+    </tr></tfoot>
+  </table></div>`;
+}
+
+// ── Add Sale ─────────────────────────────────────────────────
+document.getElementById('saleForm').onsubmit = async e => {
+  e.preventDefault();
+  const err=document.getElementById('err'), ok=document.getElementById('ok');
+  err.textContent=''; ok.style.display='none';
+  const sale=parseFloat(document.getElementById('salePrice').value||0);
+  const cash=parseFloat(document.getElementById('modeCash').value||0);
+  const bank=parseFloat(document.getElementById('modeBank').value||0);
+  const pp  =parseFloat(document.getElementById('modePP').value||0);
+  if (Math.abs((cash+bank+pp)-sale)>0.01) { err.textContent='Payment mode split must equal the sale price.'; return; }
+  spin(true);
+  try {
+    const payload = BNH_PAGE.stamp({
+      sale_date: document.getElementById('saleDate').value,
+      sale_type: 'Dispensary',
+      admission_no: null,
+      cost_price: parseFloat(document.getElementById('costPrice').value||0),
+      sale_price: sale,
+      mode_of_payment: cash>0&&bank===0&&pp===0?'Cash':bank>0&&cash===0&&pp===0?'Bank':pp>0&&cash===0&&bank===0?'PhonePe':'Mixed',
+      mode_cash: cash, mode_bank: bank, mode_phonepe: pp,
+      remark: document.getElementById('customerName').value.trim()||null
+    });
+    const { error } = await BNH_PAGE.sb.from('pharmacy_sales').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent='✅ Sale saved successfully!';
+    e.target.reset();
+    document.getElementById('saleDate').value=new Date().toISOString().slice(0,10);
+    document.getElementById('recBy').value=BNH_PAGE.user.name+' ('+BNH_PAGE.user.username+')';
+    await loadSales();
+  } catch(ex) { err.textContent=ex.message; }
+  finally { spin(false); }
+};
+
+// ── Edit ─────────────────────────────────────────────────────
+function openEdit(id) {
+  const r=allSales.find(x=>x.id===id); if(!r) return;
+  editingId=id;
+  document.getElementById('editDate').value      = r.sale_date;
+  document.getElementById('editCustomer').value  = r.remark||'';
+  document.getElementById('editCost').value      = r.cost_price;
+  document.getElementById('editSalePrice').value = r.sale_price;
+  document.getElementById('editCash').value      = r.mode_cash||0;
+  document.getElementById('editBank').value      = r.mode_bank||0;
+  document.getElementById('editPP').value        = r.mode_phonepe||0;
+  document.getElementById('editRemark').value    = '';
+  document.getElementById('editErr').textContent = '';
+  document.getElementById('editSplitWarn').textContent = '';
+  document.getElementById('editModal').classList.add('open');
+}
+function closeEdit() { editingId=null; document.getElementById('editModal').classList.remove('open'); }
+async function saveEdit() {
+  const errEl=document.getElementById('editErr'); errEl.textContent='';
+  const sale=parseFloat(document.getElementById('editSalePrice').value||0);
+  const cash=parseFloat(document.getElementById('editCash').value||0);
+  const bank=parseFloat(document.getElementById('editBank').value||0);
+  const pp  =parseFloat(document.getElementById('editPP').value||0);
+  if(Math.abs((cash+bank+pp)-sale)>0.01){ errEl.textContent='Mode split must equal sale price.'; return; }
+  spin(true);
+  try {
+    const { error } = await BNH_PAGE.sb.from('pharmacy_sales').update({
+      sale_date:   document.getElementById('editDate').value,
+      cost_price:  parseFloat(document.getElementById('editCost').value||0),
+      sale_price:  sale,
+      mode_of_payment: cash>0&&bank===0&&pp===0?'Cash':bank>0&&cash===0&&pp===0?'Bank':pp>0&&cash===0&&bank===0?'PhonePe':'Mixed',
+      mode_cash:cash, mode_bank:bank, mode_phonepe:pp,
+      remark: document.getElementById('editCustomer').value.trim()||null
+    }).eq('id',editingId);
+    if(error) throw error;
+    await loadSales(); closeEdit();
+  } catch(ex) { errEl.textContent=ex.message; }
+  finally { spin(false); }
+}
+
+// ── Delete ───────────────────────────────────────────────────
+function openDelete(id,desc) {
+  deletingId=id;
+  document.getElementById('delDesc').textContent=desc;
+  document.getElementById('delErr').textContent='';
+  document.getElementById('delModal').classList.add('open');
+}
+function closeDelete() { deletingId=null; document.getElementById('delModal').classList.remove('open'); }
+async function confirmDelete() {
+  const errEl=document.getElementById('delErr'); errEl.textContent='';
+  spin(true);
+  try {
+    const { error } = await BNH_PAGE.sb.from('pharmacy_sales').delete().eq('id',deletingId);
+    if(error) throw error;
+    allSales=allSales.filter(x=>x.id!==deletingId);
+    closeDelete(); renderList();
+  } catch(ex) { errEl.textContent=ex.message; }
+  finally { spin(false); }
+}
+
+document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeEdit();});
+document.getElementById('delModal').addEventListener('click',function(e){if(e.target===this)closeDelete();});
+
+loadSales();
+</script>
+</body>
+</html>

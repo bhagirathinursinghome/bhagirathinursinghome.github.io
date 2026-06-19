@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>My Profile</title><link rel="stylesheet" href="../assets/style.css"/></head>
+<body>
+<div class="page">
+  <h1>My Profile</h1>
+  <div class="page-card">
+    <p><b>Name:</b> <span id="n"></span></p>
+    <p><b>Mobile:</b> <span id="m"></span></p>
+    <p><b>User ID:</b> <span id="u"></span></p>
+    <p><b>Role:</b> <span id="r" style="text-transform:capitalize"></span></p>
+    <p><b>Last Login:</b> <span id="l"></span></p>
+  </div>
+</div>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["*"]);
+  const u = BNH_PAGE.user;
+  n.textContent=u.name; m.textContent=u.mobile; document.getElementById('u').textContent=u.username;
+  r.textContent=u.role; l.textContent=new Date(u.loginAt).toLocaleString();
+</script>
+</body></html>

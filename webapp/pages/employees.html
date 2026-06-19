@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Employees</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    /* ── Tabs ── */
+    .tab-bar{display:flex;gap:0;border-bottom:2px solid #e5e7eb;margin-bottom:1.5rem;}
+    .tab-btn{padding:.65rem 1.4rem;border:none;background:none;font-size:.92rem;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;border-radius:0;}
+    .tab-btn:hover{color:#1a56db;}
+    .tab-btn.active{color:#1a56db;border-bottom-color:#1a56db;}
+    .tab-panel{display:none;}
+    .tab-panel.active{display:block;}
+
+    /* ── Report ── */
+    .filter-row{display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-bottom:1.25rem;}
+    .filter-row label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:.25rem;display:block;}
+    .filter-row input,.filter-row select{padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;background:#fff;min-width:140px;}
+    .btn-sm{padding:.45rem 1rem;font-size:.85rem;border-radius:7px;border:none;cursor:pointer;background:#1a56db;color:#fff;}
+    .btn-outline{background:#fff;border:1px solid #d1d5db;color:#374151;}
+    table{width:100%;border-collapse:collapse;font-size:.9rem;}
+    th{background:#f3f4f6;padding:.6rem .85rem;text-align:left;font-weight:600;font-size:.84rem;border-bottom:2px solid #e5e7eb;}
+    td{padding:.6rem .85rem;border-bottom:1px solid #f3f4f6;}
+    tr:hover td{background:#f9fafb;}
+    .badge{display:inline-block;padding:.15rem .65rem;border-radius:20px;font-size:.78rem;font-weight:600;}
+    .badge.active{background:#d1fae5;color:#065f46;}
+    .badge.inactive{background:#fee2e2;color:#991b1b;}
+    .badge.due{background:#fef3c7;color:#92400e;}
+    .badge.paid{background:#d1fae5;color:#065f46;}
+    .row-link{cursor:pointer;}
+    .stats-row{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;}
+    .stat-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:.7rem 1rem;flex:1;min-width:110px;text-align:center;}
+    .stat-box .val{font-size:1.3rem;font-weight:700;color:#1a56db;}
+    .stat-box .lbl{font-size:.78rem;color:#6b7280;margin-top:.1rem;}
+    .empty{text-align:center;color:#9ca3af;padding:1.5rem;font-size:.92rem;}
+
+    /* ── Edit tab ── */
+    .search-bar{display:flex;gap:.75rem;margin-bottom:1.25rem;align-items:center;}
+    .search-bar input{flex:1;padding:.55rem .9rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;}
+    .emp-list{display:grid;gap:.6rem;margin-bottom:1.5rem;}
+    .emp-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:.85rem 1.1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color .15s;}
+    .emp-card:hover{border-color:#1a56db;}
+    .emp-card.selected{border-color:#1a56db;background:#eef2ff;}
+    .emp-card .emp-name{font-weight:600;font-size:.97rem;}
+    .emp-card .emp-meta{font-size:.82rem;color:#6b7280;}
+    .edit-section-title{font-weight:700;font-size:1rem;margin:1.25rem 0 .75rem;padding-bottom:.4rem;border-bottom:2px solid #e5e7eb;}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.25rem;}
+    @media(max-width:600px){.form-grid{grid-template-columns:1fr;}}
+    .span2{grid-column:1/-1;}
+    select{width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;background:#fff;}
+    .inline-row{display:flex;gap:.75rem;align-items:flex-end;}
+    .inline-row select{flex:1;}
+    .btn-danger{background:#dc2626;color:#fff;padding:.5rem 1.2rem;border:none;border-radius:8px;cursor:pointer;font-size:.9rem;}
+    .salary-hist-tbl{margin-top:.5rem;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;}
+    .salary-hist-tbl table{width:100%;border-collapse:collapse;font-size:.87rem;}
+    .salary-hist-tbl th{background:#f3f4f6;padding:.5rem .75rem;text-align:left;font-weight:600;}
+    .salary-hist-tbl td{padding:.5rem .75rem;border-top:1px solid #e5e7eb;}
+
+    /* ── Modals ── */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;align-items:center;justify-content:center;padding:1rem;}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:#fff;border-radius:14px;padding:1.75rem;width:100%;max-width:480px;box-shadow:0 8px 40px rgba(0,0,0,.22);max-height:90vh;overflow-y:auto;}
+    .modal-box h3{margin:0 0 .25rem;font-size:1.1rem;}
+    .modal-sub{color:#6b7280;font-size:.85rem;margin-bottom:1rem;}
+    .modal-actions{display:flex;gap:.75rem;margin-top:1.25rem;justify-content:flex-end;}
+    .modal-close{float:right;background:none;border:none;font-size:1.35rem;cursor:pointer;color:#6b7280;margin:-.25rem -.25rem 0 0;line-height:1;}
+
+    /* ── Employee detail popup ── */
+    .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.35rem .75rem;margin-bottom:1rem;}
+    @media(max-width:480px){.detail-grid{grid-template-columns:1fr;}}
+    .detail-item{background:#f9fafb;border-radius:8px;padding:.5rem .75rem;}
+    .detail-item .lbl{font-size:.75rem;color:#6b7280;margin-bottom:.1rem;}
+    .detail-item .val{font-size:.9rem;font-weight:600;color:#111827;}
+    .detail-item.span2{grid-column:1/-1;}
+    .section-sep{font-weight:700;font-size:.88rem;color:#374151;margin:.9rem 0 .5rem;padding-bottom:.35rem;border-bottom:2px solid #e5e7eb;grid-column:1/-1;}
+    .hist-tbl{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:.25rem;}
+    .hist-tbl th{background:#f3f4f6;padding:.45rem .6rem;text-align:left;font-weight:600;font-size:.82rem;}
+    .hist-tbl td{padding:.45rem .6rem;border-top:1px solid #f0f0f0;}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<!-- ══ Employee Detail Popup ══════════════════════════════ -->
+<div class="modal-overlay" id="empDetailModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeEmpDetail()">✕</button>
+    <h3 id="popName">—</h3>
+    <div class="modal-sub" id="popDesig">—</div>
+
+    <div class="detail-grid" id="popDetails">
+      <!-- filled by JS -->
+    </div>
+
+    <div style="font-weight:700;font-size:.88rem;color:#374151;margin:.5rem 0 .5rem;padding-bottom:.35rem;border-bottom:2px solid #e5e7eb;">
+      💰 Salary History
+    </div>
+    <table class="hist-tbl">
+      <thead><tr><th>Date</th><th>Salary (₹)</th><th>Remarks</th></tr></thead>
+      <tbody id="popSalaryHist">
+        <tr><td colspan="3" class="empty">Loading…</td></tr>
+      </tbody>
+    </table>
+
+    <div style="font-weight:700;font-size:.88rem;color:#374151;margin:.9rem 0 .5rem;padding-bottom:.35rem;border-bottom:2px solid #e5e7eb;">
+      🧾 Salary Payment History
+    </div>
+    <table class="hist-tbl">
+      <thead><tr><th>Month</th><th>Date</th><th>Voucher</th><th>Amount (₹)</th><th>Mode</th></tr></thead>
+      <tbody id="popPaymentHist">
+        <tr><td colspan="5" class="empty">Loading…</td></tr>
+      </tbody>
+    </table>
+
+    <div class="modal-actions">
+      <button class="btn-sm" style="background:#6b7280;" onclick="closeEmpDetail()">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ Appraisal Modal ════════════════════════════════════ -->
+<div class="modal-overlay" id="appraisalModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeAppraisalModal()">✕</button>
+    <h3>📈 Salary Appraisal</h3>
+    <p id="appraisalCurrentSalary" style="font-size:.9rem;color:#6b7280;margin-bottom:.75rem;"></p>
+    <label>New Salary (₹) <span style="color:red">*</span></label>
+    <input id="newSalary" type="number" min="0" step="1" placeholder="Enter new salary" style="width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;box-sizing:border-box;margin-top:.3rem;"/>
+    <label style="margin-top:.75rem;display:block;">Effective Date <span style="color:red">*</span></label>
+    <input id="appraisalDate" type="date" style="width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;box-sizing:border-box;margin-top:.3rem;"/>
+    <label style="margin-top:.75rem;display:block;">Remarks</label>
+    <input id="appraisalRemarks" placeholder="e.g. Annual increment" style="width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;box-sizing:border-box;margin-top:.3rem;"/>
+    <p class="err" id="appraisalErr" style="margin:.5rem 0 0;"></p>
+    <div class="modal-actions">
+      <button class="btn-sm" style="background:#6b7280;" onclick="closeAppraisalModal()">Cancel</button>
+      <button class="btn-sm" onclick="saveAppraisal()">Save Appraisal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Mark Inactive Modal ════════════════════════════════ -->
+<div class="modal-overlay" id="inactiveModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeInactiveModal()">✕</button>
+    <h3>⚠️ Mark Employee Inactive</h3>
+    <p>Are you sure you want to mark <strong id="inactiveName"></strong> as inactive?</p>
+    <label>Inactive Date <span style="color:red">*</span></label>
+    <input id="inactiveDate" type="date" style="width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;box-sizing:border-box;margin-top:.3rem;"/>
+    <label style="margin-top:.75rem;display:block;">Reason</label>
+    <input id="inactiveReason" placeholder="Resignation / Termination etc." style="width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;box-sizing:border-box;margin-top:.3rem;"/>
+    <p class="err" id="inactiveErr" style="margin:.5rem 0 0;"></p>
+    <div class="modal-actions">
+      <button class="btn-sm" style="background:#6b7280;" onclick="closeInactiveModal()">Cancel</button>
+      <button class="btn-sm" style="background:#dc2626;" onclick="confirmInactive()">Mark Inactive</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ New Designation Modal ══════════════════════════════ -->
+<div class="modal-overlay" id="desgModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeDesgModal()">✕</button>
+    <h3>➕ Create New Designation</h3>
+    <label>Designation Name</label>
+    <input id="newDesgName" placeholder="e.g. Senior Nurse" style="width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;box-sizing:border-box;margin-top:.3rem;"/>
+    <p class="err" id="desgErr" style="margin:.5rem 0 0;"></p>
+    <div class="modal-actions">
+      <button class="btn-sm" style="background:#6b7280;" onclick="closeDesgModal()">Cancel</button>
+      <button class="btn-sm" onclick="saveNewDesignation()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <h1>👥 Employees</h1>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-report" onclick="switchTab('report')">📋 Report</button>
+    <button class="tab-btn" id="tab-edit" onclick="switchTab('edit')" style="display:none;">✏️ Edit</button>
+    <button class="tab-btn" id="tab-add"  onclick="switchTab('add')"  style="display:none;">➕ Add</button>
+  </div>
+
+  <!-- ══ REPORT ══ -->
+  <div class="tab-panel active" id="panel-report">
+    <div class="stats-row">
+      <div class="stat-box"><div class="val" id="statTotal">—</div><div class="lbl">Total</div></div>
+      <div class="stat-box"><div class="val" id="statActive">—</div><div class="lbl">Active</div></div>
+      <div class="stat-box"><div class="val" id="statInactive">—</div><div class="lbl">Inactive</div></div>
+      <div class="stat-box"><div class="val" id="statDue">—</div><div class="lbl">Salary Due</div></div>
+    </div>
+    <div class="page-card">
+      <div class="filter-row">
+        <div>
+          <label>Search Name</label>
+          <input id="fName" placeholder="Employee name…" oninput="applyFilters()"/>
+        </div>
+        <div>
+          <label>Designation</label>
+          <select id="fDesig" onchange="applyFilters()"><option value="">All Designations</option></select>
+        </div>
+        <div>
+          <label>Status</label>
+          <select id="fStatus" onchange="applyFilters()">
+            <option value="">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div>
+          <label>Month</label>
+          <select id="fMonth" onchange="applyFilters()">
+            <option value="">All Months</option>
+            <option value="1">January</option><option value="2">February</option>
+            <option value="3">March</option><option value="4">April</option>
+            <option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option>
+            <option value="9">September</option><option value="10">October</option>
+            <option value="11">November</option><option value="12">December</option>
+          </select>
+        </div>
+        <div>
+          <label>Year</label>
+          <input id="fYear" type="number" min="2000" max="2100" placeholder="e.g. 2025" style="width:100px;" oninput="applyFilters()"/>
+        </div>
+        <div>
+          <label>Salary Status</label>
+          <select id="fDue" onchange="applyFilters()">
+            <option value="">All</option>
+            <option value="due">Due Only</option>
+            <option value="paid">Paid Only</option>
+          </select>
+        </div>
+        <div style="align-self:flex-end;">
+          <button class="btn-sm btn-outline" onclick="clearFilters()">Clear</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Name</th><th>Designation</th><th>Salary (₹)</th><th>Joining Date</th><th>Status</th><th>Salary Status</th></tr>
+          </thead>
+          <tbody id="empTbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ EDIT ══ -->
+  <div class="tab-panel" id="panel-edit">
+    <div class="page-card">
+      <div class="search-bar">
+        <input id="editSearchInput" placeholder="🔍 Search by name or designation…" oninput="filterEditList()"/>
+      </div>
+      <div class="emp-list" id="editEmpList"><p style="color:#9ca3af;font-size:.9rem;">Loading…</p></div>
+    </div>
+
+    <div class="page-card" id="editSection" style="display:none;">
+      <div class="edit-section-title">📋 Employee Details</div>
+      <form id="editForm" onsubmit="submitEditForm(event)">
+        <div class="form-grid">
+          <div>
+            <label>Employee Name <span style="color:red">*</span></label>
+            <input id="eName" required/>
+          </div>
+          <div>
+            <label>Designation <span style="color:red">*</span></label>
+            <div class="inline-row">
+              <select id="eDesignation" required><option value="">— Select —</option></select>
+            </div>
+          </div>
+          <div>
+            <label>Mobile</label>
+            <input id="eMobile" type="tel"/>
+          </div>
+          <div>
+            <label>Gender</label>
+            <select id="eGender">
+              <option value="">— Select —</option>
+              <option>Male</option><option>Female</option><option>Other</option>
+            </select>
+          </div>
+          <div>
+            <label>Joining Date</label>
+            <input id="eJoiningDate" type="date"/>
+          </div>
+          <div>
+            <label>Current Salary (₹)</label>
+            <input id="eSalary" type="number" readonly style="background:#f3f4f6;cursor:not-allowed;"/>
+          </div>
+          <div class="span2">
+            <label>Address</label>
+            <input id="eAddress"/>
+          </div>
+          <div class="span2" style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.25rem;">
+            <button type="submit" class="btn-primary" style="width:auto;padding:.6rem 1.75rem;">💾 Update Details</button>
+            <button type="button" class="btn-sm" style="background:#059669;padding:.6rem 1.25rem;font-size:.9rem;" onclick="openAppraisalModal()">📈 Salary Appraisal</button>
+            <button type="button" class="btn-danger" id="inactiveBtn" onclick="openInactiveModal()">🚫 Mark Inactive</button>
+          </div>
+          <div class="span2">
+            <p class="err" id="editErr"></p>
+            <p class="info" id="editOk" style="display:none;"></p>
+          </div>
+        </div>
+      </form>
+
+      <div class="edit-section-title" style="margin-top:1.5rem;">💰 Salary History</div>
+      <div class="salary-hist-tbl">
+        <table>
+          <thead><tr><th>Date</th><th>Salary (₹)</th><th>Remarks</th><th>By</th></tr></thead>
+          <tbody id="salaryHistBody"><tr><td colspan="4" style="color:#9ca3af;text-align:center;padding:.75rem;">Select an employee</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ADD ══ -->
+  <div class="tab-panel" id="panel-add">
+    <div class="page-card">
+      <form id="empForm" onsubmit="submitAddForm(event)">
+        <div class="form-grid">
+          <div class="span2">
+            <label>Recorded By</label>
+            <input id="recBy" readonly/>
+          </div>
+          <div>
+            <label>Employee Name <span style="color:red">*</span></label>
+            <input id="empName" placeholder="Full name" required/>
+          </div>
+          <div>
+            <label>Designation <span style="color:red">*</span></label>
+            <div class="inline-row">
+              <select id="addDesignation" required><option value="">— Select —</option></select>
+              <button type="button" class="btn-sm" onclick="openDesgModal()">+ New</button>
+            </div>
+          </div>
+          <div>
+            <label>Salary (₹) <span style="color:red">*</span></label>
+            <input id="addSalary" type="number" min="0" step="1" placeholder="e.g. 18000" required/>
+          </div>
+          <div>
+            <label>Joining Date <span style="color:red">*</span></label>
+            <input id="addJoiningDate" type="date" required/>
+          </div>
+          <div>
+            <label>Mobile</label>
+            <input id="addMobile" type="tel" placeholder="10-digit number"/>
+          </div>
+          <div>
+            <label>Gender</label>
+            <select id="addGender">
+              <option value="">— Select —</option>
+              <option>Male</option><option>Female</option><option>Other</option>
+            </select>
+          </div>
+          <div class="span2">
+            <label>Address</label>
+            <input id="addAddress" placeholder="Optional address"/>
+          </div>
+          <div class="span2" style="margin-top:.5rem;">
+            <button class="btn-primary" style="width:auto;padding:.6rem 2rem;">💾 Save Employee</button>
+          </div>
+          <div class="span2">
+            <p class="err" id="addErr"></p>
+            <p class="info" id="addOk" style="display:none;"></p>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div><!-- /.page -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  /* ── Role config ── */
+  const FULL_ACCESS_ROLES    = ["admin", "accountant"];
+  const LIMITED_ACCESS_ROLES = ["manager", "viewer"];
+  const ALL_ALLOWED_ROLES    = [...FULL_ACCESS_ROLES, ...LIMITED_ACCESS_ROLES];
+
+  BNH_PAGE.requireRole(ALL_ALLOWED_ROLES);
+
+  const userRole     = (BNH_PAGE.user?.role || '').toLowerCase();
+  const hasFullAccess = FULL_ACCESS_ROLES.map(r => r.toLowerCase()).includes(userRole);
+
+  if (hasFullAccess) {
+    document.getElementById('tab-edit').style.display = '';
+    document.getElementById('tab-add').style.display  = '';
+    document.getElementById('recBy').value =
+      BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+  }
+
+  /* ── Tab switching ── */
+  function switchTab(name) {
+    if (!hasFullAccess && name !== 'report') return;
+    ['report','edit','add'].forEach(t => {
+      document.getElementById('tab-'   + t).classList.toggle('active', t === name);
+      document.getElementById('panel-' + t).classList.toggle('active', t === name);
+    });
+  }
+
+  /* ── Shared state ── */
+  let allEmployees = [], salaryPayments = {}, designationMap = {};
+  let selectedEmp  = null;
+
+  /* ── Init ── */
+  async function init() {
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const [empRes, desigRes] = await Promise.all([
+        BNH_PAGE.sb.from('employees').select('*, designations(id,name)').order('name'),
+        BNH_PAGE.sb.from('designations').select('*').order('name')
+      ]);
+      if (empRes.error) throw empRes.error;
+
+      allEmployees = empRes.data || [];
+
+      const fDesig = document.getElementById('fDesig');
+      (desigRes.data || []).forEach(d => {
+        designationMap[d.id] = d.name;
+        const o = document.createElement('option');
+        o.value = d.id; o.textContent = d.name;
+        fDesig.appendChild(o);
+      });
+
+      /* salary_payments — optional. Each row is one voucher; sum per employee/month/year. */
+      try {
+        const { data: payments } = await BNH_PAGE.sb.from('salary_payments').select('employee_id,year,month,amount');
+        (payments || []).forEach(p => {
+          const key = `${p.employee_id}_${p.year}_${p.month}`;
+          salaryPayments[key] = (salaryPayments[key] || 0) + (p.amount || 0);
+        });
+      } catch (_) {}
+
+      const now = new Date();
+      document.getElementById('fMonth').value = now.getMonth() + 1;
+      document.getElementById('fYear').value  = now.getFullYear();
+
+      applyFilters();
+
+      if (hasFullAccess) {
+        renderEditList(allEmployees);
+        await loadEditDesignations();
+        await loadAddDesignations();
+      }
+    } catch (err) {
+      console.error('Init failed:', err);
+      document.getElementById('empTbody').innerHTML =
+        `<tr><td colspan="7" class="empty" style="color:#dc2626;">⚠️ Failed to load: ${err.message}</td></tr>`;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  /* ── Report ── */
+  function getSalaryStatus(emp, month, year) {
+    if (!month || !year) return null;
+    const firstDay     = new Date(year, month - 1, 1);
+    const lastDay      = new Date(year, month, 0);
+    const joinDate     = emp.joining_date  ? new Date(emp.joining_date)  : null;
+    const inactiveDate = emp.inactive_date ? new Date(emp.inactive_date) : null;
+    if (joinDate     && joinDate     > lastDay)  return null;
+    if (inactiveDate && inactiveDate < firstDay) return null;
+    const paid = salaryPayments[`${emp.id}_${year}_${month}`] || 0;
+    return paid >= emp.salary ? 'paid' : 'due';
+  }
+
+  function applyFilters() {
+    const name   = (document.getElementById('fName').value || '').toLowerCase();
+    const desig  = document.getElementById('fDesig').value;
+    const status = document.getElementById('fStatus').value;
+    const month  = parseInt(document.getElementById('fMonth').value) || null;
+    const year   = parseInt(document.getElementById('fYear').value)  || null;
+    const dueFil = document.getElementById('fDue').value;
+
+    const list = allEmployees.filter(e => {
+      if (name   && !e.name.toLowerCase().includes(name))  return false;
+      if (desig  && e.designation_id !== desig)            return false;
+      if (status === 'active'   && !e.is_active)           return false;
+      if (status === 'inactive' &&  e.is_active)           return false;
+      if (month && year) {
+        const ss = getSalaryStatus(e, month, year);
+        if (dueFil === 'due'  && ss !== 'due')  return false;
+        if (dueFil === 'paid' && ss !== 'paid') return false;
+      }
+      return true;
+    });
+
+    document.getElementById('statTotal').textContent    = allEmployees.length;
+    document.getElementById('statActive').textContent   = allEmployees.filter(e => e.is_active).length;
+    document.getElementById('statInactive').textContent = allEmployees.filter(e => !e.is_active).length;
+    document.getElementById('statDue').textContent      = month && year
+      ? allEmployees.filter(e => getSalaryStatus(e, month, year) === 'due').length : '—';
+
+    renderReportTable(list, month, year);
+  }
+
+  function renderReportTable(list, month, year) {
+    const tbody = document.getElementById('empTbody');
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No employees match the filters.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map((e, i) => {
+      const ss = getSalaryStatus(e, month, year);
+      const ssBadge = ss
+        ? `<span class="badge ${ss}">${ss === 'paid' ? '✅ Paid' : '⚠️ Due'}</span>`
+        : '<span style="color:#9ca3af;font-size:.82rem;">—</span>';
+      return `<tr class="row-link" onclick="openEmpDetail('${e.id}')">
+        <td>${i + 1}</td>
+        <td style="font-weight:600;">${e.name}</td>
+        <td>${e.designations?.name || '—'}</td>
+        <td>₹${(e.salary || 0).toLocaleString('en-IN')}</td>
+        <td>${e.joining_date || '—'}</td>
+        <td><span class="badge ${e.is_active ? 'active' : 'inactive'}">${e.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td>${ssBadge}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function clearFilters() {
+    document.getElementById('fName').value   = '';
+    document.getElementById('fDesig').value  = '';
+    document.getElementById('fStatus').value = '';
+    document.getElementById('fDue').value    = '';
+    const now = new Date();
+    document.getElementById('fMonth').value  = now.getMonth() + 1;
+    document.getElementById('fYear').value   = now.getFullYear();
+    applyFilters();
+  }
+
+  /* ── Employee Detail Popup ── */
+  async function openEmpDetail(id) {
+    const emp = allEmployees.find(e => e.id === id);
+    if (!emp) return;
+
+    document.getElementById('popName').textContent  = emp.name;
+    document.getElementById('popDesig').textContent =
+      (emp.designations?.name || '—') + '  ·  ' + (emp.is_active ? '🟢 Active' : '🔴 Inactive');
+
+    document.getElementById('popDetails').innerHTML = `
+      <div class="detail-item"><div class="lbl">Salary</div><div class="val">₹${(emp.salary||0).toLocaleString('en-IN')}</div></div>
+      <div class="detail-item"><div class="lbl">Joining Date</div><div class="val">${emp.joining_date||'—'}</div></div>
+      <div class="detail-item"><div class="lbl">Mobile</div><div class="val">${emp.mobile||'—'}</div></div>
+      <div class="detail-item"><div class="lbl">Gender</div><div class="val">${emp.gender||'—'}</div></div>
+      ${emp.inactive_date ? `<div class="detail-item"><div class="lbl">Inactive Date</div><div class="val">${emp.inactive_date}</div></div>` : ''}
+      ${emp.inactive_reason ? `<div class="detail-item span2"><div class="lbl">Inactive Reason</div><div class="val">${emp.inactive_reason}</div></div>` : ''}
+      ${emp.address ? `<div class="detail-item span2"><div class="lbl">Address</div><div class="val">${emp.address}</div></div>` : ''}
+    `;
+
+    /* Reset history to loading state then open modal */
+    document.getElementById('popSalaryHist').innerHTML =
+      '<tr><td colspan="3" class="empty">Loading…</td></tr>';
+
+    document.getElementById('empDetailModal').classList.add('open');
+
+    /* Fetch salary history separately — failure won't block the popup */
+    try {
+      const { data: hist, error: hErr } = await BNH_PAGE.sb
+        .from('salary_history')
+        .select('effective_date, salary, remarks')
+        .eq('employee_id', id)
+        .order('effective_date', { ascending: false });
+
+      if (hErr) throw hErr;
+
+      document.getElementById('popSalaryHist').innerHTML = (hist && hist.length)
+        ? hist.map(r => `
+            <tr>
+              <td>${r.effective_date || '—'}</td>
+              <td>₹${(r.salary || 0).toLocaleString('en-IN')}</td>
+              <td>${r.remarks || '—'}</td>
+            </tr>`).join('')
+        : '<tr><td colspan="3" class="empty">No salary history yet.</td></tr>';
+    } catch (_) {
+      document.getElementById('popSalaryHist').innerHTML =
+        '<tr><td colspan="3" class="empty">History not available.</td></tr>';
+    }
+
+    /* Fetch payment (voucher) history separately — failure won't block the popup */
+    try {
+      const MONTHS_FULL = ['', 'January','February','March','April','May','June','July','August','September','October','November','December'];
+      const { data: pays, error: pErr } = await BNH_PAGE.sb
+        .from('salary_payments')
+        .select('month, year, payment_date, voucher_no, amount, mode')
+        .eq('employee_id', id)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false })
+        .order('payment_date', { ascending: false });
+
+      if (pErr) throw pErr;
+
+      document.getElementById('popPaymentHist').innerHTML = (pays && pays.length)
+        ? pays.map(p => `
+            <tr>
+              <td>${MONTHS_FULL[p.month] || p.month} ${p.year}</td>
+              <td>${p.payment_date || '—'}</td>
+              <td>${p.voucher_no || '—'}</td>
+              <td>₹${(p.amount || 0).toLocaleString('en-IN')}</td>
+              <td>${p.mode || '—'}</td>
+            </tr>`).join('')
+        : '<tr><td colspan="5" class="empty">No payments recorded yet.</td></tr>';
+    } catch (_) {
+      document.getElementById('popPaymentHist').innerHTML =
+        '<tr><td colspan="5" class="empty">Payment history not available.</td></tr>';
+    }
+  }
+
+  function closeEmpDetail() {
+    document.getElementById('empDetailModal').classList.remove('open');
+  }
+
+  /* ── Edit Tab ── */
+  function renderEditList(list) {
+    const container = document.getElementById('editEmpList');
+    if (!list.length) {
+      container.innerHTML = '<p style="color:#9ca3af;font-size:.9rem;">No employees found.</p>';
+      return;
+    }
+    container.innerHTML = list.map(e => `
+      <div class="emp-card${selectedEmp?.id === e.id ? ' selected' : ''}" onclick="selectEmp('${e.id}')">
+        <div>
+          <div class="emp-name">${e.name}</div>
+          <div class="emp-meta">${e.designations?.name||'—'} &nbsp;|&nbsp; ₹${(e.salary||0).toLocaleString('en-IN')}</div>
+        </div>
+        <span class="badge ${e.is_active ? 'active' : 'inactive'}">${e.is_active ? 'Active' : 'Inactive'}</span>
+      </div>`).join('');
+  }
+
+  function filterEditList() {
+    const q = document.getElementById('editSearchInput').value.toLowerCase();
+    renderEditList(allEmployees.filter(e =>
+      e.name.toLowerCase().includes(q) ||
+      (e.designations?.name || '').toLowerCase().includes(q)
+    ));
+  }
+
+  async function loadEditDesignations() {
+    const { data } = await BNH_PAGE.sb.from('designations').select('*').order('name');
+    const sel = document.getElementById('eDesignation');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Select —</option>';
+    (data || []).forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.id; o.textContent = d.name;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+
+  async function selectEmp(id) {
+    selectedEmp = allEmployees.find(e => e.id === id);
+    if (!selectedEmp) return;
+    await loadEditDesignations();
+    document.getElementById('eName').value        = selectedEmp.name || '';
+    document.getElementById('eDesignation').value = selectedEmp.designation_id || '';
+    document.getElementById('eMobile').value      = selectedEmp.mobile || '';
+    document.getElementById('eGender').value      = selectedEmp.gender || '';
+    document.getElementById('eJoiningDate').value = selectedEmp.joining_date || '';
+    document.getElementById('eSalary').value      = selectedEmp.salary || '';
+    document.getElementById('eAddress').value     = selectedEmp.address || '';
+    document.getElementById('inactiveBtn').style.display = selectedEmp.is_active ? '' : 'none';
+    document.getElementById('editSection').style.display = '';
+    document.getElementById('editErr').textContent       = '';
+    document.getElementById('editOk').style.display      = 'none';
+    await loadSalaryHistory();
+    renderEditList(allEmployees);
+    document.getElementById('editSection').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function loadSalaryHistory() {
+    if (!selectedEmp) return;
+    const tbody = document.getElementById('salaryHistBody');
+    tbody.innerHTML = '<tr><td colspan="4" style="color:#9ca3af;text-align:center;padding:.75rem;">Loading…</td></tr>';
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('salary_history')
+        .select('effective_date, salary, remarks, recorded_by_name, recorded_by')
+        .eq('employee_id', selectedEmp.id)
+        .order('effective_date', { ascending: false });
+      if (error) throw error;
+      tbody.innerHTML = (data && data.length)
+        ? data.map(r => `
+            <tr>
+              <td>${r.effective_date || ''}</td>
+              <td>₹${(r.salary || 0).toLocaleString('en-IN')}</td>
+              <td>${r.remarks || '—'}</td>
+              <td>${r.recorded_by_name || r.recorded_by || '—'}</td>
+            </tr>`).join('')
+        : '<tr><td colspan="4" style="color:#9ca3af;text-align:center;padding:.75rem;">No history yet.</td></tr>';
+    } catch (_) {
+      tbody.innerHTML = '<tr><td colspan="4" style="color:#9ca3af;text-align:center;padding:.75rem;">History not available.</td></tr>';
+    }
+  }
+
+  async function submitEditForm(e) {
+    e.preventDefault();
+    if (!selectedEmp) return;
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    document.getElementById('editErr').textContent  = '';
+    document.getElementById('editOk').style.display = 'none';
+    try {
+      const { error } = await BNH_PAGE.sb.from('employees')
+        .update(BNH_PAGE.stamp({
+          name:           document.getElementById('eName').value.trim(),
+          designation_id: document.getElementById('eDesignation').value,
+          mobile:         document.getElementById('eMobile').value.trim(),
+          gender:         document.getElementById('eGender').value,
+          joining_date:   document.getElementById('eJoiningDate').value,
+          address:        document.getElementById('eAddress').value.trim(),
+        }))
+        .eq('id', selectedEmp.id);
+      if (error) throw error;
+      document.getElementById('editOk').style.display = 'block';
+      document.getElementById('editOk').textContent   = '✅ Employee updated.';
+      await reloadEmployees();
+      selectedEmp = allEmployees.find(e => e.id === selectedEmp.id);
+    } catch (err) {
+      document.getElementById('editErr').textContent = err.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  /* ── Appraisal ── */
+  function openAppraisalModal() {
+    if (!selectedEmp) return;
+    document.getElementById('appraisalCurrentSalary').textContent =
+      'Current salary: ₹' + (selectedEmp.salary || 0).toLocaleString('en-IN');
+    document.getElementById('newSalary').value         = '';
+    document.getElementById('appraisalDate').value     = new Date().toISOString().split('T')[0];
+    document.getElementById('appraisalRemarks').value  = '';
+    document.getElementById('appraisalErr').textContent = '';
+    document.getElementById('appraisalModal').classList.add('open');
+  }
+  function closeAppraisalModal() { document.getElementById('appraisalModal').classList.remove('open'); }
+
+  async function saveAppraisal() {
+    const newSal  = parseFloat(document.getElementById('newSalary').value);
+    const date    = document.getElementById('appraisalDate').value;
+    const remarks = document.getElementById('appraisalRemarks').value.trim();
+    if (!newSal || newSal <= 0) { document.getElementById('appraisalErr').textContent = 'Enter a valid salary.'; return; }
+    if (!date)                  { document.getElementById('appraisalErr').textContent = 'Effective date is required.'; return; }
+    const spinner = document.getElementById('spinner'); spinner.classList.remove('hidden');
+    try {
+      const { error: e1 } = await BNH_PAGE.sb.from('employees')
+        .update(BNH_PAGE.stamp({ salary: newSal })).eq('id', selectedEmp.id);
+      if (e1) throw e1;
+      const { error: e2 } = await BNH_PAGE.sb.from('salary_history').insert(BNH_PAGE.stamp({
+        employee_id: selectedEmp.id, salary: newSal,
+        effective_date: date, remarks: remarks || 'Salary appraisal'
+      }));
+      if (e2) throw e2;
+      closeAppraisalModal();
+      await reloadEmployees();
+      selectedEmp = allEmployees.find(e => e.id === selectedEmp.id);
+      document.getElementById('eSalary').value        = selectedEmp.salary;
+      await loadSalaryHistory();
+      document.getElementById('editOk').style.display = 'block';
+      document.getElementById('editOk').textContent   = '✅ Appraisal saved. New salary: ₹' + newSal.toLocaleString('en-IN');
+    } catch (err) {
+      document.getElementById('appraisalErr').textContent = err.message;
+    } finally { spinner.classList.add('hidden'); }
+  }
+
+  /* ── Mark Inactive ── */
+  function openInactiveModal() {
+    if (!selectedEmp) return;
+    document.getElementById('inactiveName').textContent  = selectedEmp.name;
+    document.getElementById('inactiveDate').value        = new Date().toISOString().split('T')[0];
+    document.getElementById('inactiveReason').value      = '';
+    document.getElementById('inactiveErr').textContent   = '';
+    document.getElementById('inactiveModal').classList.add('open');
+  }
+  function closeInactiveModal() { document.getElementById('inactiveModal').classList.remove('open'); }
+
+  async function confirmInactive() {
+    const date   = document.getElementById('inactiveDate').value;
+    const reason = document.getElementById('inactiveReason').value.trim();
+    if (!date) { document.getElementById('inactiveErr').textContent = 'Date is required.'; return; }
+    const spinner = document.getElementById('spinner'); spinner.classList.remove('hidden');
+    try {
+      const { error } = await BNH_PAGE.sb.from('employees')
+        .update(BNH_PAGE.stamp({ is_active: false, inactive_date: date, inactive_reason: reason }))
+        .eq('id', selectedEmp.id);
+      if (error) throw error;
+      closeInactiveModal();
+      await reloadEmployees();
+      selectedEmp = allEmployees.find(e => e.id === selectedEmp.id);
+      document.getElementById('inactiveBtn').style.display = 'none';
+      document.getElementById('editOk').style.display      = 'block';
+      document.getElementById('editOk').textContent        = 'Employee marked inactive.';
+      renderEditList(allEmployees);
+    } catch (err) {
+      document.getElementById('inactiveErr').textContent = err.message;
+    } finally { spinner.classList.add('hidden'); }
+  }
+
+  /* ── Add Tab ── */
+  async function loadAddDesignations() {
+    const { data } = await BNH_PAGE.sb.from('designations').select('*').order('name');
+    const sel = document.getElementById('addDesignation');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Select —</option>';
+    (data || []).forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.id; o.textContent = d.name;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+
+  function openDesgModal() {
+    document.getElementById('newDesgName').value       = '';
+    document.getElementById('desgErr').textContent     = '';
+    document.getElementById('desgModal').classList.add('open');
+    setTimeout(() => document.getElementById('newDesgName').focus(), 50);
+  }
+  function closeDesgModal() { document.getElementById('desgModal').classList.remove('open'); }
+
+  async function saveNewDesignation() {
+    const name = document.getElementById('newDesgName').value.trim();
+    if (!name) { document.getElementById('desgErr').textContent = 'Name is required.'; return; }
+    const { data, error } = await BNH_PAGE.sb.from('designations')
+      .insert({ name, created_by: BNH_PAGE.user.username }).select().single();
+    if (error) { document.getElementById('desgErr').textContent = error.message; return; }
+    await loadAddDesignations();
+    await loadEditDesignations();
+    document.getElementById('addDesignation').value = data.id;
+    closeDesgModal();
+  }
+
+  async function submitAddForm(e) {
+    e.preventDefault();
+    const spinner = document.getElementById('spinner'); spinner.classList.remove('hidden');
+    document.getElementById('addErr').textContent  = '';
+    document.getElementById('addOk').style.display = 'none';
+    try {
+      const { error } = await BNH_PAGE.sb.from('employees').insert(BNH_PAGE.stamp({
+        name:           document.getElementById('empName').value.trim(),
+        designation_id: document.getElementById('addDesignation').value,
+        salary:         parseFloat(document.getElementById('addSalary').value),
+        joining_date:   document.getElementById('addJoiningDate').value,
+        mobile:         document.getElementById('addMobile').value.trim(),
+        gender:         document.getElementById('addGender').value,
+        address:        document.getElementById('addAddress').value.trim(),
+        is_active:      true
+      }));
+      if (error) throw error;
+
+      /* Log initial salary in salary_history (silently skip if table missing) */
+      try {
+        const { data: newest } = await BNH_PAGE.sb.from('employees')
+          .select('id').order('created_at', { ascending: false }).limit(1).single();
+        if (newest) {
+          await BNH_PAGE.sb.from('salary_history').insert(BNH_PAGE.stamp({
+            employee_id:    newest.id,
+            salary:         parseFloat(document.getElementById('addSalary').value),
+            effective_date: document.getElementById('addJoiningDate').value,
+            remarks:        'Initial salary on joining'
+          }));
+        }
+      } catch (_) {}
+
+      document.getElementById('addOk').style.display = 'block';
+      document.getElementById('addOk').textContent   = '✅ Employee added successfully.';
+      e.target.reset();
+      document.getElementById('recBy').value =
+        BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+      await reloadEmployees();
+    } catch (err) {
+      document.getElementById('addErr').textContent = err.message;
+    } finally { spinner.classList.add('hidden'); }
+  }
+
+  /* ── Shared reload ── */
+  async function reloadEmployees() {
+    const { data } = await BNH_PAGE.sb.from('employees')
+      .select('*, designations(id,name)').order('name');
+    allEmployees = data || [];
+    applyFilters();
+    if (hasFullAccess) renderEditList(allEmployees);
+  }
+
+  /* ── Close modals on overlay click ── */
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', function(e) {
+      if (e.target === this) {
+        this.classList.remove('open');
+      }
+    });
+  });
+
+  init();
+</script>
+</body>
+</html>

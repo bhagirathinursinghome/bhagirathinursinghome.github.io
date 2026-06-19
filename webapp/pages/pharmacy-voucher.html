@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Extra Pay – Pharmacy</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    #roleBadge {
+      display:inline-flex; align-items:center; gap:.4rem;
+      padding:.3rem .9rem; border-radius:20px; font-size:.78rem; font-weight:700;
+      letter-spacing:.03em; margin-bottom:1.1rem;
+    }
+    .role-full    { background:#ede9fe; color:#5b21b6; border:1.5px solid #c4b5fd; }
+    .role-limited { background:#dcfce7; color:#166534; border:1.5px solid #86efac; }
+
+    .tab-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+    .tab-btn { padding:.5rem 1.1rem; border:2px solid #6366f1; border-radius:8px; background:#fff;
+               color:#6366f1; font-weight:600; cursor:pointer; transition:all .2s; }
+    .tab-btn.active { background:#6366f1; color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .form-row > * { flex:1; min-width:160px; }
+
+    .filter-bar { display:flex; gap:.75rem; align-items:flex-end; flex-wrap:wrap; margin-bottom:1rem; }
+    .filter-bar > * { flex:1; min-width:140px; }
+    .filter-bar label { display:block; font-size:.8rem; font-weight:600; color:#374151; margin-bottom:.2rem; }
+
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; }
+    th { background:#f0f4ff; padding:9px 10px; text-align:left; font-size:.82rem;
+         color:#4338ca; font-weight:700; border-bottom:2px solid #e0e7ff; cursor:pointer; white-space:nowrap; }
+    th:hover { background:#e0e7ff; }
+    th .sort-icon { margin-left:.3rem; color:#9ca3af; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; font-size:.82rem; vertical-align:middle; }
+    tr:hover td { background:#fafafe; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+    .due-badge { display:inline-block;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600;background:#fee2e2;color:#991b1b; }
+
+    .btn-sm { padding:4px 11px; border-radius:6px; font-size:.77rem; font-weight:600;
+              cursor:pointer; border:none; transition:all .15s; white-space:nowrap; }
+    .btn-edit       { background:#e0e7ff; color:#3730a3; }
+    .btn-edit:hover { background:#c7d2fe; }
+    .btn-del        { background:#fee2e2; color:#991b1b; }
+    .btn-del:hover  { background:#fecaca; }
+
+    .modal-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+      z-index:1000; align-items:center; justify-content:center;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal {
+      background:#fff; border-radius:14px; padding:1.75rem; width:min(94vw,480px);
+      box-shadow:0 20px 60px rgba(0,0,0,.2);
+    }
+    .modal h2 { font-size:1.05rem; margin:0 0 1.1rem; color:#1e1b4b; }
+    .modal label { display:block; font-size:.82rem; font-weight:600; color:#374151; margin:.65rem 0 .2rem; }
+    .modal input, .modal select, .modal textarea {
+      width:100%; padding:.45rem .7rem; border:1.5px solid #d1d5db;
+      border-radius:8px; font-size:.9rem; box-sizing:border-box; outline:none;
+    }
+    .modal input:focus, .modal select:focus { border-color:#6366f1; }
+    .modal-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.25rem; }
+    .btn-cancel { padding:.45rem 1.1rem; border-radius:8px; background:#f3f4f6; color:#374151; font-weight:600; cursor:pointer; border:none; }
+    .btn-save   { padding:.45rem 1.1rem; border-radius:8px; background:#6366f1; color:#fff; font-weight:600; cursor:pointer; border:none; }
+    .btn-save:hover { background:#4f46e5; }
+    .confirm-modal {
+      background:#fff; border-radius:14px; padding:1.75rem; width:min(94vw,400px);
+      box-shadow:0 20px 60px rgba(0,0,0,.2); text-align:center;
+    }
+    .confirm-modal .ci { font-size:2.5rem; margin-bottom:.4rem; }
+    .confirm-modal p { font-size:.9rem; color:#374151; margin:.4rem 0 1.1rem; }
+    .btn-danger       { padding:.45rem 1.2rem; border-radius:8px; background:#dc2626; color:#fff; font-weight:600; cursor:pointer; border:none; }
+    .btn-danger:hover { background:#b91c1c; }
+    .empty-state { text-align:center; padding:2rem 1rem; color:#9ca3af; font-size:.9rem; }
+    .results-count { font-size:.8rem; color:#6b7280; margin-bottom:.5rem; }
+
+    @media print { .tab-bar,button,#roleBadge { display:none!important; } }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<!-- EDIT GIVEN MODAL -->
+<div class="modal-overlay" id="editGivenModal">
+  <div class="modal">
+    <h2>✏️ Edit Given Entry</h2>
+    <label>Date <span style="color:red">*</span></label>
+    <input id="egDate" type="date" required />
+    <label>Pay To <span style="color:red">*</span></label>
+    <input id="egName" type="text" required />
+    <label>Pay For <span style="color:red">*</span></label>
+    <input id="egFor" type="text" required />
+    <label>Amount (₹) <span style="color:red">*</span></label>
+    <input id="egAmount" type="number" min="0.01" step="0.01" required />
+    <label>Mode <span style="color:red">*</span></label>
+    <select id="egMode" required>
+      <option value="">-- Mode --</option>
+      <option value="Cash">Cash</option>
+      <option value="Bank">Bank</option>
+      <option value="PhonePe">PhonePe</option>
+    </select>
+    <p class="err" id="egErr"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEditGiven()">Cancel</button>
+      <button class="btn-save" onclick="saveEditGiven()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT CLEAR MODAL -->
+<div class="modal-overlay" id="editClearModal">
+  <div class="modal">
+    <h2>✏️ Edit Due Clear</h2>
+    <label>Date <span style="color:red">*</span></label>
+    <input id="ecDate" type="date" required />
+    <label>Name <span style="color:red">*</span></label>
+    <input id="ecName" type="text" required />
+    <label>Voucher Amount (₹)</label>
+    <input id="ecVoucher" type="number" min="0" step="0.01" placeholder="0.00" />
+    <label>Cash Return (₹)</label>
+    <input id="ecCash" type="number" min="0" step="0.01" placeholder="0.00" />
+    <label>Remark</label>
+    <textarea id="ecRemark" rows="2"></textarea>
+    <p class="err" id="ecErr"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEditClear()">Cancel</button>
+      <button class="btn-save" onclick="saveEditClear()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="delModal">
+  <div class="confirm-modal">
+    <div class="ci">🗑️</div>
+    <strong id="delDesc" style="font-size:1rem;display:block;margin-bottom:.3rem"></strong>
+    <p>This will permanently delete this entry.<br>This action cannot be undone.</p>
+    <div style="display:flex;gap:.75rem;justify-content:center">
+      <button class="btn-cancel" onclick="closeDelete()">Cancel</button>
+      <button class="btn-danger" onclick="confirmDelete()">Yes, Delete</button>
+    </div>
+    <p class="err" id="delErr" style="margin-top:.6rem"></p>
+  </div>
+</div>
+
+<div class="page">
+  <h1>💰 Extra Pay</h1>
+  <div id="roleBadge"></div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('t1',this)">Amount Given</button>
+    <button class="tab-btn" onclick="switchTab('t2',this);loadDueClearDropdown()">Due Clear</button>
+    <button class="tab-btn" onclick="switchTab('t3',this)">Report</button>
+  </div>
+
+  <!-- TAB 1: AMOUNT GIVEN -->
+  <div id="t1" class="tab-panel active page-card">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">➕ Amount Given</h2>
+    <form id="givenForm">
+      <label>Recorded By</label>
+      <input id="recBy1" readonly />
+      <div class="form-row">
+        <div>
+          <label>Date <span style="color:red">*</span></label>
+          <input id="givenDate" type="date" required />
+        </div>
+        <div>
+          <label>Pay To (Name) <span style="color:red">*</span></label>
+          <input id="payToName" type="text" placeholder="Person's name" required />
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Pay For <span style="color:red">*</span></label>
+          <input id="payFor" type="text" placeholder="Purpose" required />
+        </div>
+        <div>
+          <label>Amount (₹) <span style="color:red">*</span></label>
+          <input id="givenAmount" type="number" min="0.01" step="0.01" required />
+        </div>
+        <div>
+          <label>Mode <span style="color:red">*</span></label>
+          <select id="givenMode" required>
+            <option value="">-- Mode --</option>
+            <option value="Cash">Cash</option>
+            <option value="Bank">Bank</option>
+            <option value="PhonePe">PhonePe</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:1rem">
+        <button type="submit" class="btn-primary" style="width:auto">💾 Save</button>
+      </div>
+      <p class="err" id="err1"></p>
+      <p class="info" id="ok1" style="display:none"></p>
+    </form>
+
+    <div style="margin-top:1.25rem">
+      <h3 style="font-size:.9rem;margin-bottom:.5rem">Recent Given</h3>
+      <div class="filter-bar" style="margin-top:.5rem">
+        <div><label>From</label><input type="date" id="gFilterFrom" onchange="renderGivenList()" /></div>
+        <div><label>To</label><input type="date" id="gFilterTo" onchange="renderGivenList()" /></div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn-primary" style="width:auto;background:#6b7280" onclick="document.getElementById('gFilterFrom').value='';document.getElementById('gFilterTo').value='';renderGivenList()">✕</button>
+        </div>
+      </div>
+      <div class="results-count" id="givenCount"></div>
+      <div id="givenList" style="font-size:.82rem;color:#555">Loading…</div>
+    </div>
+  </div>
+
+  <!-- TAB 2: DUE CLEAR -->
+  <div id="t2" class="tab-panel page-card">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">✅ Due Clear</h2>
+    <form id="clearForm">
+      <label>Recorded By</label>
+      <input id="recBy2" readonly />
+      <div class="form-row">
+        <div>
+          <label>Date <span style="color:red">*</span></label>
+          <input id="clearDate" type="date" required />
+        </div>
+        <div>
+          <label>Name (Pending Due) <span style="color:red">*</span></label>
+          <select id="clearName" required>
+            <option value="">-- Select Person --</option>
+          </select>
+        </div>
+      </div>
+      <div id="dueInfo" style="font-size:.82rem;color:#dc2626;margin:.25rem 0 .5rem;font-weight:600"></div>
+      <div class="form-row">
+        <div>
+          <label>Voucher Amount (₹)</label>
+          <input id="clearVoucher" type="number" min="0" step="0.01" placeholder="0.00" />
+        </div>
+        <div>
+          <label>Cash Return (₹)</label>
+          <input id="clearCash" type="number" min="0" step="0.01" placeholder="0.00" />
+        </div>
+      </div>
+      <label>Remark</label>
+      <textarea id="clearRemark" rows="2" placeholder="Optional…"></textarea>
+      <div style="margin-top:1rem">
+        <button type="submit" class="btn-primary" style="width:auto">💾 Save Due Clear</button>
+      </div>
+      <p class="err" id="err2"></p>
+      <p class="info" id="ok2" style="display:none"></p>
+    </form>
+
+    <div style="margin-top:1.25rem">
+      <h3 style="font-size:.9rem;margin-bottom:.5rem">Recent Due Clears</h3>
+      <div class="results-count" id="clearCount"></div>
+      <div id="clearList" style="font-size:.82rem">Loading…</div>
+    </div>
+  </div>
+
+  <!-- TAB 3: REPORT -->
+  <div id="t3" class="tab-panel page-card">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">📊 Extra Pay Report</h2>
+    <div class="form-row" style="align-items:flex-end">
+      <div><label>From Date</label><input id="rptFrom" type="date" /></div>
+      <div><label>To Date</label><input id="rptTo" type="date" /></div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn-primary" style="width:auto" onclick="loadReport()">Show</button>
+        <button class="btn-primary" style="width:auto;background:#059669" onclick="downloadPDF()">⬇ PDF</button>
+      </div>
+    </div>
+    <div style="margin-top:1rem">
+      <strong style="font-size:.85rem">🔴 All Pending Dues</strong>
+      <div id="pendingDues" style="margin-top:.5rem">Loading…</div>
+    </div>
+    <div id="rptDetail" style="margin-top:1rem"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+const FULL_ACCESS_ROLES    = ["admin"];
+const LIMITED_ACCESS_ROLES = ["manager","pharmacy","accountant"];
+const ALL_ALLOWED = [...new Set([...FULL_ACCESS_ROLES,...LIMITED_ACCESS_ROLES])];
+BNH_PAGE.requireRole(ALL_ALLOWED);
+
+const currentRole  = BNH_PAGE.user.role;
+const isFullAccess = FULL_ACCESS_ROLES.includes(currentRole);
+
+const badge = document.getElementById('roleBadge');
+badge.textContent = isFullAccess ? '🔓 Full Access — '+currentRole : '🔒 Limited Access — '+currentRole;
+badge.classList.add(isFullAccess ? 'role-full' : 'role-limited');
+
+const fmt = n => '₹'+parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+const spin = show => document.getElementById('spinner').classList[show?'remove':'add']('hidden');
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+const today = new Date().toISOString().slice(0,10);
+const monthStart = today.slice(0,7)+'-01';
+
+document.getElementById('givenDate').value  = today;
+document.getElementById('clearDate').value  = today;
+document.getElementById('rptFrom').value    = monthStart;
+document.getElementById('rptTo').value      = today;
+['recBy1','recBy2'].forEach(id=>{
+  document.getElementById(id).value = BNH_PAGE.user.name+' ('+BNH_PAGE.user.username+')';
+});
+
+let allGiven=[], allCleared=[];
+let editingGivenId=null, editingClearId=null, deletingId=null, deletingTable=null;
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='t3') loadPendingDues();
+}
+
+// ── Load all data ────────────────────────────────────────────
+async function loadAll() {
+  const [{data:g},{data:c}] = await Promise.all([
+    BNH_PAGE.sb.from('pharmacy_extra_pay_given').select('*').order('given_date',{ascending:false}),
+    BNH_PAGE.sb.from('pharmacy_extra_pay_clear').select('*').order('clear_date',{ascending:false})
+  ]);
+  allGiven   = g||[];
+  allCleared = c||[];
+  renderGivenList();
+  renderClearList();
+}
+
+// ── Given list ───────────────────────────────────────────────
+function renderGivenList() {
+  const from=document.getElementById('gFilterFrom').value;
+  const to  =document.getElementById('gFilterTo').value;
+  const filtered=allGiven.filter(r=>{
+    if(from && r.given_date<from) return false;
+    if(to   && r.given_date>to)   return false;
+    return true;
+  });
+  document.getElementById('givenCount').textContent =
+    filtered.length+' record'+(filtered.length!==1?'s':'')+
+    (filtered.length!==allGiven.length?' (filtered from '+allGiven.length+' total)':'');
+
+  const div=document.getElementById('givenList');
+  if(!filtered.length){div.innerHTML='<div class="empty-state">No records.</div>';return;}
+
+  const actionsCol=isFullAccess?'<th>Actions</th>':'';
+  const rows=filtered.map(r=>{
+    const actions=isFullAccess?`<td>
+      <div style="display:flex;gap:.3rem">
+        <button class="btn-sm btn-edit" onclick="openEditGiven('${r.id}')">✏️</button>
+        <button class="btn-sm btn-del"  onclick="openDelete('${r.id}','pharmacy_extra_pay_given','${esc(r.pay_to_name)} – ${esc(r.pay_for)}')">🗑️</button>
+      </div></td>`:'';
+    return `<tr>
+      <td>${r.given_date}</td><td>${esc(r.pay_to_name)}</td><td>${esc(r.pay_for)}</td>
+      <td class="r">${fmt(r.amount)}</td><td>${r.mode}</td>
+      <td>${esc(r.recorded_by_name||r.recorded_by||'—')}</td>${actions}
+    </tr>`;
+  }).join('');
+
+  const total=filtered.reduce((a,r)=>a+parseFloat(r.amount||0),0);
+  div.innerHTML=`<table>
+    <thead><tr><th>Date</th><th>Name</th><th>For</th><th class="r">Amount</th><th>Mode</th><th>By</th>${actionsCol}</tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="3" style="text-align:right">Total</td><td class="r">${fmt(total)}</td><td colspan="${isFullAccess?3:2}"></td></tr></tfoot>
+  </table>`;
+}
+
+// ── Clear list ───────────────────────────────────────────────
+function renderClearList() {
+  const div=document.getElementById('clearList');
+  if(!allCleared.length){div.innerHTML='<div class="empty-state">No due clear records.</div>';return;}
+
+  document.getElementById('clearCount').textContent=allCleared.length+' record'+(allCleared.length!==1?'s':'');
+
+  const actionsCol=isFullAccess?'<th>Actions</th>':'';
+  const rows=allCleared.map(r=>{
+    const actions=isFullAccess?`<td>
+      <div style="display:flex;gap:.3rem">
+        <button class="btn-sm btn-edit" onclick="openEditClear('${r.id}')">✏️</button>
+        <button class="btn-sm btn-del"  onclick="openDelete('${r.id}','pharmacy_extra_pay_clear','Due Clear – ${esc(r.clear_name)}')">🗑️</button>
+      </div></td>`:'';
+    return `<tr>
+      <td>${r.clear_date}</td><td>${esc(r.clear_name)}</td>
+      <td class="r">${fmt(r.voucher_amount)}</td><td class="r">${fmt(r.cash_return)}</td>
+      <td>${r.remark?esc(r.remark):'—'}</td>
+      <td>${esc(r.recorded_by_name||r.recorded_by||'—')}</td>${actions}
+    </tr>`;
+  }).join('');
+  div.innerHTML=`<table>
+    <thead><tr><th>Date</th><th>Name</th><th class="r">Voucher</th><th class="r">Cash Return</th><th>Remark</th><th>By</th>${actionsCol}</tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ── Due clear dropdown ───────────────────────────────────────
+async function loadDueClearDropdown() {
+  const map={};
+  allGiven.forEach(r=>{if(!map[r.pay_to_name])map[r.pay_to_name]=0;map[r.pay_to_name]+=parseFloat(r.amount||0);});
+  allCleared.forEach(r=>{if(!map[r.clear_name])map[r.clear_name]=0;map[r.clear_name]-=(parseFloat(r.voucher_amount||0)+parseFloat(r.cash_return||0));});
+  const sel=document.getElementById('clearName');
+  sel.innerHTML='<option value="">-- Select Person --</option>';
+  Object.entries(map).filter(([,v])=>v>0).sort().forEach(([name,due])=>{
+    const o=document.createElement('option');
+    o.value=name;
+    o.textContent=name+' (Due: ₹'+parseFloat(due).toLocaleString('en-IN',{minimumFractionDigits:2})+')';
+    o.dataset.due=due;
+    sel.appendChild(o);
+  });
+  sel.onchange=()=>{
+    const o=sel.options[sel.selectedIndex];
+    document.getElementById('dueInfo').textContent=o.dataset.due?'Current Due: '+fmt(o.dataset.due):'';
+  };
+}
+
+// ── Submit given ─────────────────────────────────────────────
+document.getElementById('givenForm').onsubmit = async e => {
+  e.preventDefault();
+  const err=document.getElementById('err1'),ok=document.getElementById('ok1');
+  err.textContent=''; ok.style.display='none';
+  spin(true);
+  try {
+    const payload=BNH_PAGE.stamp({
+      given_date: document.getElementById('givenDate').value,
+      pay_to_name: document.getElementById('payToName').value.trim(),
+      pay_for: document.getElementById('payFor').value.trim(),
+      amount: parseFloat(document.getElementById('givenAmount').value),
+      mode: document.getElementById('givenMode').value
+    });
+    const {error}=await BNH_PAGE.sb.from('pharmacy_extra_pay_given').insert(payload);
+    if(error) throw error;
+    ok.style.display='block'; ok.textContent='✅ Saved!';
+    e.target.reset();
+    document.getElementById('givenDate').value=today;
+    document.getElementById('recBy1').value=BNH_PAGE.user.name+' ('+BNH_PAGE.user.username+')';
+    await loadAll();
+  } catch(ex){err.textContent=ex.message;}
+  finally{spin(false);}
+};
+
+// ── Submit due clear ─────────────────────────────────────────
+document.getElementById('clearForm').onsubmit = async e => {
+  e.preventDefault();
+  const err=document.getElementById('err2'),ok=document.getElementById('ok2');
+  err.textContent=''; ok.style.display='none';
+  const voucher=parseFloat(document.getElementById('clearVoucher').value||0);
+  const cash   =parseFloat(document.getElementById('clearCash').value||0);
+  if(voucher+cash<=0){err.textContent='Enter voucher amount or cash return.';return;}
+  spin(true);
+  try {
+    const payload=BNH_PAGE.stamp({
+      clear_date: document.getElementById('clearDate').value,
+      clear_name: document.getElementById('clearName').value,
+      voucher_amount: voucher,
+      cash_return: cash,
+      remark: document.getElementById('clearRemark').value.trim()||null
+    });
+    const {error}=await BNH_PAGE.sb.from('pharmacy_extra_pay_clear').insert(payload);
+    if(error) throw error;
+    ok.style.display='block'; ok.textContent='✅ Due clear saved!';
+    e.target.reset();
+    document.getElementById('clearDate').value=today;
+    document.getElementById('recBy2').value=BNH_PAGE.user.name+' ('+BNH_PAGE.user.username+')';
+    document.getElementById('dueInfo').textContent='';
+    await loadAll();
+    loadDueClearDropdown();
+  } catch(ex){err.textContent=ex.message;}
+  finally{spin(false);}
+};
+
+// ── Edit Given ───────────────────────────────────────────────
+function openEditGiven(id) {
+  const r=allGiven.find(x=>x.id===id); if(!r) return;
+  editingGivenId=id;
+  document.getElementById('egDate').value  =r.given_date;
+  document.getElementById('egName').value  =r.pay_to_name;
+  document.getElementById('egFor').value   =r.pay_for;
+  document.getElementById('egAmount').value=r.amount;
+  document.getElementById('egMode').value  =r.mode;
+  document.getElementById('egErr').textContent='';
+  document.getElementById('editGivenModal').classList.add('open');
+}
+function closeEditGiven(){editingGivenId=null;document.getElementById('editGivenModal').classList.remove('open');}
+async function saveEditGiven() {
+  const errEl=document.getElementById('egErr'); errEl.textContent='';
+  const date=document.getElementById('egDate').value;
+  const name=document.getElementById('egName').value.trim();
+  const forv=document.getElementById('egFor').value.trim();
+  const amt =parseFloat(document.getElementById('egAmount').value);
+  const mode=document.getElementById('egMode').value;
+  if(!date||!name||!forv||isNaN(amt)||!mode){errEl.textContent='All fields are required.';return;}
+  spin(true);
+  try {
+    const {error}=await BNH_PAGE.sb.from('pharmacy_extra_pay_given').update({
+      given_date:date,pay_to_name:name,pay_for:forv,amount:amt,mode:mode
+    }).eq('id',editingGivenId);
+    if(error) throw error;
+    const idx=allGiven.findIndex(x=>x.id===editingGivenId);
+    if(idx>-1) Object.assign(allGiven[idx],{given_date:date,pay_to_name:name,pay_for:forv,amount:amt,mode:mode});
+    closeEditGiven(); renderGivenList();
+  } catch(ex){errEl.textContent=ex.message;}
+  finally{spin(false);}
+}
+
+// ── Edit Clear ───────────────────────────────────────────────
+function openEditClear(id) {
+  const r=allCleared.find(x=>x.id===id); if(!r) return;
+  editingClearId=id;
+  document.getElementById('ecDate').value   =r.clear_date;
+  document.getElementById('ecName').value   =r.clear_name;
+  document.getElementById('ecVoucher').value=r.voucher_amount||0;
+  document.getElementById('ecCash').value   =r.cash_return||0;
+  document.getElementById('ecRemark').value =r.remark||'';
+  document.getElementById('ecErr').textContent='';
+  document.getElementById('editClearModal').classList.add('open');
+}
+function closeEditClear(){editingClearId=null;document.getElementById('editClearModal').classList.remove('open');}
+async function saveEditClear() {
+  const errEl=document.getElementById('ecErr'); errEl.textContent='';
+  const v=parseFloat(document.getElementById('ecVoucher').value||0);
+  const c=parseFloat(document.getElementById('ecCash').value||0);
+  if(v+c<=0){errEl.textContent='Enter voucher or cash amount.';return;}
+  spin(true);
+  try {
+    const {error}=await BNH_PAGE.sb.from('pharmacy_extra_pay_clear').update({
+      clear_date: document.getElementById('ecDate').value,
+      clear_name: document.getElementById('ecName').value.trim(),
+      voucher_amount: v,
+      cash_return: c,
+      remark: document.getElementById('ecRemark').value.trim()||null
+    }).eq('id',editingClearId);
+    if(error) throw error;
+    await loadAll(); closeEditClear();
+  } catch(ex){errEl.textContent=ex.message;}
+  finally{spin(false);}
+}
+
+// ── Delete ───────────────────────────────────────────────────
+function openDelete(id, table, desc) {
+  deletingId=id; deletingTable=table;
+  document.getElementById('delDesc').textContent=desc;
+  document.getElementById('delErr').textContent='';
+  document.getElementById('delModal').classList.add('open');
+}
+function closeDelete(){deletingId=null;deletingTable=null;document.getElementById('delModal').classList.remove('open');}
+async function confirmDelete() {
+  const errEl=document.getElementById('delErr'); errEl.textContent='';
+  spin(true);
+  try {
+    const {error}=await BNH_PAGE.sb.from(deletingTable).delete().eq('id',deletingId);
+    if(error) throw error;
+    if(deletingTable==='pharmacy_extra_pay_given') allGiven=allGiven.filter(x=>x.id!==deletingId);
+    else allCleared=allCleared.filter(x=>x.id!==deletingId);
+    closeDelete(); renderGivenList(); renderClearList();
+    loadDueClearDropdown();
+  } catch(ex){errEl.textContent=ex.message;}
+  finally{spin(false);}
+}
+
+['editGivenModal','editClearModal','delModal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){
+    if(e.target===this){
+      if(id==='editGivenModal') closeEditGiven();
+      else if(id==='editClearModal') closeEditClear();
+      else closeDelete();
+    }
+  });
+});
+
+// ── Pending dues ─────────────────────────────────────────────
+async function loadPendingDues() {
+  const map={};
+  allGiven.forEach(r=>{if(!map[r.pay_to_name])map[r.pay_to_name]=0;map[r.pay_to_name]+=parseFloat(r.amount||0);});
+  allCleared.forEach(r=>{if(!map[r.clear_name])map[r.clear_name]=0;map[r.clear_name]-=(parseFloat(r.voucher_amount||0)+parseFloat(r.cash_return||0));});
+  const dues=Object.entries(map).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const div=document.getElementById('pendingDues');
+  if(!dues.length){div.textContent='No pending dues. 🎉';return;}
+  div.innerHTML=`<table>
+    <thead><tr style="background:#fee2e2"><th>#</th><th>Name</th><th class="r">Due Amount</th></tr></thead>
+    <tbody>${dues.map(([name,due],i)=>`<tr>
+      <td>${i+1}</td><td>${esc(name)}</td>
+      <td class="r" style="color:#dc2626;font-weight:600">${fmt(due)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+// ── Report ───────────────────────────────────────────────────
+async function loadReport() {
+  const from=document.getElementById('rptFrom').value;
+  const to  =document.getElementById('rptTo').value;
+  spin(true);
+  const [{data:given},{data:cleared}] = await Promise.all([
+    BNH_PAGE.sb.from('pharmacy_extra_pay_given').select('*').gte('given_date',from).lte('given_date',to).order('given_date'),
+    BNH_PAGE.sb.from('pharmacy_extra_pay_clear').select('*').gte('clear_date',from).lte('clear_date',to).order('clear_date')
+  ]);
+  spin(false);
+  const totalGiven  =(given||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+  const totalVoucher=(cleared||[]).reduce((a,r)=>a+parseFloat(r.voucher_amount||0),0);
+  const totalCash   =(cleared||[]).reduce((a,r)=>a+parseFloat(r.cash_return||0),0);
+
+  document.getElementById('rptDetail').innerHTML=`
+    <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">💸 Amounts Given (${from} – ${to})</h3>
+    <table id="rptGiven">
+      <thead><tr><th>Date</th><th>Name</th><th>For</th><th class="r">Amount</th><th>Mode</th><th>By</th></tr></thead>
+      <tbody>${(given||[]).map(r=>`<tr>
+        <td>${r.given_date}</td><td>${esc(r.pay_to_name)}</td><td>${esc(r.pay_for)}</td>
+        <td class="r">${fmt(r.amount)}</td><td>${r.mode}</td>
+        <td>${esc(r.recorded_by_name||r.recorded_by)}</td>
+      </tr>`).join()||'<tr><td colspan="6" style="text-align:center">None</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="3">Total</td><td class="r">${fmt(totalGiven)}</td><td colspan="2"></td></tr></tfoot>
+    </table>
+    <h3 style="font-size:.9rem;margin:.75rem 0 .25rem">✅ Due Cleared (${from} – ${to})</h3>
+    <table id="rptCleared">
+      <thead><tr><th>Date</th><th>Name</th><th class="r">Voucher</th><th class="r">Cash Return</th><th>Remark</th><th>By</th></tr></thead>
+      <tbody>${(cleared||[]).map(r=>`<tr>
+        <td>${r.clear_date}</td><td>${esc(r.clear_name)}</td>
+        <td class="r">${fmt(r.voucher_amount)}</td><td class="r">${fmt(r.cash_return)}</td>
+        <td>${r.remark||'-'}</td><td>${esc(r.recorded_by_name||r.recorded_by)}</td>
+      </tr>`).join()||'<tr><td colspan="6" style="text-align:center">None</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="2">Total</td><td class="r">${fmt(totalVoucher)}</td><td class="r">${fmt(totalCash)}</td><td colspan="2"></td></tr></tfoot>
+    </table>`;
+}
+
+async function downloadPDF() {
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  doc.setFontSize(14); doc.text('Bhagirathy Nursing Home – Pharmacy',15,15);
+  doc.setFontSize(11); doc.text('Extra Pay Report',15,22);
+  doc.setFontSize(8);  doc.text('Generated: '+new Date().toLocaleString('en-IN'),15,28);
+  let y=34;
+  ['pendingDues','rptGiven','rptCleared'].forEach(id=>{
+    const el=document.getElementById(id);
+    const tbl=el?.tagName==='TABLE'?el:el?.querySelector('table');
+    if(tbl){ doc.autoTable({html:tbl,startY:y,styles:{fontSize:8},headStyles:{fillColor:[99,102,241]},margin:{left:15,right:15}}); y=doc.lastAutoTable.finalY+6; }
+  });
+  doc.save('Extra_Pay_Report_'+today+'.pdf');
+}
+
+loadAll();
+</script>
+</body>
+</html>

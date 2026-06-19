@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Pay Salary</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .filter-row{display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-bottom:1.25rem;}
+    .filter-row label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:.25rem;display:block;}
+    .filter-row input,.filter-row select{padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;background:#fff;min-width:140px;}
+    .btn-sm{padding:.45rem 1rem;font-size:.85rem;border-radius:7px;border:none;cursor:pointer;background:#1a56db;color:#fff;}
+    .btn-outline{background:#fff;border:1px solid #d1d5db;color:#374151;}
+    .btn-green{background:#059669;color:#fff;}
+    .btn-danger{background:#dc2626;color:#fff;padding:.45rem 1rem;border:none;border-radius:7px;cursor:pointer;font-size:.85rem;}
+
+    table{width:100%;border-collapse:collapse;font-size:.9rem;}
+    th{background:#f3f4f6;padding:.6rem .85rem;text-align:left;font-weight:600;font-size:.84rem;border-bottom:2px solid #e5e7eb;white-space:nowrap;}
+    td{padding:.6rem .85rem;border-bottom:1px solid #f3f4f6;white-space:nowrap;}
+    tr:hover td{background:#f9fafb;}
+    .row-link{cursor:pointer;}
+
+    .badge{display:inline-block;padding:.15rem .65rem;border-radius:20px;font-size:.78rem;font-weight:600;}
+    .badge.active{background:#d1fae5;color:#065f46;}
+    .badge.inactive{background:#fee2e2;color:#991b1b;}
+    .badge.due{background:#fef3c7;color:#92400e;}
+    .badge.paid{background:#d1fae5;color:#065f46;}
+    .badge.partial{background:#dbeafe;color:#1e40af;}
+
+    .stats-row{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;}
+    .stat-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:.7rem 1rem;flex:1;min-width:110px;text-align:center;}
+    .stat-box .val{font-size:1.2rem;font-weight:700;color:#1a56db;}
+    .stat-box .lbl{font-size:.78rem;color:#6b7280;margin-top:.1rem;}
+    .empty{text-align:center;color:#9ca3af;padding:1.5rem;font-size:.92rem;}
+
+    /* Modals */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;align-items:center;justify-content:center;padding:1rem;}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:#fff;border-radius:14px;padding:1.75rem;width:100%;max-width:520px;box-shadow:0 8px 40px rgba(0,0,0,.22);max-height:90vh;overflow-y:auto;}
+    .modal-box h3{margin:0 0 .25rem;font-size:1.1rem;}
+    .modal-sub{color:#6b7280;font-size:.85rem;margin-bottom:1rem;}
+    .modal-actions{display:flex;gap:.75rem;margin-top:1.25rem;justify-content:flex-end;}
+    .modal-close{float:right;background:none;border:none;font-size:1.35rem;cursor:pointer;color:#6b7280;margin:-.25rem -.25rem 0 0;line-height:1;}
+
+    /* Employee detail / pay popup */
+    .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.35rem .75rem;margin-bottom:.75rem;}
+    @media(max-width:480px){.detail-grid{grid-template-columns:1fr;}}
+    .detail-item{background:#f9fafb;border-radius:8px;padding:.5rem .75rem;}
+    .detail-item .lbl{font-size:.75rem;color:#6b7280;margin-bottom:.1rem;}
+    .detail-item .val{font-size:.9rem;font-weight:600;color:#111827;}
+    .detail-item.span2{grid-column:1/-1;}
+    .section-sep{font-weight:700;font-size:.88rem;color:#374151;margin:1rem 0 .5rem;padding-bottom:.35rem;border-bottom:2px solid #e5e7eb;}
+
+    .month-due-box{display:flex;align-items:center;justify-content:space-between;background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:.65rem .9rem;margin:.5rem 0 1rem;}
+    .month-due-box.zero{background:#d1fae5;border-color:#a7f3d0;}
+    .month-due-box .mdl{font-size:.8rem;color:#6b7280;}
+    .month-due-box .mdv{font-size:1.15rem;font-weight:700;color:#92400e;}
+    .month-due-box.zero .mdv{color:#065f46;}
+
+    .pay-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1rem;margin-bottom:.5rem;}
+    @media(max-width:480px){.pay-form-grid{grid-template-columns:1fr;}}
+    .pay-form-grid label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:.25rem;display:block;}
+    .pay-form-grid input,.pay-form-grid select{width:100%;padding:.55rem .75rem;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;box-sizing:border-box;}
+    .span2{grid-column:1/-1;}
+
+    .pay-hist-tbl{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:.25rem;}
+    .pay-hist-tbl th{background:#f3f4f6;padding:.45rem .6rem;text-align:left;font-weight:600;font-size:.8rem;}
+    .pay-hist-tbl td{padding:.45rem .6rem;border-top:1px solid #f0f0f0;white-space:nowrap;}
+    .icon-btn{background:none;border:none;cursor:pointer;font-size:.95rem;padding:.15rem .3rem;border-radius:5px;}
+    .icon-btn:hover{background:#f3f4f6;}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<!-- ══ Employee Pay Popup ══════════════════════════════════ -->
+<div class="modal-overlay" id="payModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closePayModal()">✕</button>
+    <h3 id="payEmpName">—</h3>
+    <div class="modal-sub" id="payEmpDesig">—</div>
+
+    <div class="detail-grid" id="payEmpDetails"><!-- filled by JS --></div>
+
+    <div class="section-sep" style="margin-top:.5rem;">📅 Select Month</div>
+    <div class="pay-form-grid" style="margin-bottom:0;">
+      <div>
+        <label>Month</label>
+        <select id="payMonth" onchange="onPayMonthChange()">
+          <option value="1">January</option><option value="2">February</option>
+          <option value="3">March</option><option value="4">April</option>
+          <option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option>
+          <option value="9">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div>
+        <label>Year</label>
+        <input id="payYear" type="number" min="2000" max="2100" onchange="onPayMonthChange()"/>
+      </div>
+    </div>
+
+    <div class="detail-grid" id="payBreakdown" style="margin-bottom:.5rem;">
+      <!-- filled by JS: gross, absent days, deduction, bonus -->
+    </div>
+
+    <div class="month-due-box" id="monthDueBox">
+      <div>
+        <div class="mdl">Net Payable for selected month</div>
+        <div class="mdl" id="monthCollectedLine">Collected so far: ₹0</div>
+      </div>
+      <div class="mdv" id="monthDueVal">₹0</div>
+    </div>
+
+    <form id="payForm" onsubmit="submitPayment(event)">
+      <div class="pay-form-grid">
+        <div>
+          <label>Payment Date <span style="color:red">*</span></label>
+          <input id="payDate" type="date" required/>
+        </div>
+        <div>
+          <label>Voucher No. <span style="color:red">*</span></label>
+          <input id="payVoucher" placeholder="e.g. V-0231" required/>
+        </div>
+        <div>
+          <label>Amount (₹) <span style="color:red">*</span></label>
+          <input id="payAmount" type="number" min="0" step="1" placeholder="Amount paid now" required/>
+        </div>
+        <div>
+          <label>Mode <span style="color:red">*</span></label>
+          <select id="payMode" required>
+            <option value="">— Select —</option>
+            <option value="Cash">Cash</option>
+            <option value="Bank">Bank</option>
+            <option value="PhonePe">PhonePe</option>
+          </select>
+        </div>
+        <div class="span2">
+          <label>Remarks</label>
+          <input id="payRemarks" placeholder="Optional note"/>
+        </div>
+      </div>
+      <p class="err" id="payErr" style="margin:.4rem 0 0;"></p>
+      <p class="info" id="payOk" style="display:none;margin:.4rem 0 0;"></p>
+      <div class="modal-actions" style="margin-top:1rem;">
+        <button type="button" class="btn-sm" style="background:#6b7280;" onclick="closePayModal()">Close</button>
+        <button type="submit" class="btn-sm btn-green" id="paySubmitBtn">💾 Submit Payment</button>
+      </div>
+    </form>
+
+    <div class="section-sep">🧾 Payment History — <span id="payHistMonthLabel"></span></div>
+    <table class="pay-hist-tbl">
+      <thead><tr><th>Date</th><th>Voucher</th><th>Amount</th><th>Mode</th><th>By</th><th></th></tr></thead>
+      <tbody id="payHistBody"><tr><td colspan="6" class="empty">Select a month</td></tr></tbody>
+    </table>
+
+    <div class="section-sep">📜 Full Salary Payment History (all months)</div>
+    <table class="pay-hist-tbl">
+      <thead><tr><th>Month</th><th>Date</th><th>Voucher</th><th>Amount</th><th>Mode</th></tr></thead>
+      <tbody id="payFullHistBody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ Edit Payment Modal ══════════════════════════════════ -->
+<div class="modal-overlay" id="editPayModal">
+  <div class="modal-box" style="max-width:420px;">
+    <button class="modal-close" onclick="closeEditPayModal()">✕</button>
+    <h3>✏️ Edit Payment</h3>
+    <div class="pay-form-grid">
+      <div>
+        <label>Payment Date <span style="color:red">*</span></label>
+        <input id="editPayDate" type="date" required/>
+      </div>
+      <div>
+        <label>Voucher No. <span style="color:red">*</span></label>
+        <input id="editPayVoucher" required/>
+      </div>
+      <div>
+        <label>Amount (₹) <span style="color:red">*</span></label>
+        <input id="editPayAmount" type="number" min="0" step="1" required/>
+      </div>
+      <div>
+        <label>Mode <span style="color:red">*</span></label>
+        <select id="editPayMode" required>
+          <option value="Cash">Cash</option>
+          <option value="Bank">Bank</option>
+          <option value="PhonePe">PhonePe</option>
+        </select>
+      </div>
+      <div class="span2">
+        <label>Remarks</label>
+        <input id="editPayRemarks"/>
+      </div>
+    </div>
+    <p class="err" id="editPayErr" style="margin:.4rem 0 0;"></p>
+    <div class="modal-actions">
+      <button class="btn-sm" style="background:#6b7280;" onclick="closeEditPayModal()">Cancel</button>
+      <button class="btn-sm btn-green" onclick="saveEditPayment()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Delete Confirm Modal ════════════════════════════════ -->
+<div class="modal-overlay" id="deletePayModal">
+  <div class="modal-box" style="max-width:380px;">
+    <button class="modal-close" onclick="closeDeletePayModal()">✕</button>
+    <h3>🗑️ Delete Payment</h3>
+    <p style="font-size:.9rem;color:#374151;">Are you sure you want to delete this payment entry? This cannot be undone.</p>
+    <p class="err" id="deletePayErr" style="margin:.4rem 0 0;"></p>
+    <div class="modal-actions">
+      <button class="btn-sm" style="background:#6b7280;" onclick="closeDeletePayModal()">Cancel</button>
+      <button class="btn-sm" style="background:#dc2626;" onclick="confirmDeletePayment()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <h1>💵 Pay Salary</h1>
+
+  <div class="stats-row">
+    <div class="stat-box"><div class="val" id="statTotal">—</div><div class="lbl">Total Employees</div></div>
+    <div class="stat-box"><div class="val" id="statDueCount">—</div><div class="lbl">With Due</div></div>
+    <div class="stat-box"><div class="val" id="statPaidCount">—</div><div class="lbl">Fully Paid</div></div>
+    <div class="stat-box"><div class="val" id="statTotalDue">—</div><div class="lbl">Total Due (₹)</div></div>
+  </div>
+
+  <div class="page-card">
+    <div class="filter-row">
+      <div>
+        <label>Month <span style="color:red">*</span></label>
+        <select id="fMonth" onchange="onListMonthChange()">
+          <option value="1">January</option><option value="2">February</option>
+          <option value="3">March</option><option value="4">April</option>
+          <option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option>
+          <option value="9">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div>
+        <label>Year <span style="color:red">*</span></label>
+        <input id="fYear" type="number" min="2000" max="2100" style="width:100px;" onchange="onListMonthChange()"/>
+      </div>
+      <div>
+        <label>Search Name</label>
+        <input id="fName" placeholder="Employee name…" oninput="renderList()"/>
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="fDue" onchange="renderList()">
+          <option value="">All</option>
+          <option value="due">Due / Partial</option>
+          <option value="paid">Fully Paid</option>
+        </select>
+      </div>
+      <div style="align-self:flex-end;">
+        <button class="btn-sm btn-outline" onclick="clearListFilters()">Clear</button>
+      </div>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Name</th><th>Designation</th><th>Status</th><th>Net Payable</th><th>Collected</th><th>Due</th><th>Salary Status</th></tr>
+        </thead>
+        <tbody id="empTbody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <p style="font-size:.78rem;color:#6b7280;margin-top:.75rem;">
+      Click any employee row to view details and record a salary payment. Inactive employees stay listed here as long as they have a due balance for any month up to their inactive date.
+    </p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant"]);
+
+  const MONTHS = ['', 'January','February','March','April','May','June','July','August','September','October','November','December'];
+  const APPROVED_LEAVE = 4;   // keep in sync with salary_sheet.html
+  const WORKING_DAYS   = 26;  // keep in sync with salary_sheet.html
+
+  /* ── Shared state ── */
+  let allEmployees = [];
+  let listMonth = null, listYear = null;
+  let listComputed = [];           // computed rows for the list table
+  let activePayEmp = null;         // employee currently open in the pay popup
+  let payMonth = null, payYear = null;
+  let payMonthPayments = [];       // payments for the selected emp+month
+  let editingPayment = null;       // payment row being edited
+  let deletingPaymentId = null;
+
+  function fmt(n){ return '₹' + (Math.round(n) || 0).toLocaleString('en-IN'); }
+  function todayISO(){ return new Date().toISOString().split('T')[0]; }
+
+  /* ── Init ── */
+  async function init() {
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const now = new Date();
+      document.getElementById('fMonth').value = now.getMonth() + 1;
+      document.getElementById('fYear').value  = now.getFullYear();
+
+      const { data, error } = await BNH_PAGE.sb.from('employees')
+        .select('*, designations(id,name)').order('name');
+      if (error) throw error;
+      allEmployees = data || [];
+
+      await onListMonthChange();
+    } catch (err) {
+      console.error('Init failed:', err);
+      document.getElementById('empTbody').innerHTML =
+        `<tr><td colspan="8" class="empty" style="color:#dc2626;">⚠️ Failed to load: ${err.message}</td></tr>`;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  /* Gross net-payable for an employee for a given month (gross - deduction + bonus) */
+  async function computeNetMap(month, year) {
+    const { data: bonuses } = await BNH_PAGE.sb.from('salary_bonuses')
+      .select('*').eq('month', month).eq('year', year);
+    const bonusMap = {};
+    (bonuses || []).forEach(b => { bonusMap[b.employee_id] = b.amount || 0; });
+
+    const { data: absents } = await BNH_PAGE.sb.from('salary_absent')
+      .select('*').eq('month', month).eq('year', year);
+    const absentMap = {};
+    (absents || []).forEach(a => { absentMap[a.employee_id] = a.absent_days || 0; });
+
+    return { bonusMap, absentMap };
+  }
+
+  function salaryBreakdown(emp, bonusMap, absentMap) {
+    const gross = emp.salary || 0;
+    const absent = absentMap[emp.id] || 0;
+    const deductDays = Math.max(0, absent - APPROVED_LEAVE);
+    const deduction = Math.round(((gross / WORKING_DAYS) * deductDays) / 10) * 10;
+    const bonus = bonusMap[emp.id] || 0;
+    const net = gross - deduction + bonus;
+    return { gross, absent, deductDays, deduction, bonus, net };
+  }
+
+  // Backwards-compatible helper: just the net number
+  function netPayableFor(emp, bonusMap, absentMap) {
+    return salaryBreakdown(emp, bonusMap, absentMap).net;
+  }
+
+  /* Is employee in-scope for this month? (joined by month end, not inactive before month start) */
+  function isEmpInMonth(emp, month, year) {
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay  = new Date(year, month, 0);
+    const joinDate = emp.joining_date ? new Date(emp.joining_date) : null;
+    const inactiveDate = emp.inactive_date ? new Date(emp.inactive_date) : null;
+    if (joinDate && joinDate > lastDay) return false;
+    if (inactiveDate && inactiveDate < firstDay) return false;
+    return true;
+  }
+
+  /* Sum of all due (net - collected) across every month from joining up to current/inactive month */
+  async function totalDueForEmployee(emp) {
+    const join = emp.joining_date ? new Date(emp.joining_date) : null;
+    if (!join) return 0;
+    const today = new Date();
+    const endRef = emp.inactive_date ? new Date(emp.inactive_date) : today;
+    let total = 0;
+    let y = join.getFullYear(), m = join.getMonth() + 1;
+    const endY = endRef.getFullYear(), endM = endRef.getMonth() + 1;
+
+    const { data: allBonuses } = await BNH_PAGE.sb.from('salary_bonuses').select('*').eq('employee_id', emp.id);
+    const { data: allAbsents } = await BNH_PAGE.sb.from('salary_absent').select('*').eq('employee_id', emp.id);
+    const { data: allPays }    = await BNH_PAGE.sb.from('salary_payments').select('amount,month,year').eq('employee_id', emp.id);
+
+    while (y < endY || (y === endY && m <= endM)) {
+      const bonus = (allBonuses || []).find(b => b.month === m && b.year === y)?.amount || 0;
+      const absentDays = (allAbsents || []).find(a => a.month === m && a.year === y)?.absent_days || 0;
+      const deductDays = Math.max(0, absentDays - APPROVED_LEAVE);
+      const deduction = Math.round(((emp.salary || 0) / WORKING_DAYS) * deductDays / 10) * 10;
+      const net = (emp.salary || 0) - deduction + bonus;
+      const collected = (allPays || []).filter(p => p.month === m && p.year === y)
+        .reduce((s, p) => s + (p.amount || 0), 0);
+      total += Math.max(0, net - collected);
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return total;
+  }
+
+  /* ── List rendering ── */
+  async function onListMonthChange() {
+    listMonth = parseInt(document.getElementById('fMonth').value) || null;
+    listYear  = parseInt(document.getElementById('fYear').value)  || null;
+    if (!listMonth || !listYear) return;
+
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { bonusMap, absentMap } = await computeNetMap(listMonth, listYear);
+
+      const { data: payments } = await BNH_PAGE.sb.from('salary_payments')
+        .select('employee_id, amount').eq('month', listMonth).eq('year', listYear);
+      const collectedMap = {};
+      (payments || []).forEach(p => { collectedMap[p.employee_id] = (collectedMap[p.employee_id] || 0) + (p.amount || 0); });
+
+      const inScope = allEmployees.filter(e => isEmpInMonth(e, listMonth, listYear));
+
+      listComputed = await Promise.all(inScope.map(async e => {
+        const net = netPayableFor(e, bonusMap, absentMap);
+        const collected = collectedMap[e.id] || 0;
+        const due = Math.max(0, net - collected);
+        let status = 'paid';
+        if (collected <= 0 && due > 0) status = 'due';
+        else if (due > 0) status = 'partial';
+        return { emp: e, net, collected, due, status };
+      }));
+
+      renderList();
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function clearListFilters() {
+    document.getElementById('fName').value = '';
+    document.getElementById('fDue').value  = '';
+    const now = new Date();
+    document.getElementById('fMonth').value = now.getMonth() + 1;
+    document.getElementById('fYear').value  = now.getFullYear();
+    onListMonthChange();
+  }
+
+  function renderList() {
+    const name   = (document.getElementById('fName').value || '').toLowerCase();
+    const dueFil = document.getElementById('fDue').value;
+
+    let list = listComputed.filter(r => {
+      if (name && !r.emp.name.toLowerCase().includes(name)) return false;
+      if (dueFil === 'due'  && r.status === 'paid') return false;
+      if (dueFil === 'paid' && r.status !== 'paid') return false;
+      return true;
+    });
+
+    document.getElementById('statTotal').textContent     = listComputed.length;
+    document.getElementById('statDueCount').textContent  = listComputed.filter(r => r.status !== 'paid').length;
+    document.getElementById('statPaidCount').textContent = listComputed.filter(r => r.status === 'paid').length;
+    document.getElementById('statTotalDue').textContent  = fmt(listComputed.reduce((s, r) => s + r.due, 0));
+
+    const tbody = document.getElementById('empTbody');
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty">No employees match the filters.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map((r, i) => {
+      const e = r.emp;
+      const ssBadge = r.status === 'paid'
+        ? '<span class="badge paid">✅ Paid</span>'
+        : (r.status === 'partial' ? '<span class="badge partial">◐ Partial</span>' : '<span class="badge due">⚠️ Due</span>');
+      return `<tr class="row-link" onclick="openPayPopup('${e.id}')">
+        <td>${i + 1}</td>
+        <td style="font-weight:600;">${e.name}</td>
+        <td>${e.designations?.name || '—'}</td>
+        <td><span class="badge ${e.is_active ? 'active' : 'inactive'}">${e.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td>${fmt(r.net)}</td>
+        <td>${fmt(r.collected)}</td>
+        <td style="font-weight:700;color:${r.due > 0 ? '#dc2626' : '#059669'};">${r.due > 0 ? fmt(r.due) : '—'}</td>
+        <td>${ssBadge}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  /* ── Pay popup ── */
+  async function openPayPopup(empId) {
+    const emp = allEmployees.find(e => e.id === empId);
+    if (!emp) return;
+    activePayEmp = emp;
+
+    document.getElementById('payEmpName').textContent  = emp.name;
+    document.getElementById('payEmpDesig').textContent =
+      (emp.designations?.name || '—') + '  ·  ' + (emp.is_active ? '🟢 Active' : '🔴 Inactive');
+
+    document.getElementById('payEmpDetails').innerHTML = `
+      <div class="detail-item"><div class="lbl">Monthly Salary</div><div class="val">${fmt(emp.salary)}</div></div>
+      <div class="detail-item"><div class="lbl">Joining Date</div><div class="val">${emp.joining_date || '—'}</div></div>
+      <div class="detail-item"><div class="lbl">Mobile</div><div class="val">${emp.mobile || '—'}</div></div>
+      <div class="detail-item"><div class="lbl">Status</div><div class="val">${emp.is_active ? 'Active' : 'Inactive' + (emp.inactive_date ? ' (since ' + emp.inactive_date + ')' : '')}</div></div>
+    `;
+
+    document.getElementById('payMonth').value = listMonth || (new Date().getMonth() + 1);
+    document.getElementById('payYear').value  = listYear  || new Date().getFullYear();
+    document.getElementById('payDate').value  = todayISO();
+    document.getElementById('payVoucher').value = '';
+    document.getElementById('payAmount').value  = '';
+    document.getElementById('payMode').value    = '';
+    document.getElementById('payRemarks').value = '';
+    document.getElementById('payErr').textContent = '';
+    document.getElementById('payOk').style.display = 'none';
+
+    document.getElementById('payModal').classList.add('open');
+
+    await onPayMonthChange();
+    await loadFullPayHistory();
+  }
+
+  function closePayModal() {
+    document.getElementById('payModal').classList.remove('open');
+    activePayEmp = null;
+  }
+
+  async function onPayMonthChange() {
+    if (!activePayEmp) return;
+    payMonth = parseInt(document.getElementById('payMonth').value);
+    payYear  = parseInt(document.getElementById('payYear').value);
+    document.getElementById('payHistMonthLabel').textContent = MONTHS[payMonth] + ' ' + payYear;
+
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { bonusMap, absentMap } = await computeNetMap(payMonth, payYear);
+      const b = salaryBreakdown(activePayEmp, bonusMap, absentMap);
+
+      const { data: payments, error } = await BNH_PAGE.sb.from('salary_payments')
+        .select('*').eq('employee_id', activePayEmp.id).eq('month', payMonth).eq('year', payYear)
+        .order('payment_date', { ascending: false });
+      if (error) throw error;
+      payMonthPayments = payments || [];
+
+      const collected = payMonthPayments.reduce((s, p) => s + (p.amount || 0), 0);
+      const due = Math.max(0, b.net - collected);
+
+      document.getElementById('payBreakdown').innerHTML = `
+        <div class="detail-item"><div class="lbl">Gross Salary</div><div class="val">${fmt(b.gross)}</div></div>
+        <div class="detail-item"><div class="lbl">Absent Days</div><div class="val">${b.absent}${b.absent > 0 ? ' (' + b.deductDays + ' deductible)' : ''}</div></div>
+        <div class="detail-item"><div class="lbl">Deduction</div><div class="val" style="color:${b.deduction > 0 ? '#dc2626' : '#111827'};">${b.deduction > 0 ? '-' + fmt(b.deduction) : '—'}</div></div>
+        <div class="detail-item"><div class="lbl">Bonus</div><div class="val" style="color:${b.bonus > 0 ? '#059669' : '#111827'};">${b.bonus > 0 ? '+' + fmt(b.bonus) : '—'}</div></div>
+      `;
+
+      const box = document.getElementById('monthDueBox');
+      box.classList.toggle('zero', due <= 0);
+      document.getElementById('monthDueVal').textContent = fmt(due);
+      document.getElementById('monthCollectedLine').textContent =
+        `Net payable ${fmt(b.net)} · Collected so far ${fmt(collected)}`;
+
+      document.getElementById('payAmount').value = due > 0 ? due : '';
+
+      renderPayMonthHistory();
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function renderPayMonthHistory() {
+    const tbody = document.getElementById('payHistBody');
+    if (!payMonthPayments.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No payments recorded for this month.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = payMonthPayments.map(p => `
+      <tr>
+        <td>${p.payment_date || '—'}</td>
+        <td>${p.voucher_no || '—'}</td>
+        <td>${fmt(p.amount)}</td>
+        <td>${p.mode || '—'}</td>
+        <td>${p.recorded_by_name || p.recorded_by || '—'}</td>
+        <td>
+          <button class="icon-btn" title="Edit" onclick="openEditPayModal('${p.id}')">✏️</button>
+          <button class="icon-btn" title="Delete" onclick="openDeletePayModal('${p.id}')">🗑️</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function loadFullPayHistory() {
+    if (!activePayEmp) return;
+    const tbody = document.getElementById('payFullHistBody');
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('salary_payments')
+        .select('*').eq('employee_id', activePayEmp.id)
+        .order('year', { ascending: false }).order('month', { ascending: false })
+        .order('payment_date', { ascending: false });
+      if (error) throw error;
+      tbody.innerHTML = (data && data.length)
+        ? data.map(p => `
+            <tr>
+              <td>${MONTHS[p.month]} ${p.year}</td>
+              <td>${p.payment_date || '—'}</td>
+              <td>${p.voucher_no || '—'}</td>
+              <td>${fmt(p.amount)}</td>
+              <td>${p.mode || '—'}</td>
+            </tr>`).join('')
+        : '<tr><td colspan="5" class="empty">No payment history yet.</td></tr>';
+    } catch (_) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">History not available.</td></tr>';
+    }
+  }
+
+  /* ── Submit new payment ── */
+  async function submitPayment(e) {
+    e.preventDefault();
+    if (!activePayEmp) return;
+    const spinner = document.getElementById('spinner');
+    document.getElementById('payErr').textContent = '';
+    document.getElementById('payOk').style.display = 'none';
+
+    const date    = document.getElementById('payDate').value;
+    const voucher = document.getElementById('payVoucher').value.trim();
+    const amount  = parseFloat(document.getElementById('payAmount').value);
+    const mode    = document.getElementById('payMode').value;
+    const remarks = document.getElementById('payRemarks').value.trim();
+
+    if (!date)   { document.getElementById('payErr').textContent = 'Payment date is required.'; return; }
+    if (!voucher){ document.getElementById('payErr').textContent = 'Voucher number is required.'; return; }
+    if (!amount || amount <= 0) { document.getElementById('payErr').textContent = 'Enter a valid amount.'; return; }
+    if (!mode)   { document.getElementById('payErr').textContent = 'Select a payment mode.'; return; }
+
+    spinner.classList.remove('hidden');
+    try {
+      const payload = BNH_PAGE.stamp({
+        employee_id:  activePayEmp.id,
+        employee_name: activePayEmp.name,
+        month:  payMonth,
+        year:   payYear,
+        payment_date: date,
+        voucher_no:   voucher,
+        amount:       amount,
+        mode:         mode,
+        remarks:      remarks
+      });
+      const { error } = await BNH_PAGE.sb.from('salary_payments').insert(payload);
+      if (error) throw error;
+
+      document.getElementById('payOk').style.display = 'block';
+      document.getElementById('payOk').textContent   = '✅ Payment recorded successfully.';
+      document.getElementById('payVoucher').value = '';
+      document.getElementById('payRemarks').value = '';
+
+      await onPayMonthChange();
+      await loadFullPayHistory();
+      await onListMonthChange();
+    } catch (err) {
+      document.getElementById('payErr').textContent = err.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  /* ── Edit payment ── */
+  function openEditPayModal(id) {
+    const p = payMonthPayments.find(x => x.id === id);
+    if (!p) return;
+    editingPayment = p;
+    document.getElementById('editPayDate').value    = p.payment_date || '';
+    document.getElementById('editPayVoucher').value  = p.voucher_no || '';
+    document.getElementById('editPayAmount').value   = p.amount || '';
+    document.getElementById('editPayMode').value     = p.mode || 'Cash';
+    document.getElementById('editPayRemarks').value  = p.remarks || '';
+    document.getElementById('editPayErr').textContent = '';
+    document.getElementById('editPayModal').classList.add('open');
+  }
+  function closeEditPayModal() {
+    document.getElementById('editPayModal').classList.remove('open');
+    editingPayment = null;
+  }
+
+  async function saveEditPayment() {
+    if (!editingPayment) return;
+    const date    = document.getElementById('editPayDate').value;
+    const voucher = document.getElementById('editPayVoucher').value.trim();
+    const amount  = parseFloat(document.getElementById('editPayAmount').value);
+    const mode    = document.getElementById('editPayMode').value;
+    const remarks = document.getElementById('editPayRemarks').value.trim();
+
+    if (!date)   { document.getElementById('editPayErr').textContent = 'Payment date is required.'; return; }
+    if (!voucher){ document.getElementById('editPayErr').textContent = 'Voucher number is required.'; return; }
+    if (!amount || amount <= 0) { document.getElementById('editPayErr').textContent = 'Enter a valid amount.'; return; }
+
+    const spinner = document.getElementById('spinner'); spinner.classList.remove('hidden');
+    try {
+      const { error } = await BNH_PAGE.sb.from('salary_payments')
+        .update(BNH_PAGE.stamp({
+          payment_date: date, voucher_no: voucher, amount, mode, remarks
+        }))
+        .eq('id', editingPayment.id);
+      if (error) throw error;
+      closeEditPayModal();
+      await onPayMonthChange();
+      await loadFullPayHistory();
+      await onListMonthChange();
+    } catch (err) {
+      document.getElementById('editPayErr').textContent = err.message;
+    } finally { spinner.classList.add('hidden'); }
+  }
+
+  /* ── Delete payment ── */
+  function openDeletePayModal(id) {
+    deletingPaymentId = id;
+    document.getElementById('deletePayErr').textContent = '';
+    document.getElementById('deletePayModal').classList.add('open');
+  }
+  function closeDeletePayModal() {
+    document.getElementById('deletePayModal').classList.remove('open');
+    deletingPaymentId = null;
+  }
+
+  async function confirmDeletePayment() {
+    if (!deletingPaymentId) return;
+    const spinner = document.getElementById('spinner'); spinner.classList.remove('hidden');
+    try {
+      const { error } = await BNH_PAGE.sb.from('salary_payments').delete().eq('id', deletingPaymentId);
+      if (error) throw error;
+      closeDeletePayModal();
+      await onPayMonthChange();
+      await loadFullPayHistory();
+      await onListMonthChange();
+    } catch (err) {
+      document.getElementById('deletePayErr').textContent = err.message;
+    } finally { spinner.classList.add('hidden'); }
+  }
+
+  /* ── Close modals on overlay click ── */
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', function (e) {
+      if (e.target === this) this.classList.remove('open');
+    });
+  });
+
+  init();
+</script>
+</body>
+</html>

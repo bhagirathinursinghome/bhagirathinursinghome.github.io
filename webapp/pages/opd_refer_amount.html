@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Refer Amount Entry</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .tabs { display:flex; gap:0; margin-bottom:1.2rem; border-bottom:2px solid #e9ecef; overflow-x:auto; }
+    .tab-btn { padding:.65rem 1.3rem; background:none; border:none; cursor:pointer; border-bottom:3px solid transparent; font-size:.9rem; color:#666; white-space:nowrap; }
+    .tab-btn.active { color:#007bff; border-bottom-color:#007bff; font-weight:600; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+
+    .filter-bar { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1rem; }
+    .filter-group { display:flex; flex-direction:column; flex:1; min-width:140px; }
+    .filter-group label { font-size:.8rem; color:#666; margin-bottom:.25rem; }
+    .filter-group input, .filter-group select { padding:.45rem .7rem; border:1px solid #ccc; border-radius:3px; font-size:.85rem; }
+
+    .stats-row { display:flex; gap:.75rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .stat-box { background:#f8f9fa; border-radius:4px; padding:.65rem 1rem; flex:1; min-width:110px; border-left:3px solid #007bff; }
+    .stat-box .val { font-size:1.2rem; font-weight:700; color:#007bff; }
+    .stat-box .lbl { font-size:.75rem; color:#666; margin-top:2px; }
+
+    .records-table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    th { background:#f0f0f0; padding:8px 10px; text-align:left; font-weight:500; border-bottom:2px solid #ddd; white-space:nowrap; }
+    td { padding:8px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
+    tbody tr { cursor:pointer; }
+    tbody tr:hover td { background:#f5f9ff; }
+    .case-no { color:#007bff; font-weight:700; }
+
+    .badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:.75rem; font-weight:600; }
+    .badge-pending  { background:#fff3cd; color:#856404; }
+    .badge-complete { background:#d1e7dd; color:#0a3622; }
+    .badge-paid     { background:#cce5ff; color:#004085; }
+    .badge-due      { background:#f8d7da; color:#721c24; }
+
+    /* Modal */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.48); z-index:1000; display:flex; align-items:center; justify-content:center; padding:1rem; }
+    .modal-overlay.hidden { display:none!important; }
+    .modal-box { background:white; border-radius:8px; width:min(96vw,680px); max-height:92vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.2); }
+    .modal-header { padding:1.1rem 1.4rem; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:white; z-index:2; }
+    .modal-header h2 { margin:0; font-size:1.05rem; }
+    .modal-close { font-size:1.5rem; cursor:pointer; color:#999; border:none; background:none; line-height:1; }
+    .modal-close:hover { color:#333; }
+    .modal-body { padding:1.4rem; }
+    .modal-footer { padding:1rem 1.4rem; border-top:1px solid #eee; display:flex; gap:.75rem; justify-content:flex-end; background:#fafafa; }
+
+    .detail-section { margin-bottom:1.4rem; }
+    .detail-section h3 { font-size:.92rem; color:#007bff; margin:0 0 .7rem 0; border-bottom:1px solid #eee; padding-bottom:.4rem; }
+    .detail-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:.8rem; margin-bottom:.75rem; }
+    .detail-label { font-size:.73rem; color:#999; text-transform:uppercase; }
+    .detail-value { font-size:.9rem; color:#333; font-weight:500; margin-top:.2rem; }
+
+    .amount-summary { background:#f8f9fa; padding:1rem; border-radius:4px; border-left:4px solid #007bff; display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:.8rem; margin-bottom:1rem; }
+    .amount-label { font-size:.72rem; color:#666; text-transform:uppercase; }
+    .amount-value { font-size:1.05rem; font-weight:700; color:#007bff; margin-top:.2rem; }
+
+    .tests-list { background:#f9f9f9; padding:.7rem 1rem; border-radius:4px; font-size:.85rem; line-height:1.6; }
+
+    /* Entry form */
+    .entry-form { background:#e7f3ff; border:1px solid #b8daff; border-radius:6px; padding:1.2rem; margin-top:.5rem; }
+    .entry-form h4 { margin:0 0 1rem 0; color:#004085; font-size:.95rem; }
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .form-row > * { flex:1; min-width:150px; }
+    .form-group { margin-bottom:.85rem; }
+    .form-group label { display:block; margin-bottom:.3rem; font-weight:500; font-size:.85rem; }
+    .form-group input, .form-group select, .form-group textarea { width:100%; padding:.42rem .65rem; border:1px solid #ccc; border-radius:3px; font-size:.85rem; box-sizing:border-box; }
+    .form-group input:focus, .form-group select:focus { border-color:#007bff; outline:none; box-shadow:0 0 0 2px rgba(0,123,255,.15); }
+
+    .test-bill-table { width:100%; border-collapse:collapse; font-size:.83rem; margin-bottom:.5rem; }
+    .test-bill-table th { background:#f0f0f0; padding:6px 9px; text-align:left; border-bottom:1px solid #ddd; }
+    .test-bill-table td { padding:7px 9px; border-bottom:1px solid #f0f0f0; }
+    .test-bill-table tr:last-child td { border-bottom:none; font-weight:700; background:#f8f9fa; }
+
+    .refer-info-box { background:#fff3cd; border:1px solid #ffc107; border-radius:4px; padding:.75rem 1rem; margin-bottom:1rem; font-size:.87rem; }
+    .refer-info-box strong { color:#856404; }
+
+    .empty-state { text-align:center; padding:2.5rem; color:#aaa; }
+    .hidden { display:none!important; }
+
+    .pagination { display:flex; gap:.4rem; justify-content:center; margin-top:1rem; flex-wrap:wrap; }
+    .pagination button { padding:.38rem .65rem; border:1px solid #ccc; background:white; cursor:pointer; border-radius:3px; font-size:.82rem; }
+    .pagination button.active { background:#007bff; color:white; border-color:#007bff; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>💊 Refer Amount Entry</h1>
+
+  <div class="page-card">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="pending">⏳ Pending Entry <span id="pendingCount" class="badge badge-pending" style="margin-left:.3rem"></span></button>
+      <button class="tab-btn" data-tab="completed">✅ Completed</button>
+    </div>
+
+    <!-- ══ PENDING TAB ══ -->
+    <div class="tab-content active" id="tab-pending">
+      <div class="stats-row" id="pendingStats"></div>
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Search</label>
+          <input id="pendSearch" placeholder="Case no, patient, refer…" oninput="filterPending()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date From</label>
+          <input type="date" id="pendDateFrom" onchange="filterPending()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date To</label>
+          <input type="date" id="pendDateTo" onchange="filterPending()"/>
+        </div>
+        <div class="filter-group">
+          <label>Refer Name</label>
+          <select id="pendReferFilter" onchange="filterPending()">
+            <option value="">All Refers</option>
+          </select>
+        </div>
+      </div>
+      <div class="records-table-wrap">
+        <div id="pendingTable"><div class="empty-state">Loading…</div></div>
+      </div>
+      <div class="pagination" id="pendPager"></div>
+    </div>
+
+    <!-- ══ COMPLETED TAB ══ -->
+    <div class="tab-content" id="tab-completed">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Search</label>
+          <input id="compSearch" placeholder="Case no, patient, refer…" oninput="filterCompleted()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date From</label>
+          <input type="date" id="compDateFrom" onchange="filterCompleted()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date To</label>
+          <input type="date" id="compDateTo" onchange="filterCompleted()"/>
+        </div>
+        <div class="filter-group">
+          <label>Refer Name</label>
+          <select id="compReferFilter" onchange="filterCompleted()">
+            <option value="">All Refers</option>
+          </select>
+        </div>
+      </div>
+      <div class="records-table-wrap">
+        <div id="completedTable"><div class="empty-state">Loading…</div></div>
+      </div>
+      <div class="pagination" id="compPager"></div>
+    </div>
+
+    <p class="err" id="err"></p>
+    <p class="info" id="ok" style="display:none"></p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     DETAIL + ENTRY MODAL
+══════════════════════════════ -->
+<div class="modal-overlay hidden" id="detailModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="modalTitle">Case Details</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter">
+      <button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant","manager"]);
+
+  let allCases      = [];
+  let pendingCases  = [], filteredPending   = [], currentPendPage  = 1;
+  let completedCases= [], filteredCompleted = [], currentCompPage  = 1;
+  const PER_PAGE = 20;
+
+  let currentRecord = null;
+
+  // ── Helpers ──
+  function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmt(n){ return n!=null && n!=='' ? '₹'+Number(n).toLocaleString('en-IN') : '—'; }
+  function fmtDate(d){ return d ? d.slice(0,10) : '—'; }
+  function showSpinner(v){ document.getElementById('spinner').classList.toggle('hidden',!v); }
+  function showErr(msg){ const e=document.getElementById('err'); e.textContent=msg; setTimeout(()=>e.textContent='',5000); }
+  function showOk(msg) { const o=document.getElementById('ok'); o.style.display='block'; o.textContent=msg; setTimeout(()=>o.style.display='none',3000); }
+
+  function getPayStatus(r){
+    const disc=Number(r.discount||0), bill=Number(r.bill_amount||0), paid=Number(r.paid_amount||0);
+    const due=bill-disc-paid;
+    if(due<=0) return {s:'paid',   t:'✅ Paid',    c:'badge-paid'};
+    if(paid===0) return{s:'due',   t:'⏳ Due',     c:'badge-due'};
+    return           {s:'partial', t:'⚠️ Partial', c:'badge-pending'};
+  }
+
+  // ── Tabs ──
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Load data ──
+  async function loadData(){
+    showSpinner(true);
+    try {
+      // All cases that have a refer_name set
+      const { data, error } = await BNH_PAGE.sb
+        .from('opd_cases')
+        .select('*')
+        .not('refer_name','is',null)
+        .order('case_date',{ascending:false});
+      if(error) throw error;
+      allCases = data || [];
+
+      // Pending = refer_amount is null/0
+      pendingCases   = allCases.filter(c => c.refer_amount == null || c.refer_amount === 0);
+      // Completed = refer_amount has been set
+      completedCases = allCases.filter(c => c.refer_amount != null && c.refer_amount > 0);
+
+      buildReferFilters();
+      renderStats();
+      filterPending();
+      filterCompleted();
+    } catch(e){ showErr('Load error: '+e.message); }
+    finally { showSpinner(false); }
+  }
+
+  function buildReferFilters(){
+    const refers = [...new Set(allCases.map(c=>c.refer_name).filter(Boolean))].sort();
+    ['pendReferFilter','compReferFilter'].forEach(id=>{
+      const sel=document.getElementById(id);
+      const cur=sel.value;
+      sel.innerHTML='<option value="">All Refers</option>'+refers.map(r=>`<option value="${esc(r)}" ${cur===r?'selected':''}>${esc(r)}</option>`).join('');
+    });
+  }
+
+  function renderStats(){
+    const totalPendAmt = pendingCases.reduce((s,c)=>s+Number(c.bill_amount||0),0);
+    document.getElementById('pendingStats').innerHTML=`
+      <div class="stat-box"><div class="val">${pendingCases.length}</div><div class="lbl">Pending Entry</div></div>
+      <div class="stat-box"><div class="val" style="color:#28a745">${completedCases.length}</div><div class="lbl">Completed</div></div>
+      <div class="stat-box"><div class="val">${fmt(totalPendAmt)}</div><div class="lbl">Pending Bill Total</div></div>
+      <div class="stat-box"><div class="val">${fmt(completedCases.reduce((s,c)=>s+Number(c.refer_amount||0),0))}</div><div class="lbl">Total Refer Amount Set</div></div>
+    `;
+    document.getElementById('pendingCount').textContent = pendingCases.length;
+  }
+
+  // ── Filters ──
+  function doFilter(src, searchId, dateFromId, dateToId, referId){
+    const q  = (document.getElementById(searchId).value||'').toLowerCase();
+    const df = document.getElementById(dateFromId).value;
+    const dt = document.getElementById(dateToId).value;
+    const rf = document.getElementById(referId).value;
+    return src.filter(r=>{
+      if(q && !r.case_no?.toLowerCase().includes(q) && !r.patient_name?.toLowerCase().includes(q) && !r.refer_name?.toLowerCase().includes(q)) return false;
+      if(df && r.case_date < df) return false;
+      if(dt && r.case_date > dt) return false;
+      if(rf && r.refer_name !== rf) return false;
+      return true;
+    });
+  }
+
+  function filterPending(){
+    filteredPending = doFilter(pendingCases,'pendSearch','pendDateFrom','pendDateTo','pendReferFilter');
+    currentPendPage=1; renderPendingTable();
+  }
+  function filterCompleted(){
+    filteredCompleted = doFilter(completedCases,'compSearch','compDateFrom','compDateTo','compReferFilter');
+    currentCompPage=1; renderCompletedTable();
+  }
+
+  // ── Render tables ──
+  function renderPendingTable(){
+    const div=document.getElementById('pendingTable');
+    if(!filteredPending.length){ div.innerHTML='<div class="empty-state">🎉 No pending refer amount entries.</div>'; document.getElementById('pendPager').innerHTML=''; return; }
+    const rows=filteredPending.slice((currentPendPage-1)*PER_PAGE, currentPendPage*PER_PAGE);
+    div.innerHTML=`<table>
+      <thead><tr>
+        <th>Case No</th><th>Date</th><th>Patient</th><th>Bill</th><th>Discount</th><th>Paid</th><th>Due</th><th>Refer</th><th>Pay Status</th><th>Action</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>{
+        const ps=getPayStatus(r);
+        const disc=Number(r.discount||0), due=Number(r.bill_amount||0)-disc-Number(r.paid_amount||0);
+        return `<tr onclick="openDetail('${r.id}','pending')">
+          <td class="case-no">${esc(r.case_no)}</td>
+          <td>${fmtDate(r.case_date)}</td>
+          <td>${esc(r.patient_name)}</td>
+          <td>${fmt(r.bill_amount)}</td>
+          <td>${disc>0?fmt(disc):'—'}</td>
+          <td>${fmt(r.paid_amount)}</td>
+          <td style="color:${due>0?'#dc3545':'#28a745'}">${fmt(due)}</td>
+          <td><strong>${esc(r.refer_name)}</strong></td>
+          <td><span class="badge ${ps.c}">${ps.t}</span></td>
+          <td onclick="event.stopPropagation()">
+            <button class="btn-primary" style="width:auto;padding:4px 10px;font-size:.78rem" onclick="openDetail('${r.id}','pending')">💰 Enter Amount</button>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+    renderPager('pendPager', filteredPending.length, currentPendPage, 'pend');
+  }
+
+  function renderCompletedTable(){
+    const div=document.getElementById('completedTable');
+    if(!filteredCompleted.length){ div.innerHTML='<div class="empty-state">No completed refer entries yet.</div>'; document.getElementById('compPager').innerHTML=''; return; }
+    const rows=filteredCompleted.slice((currentCompPage-1)*PER_PAGE, currentCompPage*PER_PAGE);
+    div.innerHTML=`<table>
+      <thead><tr>
+        <th>Case No</th><th>Date</th><th>Patient</th><th>Bill</th><th>Refer</th><th>Refer Amount</th><th>Refer Pay</th><th>Action</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>{ return `<tr onclick="openDetail('${r.id}','completed')">
+        <td class="case-no">${esc(r.case_no)}</td>
+        <td>${fmtDate(r.case_date)}</td>
+        <td>${esc(r.patient_name)}</td>
+        <td>${fmt(r.bill_amount)}</td>
+        <td><strong>${esc(r.refer_name)}</strong></td>
+        <td style="color:#007bff;font-weight:700">${fmt(r.refer_amount)}</td>
+        <td>${r.refer_payment_status==='paid'
+          ? '<span class="badge badge-paid">✅ Paid</span>'
+          : '<span class="badge badge-due">⏳ Pending</span>'}</td>
+        <td onclick="event.stopPropagation()">
+          <button class="btn-primary" style="width:auto;padding:4px 10px;font-size:.78rem;background:#6c757d" onclick="openDetail('${r.id}','completed')">👁 View</button>
+        </td>
+      </tr>`; }).join('')}</tbody>
+    </table>`;
+    renderPager('compPager', filteredCompleted.length, currentCompPage, 'comp');
+  }
+
+  function renderPager(pagerId, total, page, key){
+    const tp=Math.ceil(total/PER_PAGE);
+    const p=document.getElementById(pagerId);
+    if(tp<=1){p.innerHTML='';return;}
+    let h='';
+    if(page>1){ h+=`<button onclick="goP('${key}',1)">«</button><button onclick="goP('${key}',${page-1})">‹ Prev</button>`; }
+    for(let i=Math.max(1,page-2);i<=Math.min(tp,page+2);i++)
+      h+=`<button ${i===page?'class="active"':''} onclick="goP('${key}',${i})">${i}</button>`;
+    if(page<tp){ h+=`<button onclick="goP('${key}',${page+1})">Next ›</button><button onclick="goP('${key}',${tp})">»</button>`; }
+    p.innerHTML=h;
+  }
+  function goP(key,page){
+    if(key==='pend'){currentPendPage=page;renderPendingTable();}
+    else{currentCompPage=page;renderCompletedTable();}
+  }
+
+  // ── Detail + Entry Modal ──
+  function openDetail(id, mode){
+    const r = allCases.find(x=>x.id===id);
+    if(!r) return;
+    currentRecord = r;
+
+    // Parse tests
+    let tests=[];
+    if(r.tests){ tests = String(r.tests).split(',').map(t=>t.trim()).filter(Boolean); }
+
+    const ps  = getPayStatus(r);
+    const disc = Number(r.discount||0);
+    const due  = Number(r.bill_amount||0)-disc-Number(r.paid_amount||0);
+
+    // Test-wise bill (show as individual line items with estimated equal share if no price stored)
+    let testBillHTML='';
+    if(tests.length){
+      const perTest = tests.length>0 ? (Number(r.bill_amount||0)/tests.length) : 0;
+      testBillHTML=`<div class="detail-section">
+        <h3>🧪 Test-wise Bill</h3>
+        <table class="test-bill-table">
+          <thead><tr><th>#</th><th>Test Name</th><th>Amount (est.)</th></tr></thead>
+          <tbody>
+            ${tests.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(t)}</td><td>${fmt(perTest.toFixed(2))}</td></tr>`).join('')}
+            <tr><td colspan="2"><strong>Total</strong></td><td><strong>${fmt(r.bill_amount)}</strong></td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:.76rem;color:#aaa;margin:.35rem 0 0 0">* Individual test amounts are estimated equally. Actual prices may differ.</p>
+      </div>`;
+    }
+
+    // Entry form (only for pending mode)
+    let entryHTML='';
+    if(mode==='pending'){
+      entryHTML=`<div class="entry-form">
+        <h4>💰 Enter Refer Amount</h4>
+        <div class="refer-info-box">
+          <strong>Refer:</strong> ${esc(r.refer_name)} &nbsp;|&nbsp;
+          <strong>Case Type:</strong> ${r.case_type==='lab_sample'?'Lab Sample':r.case_type==='sport_sample'?'Sport Sample':esc(r.case_type||'—')}
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Refer Amount (₹) <span style="color:red">*</span></label>
+            <input id="ra_amount" type="number" min="0" step="0.01" placeholder="Enter refer amount" required/>
+          </div>
+          <div class="form-group">
+            <label>Remarks (optional)</label>
+            <input id="ra_remark" type="text" placeholder="Notes…"/>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      entryHTML=`<div class="detail-section">
+        <h3>💰 Refer Amount</h3>
+        <div class="amount-summary">
+          <div><div class="amount-label">Refer Amount</div><div class="amount-value">${fmt(r.refer_amount)}</div></div>
+          <div><div class="amount-label">Refer Pay Status</div>
+            <div class="amount-value" style="font-size:.9rem;color:${r.refer_payment_status==='paid'?'#28a745':'#dc3545'}">
+              ${r.refer_payment_status==='paid'?'✅ Paid':'⏳ Pending'}
+            </div>
+          </div>
+          ${r.refer_voucher_no?`<div><div class="amount-label">Voucher No</div><div class="amount-value" style="font-size:.88rem">${esc(r.refer_voucher_no)}</div></div>`:''}
+          ${r.refer_paid_date?`<div><div class="amount-label">Paid Date</div><div class="amount-value" style="font-size:.88rem">${fmtDate(r.refer_paid_date)}</div></div>`:''}
+        </div>
+      </div>`;
+    }
+
+    document.getElementById('modalTitle').textContent = `Case ${r.case_no} — ${r.patient_name}`;
+    document.getElementById('modalBody').innerHTML=`
+      <div class="detail-section">
+        <h3>📝 Case Information</h3>
+        <div class="detail-grid">
+          <div><div class="detail-label">Case No</div><div class="detail-value">${esc(r.case_no)}</div></div>
+          <div><div class="detail-label">Date</div><div class="detail-value">${fmtDate(r.case_date)}</div></div>
+          <div><div class="detail-label">Patient</div><div class="detail-value">${esc(r.patient_name)}</div></div>
+          <div><div class="detail-label">Case Type</div><div class="detail-value">${esc(r.case_type||'—')}</div></div>
+          <div><div class="detail-label">Entered By</div><div class="detail-value">${esc(r.entered_by||r.recorded_by_name||'—')}</div></div>
+          <div><div class="detail-label">Trans No</div><div class="detail-value">${esc(r.trans_no||'—')}</div></div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h3>💵 Payment Summary</h3>
+        <div class="amount-summary">
+          <div><div class="amount-label">Bill Amount</div><div class="amount-value">${fmt(r.bill_amount)}</div></div>
+          <div><div class="amount-label">Discount</div><div class="amount-value" style="color:#6c757d">${fmt(disc)}</div></div>
+          <div><div class="amount-label">Paid</div><div class="amount-value" style="color:#28a745">${fmt(r.paid_amount)}</div></div>
+          <div><div class="amount-label">Due</div><div class="amount-value" style="color:${due>0?'#dc3545':'#28a745'}">${fmt(due)}</div></div>
+          <div><div class="amount-label">Status</div><div class="amount-value" style="font-size:.88rem;color:${ps.s==='paid'?'#28a745':ps.s==='due'?'#dc3545':'#e67e00'}">${ps.t}</div></div>
+        </div>
+      </div>
+
+      ${testBillHTML}
+      ${entryHTML}
+      <p class="err" id="modalErr" style="margin-top:.5rem"></p>
+    `;
+
+    // Footer buttons
+    const footer=document.getElementById('modalFooter');
+    if(mode==='pending'){
+      footer.innerHTML=`
+        <button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary" style="width:auto" onclick="submitReferAmount('${r.id}')">💾 Save Refer Amount</button>
+      `;
+    } else {
+      footer.innerHTML=`<button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeModal()">Close</button>`;
+    }
+
+    document.getElementById('detailModal').classList.remove('hidden');
+  }
+
+  function closeModal(){
+    document.getElementById('detailModal').classList.add('hidden');
+    currentRecord=null;
+  }
+  document.getElementById('detailModal').addEventListener('click',e=>{if(e.target===document.getElementById('detailModal')) closeModal();});
+
+  async function submitReferAmount(id){
+    const amtEl=document.getElementById('ra_amount');
+    const errEl=document.getElementById('modalErr');
+    errEl.textContent='';
+    const amt = parseFloat(amtEl?.value);
+    if(!amt || amt<=0){ errEl.textContent='⚠️ Please enter a valid refer amount greater than 0.'; return; }
+    const remark = document.getElementById('ra_remark')?.value.trim()||null;
+    showSpinner(true);
+    try {
+      const payload = BNH_PAGE.stamp({
+        refer_amount: amt,
+        refer_amount_remark: remark,
+        refer_payment_status: 'pending' // default pending until paid
+      });
+      const { error } = await BNH_PAGE.sb.from('opd_cases').update(payload).eq('id',id);
+      if(error) throw error;
+      showOk('✅ Refer amount saved successfully!');
+      closeModal();
+      await loadData();
+    } catch(e){ errEl.textContent='Error: '+e.message; }
+    finally { showSpinner(false); }
+  }
+
+  loadData();
+</script>
+</body>
+</html>

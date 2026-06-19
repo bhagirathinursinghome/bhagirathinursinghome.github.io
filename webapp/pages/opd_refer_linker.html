@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>OPD Refer Linker</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .form-row > * { flex: 1; min-width: 200px; }
+    .case-card { background: #f9f9f9; border: 1px solid #ddd; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+    .case-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+    .case-info { flex: 1; }
+    .case-no { font-weight: bold; color: #007bff; font-size: 1.1rem; }
+    .case-detail { font-size: 0.85rem; color: #666; margin-top: 0.25rem; }
+    .case-tests { background: white; padding: 0.5rem; border-radius: 3px; font-size: 0.8rem; color: #555; max-height: 80px; overflow-y: auto; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      font-size: 0.9rem;
+      box-sizing: border-box;
+    }
+    .quack-display { background: #fff3e0; padding: 0.75rem; border-radius: 3px; border-left: 3px solid #ff9800; font-size: 0.9rem; margin-top: 0.5rem; }
+    .quack-display strong { display: block; color: #e65100; }
+    .case-actions { display: flex; gap: 0.5rem; }
+    .btn-sm { padding: 0.5rem 1rem; font-size: 0.85rem; }
+    .btn-success { background: #28a745; }
+    .btn-success:hover { background: #218838; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e9ecef; }
+    .tab-btn { padding: 0.75rem 1.5rem; background: none; border: none; cursor: pointer; border-bottom: 3px solid transparent; font-size: 0.95rem; color: #666; }
+    .tab-btn.active { color: #007bff; border-bottom-color: #007bff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .completed-list { list-style: none; padding: 0; }
+    .completed-item { background: #f0f0f0; padding: 0.75rem; border-radius: 4px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+    .completed-item .case-info { margin: 0; }
+    .completed-item .status-badge { background: #28a745; color: white; padding: 0.25rem 0.75rem; border-radius: 3px; font-size: 0.75rem; }
+    .summary-box { background: #f8f9fa; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border-left: 4px solid #007bff; }
+    .summary-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+    .empty-state { text-align: center; padding: 2rem; color: #999; }
+    .empty-state-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .refer-type-toggle { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .refer-type-btn { padding: 0.4rem 0.9rem; border: 1px solid #ccc; background: #f8f9fa; border-radius: 3px; cursor: pointer; font-size: 0.85rem; }
+    .refer-type-btn.active { background: #007bff; color: white; border-color: #007bff; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>🔗 OPD Refer & IPD Linker</h1>
+
+  <div class="page-card">
+    <p style="margin-bottom: 1rem; color: #555; font-size: 0.9rem;">
+      Link OPD cases to IPD admissions and add referral information. Complete each case before moving to next.
+    </p>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="pending">📋 Pending Cases</button>
+      <button class="tab-btn" data-tab="completed">✅ Completed</button>
+    </div>
+
+    <!-- Pending Cases Tab -->
+    <div class="tab-content active" id="pending-tab">
+      <div id="pendingCasesContainer">
+        <div class="empty-state">
+          <div class="empty-state-icon">📭</div>
+          <p>Loading OPD cases...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Completed Cases Tab -->
+    <div class="tab-content" id="completed-tab">
+      <div class="summary-box">
+        <div class="summary-row">
+          <span>Completed Cases:</span>
+          <strong id="completedCount">0</strong>
+        </div>
+      </div>
+      <ul class="completed-list" id="completedList">
+        <li style="text-align: center; color: #999; padding: 2rem;">No completed cases yet</li>
+      </ul>
+    </div>
+
+    <p class="err" id="err"></p>
+    <p class="info" id="ok" style="display:none"></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+  BNH_PAGE.requireRole(["manager", "admin", "accountant","reception"]);
+
+  let pendingCases = [];
+  let completedCases = [];
+  let ipdPatients = [];
+  let quackDoctors = [];
+
+  // Load quack doctors (unique by doctor_name+mobile, with team info)
+  async function loadQuackDoctors() {
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('gramin_doctor_visits')
+        .select('id,doctor_name,mobile,recorded_by_name').order('doctor_name');
+      if (!error && data) {
+        // Deduplicate by mobile, keep first entry per unique doctor mobile
+        const seen = new Set();
+        quackDoctors = data.filter(d => {
+          const key = d.mobile || d.doctor_name;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+    } catch (e) {
+      console.error('Error loading quack doctors:', e);
+    }
+  }
+
+  // Load IPD current patients
+  async function loadIPDPatients() {
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
+        .select('*').eq('is_discharged', false);
+      if (!error && data) {
+        ipdPatients = data;
+      }
+    } catch (e) {
+      console.error('Error loading IPD patients:', e);
+    }
+  }
+
+  // Load pending OPD cases
+  async function loadPendingCases() {
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('opd_cases')
+        .select('*').eq('status', 'pending_refer').order('case_date', { ascending: false });
+      if (!error && data) {
+        pendingCases = data;
+        renderPendingCases();
+      }
+    } catch (e) {
+      console.error('Error loading cases:', e);
+      document.getElementById('err').textContent = 'Error loading cases: ' + e.message;
+    }
+  }
+
+  // Load completed cases
+  async function loadCompletedCases() {
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('opd_cases')
+        .select('*').neq('status', 'pending_refer').order('case_date', { ascending: false });
+      if (!error && data) {
+        completedCases = data;
+        renderCompletedCases();
+      }
+    } catch (e) {
+      console.error('Error loading completed:', e);
+    }
+  }
+
+  // Build quack doctor options HTML
+  function quackOptions() {
+    return quackDoctors.map(d =>
+      `<option value="quack|${d.doctor_name}|${d.mobile}|${d.recorded_by_name||''}">${d.doctor_name} — 📞 ${d.mobile} (${d.recorded_by_name||'Unknown Team'})</option>`
+    ).join('');
+  }
+
+  // Render pending cases
+  function renderPendingCases() {
+    const container = document.getElementById('pendingCasesContainer');
+
+    if (pendingCases.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🎉</div>
+          <p>All OPD cases have been linked!</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = pendingCases.map((caseData, idx) => `
+      <div class="case-card" id="case-${caseData.id}">
+        <div class="case-header">
+          <div class="case-info">
+            <div class="case-no">${caseData.case_no}</div>
+            <div class="case-detail">📅 ${caseData.case_date} | 👤 ${caseData.patient_name}</div>
+            <div class="case-detail">💰 Bill: ₹${caseData.bill_amount} | Paid: ₹${caseData.paid_amount} | Discount: ₹${caseData.discount || 0} | Due: ₹${Math.max(0, caseData.bill_amount - caseData.paid_amount - (caseData.discount || 0))}</div>
+          </div>
+        </div>
+
+        <div class="case-tests" title="Tests performed">
+          <strong style="display: block; margin-bottom: 0.25rem;">Tests:</strong>
+          ${caseData.tests}
+        </div>
+
+        <form class="case-form" data-case-id="${caseData.id}" style="margin-top: 1rem;">
+
+          <!-- Refer Type Toggle -->
+          <div class="form-group">
+            <label>Refer <span style="color:red">*</span></label>
+            <div class="refer-type-toggle">
+              <button type="button" class="refer-type-btn active" data-case="${caseData.id}" data-type="quack" onclick="switchReferType('${caseData.id}','quack')">👨‍⚕️ Refer</button>
+              <button type="button" class="refer-type-btn" data-case="${caseData.id}" data-type="none" onclick="switchReferType('${caseData.id}','none')">🚫 Not Applicable</button>
+            </div>
+          </div>
+
+          <!-- Quack Doctor Select -->
+          <div class="form-group" id="refer-quack-${caseData.id}">
+            <label>Select Quack Doctor</label>
+            <select name="quack_doctor" onchange="showQuackInfo('${caseData.id}', this.value)">
+              <option value="">Choose Refer...</option>
+              ${quackOptions()}
+            </select>
+            <div class="quack-display" id="quack-display-${caseData.id}" style="display:none; margin-top: 0.5rem;"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Linked to IPD Case?</label>
+              <select name="ipd_link" required>
+                <option value="no">No (Not Applicable)</option>
+                <option value="yes">Yes (Select Patient)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" id="ipd-patient-row-${caseData.id}" style="display: none;">
+            <div class="form-group">
+              <label>Select IPD Patient</label>
+              <select name="ipd_patient_id">
+                <option value="">Choose IPD Patient...</option>
+                ${ipdPatients.map(p => `<option value="${p.id}">${p.patient_name} (${p.admission_no})</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Case Type <span style="color: red;">*</span></label>
+              <select name="case_type" required>
+                <option value="">Choose Type...</option>
+                <option value="lab_sample">Lab Sample</option>
+                <option value="sport_sample">Sport Sample</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="case-actions" style="margin-top: 1rem;">
+            <button type="submit" class="btn-primary btn-sm btn-success">✅ Complete & Save</button>
+            <button type="button" class="btn-primary btn-sm" style="background: #6c757d;" onclick="this.closest('.case-card').remove();">Skip</button>
+          </div>
+        </form>
+      </div>
+    `).join('');
+
+    // Attach event listeners for ipd_link toggle + refer_id display
+    document.querySelectorAll('.case-form').forEach(form => {
+      form.addEventListener('change', (e) => {
+        if (e.target.name === 'ipd_link') {
+          const caseId = form.dataset.caseId;
+          const row = document.getElementById(`ipd-patient-row-${caseId}`);
+          if (e.target.value === 'yes') {
+            row.style.display = 'flex';
+            form.querySelector('[name="ipd_patient_id"]').required = true;
+          } else {
+            row.style.display = 'none';
+            form.querySelector('[name="ipd_patient_id"]').required = false;
+          }
+        }
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const caseId = form.dataset.caseId;
+        const caseData = pendingCases.find(c => c.id === caseId);
+        const formData = new FormData(form);
+
+        // Determine active refer type
+        const activeType = form.querySelector('.refer-type-btn.active')?.dataset.type || 'none';
+        const ipdLink = formData.get('ipd_link') === 'yes' ? formData.get('ipd_patient_id') : null;
+        const caseType = formData.get('case_type');
+
+        let referId = null;
+        let referName = null;
+
+        if (activeType === 'quack') {
+          const qval = formData.get('quack_doctor') || '';
+          if (qval) {
+            const parts = qval.split('|');
+            referName = `👨‍⚕️ ${parts[1]} (📞${parts[2]}, Team: ${parts[3] || 'N/A'})`;
+          }
+        }
+
+        const spinner = document.getElementById('spinner');
+        spinner.classList.remove('hidden');
+
+        try {
+          const updatePayload = {
+            refer_id: referId,
+            refer_name: referName,
+            ipd_admission_id: ipdLink,
+            case_type: caseType,
+            status: 'completed'
+          };
+
+          const { error } = await BNH_PAGE.sb.from('opd_cases')
+            .update(updatePayload).eq('id', caseId);
+
+          if (error) throw error;
+
+          pendingCases = pendingCases.filter(c => c.id !== caseId);
+          completedCases.push({ ...caseData, ...updatePayload });
+
+          document.getElementById(`case-${caseId}`).remove();
+          renderCompletedCases();
+
+          const ok = document.getElementById('ok');
+          ok.style.display = 'block';
+          ok.textContent = '✅ Case linked successfully!';
+          setTimeout(() => { ok.style.display = 'none'; }, 3000);
+
+          renderPendingCases();
+        } catch (err) {
+          document.getElementById('err').textContent = 'Error: ' + err.message;
+        } finally {
+          spinner.classList.add('hidden');
+        }
+      });
+    });
+  }
+
+  // Switch refer type for a case card
+  function switchReferType(caseId, type) {
+    const form = document.querySelector(`[data-case-id="${caseId}"]`);
+    form.querySelectorAll('.refer-type-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.type === type);
+    });
+    // Show quack panel only when type is quack
+    document.getElementById(`refer-quack-${caseId}`).style.display = type === 'quack' ? '' : 'none';
+    // Clear quack display when switching away
+    const qd = document.getElementById(`quack-display-${caseId}`);
+    if (qd) qd.style.display = 'none';
+  }
+
+  // Show quack doctor info card
+  function showQuackInfo(caseId, val) {
+    const display = document.getElementById(`quack-display-${caseId}`);
+    if (!val || !val.startsWith('quack|')) { display.style.display = 'none'; return; }
+    const parts = val.split('|');
+    display.style.display = 'block';
+    display.innerHTML = `
+      <strong>👨‍⚕️ Quack Doctor</strong>
+      <span>Name: <b>${parts[1]}</b></span><br>
+      <span>📞 Mobile: <b>${parts[2]}</b></span><br>
+      <span>🏷️ Team: <b>${parts[3] || 'N/A'}</b></span>
+    `;
+  }
+
+  // Render completed cases
+  function renderCompletedCases() {
+    const list = document.getElementById('completedList');
+    document.getElementById('completedCount').textContent = completedCases.length;
+
+    if (completedCases.length === 0) {
+      list.innerHTML = '<li style="text-align: center; color: #999; padding: 2rem;">No completed cases yet</li>';
+      return;
+    }
+
+    list.innerHTML = completedCases.map(c => `
+      <li class="completed-item">
+        <div class="case-info">
+          <div class="case-no">${c.case_no}</div>
+          <div class="case-detail">👤 ${c.patient_name} | 📅 ${c.case_date}</div>
+          <div class="case-detail">📌 Refer: ${c.refer_name || 'N/A'} | 🏥 IPD: ${c.ipd_admission_id ? 'Linked' : 'No'} | 📂 ${c.case_type}</div>
+        </div>
+        <span class="status-badge">✓ Done</span>
+      </li>
+    `).join('');
+  }
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      const tabId = btn.dataset.tab + '-tab';
+      document.getElementById(tabId).classList.add('active');
+    });
+  });
+
+  // Initialize
+  async function init() {
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      await loadQuackDoctors();
+      await loadIPDPatients();
+      await loadPendingCases();
+      await loadCompletedCases();
+    } catch (e) {
+      document.getElementById('err').textContent = 'Initialization error: ' + e.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
