@@ -168,7 +168,7 @@
       label: "IPD - Transactions",
       icon: "🔄",
       page: "pages/ipd-transactions.html",
-      roles: ["admin", "accountant", "pharmacy"]
+      roles: ["admin", "accountant"]
     },
     {
       label: "IPD - Data Editor",
