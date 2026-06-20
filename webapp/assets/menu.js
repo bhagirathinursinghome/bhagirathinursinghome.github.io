@@ -156,7 +156,7 @@
       label: "IPD - Reports",
       icon: "📊",
       page: "pages/ipd-reports.html",
-      roles: ["admin", "accountant", "manager", "viewer"]
+      roles: ["admin", "accountant", "manager", "viewer", "reception"]
     },
     {
       label: "IPD - Medicine Sale",
