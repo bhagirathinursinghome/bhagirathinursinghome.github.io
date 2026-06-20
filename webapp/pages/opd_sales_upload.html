@@ -350,10 +350,8 @@ BNH_PAGE.requireRole(["manager", "admin", "accountant"]);
 // ─── state ────────────────────────────────────────────────────────────────
 let salesFileObj  = null;
 let cashFileObj   = null;
-let mergedData    = [];      // final merged + reconciled rows (for preview)
-let rawSalesRows  = [];      // raw per-test rows from the API (→ opd_test)
-let rawCashRows   = [];      // raw per-transaction rows from the API (→ opd_cash_register)
-let existingCases = new Set(); // case_no already in opd_case
+let mergedData    = [];      // final merged + reconciled rows
+let existingCases = new Set(); // case_no already in Supabase
 
 // ─── API URL persistence ──────────────────────────────────────────────────
 function saveApiUrl() {
@@ -496,15 +494,10 @@ async function runNormalizer() {
 
 // ─── merge + reconcile (discount-aware) ────────────────────────────────────
 async function mergeAndReconcile(salesRows, cashRows) {
-  // keep the raw, ungrouped rows — these are what actually get written to
-  // opd_test (one row per test) and opd_cash_register (one row per transaction)
-  rawSalesRows = salesRows;
-  rawCashRows  = cashRows;
-
-  // fetch existing case_no from opd_case for duplicate detection
+  // fetch existing case_no from Supabase for duplicate detection
   try {
     const { data: existing } = await BNH_PAGE.sb
-      .from('opd_case')
+      .from('opd_cases')
       .select('case_no');
     existingCases = new Set((existing || []).map(r => r.case_no));
     if (existingCases.size > 0) {
@@ -703,17 +696,6 @@ function toISODate(d) {
 }
 function escHtml(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// opd_test / opd_cash_register / opd_case use created_by_id + created_by_name
-// (rather than this app's usual recorded_by / recorded_by_name), so stamp
-// once per upload and remap. NOTE: assumes BNH_PAGE.stamp() attaches
-// recorded_by (user id) and recorded_by_name — same as it does for every
-// other table in this app. Adjust the two lines below if your stamp()
-// helper uses different field names.
-function getCreatorStamp() {
-  const s = BNH_PAGE.stamp({});
-  return { created_by_id: s.recorded_by || null, created_by_name: s.recorded_by_name || null };
-}
-
 // ─── tabs ──────────────────────────────────────────────────────────────────
 function switchTab(event, name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -722,10 +704,10 @@ function switchTab(event, name) {
   document.getElementById(name + '-tab').classList.add('active');
 }
 
-// ─── upload to Supabase: writes opd_case + opd_test + opd_cash_register ───
+// ─── upload to Supabase (skip duplicates) ─────────────────────────────────
 async function uploadToSupabase() {
   const newCases = mergedData.filter(c => !c.is_duplicate);
-  if (newCases.length === 0 && rawCashRows.length === 0) {
+  if (newCases.length === 0) {
     document.getElementById('err').textContent = 'No new cases to upload (all are duplicates)';
     return;
   }
@@ -738,124 +720,43 @@ async function uploadToSupabase() {
   err.textContent = '';
   spinner.classList.remove('hidden');
   bar.style.display = 'block';
-  fill.style.width  = '5%';
-  fill.textContent  = '5%';
-
-  const stamp = getCreatorStamp(); // same uploading user for every row in this batch
+  fill.style.width  = '10%';
+  fill.textContent  = '10%';
 
   try {
     document.getElementById('step3Number').classList.replace('pending', 'done');
     document.getElementById('step3Number').textContent = '✓';
 
-    const newCaseNos = new Set(newCases.map(c => c.case_no));
-
-    // ── 1. opd_case — one master row per new case ───────────────────────
-    log('📝 Creating case records…');
-    const caseRows = newCases.map(c => ({
-      case_no:      c.case_no,
-      case_date:    toISODate(c.case_date),
-      patient_name: c.patient_name,
+    const payload = newCases.map(c => BNH_PAGE.stamp({
+      case_no:       c.case_no,
+      case_date:     toISODate(c.case_date),
+      patient_name:  c.patient_name,
+      bill_amount:   c.bill_amount,
+      paid_amount:   c.paid_amount,
+      discount:      c.discount,          // ✅ included
+      // due_amount not stored — calculated dynamically as bill_amount - paid_amount - discount
+      tests:         c.tests,
+      trans_no:      c.trans_nos,
+      entered_by:    c.entry_by,
+      status:        'pending_refer'
     }));
-    if (caseRows.length > 0) {
-      const { error: caseErr } = await BNH_PAGE.sb
-        .from('opd_case')
-        .upsert(caseRows, { onConflict: 'case_no', ignoreDuplicates: true });
-      if (caseErr) throw new Error('opd_case: ' + caseErr.message);
-    }
-    fill.style.width = '30%'; fill.textContent = '30%';
 
-    // ── 2. opd_test — one row per test line, for the new cases only ─────
-    log('📝 Inserting test line items…');
-    const testRows = rawSalesRows
-      .filter(r => newCaseNos.has(r.case_number))
-      .map(r => ({
-        case_date:       toISODate(r.case_date),
-        case_number:     r.case_number,
-        patient_name:    r.patient_name,
-        test_name:       r.test_name,
-        test_amount:     r.test_amount,
-        created_by_id:   stamp.created_by_id,
-        created_by_name: stamp.created_by_name,
-      }));
-    if (testRows.length > 0) {
-      const { error: testErr } = await BNH_PAGE.sb.from('opd_test').insert(testRows);
-      if (testErr) throw new Error('opd_test: ' + testErr.message);
-    }
-    fill.style.width = '55%'; fill.textContent = '55%';
+    fill.style.width = '50%'; fill.textContent = '50%';
 
-    // ── 3. opd_cash_register — every NEW transaction (not just new cases;
-    //      a case created in an earlier upload can still receive a fresh
-    //      payment today) ─────────────────────────────────────────────────
-    log('📝 Checking for already-recorded transactions…');
-    let existingTransNos = new Set();
-    try {
-      const { data: existingTx } = await BNH_PAGE.sb
-        .from('opd_cash_register')
-        .select('transaction_no')
-        .in('transaction_no', rawCashRows.map(r => r.trans_number).filter(Boolean));
-      existingTransNos = new Set((existingTx || []).map(r => r.transaction_no));
-    } catch (e) {
-      log('⚠️ Could not check existing transactions: ' + e.message, 'log-warn');
-    }
+    // Batch insert (upsert with ignore to be safe against race conditions)
+    const { error } = await BNH_PAGE.sb
+      .from('opd_cases')
+      .upsert(payload, { onConflict: 'case_no', ignoreDuplicates: true });
 
-    const cashToInsert = rawCashRows.filter(r =>
-      r.trans_number && !existingTransNos.has(r.trans_number)
-    );
-
-    // Any cash row whose case_no isn't already in opd_case (pre-existing or
-    // just created above) needs a stub case row first, or the FK will reject it.
-    const knownCaseNos = new Set([...existingCases, ...newCaseNos]);
-    const stubCases = [];
-    const seenStub = new Set();
-    cashToInsert.forEach(r => {
-      if (!knownCaseNos.has(r.case_number) && !seenStub.has(r.case_number)) {
-        stubCases.push({
-          case_no:      r.case_number,
-          case_date:    toISODate(r.case_date || r.trans_date),
-          patient_name: r.patient_name,
-        });
-        seenStub.add(r.case_number);
-        knownCaseNos.add(r.case_number);
-      }
-    });
-    if (stubCases.length > 0) {
-      log(`⚠️ ${stubCases.length} payment(s) reference a case not found in this Sales Report — creating case record from Cash Register data only (no tests).`, 'log-warn');
-      const { error: stubErr } = await BNH_PAGE.sb
-        .from('opd_case')
-        .upsert(stubCases, { onConflict: 'case_no', ignoreDuplicates: true });
-      if (stubErr) throw new Error('opd_case (stub): ' + stubErr.message);
-    }
-
-    log('📝 Inserting cash register entries…');
-    const cashRowsOut = cashToInsert.map(r => ({
-      transaction_date: toISODate(r.trans_date),
-      case_date:        toISODate(r.case_date),
-      transaction_no:   r.trans_number,
-      case_no:          r.case_number,
-      patient_name:     r.patient_name,
-      entry_by:         r.entry_by,
-      income:           r.income,
-      discount:         r.discount,
-      created_by_id:    stamp.created_by_id,
-      created_by_name:  stamp.created_by_name,
-    }));
-    if (cashRowsOut.length > 0) {
-      const { error: cashErr } = await BNH_PAGE.sb.from('opd_cash_register').insert(cashRowsOut);
-      if (cashErr) throw new Error('opd_cash_register: ' + cashErr.message);
-    }
+    if (error) throw error;
 
     fill.style.width = '100%'; fill.textContent = '100%';
 
-    const skippedCases = mergedData.length - newCases.length;
-    const skippedTx     = rawCashRows.length - cashToInsert.length;
+    const skipped = mergedData.length - newCases.length;
     document.getElementById('successBox').style.display = 'block';
     document.getElementById('successMessage').innerHTML = `
-      ✅ Uploaded <strong>${caseRows.length} new case(s)</strong>,
-      <strong>${testRows.length} test line(s)</strong>, and
-      <strong>${cashRowsOut.length} cash entr${cashRowsOut.length === 1 ? 'y' : 'ies'}</strong> to Supabase.<br>
-      ${skippedCases > 0 ? `⚠️ <strong>${skippedCases} duplicate case(s)</strong> were skipped.<br>` : ''}
-      ${skippedTx > 0 ? `⚠️ <strong>${skippedTx} duplicate transaction(s)</strong> were skipped.<br>` : ''}
-      ${stubCases.length > 0 ? `ℹ️ <strong>${stubCases.length} case(s)</strong> were created from Cash Register data only (no matching tests in this Sales Report).<br>` : ''}
+      ✅ Successfully uploaded <strong>${payload.length} new OPD case(s)</strong> to Supabase.<br>
+      ${skipped > 0 ? `⚠️ <strong>${skipped} duplicate(s)</strong> were skipped.<br>` : ''}
       Ready for refer linking in the next step.
     `;
 
@@ -863,7 +764,6 @@ async function uploadToSupabase() {
     document.getElementById('proceedBtn').style.display = 'block';
 
   } catch (ex) {
-    log('❌ Upload error: ' + ex.message, 'log-err');
     err.textContent = 'Upload error: ' + ex.message;
   } finally {
     spinner.classList.add('hidden');
