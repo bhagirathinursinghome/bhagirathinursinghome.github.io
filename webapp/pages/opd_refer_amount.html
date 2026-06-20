@@ -6,6 +6,8 @@
   <title>Refer Amount Entry</title>
   <link rel="stylesheet" href="../assets/style.css"/>
   <style>
+    .role-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:600;margin-left:.5rem;vertical-align:middle}
+    .role-full{background:#d1e7dd;color:#0a3622}.role-limited{background:#fff3cd;color:#856404}
     .tabs{display:flex;gap:0;margin-bottom:1.2rem;border-bottom:2px solid #e9ecef;overflow-x:auto}
     .tab-btn{padding:.65rem 1.3rem;background:none;border:none;cursor:pointer;border-bottom:3px solid transparent;font-size:.9rem;color:#666;white-space:nowrap}
     .tab-btn.active{color:#007bff;border-bottom-color:#007bff;font-weight:600}
@@ -26,9 +28,10 @@
     .badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:.75rem;font-weight:600}
     .badge-pending{background:#fff3cd;color:#856404}.badge-paid{background:#d1e7dd;color:#0a3622}
     .badge-due{background:#f8d7da;color:#721c24}.badge-partial{background:#fff3cd;color:#856404}
+    .badge-set{background:#d1e7dd;color:#0a3622}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem}
     .modal-overlay.hidden{display:none!important}
-    .modal-box{background:white;border-radius:8px;width:min(96vw,680px);max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+    .modal-box{background:white;border-radius:8px;width:min(96vw,700px);max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)}
     .modal-header{padding:1.1rem 1.4rem;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:white;z-index:2}
     .modal-header h2{margin:0;font-size:1.05rem}
     .modal-close{font-size:1.5rem;cursor:pointer;color:#999;border:none;background:none;line-height:1}
@@ -47,6 +50,9 @@
     .test-bill-table th{background:#f0f0f0;padding:6px 9px;text-align:left;border-bottom:1px solid #ddd}
     .test-bill-table td{padding:7px 9px;border-bottom:1px solid #f0f0f0}
     .test-bill-table tr.total-row td{border-bottom:none;font-weight:700;background:#f8f9fa}
+    .cash-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.5rem}
+    .cash-table th{background:#f0f0f0;padding:6px 8px;text-align:left}
+    .cash-table td{padding:6px 8px;border-bottom:1px solid #f0f0f0}
     .entry-form{background:#e7f3ff;border:1px solid #b8daff;border-radius:6px;padding:1.2rem;margin-top:.5rem}
     .entry-form h4{margin:0 0 1rem 0;color:#004085;font-size:.95rem}
     .refer-info-box{background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.87rem}
@@ -59,14 +65,14 @@
     .completed-box{background:#d1e7dd;border:1px solid #a3cfbb;border-radius:6px;padding:1rem}
     .completed-box h4{margin:0 0 .75rem 0;color:#0a3622;font-size:.92rem}
     .empty-state{text-align:center;padding:2.5rem;color:#aaa}
+    .info-note{background:#e7f3ff;border:1px solid #b8daff;border-radius:4px;padding:.6rem .9rem;font-size:.83rem;color:#004085;margin-top:.5rem}
+    .btn-del{background:#dc3545;color:white;border:none;border-radius:3px;cursor:pointer}
+    .btn-del:hover{background:#a71d2a}
+    .btn-sm{padding:.5rem 1rem;font-size:.85rem}
     .hidden{display:none!important}
     .pagination{display:flex;gap:.4rem;justify-content:center;margin-top:1rem;flex-wrap:wrap}
     .pagination button{padding:.38rem .65rem;border:1px solid #ccc;background:white;cursor:pointer;border-radius:3px;font-size:.82rem}
     .pagination button.active{background:#007bff;color:white;border-color:#007bff}
-    .role-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:600;margin-left:.5rem;vertical-align:middle}
-    .role-full{background:#d1e7dd;color:#0a3622}.role-limited{background:#fff3cd;color:#856404}
-    .btn-del{background:#dc3545;color:white;border:none;border-radius:3px;cursor:pointer}
-    .btn-del:hover{background:#a71d2a}
   </style>
 </head>
 <body>
@@ -74,9 +80,14 @@
 <div class="page">
   <h1>💊 Refer Amount Entry <span id="roleBadge" class="role-badge"></span></h1>
   <div class="page-card">
+    <p style="margin-bottom:1rem;color:#555;font-size:.9rem">
+      Set the refer amount for linked OPD cases. Click any case to view its tests, full payment history and set/update the amount.
+      Payment recording (voucher, mode, paid date) happens on a separate Refer Payment page.
+    </p>
+
     <div class="tabs">
-      <button class="tab-btn active" data-tab="pending">⏳ Pending Entry <span id="pendingCount" class="badge badge-pending" style="margin-left:.3rem"></span></button>
-      <button class="tab-btn" data-tab="completed">✅ Completed</button>
+      <button class="tab-btn active" data-tab="pending">⏳ Pending Amount <span id="pendingCount" class="badge badge-pending" style="margin-left:.3rem"></span></button>
+      <button class="tab-btn" data-tab="completed">✅ Amount Set <span id="completedCount" class="badge badge-set" style="margin-left:.3rem"></span></button>
     </div>
 
     <div class="tab-content active" id="tab-pending">
@@ -94,6 +105,7 @@
     </div>
 
     <div class="tab-content" id="tab-completed">
+      <div class="stats-row" id="completedStats"></div>
       <div class="filter-bar">
         <div class="filter-group"><label>Search</label><input id="compSearch" placeholder="Case no, patient, refer…" oninput="filterCompleted()"/></div>
         <div class="filter-group"><label>Date From</label><input type="date" id="compDateFrom" onchange="filterCompleted()"/></div>
@@ -111,6 +123,7 @@
   </div>
 </div>
 
+<!-- ═══ DETAIL MODAL ═════════════════════════════════════════════════════ -->
 <div class="modal-overlay hidden" id="detailModal">
   <div class="modal-box">
     <div class="modal-header">
@@ -135,39 +148,211 @@
   const userRole     = BNH_PAGE.user?.role||'';
   const isFullAccess = FULL_ACCESS_ROLES.includes(userRole);
 
-  // Role badge
-  const rb = document.getElementById('roleBadge');
-  rb.textContent = isFullAccess ? '🔓 Full Access' : '✍️ Entry Only';
+  const rb=document.getElementById('roleBadge');
+  rb.textContent = isFullAccess ? '🔓 Full Access' : '👁 Limited Access';
   rb.className   = 'role-badge '+(isFullAccess?'role-full':'role-limited');
 
-  // TABLE: opd_refer_payments
-  // Existing cols : id, payment_date, opd_case_id, refer_id, refer_name, amount, mode, remark, recorded_by, recorded_at
-  // Added cols    : case_no, patient_name, case_date, refer_amount, payment_status, voucher_no,
-  //                 paid_date, discount, pay_mode, paid_by, paid_by_name, paid_at, recorded_by_name
-  //
-  // In this page:
-  //   "refer_amount" = the amount to be paid to the referrer (set here)
-  //   "amount"       = existing field (may store cash received, kept intact)
-  //   "payment_status" = 'pending' | 'paid'  (managed by refer_paid page)
+  // ── State ─────────────────────────────────────────────────────────────────
+  let allCases     = [];   // opd_case rows that have a refer_name set
+  let testsByCase  = {};   // case_no → [{test_name,test_amount}]
+  let cashByCase   = {};   // case_no → {paid,discount,due,rows:[]}
 
-  let allCases=[], allReferPayments=[];
-  let pendingCases=[], filteredPending=[], currentPendPage=1;
-  let completedEntries=[], filteredCompleted=[], currentCompPage=1;
-  const PER=20;
+  let filteredPend = [], currentPendPage = 1;
+  let filteredComp = [], currentCompPage = 1;
+  const PER = 15;
 
+  // ── Helpers ──────────────────────────────────────────────────────────────
   function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
   function fmt(n){return n!=null&&n!==''?'₹'+Number(n).toLocaleString('en-IN'):'—';}
-  function fmtDate(d){return d?String(d).slice(0,10):'—';}
+  function fmtD(d){return d?String(d).slice(0,10):'—';}
   function showSpinner(v){document.getElementById('spinner').classList.toggle('hidden',!v);}
   function showErr(msg){const e=document.getElementById('err');e.textContent=msg;setTimeout(()=>e.textContent='',6000);}
   function showOk(msg){const o=document.getElementById('ok');o.style.display='block';o.textContent=msg;setTimeout(()=>o.style.display='none',3000);}
-  function gps(r){
-    const disc=Number(r.discount||0),bill=Number(r.bill_amount||0),paid=Number(r.paid_amount||0),due=bill-disc-paid;
-    if(due<=0)return{s:'paid',t:'✅ Paid',c:'badge-paid'};
-    if(paid===0)return{s:'due',t:'⏳ Due',c:'badge-due'};
-    return{s:'partial',t:'⚠️ Partial',c:'badge-partial'};
+
+  // ── Load data ─────────────────────────────────────────────────────────────
+  async function loadCases(){
+    const{data,error}=await BNH_PAGE.sb.from('opd_case')
+      .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,type,ipd_link,refer_amount,refer_amount_enter_by,refer_amount_enter_time,refer_payment_status')
+      .not('refer_name','is',null)
+      .order('case_date',{ascending:false});
+    if(error)throw error;
+    allCases=data||[];
   }
 
+  async function loadTests(){
+    const{data,error}=await BNH_PAGE.sb.from('opd_test')
+      .select('case_number,test_name,test_amount');
+    if(error){console.warn('opd_test:',error.message);return;}
+    testsByCase={};
+    (data||[]).forEach(r=>{
+      if(!testsByCase[r.case_number])testsByCase[r.case_number]=[];
+      testsByCase[r.case_number].push({name:r.test_name,amount:Number(r.test_amount||0)});
+    });
+  }
+
+  async function loadCash(){
+    const{data,error}=await BNH_PAGE.sb.from('opd_cash_register')
+      .select('case_no,transaction_no,transaction_date,income,discount,entry_by,created_by_name')
+      .order('transaction_date',{ascending:false});
+    if(error){console.warn('opd_cash_register:',error.message);return;}
+    cashByCase={};
+    (data||[]).forEach(r=>{
+      const cn=(r.case_no||'').trim();
+      if(!cashByCase[cn])cashByCase[cn]={paid:0,discount:0,due:0,rows:[]};
+      cashByCase[cn].paid     += Number(r.income||0);
+      cashByCase[cn].discount += Number(r.discount||0);
+      cashByCase[cn].rows.push(r);
+    });
+    Object.keys(cashByCase).forEach(cn=>{
+      const cas=allCases.find(x=>x.case_no===cn);
+      const bill=Number(cas?.total_amount||0);
+      cashByCase[cn].due=Math.max(0,bill-cashByCase[cn].paid-cashByCase[cn].discount);
+    });
+  }
+
+  function buildReferFilters(){
+    const refers=[...new Set(allCases.map(c=>c.refer_name).filter(Boolean))].sort();
+    ['pendReferFilter','compReferFilter'].forEach(id=>{
+      const sel=document.getElementById(id);
+      const current=sel.value;
+      sel.innerHTML='<option value="">All Refers</option>'+
+        refers.map(r=>`<option value="${esc(r)}" ${current===r?'selected':''}>${esc(r)}</option>`).join('');
+    });
+  }
+
+  // ── Filters ──────────────────────────────────────────────────────────────
+  function applyFilter(src,searchId,dfId,dtId,referId){
+    const q=(document.getElementById(searchId).value||'').toLowerCase();
+    const df=document.getElementById(dfId).value;
+    const dt=document.getElementById(dtId).value;
+    const rf=referId?document.getElementById(referId).value:'';
+    return src.filter(x=>{
+      if(q&&!(x.case_no||'').toLowerCase().includes(q)&&!(x.patient_name||'').toLowerCase().includes(q)&&!(x.refer_name||'').toLowerCase().includes(q))return false;
+      const d=String(x.case_date||'').slice(0,10);
+      if(df&&d<df)return false;
+      if(dt&&d>dt)return false;
+      if(rf&&x.refer_name!==rf)return false;
+      return true;
+    });
+  }
+
+  function filterPending(){
+    const pending=allCases.filter(c=>!c.refer_amount||Number(c.refer_amount)<=0);
+    filteredPend=applyFilter(pending,'pendSearch','pendDateFrom','pendDateTo','pendReferFilter');
+    currentPendPage=1;
+    document.getElementById('pendingCount').textContent=pending.length;
+    renderPendingStats(pending);
+    renderPendingPage();
+  }
+
+  function filterCompleted(){
+    const completed=allCases.filter(c=>c.refer_amount&&Number(c.refer_amount)>0);
+    filteredComp=applyFilter(completed,'compSearch','compDateFrom','compDateTo','compReferFilter');
+    currentCompPage=1;
+    document.getElementById('completedCount').textContent=completed.length;
+    renderCompletedStats(completed);
+    renderCompletedPage();
+  }
+
+  function renderPendingStats(pending){
+    const totalBill=pending.reduce((s,c)=>s+Number(c.total_amount||0),0);
+    document.getElementById('pendingStats').innerHTML=`
+      <div class="stat-box"><div class="val" style="color:#dc3545">${pending.length}</div><div class="lbl">Pending Amount</div></div>
+      <div class="stat-box"><div class="val">${filteredPend.length}</div><div class="lbl">Showing (filtered)</div></div>
+      <div class="stat-box"><div class="val">${fmt(totalBill)}</div><div class="lbl">Total Bill (pending set)</div></div>`;
+  }
+
+  function renderCompletedStats(completed){
+    const totalRefer=completed.reduce((s,c)=>s+Number(c.refer_amount||0),0);
+    const paid=completed.filter(c=>c.refer_payment_status==='paid').length;
+    document.getElementById('completedStats').innerHTML=`
+      <div class="stat-box"><div class="val" style="color:#28a745">${completed.length}</div><div class="lbl">Amount Set</div></div>
+      <div class="stat-box"><div class="val">${filteredComp.length}</div><div class="lbl">Showing (filtered)</div></div>
+      <div class="stat-box"><div class="val">${fmt(totalRefer)}</div><div class="lbl">Total Refer Amount</div></div>
+      <div class="stat-box"><div class="val" style="color:#28a745">${paid}</div><div class="lbl">Already Paid</div></div>`;
+  }
+
+  // ── Pay status pill for case bill (not refer payment) ───────────────────
+  function billStatus(caseNo,totalAmount){
+    const bill=Number(totalAmount||0);
+    const c=cashByCase[caseNo];
+    if(!c||bill===0)return{t:'⏳ Due',col:'badge-due'};
+    if(c.due<=0)return{t:'✅ Paid',col:'badge-paid'};
+    if(c.paid>0)return{t:'⚠️ Partial',col:'badge-partial'};
+    return{t:'⏳ Due',col:'badge-due'};
+  }
+
+  // ── Render: Pending table ────────────────────────────────────────────────
+  function renderPendingPage(){
+    const div=document.getElementById('pendingTable');
+    if(!filteredPend.length){
+      div.innerHTML='<div class="empty-state">🎉 No pending refer amounts.</div>';
+      document.getElementById('pendPager').innerHTML='';
+      return;
+    }
+    const rows=filteredPend.slice((currentPendPage-1)*PER,currentPendPage*PER);
+    div.innerHTML=`<table>
+      <thead><tr><th>Case No</th><th>Date</th><th>Patient</th><th>Refer</th><th>Bill</th><th>Bill Status</th><th>Tests</th></tr></thead>
+      <tbody>${rows.map(c=>{
+        const bs=billStatus(c.case_no,c.total_amount);
+        const tests=(testsByCase[c.case_no]||[]).map(t=>t.name).join(', ')||'—';
+        return`<tr onclick="openDetail('${esc(c.case_no)}')">
+          <td class="case-no">${esc(c.case_no)}</td>
+          <td>${fmtD(c.case_date)}</td>
+          <td>${esc(c.patient_name)}</td>
+          <td>${esc(c.refer_name||'—')}</td>
+          <td>${fmt(c.total_amount)}</td>
+          <td><span class="badge ${bs.col}">${bs.t}</span></td>
+          <td style="font-size:.78rem;color:#666;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(tests)}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+    renderPager('pendPager',filteredPend.length,currentPendPage,'pend');
+  }
+
+  // ── Render: Completed table ──────────────────────────────────────────────
+  function renderCompletedPage(){
+    const div=document.getElementById('completedTable');
+    if(!filteredComp.length){
+      div.innerHTML='<div class="empty-state">No refer amounts set yet.</div>';
+      document.getElementById('compPager').innerHTML='';
+      return;
+    }
+    const rows=filteredComp.slice((currentCompPage-1)*PER,currentCompPage*PER);
+    div.innerHTML=`<table>
+      <thead><tr><th>Case No</th><th>Date</th><th>Patient</th><th>Refer</th><th>Refer Amount</th><th>Pay Status</th><th>Set By</th><th>Set On</th></tr></thead>
+      <tbody>${rows.map(c=>`<tr onclick="openDetail('${esc(c.case_no)}')">
+          <td class="case-no">${esc(c.case_no)}</td>
+          <td>${fmtD(c.case_date)}</td>
+          <td>${esc(c.patient_name)}</td>
+          <td>${esc(c.refer_name||'—')}</td>
+          <td style="font-weight:700;color:#007bff">${fmt(c.refer_amount)}</td>
+          <td><span class="badge ${c.refer_payment_status==='paid'?'badge-paid':'badge-due'}">${c.refer_payment_status==='paid'?'✅ Paid':'⏳ Pending'}</span></td>
+          <td style="font-size:.8rem;color:#666">${esc(c.refer_amount_enter_by||'—')}</td>
+          <td style="font-size:.8rem;color:#666">${fmtD(c.refer_amount_enter_time)}</td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+    renderPager('compPager',filteredComp.length,currentCompPage,'comp');
+  }
+
+  // ── Pagination ───────────────────────────────────────────────────────────
+  function renderPager(pagerId,total,page,key){
+    const tp=Math.ceil(total/PER);
+    const p=document.getElementById(pagerId);
+    if(tp<=1){p.innerHTML='';return;}
+    let h='';
+    if(page>1)h+=`<button onclick="goP('${key}',1)">«</button><button onclick="goP('${key}',${page-1})">‹</button>`;
+    for(let i=Math.max(1,page-2);i<=Math.min(tp,page+2);i++)
+      h+=`<button ${i===page?'class="active"':''} onclick="goP('${key}',${i})">${i}</button>`;
+    if(page<tp)h+=`<button onclick="goP('${key}',${page+1})">›</button><button onclick="goP('${key}',${tp})">»</button>`;
+    p.innerHTML=h;
+  }
+  function goP(key,page){
+    if(key==='pend'){currentPendPage=page;renderPendingPage();}
+    else{currentCompPage=page;renderCompletedPage();}
+  }
+
+  // ── Tabs ─────────────────────────────────────────────────────────────────
   document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
       document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -177,357 +362,227 @@
     });
   });
 
-  async function loadData(){
-    showSpinner(true);
-    try{
-      // Load opd_cases that have a refer_name
-      const{data:cases,error:ce}=await BNH_PAGE.sb
-        .from('opd_cases').select('*')
-        .not('refer_name','is',null)
-        .order('case_date',{ascending:false});
-      if(ce)throw ce;
-      allCases=cases||[];
-
-      // Load opd_refer_payments — all rows
-      const{data:rp,error:re}=await BNH_PAGE.sb
-        .from('opd_refer_payments').select('*')
-        .order('recorded_at',{ascending:false});
-      if(re)throw re;
-      allReferPayments=rp||[];
-
-      // Pending = opd_cases with refer_name but NO row yet in opd_refer_payments (matched by opd_case_id)
-      const enteredIds=new Set(allReferPayments.map(x=>x.opd_case_id).filter(Boolean));
-      pendingCases=allCases.filter(c=>!enteredIds.has(c.id));
-
-      // Completed = rows in opd_refer_payments that have refer_amount set
-      completedEntries=allReferPayments.filter(x=>x.refer_amount!=null && Number(x.refer_amount)>0);
-
-      buildReferFilters();
-      renderStats();
-      filterPending();
-      filterCompleted();
-    }catch(e){showErr('Load error: '+e.message);}
-    finally{showSpinner(false);}
-  }
-
-  function buildReferFilters(){
-    const refers=[...new Set([
-      ...allCases.map(c=>c.refer_name),
-      ...allReferPayments.map(x=>x.refer_name)
-    ].filter(Boolean))].sort();
-    ['pendReferFilter','compReferFilter'].forEach(id=>{
-      document.getElementById(id).innerHTML='<option value="">All Refers</option>'+
-        refers.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
-    });
-  }
-
-  function renderStats(){
-    const pendBill=pendingCases.reduce((s,c)=>s+Number(c.bill_amount||0),0);
-    const compAmt=completedEntries.reduce((s,x)=>s+Number(x.refer_amount||0),0);
-    document.getElementById('pendingStats').innerHTML=`
-      <div class="stat-box"><div class="val" style="color:#dc3545">${pendingCases.length}</div><div class="lbl">Pending Entry</div></div>
-      <div class="stat-box"><div class="val" style="color:#28a745">${completedEntries.length}</div><div class="lbl">Completed</div></div>
-      <div class="stat-box"><div class="val">${fmt(pendBill)}</div><div class="lbl">Pending Bill Total</div></div>
-      <div class="stat-box"><div class="val">${fmt(compAmt)}</div><div class="lbl">Total Refer Amt Set</div></div>`;
-    document.getElementById('pendingCount').textContent=pendingCases.length;
-  }
-
-  function doFilter(src,searchId,dfId,dtId,rfId,isRpRow){
-    const q=(document.getElementById(searchId).value||'').toLowerCase();
-    const df=document.getElementById(dfId).value,dt=document.getElementById(dtId).value;
-    const rf=document.getElementById(rfId).value;
-    return src.filter(r=>{
-      const cno=(isRpRow?r.case_no:r.case_no||r.case_no)||'';
-      const pt=(isRpRow?r.patient_name:r.patient_name)||'';
-      const rn=r.refer_name||'';
-      if(q&&!cno.toLowerCase().includes(q)&&!pt.toLowerCase().includes(q)&&!rn.toLowerCase().includes(q))return false;
-      const d=String(isRpRow?(r.case_date||r.recorded_at||''):(r.case_date||'')).slice(0,10);
-      if(df&&d<df)return false;if(dt&&d>dt)return false;
-      if(rf&&rn!==rf)return false;
-      return true;
-    });
-  }
-
-  function filterPending(){
-    filteredPending=doFilter(pendingCases,'pendSearch','pendDateFrom','pendDateTo','pendReferFilter',false);
-    currentPendPage=1;renderPendingTable();
-  }
-  function filterCompleted(){
-    filteredCompleted=doFilter(completedEntries,'compSearch','compDateFrom','compDateTo','compReferFilter',true);
-    currentCompPage=1;renderCompletedTable();
-  }
-
-  function renderPendingTable(){
-    const div=document.getElementById('pendingTable');
-    if(!filteredPending.length){div.innerHTML='<div class="empty-state">🎉 No pending refer amount entries.</div>';document.getElementById('pendPager').innerHTML='';return;}
-    const rows=filteredPending.slice((currentPendPage-1)*PER,currentPendPage*PER);
-    div.innerHTML=`<table>
-      <thead><tr><th>Case No</th><th>Date</th><th>Patient</th><th>Bill</th><th>Discount</th><th>Paid</th><th>Due</th><th>Refer</th><th>Bill Status</th><th>Action</th></tr></thead>
-      <tbody>${rows.map(r=>{
-        const ps=gps(r),disc=Number(r.discount||0),due=Number(r.bill_amount||0)-disc-Number(r.paid_amount||0);
-        return`<tr onclick="openDetail('${r.id}','pending')">
-          <td class="case-no">${esc(r.case_no)}</td><td>${fmtDate(r.case_date)}</td><td>${esc(r.patient_name)}</td>
-          <td>${fmt(r.bill_amount)}</td><td>${disc>0?fmt(disc):'—'}</td><td>${fmt(r.paid_amount)}</td>
-          <td style="color:${due>0?'#dc3545':'#28a745'}">${fmt(due)}</td>
-          <td><strong>${esc(r.refer_name)}</strong></td>
-          <td><span class="badge ${ps.c}">${ps.t}</span></td>
-          <td onclick="event.stopPropagation()">
-            <button class="btn-primary" style="width:auto;padding:4px 10px;font-size:.78rem"
-              onclick="openDetail('${r.id}','pending')">💰 Enter Amount</button>
-          </td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table>`;
-    renderPager('pendPager',filteredPending.length,currentPendPage,'pend');
-  }
-
-  function renderCompletedTable(){
-    const div=document.getElementById('completedTable');
-    if(!filteredCompleted.length){div.innerHTML='<div class="empty-state">No completed entries yet.</div>';document.getElementById('compPager').innerHTML='';return;}
-    const rows=filteredCompleted.slice((currentCompPage-1)*PER,currentCompPage*PER);
-    div.innerHTML=`<table>
-      <thead><tr><th>Case No</th><th>Case Date</th><th>Patient</th><th>Refer</th><th>Refer Amount</th><th>Pay Status</th><th>Entered By</th><th>Entered On</th></tr></thead>
-      <tbody>${rows.map(rp=>`<tr onclick="openDetailFromRp('${rp.id}')">
-        <td class="case-no">${esc(rp.case_no||'—')}</td>
-        <td>${fmtDate(rp.case_date||rp.payment_date)}</td>
-        <td>${esc(rp.patient_name||'—')}</td>
-        <td><strong>${esc(rp.refer_name||'—')}</strong></td>
-        <td style="color:#007bff;font-weight:700">${fmt(rp.refer_amount)}</td>
-        <td>${rp.payment_status==='paid'
-          ?'<span class="badge badge-paid">✅ Paid</span>'
-          :'<span class="badge badge-pending">⏳ Pending</span>'}</td>
-        <td style="font-size:.8rem">${esc(rp.recorded_by_name||rp.recorded_by||'—')}</td>
-        <td style="font-size:.8rem">${fmtDate(rp.recorded_at)}</td>
-      </tr>`).join('')}</tbody>
-    </table>`;
-    renderPager('compPager',filteredCompleted.length,currentCompPage,'comp');
-  }
-
-  function renderPager(pagerId,total,page,key){
-    const tp=Math.ceil(total/PER),p=document.getElementById(pagerId);
-    if(tp<=1){p.innerHTML='';return;}
-    let h='';
-    if(page>1){h+=`<button onclick="goP('${key}',1)">«</button><button onclick="goP('${key}',${page-1})">‹ Prev</button>`;}
-    for(let i=Math.max(1,page-2);i<=Math.min(tp,page+2);i++)
-      h+=`<button ${i===page?'class="active"':''} onclick="goP('${key}',${i})">${i}</button>`;
-    if(page<tp){h+=`<button onclick="goP('${key}',${page+1})">Next ›</button><button onclick="goP('${key}',${tp})">»</button>`;}
-    p.innerHTML=h;
-  }
-  function goP(key,page){
-    if(key==='pend'){currentPendPage=page;renderPendingTable();}
-    else{currentCompPage=page;renderCompletedTable();}
-  }
-
-  function openDetail(caseId,mode){
-    const r=allCases.find(x=>x.id===caseId);
-    if(!r)return;
-    const ps=gps(r),disc=Number(r.discount||0),due=Number(r.bill_amount||0)-disc-Number(r.paid_amount||0);
-
-    // Test-wise bill — equal split estimate
-    const rawTests=r.tests?String(r.tests).split(',').map(t=>t.trim()).filter(Boolean):[];
-    let testBillHTML='';
-    if(rawTests.length){
-      const bill=Number(r.bill_amount||0);
-      const perTest=bill/rawTests.length;
-      testBillHTML=`<div class="detail-section"><h3>🧪 Test-wise Bill</h3>
-        <table class="test-bill-table">
-          <thead><tr><th>#</th><th>Test Name</th><th>Est. Amount</th></tr></thead>
-          <tbody>
-            ${rawTests.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(t)}</td><td>${fmt(perTest.toFixed(2))}</td></tr>`).join('')}
-            <tr class="total-row"><td colspan="2"><strong>Total Bill</strong></td><td><strong>${fmt(bill)}</strong></td></tr>
-          </tbody>
-        </table>
-        <p style="font-size:.74rem;color:#aaa;margin:.3rem 0 0">* Amounts split equally — actual prices may differ.</p>
-      </div>`;
+  // ── Detail modal: tests + bill + payment history + amount entry ─────────
+  function buildTestBillHTML(caseNo,totalAmount){
+    const tests=testsByCase[caseNo]||[];
+    const testsTotal=tests.reduce((s,t)=>s+t.amount,0);
+    if(!tests.length){
+      return `<div class="detail-section"><h3>🧪 Tests Performed</h3>
+        <div class="info-note">ℹ️ No itemised test records found for this case.</div></div>`;
     }
+    return `<div class="detail-section"><h3>🧪 Tests Performed</h3>
+      <table class="test-bill-table">
+        <thead><tr><th>Test Name</th><th style="text-align:right">Amount</th></tr></thead>
+        <tbody>
+          ${tests.map(t=>`<tr><td>${esc(t.name||'—')}</td><td style="text-align:right">${fmt(t.amount)}</td></tr>`).join('')}
+          <tr class="total-row"><td>Total (Tests)</td><td style="text-align:right">${fmt(testsTotal)}</td></tr>
+        </tbody>
+      </table>
+      ${Math.round(testsTotal)!==Math.round(Number(totalAmount||0))?`<div class="info-note">ℹ️ Test total differs from case bill amount (${fmt(totalAmount)}). Bill amount is used for due calculation.</div>`:''}
+    </div>`;
+  }
 
-    let entryHTML='';
-    if(mode==='pending'){
-      entryHTML=`<div class="entry-form">
-        <h4>💰 Enter Refer Amount</h4>
-        <div class="refer-info-box">
-          <strong>Refer:</strong> ${esc(r.refer_name)}
-          &nbsp;|&nbsp;<strong>Case Type:</strong> ${r.case_type==='lab_sample'?'Lab Sample':r.case_type==='sport_sample'?'Sport Sample':esc(r.case_type||'—')}
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Refer Amount (₹) <span style="color:red">*</span></label>
-            <input id="ra_amount" type="number" min="0.01" step="0.01" placeholder="Enter refer amount" required/>
+  function buildCashHistoryHTML(caseNo,c){
+    const rows=c.rows||[];
+    if(!rows.length){
+      return `<div class="detail-section"><h3>💵 Payment History</h3>
+        <div class="info-note">ℹ️ No cash register entries recorded for this case.</div></div>`;
+    }
+    return `<div class="detail-section"><h3>💵 Payment History</h3>
+      <table class="cash-table">
+        <thead><tr><th>Date</th><th>Trans No</th><th>Income</th><th>Discount</th><th>Net</th><th>Entry By</th></tr></thead>
+        <tbody>${rows.map(p=>`<tr>
+          <td>${fmtD(p.transaction_date)}</td>
+          <td style="font-size:.8rem">${esc(p.transaction_no||'—')}</td>
+          <td style="color:#28a745;font-weight:600">${fmt(p.income)}</td>
+          <td style="color:#6c757d">${Number(p.discount||0)>0?fmt(p.discount):'—'}</td>
+          <td style="font-weight:700">${fmt(Number(p.income||0)-Number(p.discount||0))}</td>
+          <td style="font-size:.8rem;color:#666">${esc(p.entry_by||p.created_by_name||'—')}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+  }
+
+  function openDetail(caseNo){
+    const c=allCases.find(x=>x.case_no===caseNo);
+    if(!c){showErr('Case not found: '+caseNo);return;}
+
+    const cash=cashByCase[caseNo]||{paid:0,discount:0,due:Number(c.total_amount||0),rows:[]};
+
+    document.getElementById('modalTitle').textContent=`${c.case_no} — ${c.patient_name}`;
+
+    const referInfoHTML=`<div class="refer-info-box">
+      📌 Referred to <strong>${esc(c.refer_name||'—')}</strong>
+      &nbsp;|&nbsp; 📂 Type: <strong>${esc(c.type||'—')}</strong>
+      ${c.ipd_link?` &nbsp;|&nbsp; 🏥 IPD: <strong>${esc(c.ipd_link)}</strong>`:''}
+    </div>`;
+
+    const billSummaryHTML=`<div class="detail-section"><h3>💰 Bill Summary (this case)</h3>
+      <div class="amount-summary">
+        <div><div class="amount-label">Total Bill</div><div class="amount-value">${fmt(c.total_amount)}</div></div>
+        <div><div class="amount-label">Total Received</div><div class="amount-value" style="color:#28a745">${fmt(cash.paid)}</div></div>
+        <div><div class="amount-label">Total Discount</div><div class="amount-value" style="color:#6c757d">${fmt(cash.discount)}</div></div>
+        <div><div class="amount-label">Due</div><div class="amount-value" style="color:${cash.due>0?'#dc3545':'#28a745'}">${fmt(cash.due)}</div></div>
+      </div>
+    </div>`;
+
+    const testBillHTML = buildTestBillHTML(caseNo,c.total_amount);
+    const cashHistoryHTML = buildCashHistoryHTML(caseNo,cash);
+
+    // Refer amount section: entry form (pending) or completed display
+    let referAmountHTML;
+    const hasAmount = c.refer_amount && Number(c.refer_amount)>0;
+
+    if(hasAmount){
+      referAmountHTML=`<div class="detail-section"><h3>🎯 Refer Amount</h3>
+        <div class="completed-box">
+          <h4>✅ Refer amount has been set</h4>
+          <div class="detail-grid">
+            <div><div class="detail-label">Refer Amount</div><div class="detail-value" style="font-size:1.1rem;font-weight:700;color:#0a3622">${fmt(c.refer_amount)}</div></div>
+            <div><div class="detail-label">Set By</div><div class="detail-value">${esc(c.refer_amount_enter_by||'—')}</div></div>
+            <div><div class="detail-label">Set On</div><div class="detail-value">${fmtD(c.refer_amount_enter_time)}</div></div>
+            <div><div class="detail-label">Payment Status</div><div class="detail-value">${c.refer_payment_status==='paid'?'✅ Paid':'⏳ Pending (handled on Payment page)'}</div></div>
           </div>
-          <div class="form-group">
-            <label>Remarks (optional)</label>
-            <input id="ra_remark" type="text" placeholder="Notes…"/>
+          ${isFullAccess?`<div class="form-group" style="margin-top:1rem">
+            <label>Update Refer Amount</label>
+            <input id="ra_update_amount" type="number" min="0.01" step="0.01" value="${Number(c.refer_amount)}"/>
           </div>
+          <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+            <button class="btn-primary btn-sm" style="width:auto" onclick="updateReferAmount('${esc(caseNo)}')">💾 Update Amount</button>
+            <button class="btn-del btn-sm" style="width:auto" onclick="deleteReferAmount('${esc(caseNo)}')">🗑️ Delete Amount</button>
+          </div>
+          <p class="err" id="modalErr" style="margin-top:.5rem"></p>`:''}
         </div>
-        <p class="err" id="modalErr" style="margin-top:.25rem"></p>
       </div>`;
-    }
-
-    document.getElementById('modalTitle').textContent=`Case ${r.case_no} — ${r.patient_name}`;
-    document.getElementById('modalBody').innerHTML=`
-      <div class="detail-section"><h3>📝 Case Information</h3>
-        <div class="detail-grid">
-          <div><div class="detail-label">Case No</div><div class="detail-value">${esc(r.case_no)}</div></div>
-          <div><div class="detail-label">Date</div><div class="detail-value">${fmtDate(r.case_date)}</div></div>
-          <div><div class="detail-label">Patient</div><div class="detail-value">${esc(r.patient_name)}</div></div>
-          <div><div class="detail-label">Case Type</div><div class="detail-value">${r.case_type==='lab_sample'?'Lab Sample':r.case_type==='sport_sample'?'Sport Sample':esc(r.case_type||'—')}</div></div>
-          <div><div class="detail-label">Entered By</div><div class="detail-value">${esc(r.entered_by||r.recorded_by_name||'—')}</div></div>
-          <div><div class="detail-label">Trans No</div><div class="detail-value">${esc(r.trans_no||'—')}</div></div>
-        </div>
-      </div>
-      <div class="detail-section"><h3>💵 Payment Summary</h3>
-        <div class="amount-summary">
-          <div><div class="amount-label">Bill Amount</div><div class="amount-value">${fmt(r.bill_amount)}</div></div>
-          <div><div class="amount-label">Discount</div><div class="amount-value" style="color:#6c757d">${fmt(disc)}</div></div>
-          <div><div class="amount-label">Paid</div><div class="amount-value" style="color:#28a745">${fmt(r.paid_amount)}</div></div>
-          <div><div class="amount-label">Due</div><div class="amount-value" style="color:${due>0?'#dc3545':'#28a745'}">${fmt(due)}</div></div>
-          <div><div class="amount-label">Status</div><div class="amount-value" style="font-size:.88rem;color:${ps.s==='paid'?'#28a745':ps.s==='due'?'#dc3545':'#e67e00'}">${ps.t}</div></div>
-        </div>
-      </div>
-      ${testBillHTML}
-      ${entryHTML}`;
-
-    const footer=document.getElementById('modalFooter');
-    if(mode==='pending'){
-      footer.innerHTML=`
-        <button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeModal()">Cancel</button>
-        <button class="btn-primary" style="width:auto" onclick="submitReferAmount('${r.id}','${esc(r.case_no)}','${esc(r.patient_name||'')}','${esc(r.refer_name||'')}','${esc(r.refer_id||'')}','${r.case_date||''}')">💾 Save Refer Amount</button>`;
-    } else {
-      footer.innerHTML=`<button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeModal()">Close</button>`;
-    }
-    document.getElementById('detailModal').classList.remove('hidden');
-  }
-
-  function openDetailFromRp(rpId){
-    const rp=allReferPayments.find(x=>x.id===rpId);
-    if(!rp)return;
-    const caseRec=allCases.find(x=>x.id===rp.opd_case_id)||{};
-    document.getElementById('modalTitle').textContent=`${rp.case_no||caseRec.case_no||'—'} — ${rp.patient_name||caseRec.patient_name||''}`;
-
-    const amountRowHTML = isFullAccess
-      ? `<div><div class="amount-label">Refer Amount</div>
-           <input id="rpe_amount" type="number" min="0.01" step="0.01" value="${Number(rp.refer_amount||0)}"
-             style="width:100%;padding:.35rem .5rem;border:1px solid #ccc;border-radius:3px;font-size:.95rem;font-weight:700;color:#007bff"/>
-         </div>`
-      : `<div><div class="amount-label">Refer Amount</div><div class="amount-value">${fmt(rp.refer_amount)}</div></div>`;
-    const remarkFieldHTML = isFullAccess
-      ? `<div class="form-group" style="margin-top:.85rem">
-           <label>Remark</label>
-           <input id="rpe_remark" type="text" value="${esc(rp.remark||'')}" placeholder="Notes…"/>
-         </div>`
-      : '';
-
-    document.getElementById('modalBody').innerHTML=`
-      <div class="detail-section"><h3>📝 Case Summary</h3>
-        <div class="detail-grid">
-          <div><div class="detail-label">Case No</div><div class="detail-value">${esc(rp.case_no||caseRec.case_no||'—')}</div></div>
-          <div><div class="detail-label">Case Date</div><div class="detail-value">${fmtDate(rp.case_date||caseRec.case_date)}</div></div>
-          <div><div class="detail-label">Patient</div><div class="detail-value">${esc(rp.patient_name||caseRec.patient_name||'—')}</div></div>
-          <div><div class="detail-label">Refer</div><div class="detail-value"><strong>${esc(rp.refer_name||'—')}</strong></div></div>
-        </div>
-      </div>
-      <div class="detail-section"><h3>💰 Refer Amount Details</h3>
-        <div class="amount-summary">
-          ${amountRowHTML}
-          <div><div class="amount-label">Pay Status</div>
-            <div class="amount-value" style="font-size:.9rem;color:${rp.payment_status==='paid'?'#28a745':'#dc3545'}">
-              ${rp.payment_status==='paid'?'✅ Paid':'⏳ Pending'}
+    }else{
+      referAmountHTML=`<div class="detail-section"><h3>🎯 Set Refer Amount</h3>
+        <div class="entry-form">
+          <h4>Enter the refer amount for ${esc(c.refer_name||'this refer')}</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Refer Amount <span style="color:red">*</span></label>
+              <input id="ra_amount" type="number" min="0.01" step="0.01" placeholder="0.00"/>
             </div>
           </div>
-          ${rp.payment_status==='paid'&&rp.voucher_no?`<div><div class="amount-label">Voucher No</div><div class="amount-value" style="font-size:.88rem">${esc(rp.voucher_no)}</div></div>`:''}
-          ${rp.paid_date?`<div><div class="amount-label">Paid Date</div><div class="amount-value" style="font-size:.88rem">${fmtDate(rp.paid_date)}</div></div>`:''}
+          <button class="btn-primary btn-sm" style="width:auto" onclick="submitReferAmount('${esc(caseNo)}')">✅ Save Refer Amount</button>
+          <p class="err" id="modalErr" style="margin-top:.5rem"></p>
         </div>
-        ${remarkFieldHTML}
-      </div>
-      <div style="font-size:.8rem;color:#aaa;margin-top:.5rem">
-        Entered by ${esc(rp.recorded_by_name||rp.recorded_by||'—')} on ${fmtDate(rp.recorded_at)}
-        ${rp.remark?`<br>Remark: ${esc(rp.remark)}`:''}
-      </div>
-      <p class="err" id="rpeErr" style="margin-top:.5rem"></p>`;
-
-    const footerBtns = [`<button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeModal()">Close</button>`];
-    if(isFullAccess){
-      footerBtns.push(`<button class="btn-del" style="padding:.5rem 1rem;font-size:.85rem" onclick="deleteReferAmount('${rp.id}')">🗑 Delete</button>`);
-      footerBtns.push(`<button class="btn-primary" style="width:auto" onclick="saveReferAmountEdit('${rp.id}')">💾 Save Changes</button>`);
+      </div>`;
     }
-    document.getElementById('modalFooter').innerHTML=footerBtns.join('');
+
+    document.getElementById('modalBody').innerHTML = referInfoHTML + billSummaryHTML + testBillHTML + cashHistoryHTML + referAmountHTML;
+    document.getElementById('modalFooter').innerHTML = `<button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeModal()">Close</button>`;
     document.getElementById('detailModal').classList.remove('hidden');
-  }
-
-  async function saveReferAmountEdit(rpId){
-    if(!isFullAccess)return;
-    const errEl=document.getElementById('rpeErr');
-    errEl.textContent='';
-    const amt=parseFloat(document.getElementById('rpe_amount')?.value);
-    if(!amt||amt<=0){errEl.textContent='⚠️ Please enter a valid refer amount greater than 0.';return;}
-    const remark=document.getElementById('rpe_remark')?.value.trim()||null;
-    showSpinner(true);
-    try{
-      const payload={refer_amount:amt, amount:amt, remark:remark};
-      const{error}=await BNH_PAGE.sb.from('opd_refer_payments').update(payload).eq('id',rpId);
-      if(error)throw error;
-      showOk('✅ Refer amount updated successfully!');
-      closeModal();
-      await loadData();
-    }catch(e){errEl.textContent='Error: '+e.message;}
-    finally{showSpinner(false);}
-  }
-
-  async function deleteReferAmount(rpId){
-    if(!isFullAccess)return;
-    if(!confirm('⚠️ Delete this refer amount entry?\n\nThis action CANNOT be undone.'))return;
-    showSpinner(true);
-    try{
-      const{error}=await BNH_PAGE.sb.from('opd_refer_payments').delete().eq('id',rpId);
-      if(error)throw error;
-      showOk('🗑 Entry deleted.');
-      closeModal();
-      await loadData();
-    }catch(e){showErr('Delete error: '+e.message);}
-    finally{showSpinner(false);}
   }
 
   function closeModal(){document.getElementById('detailModal').classList.add('hidden');}
   document.getElementById('detailModal').addEventListener('click',e=>{if(e.target===document.getElementById('detailModal'))closeModal();});
 
-
-
-  async function submitReferAmount(caseId,caseNo,patientName,referName,referId,caseDate){
+  // ── Save refer amount (new) ──────────────────────────────────────────────
+  async function submitReferAmount(caseNo){
     const errEl=document.getElementById('modalErr');
     errEl.textContent='';
     const amt=parseFloat(document.getElementById('ra_amount')?.value);
     if(!amt||amt<=0){errEl.textContent='⚠️ Please enter a valid refer amount greater than 0.';return;}
-    const remark=document.getElementById('ra_remark')?.value.trim()||null;
     showSpinner(true);
     try{
-      const now=new Date().toISOString();
       const payload={
-        opd_case_id:   caseId,
-        case_no:       caseNo,
-        patient_name:  patientName,
-        refer_name:    referName,
-        refer_id:      referId||null,
-        case_date:     caseDate||null,
-        refer_amount:  amt,
-        payment_status:'pending',
-        payment_date:  caseDate||now.slice(0,10),
-        amount:        amt,           // keep existing 'amount' col in sync
-        mode:          null,
-        remark:        remark,
-        recorded_by:   BNH_PAGE.user?.username||null,
-        recorded_by_name: BNH_PAGE.user?.name||null,
-        recorded_at:   now
+        refer_amount:        amt,
+        refer_amount_enter_by: BNH_PAGE.user?.name || BNH_PAGE.user?.username || null,
+        refer_amount_enter_time: new Date().toISOString(),
+        updated_at:          new Date().toISOString()
       };
-      const{error}=await BNH_PAGE.sb.from('opd_refer_payments').insert(payload);
+      const{error}=await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no',caseNo);
       if(error)throw error;
-      showOk('✅ Refer amount saved successfully!');
+
+      const idx=allCases.findIndex(c=>c.case_no===caseNo);
+      if(idx>=0)Object.assign(allCases[idx],payload);
+
+      showOk(`✅ Refer amount saved for ${caseNo}!`);
       closeModal();
-      await loadData();
+      filterPending();
+      filterCompleted();
     }catch(e){errEl.textContent='Error: '+e.message;}
     finally{showSpinner(false);}
   }
 
-  loadData();
+  // ── Update refer amount (already set, full access only) ─────────────────
+  async function updateReferAmount(caseNo){
+    if(!isFullAccess)return;
+    const errEl=document.getElementById('modalErr');
+    errEl.textContent='';
+    const amt=parseFloat(document.getElementById('ra_update_amount')?.value);
+    if(!amt||amt<=0){errEl.textContent='⚠️ Please enter a valid refer amount greater than 0.';return;}
+    showSpinner(true);
+    try{
+      const payload={
+        refer_amount:        amt,
+        refer_amount_enter_by: BNH_PAGE.user?.name || BNH_PAGE.user?.username || null,
+        refer_amount_enter_time: new Date().toISOString(),
+        updated_at:          new Date().toISOString()
+      };
+      const{error}=await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no',caseNo);
+      if(error)throw error;
+
+      const idx=allCases.findIndex(c=>c.case_no===caseNo);
+      if(idx>=0)Object.assign(allCases[idx],payload);
+
+      showOk(`✅ Refer amount updated for ${caseNo}!`);
+      closeModal();
+      filterPending();
+      filterCompleted();
+    }catch(e){errEl.textContent='Error: '+e.message;}
+    finally{showSpinner(false);}
+  }
+
+  // ── Delete refer amount (resets case back to pending, full access only) ─
+  async function deleteReferAmount(caseNo){
+    if(!isFullAccess)return;
+    const c=allCases.find(x=>x.case_no===caseNo);
+    if(c&&c.refer_payment_status==='paid'){
+      const errEl=document.getElementById('modalErr');
+      if(errEl)errEl.textContent='⚠️ This refer amount is already marked Paid. Clear the payment on the Payment page first.';
+      return;
+    }
+    if(!confirm(`⚠️ Delete the refer amount for ${caseNo}?\n\nThis will reset it back to Pending. This action CANNOT be undone.`))return;
+    showSpinner(true);
+    try{
+      const payload={
+        refer_amount:           0,
+        refer_amount_enter_by:  null,
+        refer_amount_enter_time:null,
+        updated_at:              new Date().toISOString()
+      };
+      const{error}=await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no',caseNo);
+      if(error)throw error;
+
+      const idx=allCases.findIndex(c=>c.case_no===caseNo);
+      if(idx>=0)Object.assign(allCases[idx],payload);
+
+      showOk(`🗑️ Refer amount deleted for ${caseNo}. Case moved back to Pending.`);
+      closeModal();
+      filterPending();
+      filterCompleted();
+    }catch(e){showErr('Delete error: '+e.message);}
+    finally{showSpinner(false);}
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  async function init(){
+    showSpinner(true);
+    try{
+      await loadCases();
+      await loadTests();
+      await loadCash();
+      buildReferFilters();
+      filterPending();
+      filterCompleted();
+    }catch(e){
+      showErr('Initialization error: '+e.message);
+      console.error(e);
+    }finally{showSpinner(false);}
+  }
+
+  init();
 </script>
 </body>
 </html>
