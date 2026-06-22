@@ -112,6 +112,11 @@
       page: "pages/gramin-visit-manager.html",
       roles: ["admin", "accountant", "manager", "viewer"]
     },
+    { label: "Call Refer", 
+      icon: "📞", 
+      page: "pages/call-refer.html", 
+      roles: ["admin","manager","accountant","viewer", "reception"] 
+    },
 
     // ==========================================
     // IPD
