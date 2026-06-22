@@ -33,6 +33,14 @@
                 padding:.6rem .9rem; font-size:.84rem; margin-bottom:.75rem; }
     .date-filter { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1rem; }
     .date-filter > * { flex:1; min-width:140px; }
+    .search-bar { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:.9rem; }
+    .search-bar input { flex:1; min-width:160px; padding:.45rem .75rem; border:1.5px solid #c7d2fe;
+                        border-radius:8px; font-size:.9rem; outline:none; }
+    .search-bar input:focus { border-color:#6366f1; }
+    .search-bar .clear-btn { background:none; border:1.5px solid #d1d5db; border-radius:8px;
+                             padding:.4rem .85rem; cursor:pointer; font-size:.82rem; color:#6b7280; }
+    .search-bar .clear-btn:hover { border-color:#6366f1; color:#6366f1; }
+    .no-results { text-align:center; color:#9ca3af; font-size:.9rem; padding:1.5rem 0; }
   </style>
 </head>
 <body>
@@ -56,6 +64,11 @@
         <div class="credit-note">
           ⚠ IPD medicine indens are <strong>credit sales</strong>.
           Creditor: <strong>Bhagirathi Nursing Home</strong>. No cash received — Bhagirathi's due increases.
+        </div>
+        <div class="search-bar">
+          <input id="searchName" type="text" placeholder="🔍 Search by patient name…" oninput="filterPatients()"/>
+          <input id="searchAdmNo" type="text" placeholder="🔍 Search by admission no…" oninput="filterPatients()"/>
+          <button class="clear-btn" onclick="clearPatientSearch()">✕ Clear</button>
         </div>
         <div id="activeList">Loading…</div>
       </div>
@@ -155,6 +168,11 @@
         <button class="btn-primary" style="width:auto" onclick="loadHistory()">Show</button>
       </div>
     </div>
+    <div class="search-bar" id="histSearchBar" style="display:none">
+      <input id="histSearchName" type="text" placeholder="🔍 Filter by patient name…" oninput="filterHistory()"/>
+      <input id="histSearchAdmNo" type="text" placeholder="🔍 Filter by admission no…" oninput="filterHistory()"/>
+      <button class="clear-btn" onclick="clearHistorySearch()">✕ Clear</button>
+    </div>
     <div id="histList" style="font-size:.85rem;color:#555">Select date range and click Show.</div>
   </div>
 </div>
@@ -175,17 +193,45 @@
   }
 
   // ── PATIENT LIST ──────────────────────────────────────
+  let _allPatients = [];
+
   async function loadActive() {
     const div = document.getElementById('activeList');
     const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
       .select('id,admission_date,admission_no,patient_name')
       .eq('is_discharged', false).order('admission_date');
     if (error||!data||data.length===0){div.textContent='No active patients.';return;}
-    div.innerHTML = data.map(r=>`
+    _allPatients = data;
+    renderPatientCards(data);
+  }
+
+  function renderPatientCards(list) {
+    const div = document.getElementById('activeList');
+    if (!list.length) {
+      div.innerHTML = '<div class="no-results">No patients match your search.</div>';
+      return;
+    }
+    div.innerHTML = list.map(r=>`
       <div class="patient-card" onclick="openIndenForm('${r.id}','${r.admission_no}','${r.patient_name.replace(/'/g,"\\'")}','${r.admission_date}')">
         <div class="pname">${r.patient_name}</div>
         <div class="pmeta">📅 ${r.admission_date} &nbsp;|&nbsp; Adm: ${r.admission_no}</div>
       </div>`).join('');
+  }
+
+  function filterPatients() {
+    const name  = document.getElementById('searchName').value.trim().toLowerCase();
+    const admNo = document.getElementById('searchAdmNo').value.trim().toLowerCase();
+    const filtered = _allPatients.filter(r =>
+      (!name  || r.patient_name.toLowerCase().includes(name)) &&
+      (!admNo || r.admission_no.toLowerCase().includes(admNo))
+    );
+    renderPatientCards(filtered);
+  }
+
+  function clearPatientSearch() {
+    document.getElementById('searchName').value  = '';
+    document.getElementById('searchAdmNo').value = '';
+    renderPatientCards(_allPatients);
   }
   loadActive();
 
@@ -361,16 +407,11 @@
   };
 
   // ── HISTORY TAB ───────────────────────────────────────
-  async function loadHistory() {
-    const from = document.getElementById('histFrom').value;
-    const to   = document.getElementById('histTo').value;
-    if (!from||!to) return;
+  let _allHistory = [];
+
+  function renderHistoryTable(data) {
     const div = document.getElementById('histList');
-    div.textContent = 'Loading…';
-    const { data } = await BNH_PAGE.sb.from('ipd_medicine_indens')
-      .select('*').gte('inden_date',from).lte('inden_date',to)
-      .order('inden_date',{ascending:false});
-    if (!data||data.length===0){div.textContent='No entries in this range.';return;}
+    if (!data||data.length===0){div.innerHTML='<div class="no-results">No entries found.</div>';return;}
     const total = data.reduce((a,r)=>a+parseFloat(r.amount||0),0);
     div.innerHTML = `<table>
       <thead><tr>
@@ -388,6 +429,39 @@
       </tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="5">Total</td><td class="r">${fmt(total)}</td><td></td></tr></tfoot>
     </table>`;
+  }
+
+  async function loadHistory() {
+    const from = document.getElementById('histFrom').value;
+    const to   = document.getElementById('histTo').value;
+    if (!from||!to) return;
+    const div = document.getElementById('histList');
+    div.textContent = 'Loading…';
+    const { data } = await BNH_PAGE.sb.from('ipd_medicine_indens')
+      .select('*').gte('inden_date',from).lte('inden_date',to)
+      .order('inden_date',{ascending:false});
+    _allHistory = data || [];
+    document.getElementById('histSearchBar').style.display = _allHistory.length ? 'flex' : 'none';
+    document.getElementById('histSearchName').value  = '';
+    document.getElementById('histSearchAdmNo').value = '';
+    if (!_allHistory.length){div.textContent='No entries in this range.';return;}
+    renderHistoryTable(_allHistory);
+  }
+
+  function filterHistory() {
+    const name  = document.getElementById('histSearchName').value.trim().toLowerCase();
+    const admNo = document.getElementById('histSearchAdmNo').value.trim().toLowerCase();
+    const filtered = _allHistory.filter(r =>
+      (!name  || (r.patient_name||'').toLowerCase().includes(name)) &&
+      (!admNo || (r.admission_no||'').toLowerCase().includes(admNo))
+    );
+    renderHistoryTable(filtered);
+  }
+
+  function clearHistorySearch() {
+    document.getElementById('histSearchName').value  = '';
+    document.getElementById('histSearchAdmNo').value = '';
+    renderHistoryTable(_allHistory);
   }
 </script>
 </body>
