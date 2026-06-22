@@ -58,6 +58,15 @@
     .pagination button { padding: 0.38rem 0.65rem; border: 1px solid #ccc; background: white; cursor: pointer; border-radius: 3px; font-size: 0.82rem; }
     .pagination button.active { background: #007bff; color: white; border-color: #007bff; }
     .divider { border: none; border-top: 1px solid #e9ecef; margin: 0.75rem 0; }
+
+    /* ── Modal Popup Styles ── */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: white; padding: 1.5rem; border-radius: 6px; width: 100%; max-width: 550px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e9ecef; padding-bottom: 0.5rem; }
+    .modal-header h3 { margin: 0; font-size: 1.2rem; color: #333; }
+    .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
+    .modal-close:hover { color: #333; }
   </style>
 </head>
 <body>
@@ -75,7 +84,6 @@
       <button class="tab-btn" data-tab="completed">✅ Completed <span id="compBadge" style="background:#28a745;color:white;padding:1px 7px;border-radius:10px;font-size:.75rem;margin-left:.3rem"></span></button>
     </div>
 
-    <!-- ── Pending Tab ── -->
     <div class="tab-content active" id="pending-tab">
       <div class="filter-bar">
         <div class="filter-group">
@@ -98,7 +106,6 @@
       <div class="pagination" id="pendPager"></div>
     </div>
 
-    <!-- ── Completed Tab ── -->
     <div class="tab-content" id="completed-tab">
       <div class="filter-bar">
         <div class="filter-group">
@@ -128,12 +135,78 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="editModalTitle">✏️ Edit Linked Case</h3>
+      <button class="modal-close" onclick="closeEditModal()">&times;</button>
+    </div>
+    <form id="editCaseForm">
+      <div class="form-group">
+        <label>Refer <span style="color:red">*</span></label>
+        <div class="refer-type-toggle">
+          <button type="button" class="refer-type-btn modal-ref-btn" id="modal-ref-quack" data-type="quack"
+            onclick="switchModalReferType('quack')">👨‍⚕️ Refer</button>
+          <button type="button" class="refer-type-btn modal-ref-btn" id="modal-ref-none" data-type="none"
+            onclick="switchModalReferType('none')">🚫 Not Applicable</button>
+        </div>
+      </div>
+
+      <div class="form-group" id="modal-refer-quack-row">
+        <label>Select Refer Doctor</label>
+        <select name="quack_doctor" id="modalQuackSelect" onchange="showModalQuackInfo(this.value)">
+          <option value="">Choose Refer…</option>
+        </select>
+        <div class="quack-display" id="modal-quack-display" style="display:none;margin-top:.5rem;"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Case Type <span style="color:red">*</span></label>
+          <select name="case_type" required>
+            <option value="">Choose Type…</option>
+            <option value="lab_sample">Lab Sample</option>
+            <option value="sport_sample">Sport Sample</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Linked to IPD Admission?</label>
+          <select name="ipd_link_yn" onchange="toggleModalIPDRow(this.value)">
+            <option value="no">No (Not Applicable)</option>
+            <option value="yes">Yes (Select Patient)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row" id="modal-ipd-patient-row" style="display:none;">
+        <div class="form-group">
+          <label>Select IPD Patient (Admission No)</label>
+          <select name="ipd_patient_id" id="modalIpdSelect">
+            <option value="">Choose IPD Patient…</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="case-actions" style="margin-top:1.5rem; justify-content: flex-end;">
+        <button type="button" class="btn-primary btn-sm" style="background:#6c757d;" onclick="closeEditModal()">Cancel</button>
+        <button type="submit" class="btn-primary btn-sm btn-success">💾 Update changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
 
 <script>
   BNH_PAGE.requireRole(["manager", "admin", "accountant", "reception"]);
+
+  /* ── access control setup ── */
+  const FULL_ACCESS_ROLES    = ["admin"];
+  const LIMITED_ACCESS_ROLES = ["manager", "accountant", "reception"];
+  let currentUserRole        = null;
 
   /* ── state ── */
   let allCases      = [];   // all opd_case rows (pending = refer_enter_by IS NULL)
@@ -309,7 +382,6 @@
 
         <form class="case-form" data-case-no="${esc(c.case_no)}" style="margin-top:.75rem;">
 
-          <!-- Refer type toggle -->
           <div class="form-group">
             <label>Refer <span style="color:red">*</span></label>
             <div class="refer-type-toggle">
@@ -320,7 +392,6 @@
             </div>
           </div>
 
-          <!-- Quack doctor select -->
           <div class="form-group" id="refer-quack-${esc(c.case_no)}">
             <label>Select Refer Doctor</label>
             <select name="quack_doctor" onchange="showQuackInfo('${esc(c.case_no)}', this.value)">
@@ -331,7 +402,6 @@
           </div>
 
           <div class="form-row">
-            <!-- Case Type -->
             <div class="form-group">
               <label>Case Type <span style="color:red">*</span></label>
               <select name="case_type" required>
@@ -341,7 +411,6 @@
               </select>
             </div>
 
-            <!-- IPD Link toggle -->
             <div class="form-group">
               <label>Linked to IPD Admission?</label>
               <select name="ipd_link_yn" onchange="toggleIPDRow('${esc(c.case_no)}', this.value)">
@@ -351,7 +420,6 @@
             </div>
           </div>
 
-          <!-- IPD patient row (hidden by default) -->
           <div class="form-row" id="ipd-patient-row-${esc(c.case_no)}" style="display:none;">
             <div class="form-group">
               <label>Select IPD Patient (Admission No)</label>
@@ -492,11 +560,20 @@
     }
 
     const slice = filteredComp.slice((currentCompPage-1)*PER, currentCompPage*PER);
+    const isFullAccess = FULL_ACCESS_ROLES.includes(currentUserRole);
 
     list.innerHTML = slice.map(c => {
       const tests = (testsByCase[c.case_no] || []).join(', ') || '—';
+      
+      const actionButtons = isFullAccess ? `
+        <div style="margin-top: .6rem; display: flex; gap: .5rem;">
+          <button class="btn-primary btn-sm" style="background:#007bff;" onclick="editCompletedCase('${esc(c.case_no)}')">✏️ Edit</button>
+          <button class="btn-primary btn-sm" style="background:#dc3545;" onclick="deleteCompletedCase('${esc(c.case_no)}')">🗑️ Delete</button>
+        </div>
+      ` : '';
+
       return `
-      <li class="completed-item" style="flex-direction:column;align-items:flex-start;gap:.4rem;">
+      <li class="completed-item" id="completed-${c.case_no}" style="flex-direction:column;align-items:flex-start;gap:.4rem;">
         <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
           <div>
             <div class="case-no">${esc(c.case_no)}</div>
@@ -516,10 +593,168 @@
         <div class="case-detail" style="font-size:.78rem;color:#aaa;">
           Entered: ${fmtD(c.refer_enter_time)} by ${esc(c.refer_enter_by||'—')}
         </div>
+        ${actionButtons}
       </li>`;
     }).join('');
 
     renderPager('compPager', filteredComp.length, currentCompPage, 'comp');
+  }
+
+  /* ── edit modal control helpers ── */
+  function switchModalReferType(type) {
+    document.querySelectorAll('.modal-ref-btn').forEach(btn => 
+      btn.classList.toggle('active', btn.dataset.type === type)
+    );
+    const row = document.getElementById('modal-refer-quack-row');
+    if (row) row.style.display = type === 'quack' ? '' : 'none';
+    if (type !== 'quack') document.getElementById('modal-quack-display').style.display = 'none';
+  }
+
+  function toggleModalIPDRow(val) {
+    const row = document.getElementById('modal-ipd-patient-row');
+    const sel = row?.querySelector('[name="ipd_patient_id"]');
+    if (val === 'yes') { row.style.display = 'flex'; if(sel) sel.required = true; }
+    else               { row.style.display = 'none';  if(sel) sel.required = false; }
+  }
+
+  function showModalQuackInfo(val) {
+    const display = document.getElementById('modal-quack-display');
+    if (!val) { display.style.display = 'none'; return; }
+    const [name, mobile, team] = val.split('|');
+    display.style.display = 'block';
+    display.innerHTML = `
+      <strong>👨‍⚕️ Refer Doctor</strong>
+      <span>Name: <b>${esc(name)}</b></span><br>
+      <span>📞 Mobile: <b>${esc(mobile||'—')}</b></span><br>
+      <span>🏷️ Team: <b>${esc(team||'N/A')}</b></span>`;
+  }
+
+  function closeEditModal() {
+    document.getElementById('editModal').classList.remove('active');
+  }
+
+  /* ── open & configure edit completed case modal ── */
+  function editCompletedCase(caseNo) {
+    const c = allCases.find(x => x.case_no === caseNo);
+    if (!c) return;
+
+    const modal = document.getElementById('editModal');
+    const form  = document.getElementById('editCaseForm');
+    form.dataset.caseNo = caseNo;
+    document.getElementById('editModalTitle').textContent = `✏️ Edit Case Layout: ${caseNo}`;
+
+    // Set configuration values
+    form.elements['case_type'].value = c.type || '';
+
+    if (c.refer_name) {
+      switchModalReferType('quack');
+      // Match textual refer string against doctor database to restore option state
+      const matchedDoc = quackDoctors.find(d => c.refer_name.startsWith(d.doctor_name));
+      if (matchedDoc) {
+        const optionVal = `${matchedDoc.doctor_name}|${matchedDoc.mobile||''}|${matchedDoc.recorded_by_name||''}`;
+        form.elements['quack_doctor'].value = optionVal;
+        showModalQuackInfo(optionVal);
+      } else {
+        form.elements['quack_doctor'].value = '';
+      }
+    } else {
+      switchModalReferType('none');
+      form.elements['quack_doctor'].value = '';
+    }
+
+    if (c.ipd_link) {
+      form.elements['ipd_link_yn'].value = 'yes';
+      toggleModalIPDRow('yes');
+      form.elements['ipd_patient_id'].value = c.ipd_link;
+    } else {
+      form.elements['ipd_link_yn'].value = 'no';
+      toggleModalIPDRow('no');
+      form.elements['ipd_patient_id'].value = '';
+    }
+
+    modal.classList.add('active');
+  }
+
+  // Setup handler for modal update submission
+  document.getElementById('editCaseForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form     = e.target;
+    const caseNo   = form.dataset.caseNo;
+    const formData = new FormData(form);
+    const activeType = form.querySelector('.modal-ref-btn.active')?.dataset.type || 'none';
+
+    let referName = null;
+    if (activeType === 'quack') {
+      const qval = formData.get('quack_doctor') || '';
+      if (qval) {
+        const [name, mobile, team] = qval.split('|');
+        referName = `${name} (${mobile||''}, Team: ${team||'N/A'})`;
+      }
+    }
+
+    const caseType = formData.get('case_type');
+    if (!caseType) { showErr('⚠️ Please choose a Case Type.'); return; }
+
+    const ipdLinkYN = formData.get('ipd_link_yn');
+    const ipdLink   = ipdLinkYN === 'yes' ? (formData.get('ipd_patient_id') || null) : null;
+    if (ipdLinkYN === 'yes' && !ipdLink) { showErr('⚠️ Please select an IPD patient.'); return; }
+
+    showSpinner(true);
+    try {
+      const payload = {
+        refer_name: referName,
+        type:       caseType,
+        ipd_link:   ipdLink,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no', caseNo);
+      if (error) throw error;
+
+      // sync matching profile in memory 
+      const idx = allCases.findIndex(c => c.case_no === caseNo);
+      if (idx >= 0) Object.assign(allCases[idx], payload);
+
+      closeEditModal();
+      filterAndRenderPending();
+      filterAndRenderCompleted();
+      showOk(`✅ Case ${caseNo} updated successfully!`);
+    } catch(err) {
+      showErr('Error: ' + err.message);
+    } finally {
+      showSpinner(false);
+    }
+  });
+
+  /* ── delete/reset completed case linkage (Full Access Only) ── */
+  async function deleteCompletedCase(caseNo) {
+    if (!confirm(`Are you sure you want to clear the linkage data for case ${caseNo}? This will move it back to Pending.`)) return;
+
+    showSpinner(true);
+    try {
+      const payload = {
+        refer_name: null,
+        refer_enter_by: null,
+        refer_enter_time: null,
+        type: null,
+        ipd_link: null,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no', caseNo);
+      if (error) throw error;
+
+      const idx = allCases.findIndex(c => c.case_no === caseNo);
+      if (idx >= 0) Object.assign(allCases[idx], payload);
+
+      filterAndRenderPending();
+      filterAndRenderCompleted();
+      showOk(`🗑️ Case ${caseNo} reference reset to pending.`);
+    } catch(err) {
+      showErr('Error: ' + err.message);
+    } finally {
+      showSpinner(false);
+    }
   }
 
   /* ── pagination ── */
@@ -553,8 +788,19 @@
   async function init() {
     showSpinner(true);
     try {
+      if (window.BNH_PAGE && typeof BNH_PAGE.getUserRole === 'function') {
+        currentUserRole = BNH_PAGE.getUserRole();
+      } else if (window.BNH_PAGE && BNH_PAGE.user) {
+        currentUserRole = BNH_PAGE.user.role;
+      }
+      
       await loadQuackDoctors();
       await loadIPDPatients();
+      
+      // Inject dropdown details safely inside modal select structures
+      document.getElementById('modalQuackSelect').innerHTML = '<option value="">Choose Refer…</option>' + quackOptions();
+      document.getElementById('modalIpdSelect').innerHTML = '<option value="">Choose IPD Patient…</option>' + ipdPatients.map(p=>`<option value="${esc(p.admission_no)}">${esc(p.patient_name)} (${esc(p.admission_no)})</option>`).join('');
+
       await loadCases();
       await loadTests();
       await loadCash();
