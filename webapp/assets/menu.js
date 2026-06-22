@@ -122,6 +122,12 @@
       page: "pages/ipd-admission.html",
       roles: ["admin", "accountant", "reception", "manager"]
     },
+        {
+      label: "IPD - Documents",
+      icon: "📁",
+      page: "pages/ipd-documents.html",
+      roles: ["admin", "accountant", "reception", "manager"]
+    },
     {
       label: "IPD - Doctor Entry",
       icon: "👨‍⚕️",
