@@ -30,13 +30,16 @@
     .search-ico{position:absolute;left:.65rem;top:50%;transform:translateY(-50%);font-size:1rem;pointer-events:none}
 
     /* ── Modal base ── */
-    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center}
-    .modal-overlay.open{display:flex}
-    .modal{background:#fff;border-radius:12px;padding:1.4rem 1.6rem;width:min(740px,97vw);max-height:92vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,.24)}
-    .modal-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.3rem}
-    .modal-hdr h2{margin:0;font-size:1.08rem;color:#1a2a3a}
-    .modal-close{background:none;border:none;font-size:1.35rem;cursor:pointer;color:#888;line-height:1;padding:0;flex-shrink:0}
-    .modal-close:hover{color:#c62828}
+    .ipd-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;padding:1rem}
+    .ipd-modal-overlay.open{display:flex}
+    .ipd-modal{background:#fff;border-radius:14px;width:min(760px,97vw);max-height:92vh;overflow-y:auto;box-shadow:0 16px 60px rgba(0,0,0,.28);display:flex;flex-direction:column}
+    .ipd-modal-hdr{display:flex;align-items:flex-start;justify-content:space-between;padding:1.2rem 1.5rem .9rem;background:linear-gradient(135deg,#1a6fc1 0%,#1557a0 100%);border-radius:14px 14px 0 0;flex-shrink:0}
+    .ipd-modal-hdr h2{margin:0;font-size:1.12rem;color:#fff;font-weight:700}
+    .modal-patient-meta{font-size:.78rem;color:rgba(255,255,255,.82);margin:.3rem 0 0;display:flex;flex-wrap:wrap;gap:.5rem .9rem}
+    .modal-patient-meta span{display:flex;align-items:center;gap:.25rem}
+    .ipd-modal-close{background:rgba(255,255,255,.18);border:none;font-size:1.1rem;cursor:pointer;color:#fff;line-height:1;padding:.35rem .5rem;border-radius:6px;flex-shrink:0;transition:.15s}
+    .ipd-modal-close:hover{background:rgba(255,255,255,.32)}
+    .ipd-modal-body{padding:1.1rem 1.5rem 1.4rem;flex:1}
     .completion-strip{display:flex;gap:1.2rem;align-items:center;background:#f8f9fb;border-radius:6px;padding:.55rem .85rem;margin:.6rem 0 1rem;flex-wrap:wrap}
     .cs-item{display:flex;align-items:center;gap:.35rem;font-size:.8rem;color:#444}
     .cs-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
@@ -147,15 +150,16 @@
 </div>
 
 <!-- PATIENT MODAL -->
-<div class="modal-overlay" id="patientModal">
-  <div class="modal">
-    <div class="modal-hdr">
-      <div>
+<div class="ipd-modal-overlay" id="patientModal">
+  <div class="ipd-modal">
+    <div class="ipd-modal-hdr">
+      <div style="flex:1;min-width:0">
         <h2 id="modalTitle">Patient Documents</h2>
-        <p id="modalMeta" style="font-size:.79rem;color:#666;margin:.15rem 0 0;"></p>
+        <div class="modal-patient-meta" id="modalMeta"></div>
       </div>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+      <button class="ipd-modal-close" onclick="closeModal()">✕</button>
     </div>
+    <div class="ipd-modal-body">
     <div class="completion-strip" id="completionStrip"></div>
     <hr class="divider"/>
 
@@ -194,6 +198,7 @@
 
     <p class="err" id="modalErr" style="margin-top:.7rem;"></p>
     <p class="info" id="modalOk" style="display:none;margin-top:.7rem;"></p>
+    </div><!-- /ipd-modal-body -->
   </div>
 </div>
 
@@ -202,7 +207,7 @@
   <div class="upload-popup">
     <div class="up-header">
       <h3 id="upPopupTitle">Upload Document</h3>
-      <button class="modal-close" onclick="closeUploadPopup()">✕</button>
+      <button class="ipd-modal-close" onclick="closeUploadPopup()">✕</button>
     </div>
     <div class="up-body">
       <div id="upLockedNote" class="up-locked-note hidden"></div>
@@ -235,7 +240,7 @@
       <h3 id="vpTitle">Document</h3>
       <div class="vp-actions">
         <a class="vp-dl" id="vpDownload" href="#" target="_blank">⬇ Download</a>
-        <button class="modal-close" onclick="closeViewPopup()">✕</button>
+        <button class="ipd-modal-close" onclick="closeViewPopup()">✕</button>
       </div>
     </div>
     <div class="vp-body" id="vpBody">
@@ -369,7 +374,13 @@ function openPatient(admId) {
   if(!currentPatient) return;
   clearStatus();
   document.getElementById('modalTitle').textContent='📁 '+currentPatient.patient_name;
-  document.getElementById('modalMeta').textContent='📋 '+currentPatient.admission_no+'  |  📅 '+currentPatient.admission_date+'  |  💊 '+currentPatient.case_mode+(currentPatient.case_type?'  |  🏷️ '+currentPatient.case_type:'');
+  const metaParts=[
+    '📋 '+currentPatient.admission_no,
+    '📅 '+currentPatient.admission_date,
+    '💊 '+currentPatient.case_mode,
+    ...(currentPatient.case_type?['🏷️ '+currentPatient.case_type]:[])
+  ];
+  document.getElementById('modalMeta').innerHTML=metaParts.map(p=>`<span>${esc(p)}</span>`).join('');
   document.getElementById('patientModal').classList.add('open');
   refreshUploadButtons();
   renderCompletionStrip();
