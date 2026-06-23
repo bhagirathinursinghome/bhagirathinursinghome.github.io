@@ -206,7 +206,7 @@
         BNH_PAGE.sb.from('ipd_cash_receipts').select('*').eq('admission_id',admId).order('receipt_date'),
         BNH_PAGE.sb.from('ipd_additional_charges').select('*').eq('admission_id',admId).order('charge_date'),
         BNH_PAGE.sb.from('ipd_medicine_indens').select('*').eq('admission_id',admId),
-        BNH_PAGE.sb.from('opd_cases').select('*').eq('ipd_admission_id',admId)
+        BNH_PAGE.sb.from('opd_case').select('case_no,case_date,patient_name,total_amount,type,refer_name').eq('ipd_link', adm.admission_no)
       ]);
 
       document.getElementById('listView').classList.add('hidden');
@@ -231,34 +231,27 @@
         ['Refer Amt', amtEntry && amtEntry.refer_amount!=null ? fmt(amtEntry.refer_amount) : 'N/A']
       ].map(([l,v])=>`<div class="lbl">${l}</div><div class="val">${v}</div>`).join('');
 
-      // OPD Bills
-      const totalOpd = (opdBills||[]).reduce((a,b)=>a+parseFloat(b.bill_amount||0),0);
-      const paidOpd  = (opdBills||[]).reduce((a,b)=>a+parseFloat(b.paid_amount||0)+parseFloat(b.discount||0),0);
-      const opdDue   = totalOpd - paidOpd;
+      // OPD Bills (linked via opd_case.ipd_link = admission_no)
+      const totalOpd = (opdBills||[]).reduce((a,b)=>a+parseFloat(b.total_amount||0),0);
       if (opdBills && opdBills.length > 0) {
         document.getElementById('opdSummary').innerHTML =
           `<table><thead><tr>
              <th>Case No.</th><th>Date</th><th>Patient</th>
-             <th class="r">Bill</th><th class="r">Paid</th><th class="r">Disc</th><th class="r">Due</th>
+             <th>Type</th><th>Refer</th><th class="r">Bill Amount</th>
            </tr></thead>
-           <tbody>${opdBills.map(b => {
-             const due = parseFloat(b.bill_amount||0)-parseFloat(b.paid_amount||0)-parseFloat(b.discount||0);
-             return `<tr>
+           <tbody>${opdBills.map(b => `<tr>
                <td>${b.case_no||'-'}</td>
                <td>${b.case_date||'-'}</td>
                <td>${b.patient_name||'-'}</td>
-               <td class="r">${fmt(b.bill_amount)}</td>
-               <td class="r">${fmt(b.paid_amount)}</td>
-               <td class="r">${fmt(b.discount)}</td>
-               <td class="r" style="color:${due>0?'#dc2626':'#059669'}">${fmt(due)}</td>
-             </tr>`;
-           }).join('')}</tbody>
-           <tfoot><tr><td colspan="3">Total</td>
-             <td class="r">${fmt(totalOpd)}</td><td class="r">${fmt(paidOpd)}</td>
-             <td></td><td class="r" style="color:${opdDue>0?'#dc2626':'#059669'}">${fmt(opdDue)}</td>
+               <td>${b.type||'-'}</td>
+               <td>${b.refer_name||'N/A'}</td>
+               <td class="r">${fmt(b.total_amount)}</td>
+             </tr>`).join('')}</tbody>
+           <tfoot><tr><td colspan="5">Total OPD Bill</td>
+             <td class="r">${fmt(totalOpd)}</td>
            </tr></tfoot></table>`;
       } else {
-        document.getElementById('opdSummary').innerHTML = '<span style="color:#6b7280">No OPD bills linked.</span>';
+        document.getElementById('opdSummary').innerHTML = '<span style="color:#6b7280">No OPD cases linked.</span>';
       }
 
       // Receipt History
@@ -307,14 +300,10 @@
     const pkgAmt   = parseFloat(amtEntry?.package_amount||amtEntry?.nh_fees||0);
     const totalRcpt = (receipts||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const totalDisc = (receipts||[]).reduce((a,r)=>a+parseFloat(r.discount||0),0);
-    const opdDue   = (opdBills||[]).reduce((a,b)=>a+parseFloat(b.bill_amount||0)-parseFloat(b.paid_amount||0)-parseFloat(b.discount||0),0);
 
     let reasons = [];
     if (!isCashless && (totalRcpt + totalDisc) < pkgAmt) {
       reasons.push(`Package payment pending: ${fmt(pkgAmt - totalRcpt - totalDisc)} remaining`);
-    }
-    if (opdDue > 0) {
-      reasons.push(`OPD bill due: ${fmt(opdDue)} unpaid`);
     }
 
     const btn = document.getElementById('dischargeBtn');
