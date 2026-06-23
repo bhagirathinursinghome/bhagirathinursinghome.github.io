@@ -7,202 +7,282 @@
   <link rel="stylesheet" href="../assets/style.css"/>
   <style>
     .tab-bar {
-      display: flex; gap: 0.2rem;
-      border-bottom: 2px solid var(--border,#e2e8f0);
-      margin-bottom: 1.1rem; flex-wrap: wrap;
+      display:flex; gap:0.2rem;
+      border-bottom:2px solid var(--border,#e2e8f0);
+      margin-bottom:1.1rem; flex-wrap:wrap;
     }
     .tab-btn {
-      padding: 0.5rem 0.9rem; border: none; background: none;
-      cursor: pointer; font-size: 0.84rem; font-weight: 600;
-      color: var(--text-muted,#888);
-      border-bottom: 2px solid transparent; margin-bottom: -2px;
-      border-radius: 6px 6px 0 0;
-      transition: color 0.15s, border-color 0.15s; white-space: nowrap;
+      padding:0.5rem 0.9rem; border:none; background:none;
+      cursor:pointer; font-size:0.84rem; font-weight:600;
+      color:var(--text-muted,#888);
+      border-bottom:2px solid transparent; margin-bottom:-2px;
+      border-radius:6px 6px 0 0;
+      transition:color 0.15s,border-color 0.15s; white-space:nowrap;
     }
-    .tab-btn.active { color: var(--primary,#2563eb); border-bottom-color: var(--primary,#2563eb); }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
+    .tab-btn.active{color:var(--primary,#2563eb);border-bottom-color:var(--primary,#2563eb);}
+    .tab-panel{display:none;}
+    .tab-panel.active{display:block;}
 
-    .stat-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
-    .stat-card {
-      flex: 1; min-width: 110px;
-      background: var(--card-bg,#f8fafc);
-      border: 1px solid var(--border,#e2e8f0);
-      border-radius: 10px; padding: 0.75rem 1rem; text-align: center;
+    .stat-row{display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.1rem;}
+    .stat-card{
+      flex:1;min-width:110px;
+      background:var(--card-bg,#f8fafc);
+      border:1px solid var(--border,#e2e8f0);
+      border-radius:10px;padding:0.75rem 1rem;text-align:center;
     }
-    .stat-card .stat-val { font-size: 1.55rem; font-weight: 700; line-height: 1; }
-    .stat-card .stat-lbl { font-size: 0.72rem; color: var(--text-muted,#888); margin-top: 0.2rem; }
-    .stat-card.green .stat-val { color: #16a34a; }
-    .stat-card.orange .stat-val { color: #d97706; }
-    .stat-card.blue .stat-val { color: #2563eb; }
-    .stat-card.red .stat-val { color: #dc2626; }
+    .stat-card .stat-val{font-size:1.55rem;font-weight:700;line-height:1;}
+    .stat-card .stat-lbl{font-size:0.72rem;color:var(--text-muted,#888);margin-top:0.2rem;}
+    .stat-card.green .stat-val{color:#16a34a;}
+    .stat-card.orange .stat-val{color:#d97706;}
+    .stat-card.blue .stat-val{color:#2563eb;}
+    .stat-card.red .stat-val{color:#dc2626;}
 
-    .doctor-card {
-      background: var(--card-bg,#fff);
-      border: 1px solid var(--border,#e2e8f0);
-      border-radius: 12px; padding: 0.85rem 1rem;
-      margin-bottom: 0.6rem;
-      display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;
-      transition: border-color 0.2s, background 0.2s;
+    .doctor-card{
+      background:var(--card-bg,#fff);
+      border:1px solid var(--border,#e2e8f0);
+      border-radius:12px;padding:0.85rem 1rem;
+      margin-bottom:0.6rem;
+      display:flex;align-items:center;gap:0.85rem;flex-wrap:wrap;
+      transition:border-color 0.2s,background 0.2s,opacity 0.2s;
     }
-    .doctor-card.done {
-      opacity: 0.6; border-color: #bbf7d0; background: #f0fdf4;
-    }
-    .doc-seq {
-      font-size: 0.75rem; font-weight: 700;
-      color: var(--text-muted,#888); min-width: 2rem; text-align: center;
-    }
-    .doc-info { flex: 1; min-width: 160px; }
-    .doc-name { font-weight: 700; font-size: 0.95rem; }
-    .doc-meta { font-size: 0.79rem; color: var(--text-muted,#888); margin-top: 0.12rem; }
-    .doc-mobile { font-weight: 600; font-size: 0.87rem; letter-spacing: 0.02em; margin-top: 0.1rem; }
+    .doctor-card.done{opacity:0.6;border-color:#bbf7d0;background:#f0fdf4;}
+    .doc-seq{font-size:0.75rem;font-weight:700;color:var(--text-muted,#888);min-width:2rem;text-align:center;}
+    .doc-info{flex:1;min-width:160px;}
+    .doc-name{font-weight:700;font-size:0.95rem;}
+    .doc-meta{font-size:0.79rem;color:var(--text-muted,#888);margin-top:0.12rem;}
+    .doc-mobile{font-weight:600;font-size:0.87rem;letter-spacing:0.02em;margin-top:0.1rem;}
+    .doc-outcome{font-size:0.78rem;margin-top:0.18rem;}
 
-    .call-btns { display: flex; gap: 0.4rem; flex-shrink: 0; flex-wrap: wrap; }
-    .btn-call {
-      display: inline-flex; align-items: center; gap: 0.3rem;
-      padding: 0.42rem 0.8rem; background: #2563eb; color: #fff;
-      border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 600;
-      cursor: pointer; text-decoration: none; transition: background 0.15s;
+    .call-btns{display:flex;gap:0.4rem;flex-shrink:0;flex-wrap:wrap;}
+    .btn-call{
+      display:inline-flex;align-items:center;gap:0.3rem;
+      padding:0.42rem 0.8rem;background:#2563eb;color:#fff;
+      border:none;border-radius:8px;font-size:0.8rem;font-weight:600;
+      cursor:pointer;text-decoration:none;transition:background 0.15s;
     }
-    .btn-call:hover { background: #1d4ed8; }
-    .btn-wa {
-      display: inline-flex; align-items: center; gap: 0.3rem;
-      padding: 0.42rem 0.8rem; background: #16a34a; color: #fff;
-      border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 600;
-      cursor: pointer; text-decoration: none; transition: background 0.15s;
+    .btn-call:hover{background:#1d4ed8;}
+    .btn-wa{
+      display:inline-flex;align-items:center;gap:0.3rem;
+      padding:0.42rem 0.8rem;background:#16a34a;color:#fff;
+      border:none;border-radius:8px;font-size:0.8rem;font-weight:600;
+      cursor:pointer;text-decoration:none;transition:background 0.15s;
     }
-    .btn-wa:hover { background: #15803d; }
-    .btn-done {
-      display: inline-flex; align-items: center; gap: 0.3rem;
-      padding: 0.42rem 0.8rem; background: #f0fdf4; color: #16a34a;
-      border: 1px solid #bbf7d0; border-radius: 8px;
-      font-size: 0.8rem; font-weight: 600; cursor: pointer;
-      transition: background 0.15s, color 0.15s;
+    .btn-wa:hover{background:#15803d;}
+    .btn-done{
+      display:inline-flex;align-items:center;gap:0.3rem;
+      padding:0.42rem 0.8rem;background:#f0fdf4;color:#16a34a;
+      border:1px solid #bbf7d0;border-radius:8px;
+      font-size:0.8rem;font-weight:600;cursor:pointer;
+      transition:background 0.15s,color 0.15s;
     }
-    .btn-done.active { background: #16a34a; color: #fff; border-color: #16a34a; }
+    .btn-done.active{background:#16a34a;color:#fff;border-color:#16a34a;}
 
-    .records-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
-    .records-table th {
-      text-align: left; padding: 0.5rem 0.7rem;
-      font-size: 0.69rem; font-weight: 700; letter-spacing: 0.09em;
-      text-transform: uppercase; color: var(--text-muted,#888);
-      border-bottom: 1px solid var(--border,#e2e8f0); white-space: nowrap;
+    .records-table{width:100%;border-collapse:collapse;font-size:0.86rem;}
+    .records-table th{
+      text-align:left;padding:0.5rem 0.7rem;
+      font-size:0.69rem;font-weight:700;letter-spacing:0.09em;
+      text-transform:uppercase;color:var(--text-muted,#888);
+      border-bottom:1px solid var(--border,#e2e8f0);white-space:nowrap;
     }
-    .records-table td {
-      padding: 0.55rem 0.7rem;
-      border-bottom: 1px solid var(--border,#e2e8f0); vertical-align: middle;
+    .records-table td{
+      padding:0.55rem 0.7rem;
+      border-bottom:1px solid var(--border,#e2e8f0);vertical-align:middle;
     }
-    .records-table tr:last-child td { border-bottom: none; }
-    .records-table tr:hover td { background: var(--hover-bg,#f8fafc); }
+    .records-table tr:last-child td{border-bottom:none;}
+    .records-table tr:hover td{background:var(--hover-bg,#f8fafc);}
 
-    .settings-card {
-      background: var(--card-bg,#fff); border: 1px solid var(--border,#e2e8f0);
-      border-radius: 12px; padding: 1.1rem 1.25rem; margin-bottom: 1rem;
+    .settings-card{
+      background:var(--card-bg,#fff);border:1px solid var(--border,#e2e8f0);
+      border-radius:12px;padding:1.1rem 1.25rem;margin-bottom:1rem;
     }
-    .settings-card h3 { margin: 0 0 0.85rem; font-size: 0.92rem; }
-    .settings-row { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 0.7rem; }
-    .settings-row label {
-      display: block; font-size: 0.77rem; font-weight: 600;
-      color: var(--text-muted,#888); text-transform: uppercase;
-      letter-spacing: 0.06em; margin-bottom: 0.3rem;
+    .settings-card h3{margin:0 0 0.85rem;font-size:0.92rem;}
+    .settings-row{display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:0.7rem;}
+    .settings-row label{
+      display:block;font-size:0.77rem;font-weight:600;
+      color:var(--text-muted,#888);text-transform:uppercase;
+      letter-spacing:0.06em;margin-bottom:0.3rem;
     }
-    .settings-row input[type=number] {
-      padding: 0.5rem 0.75rem; border: 1px solid var(--border,#e2e8f0);
-      border-radius: 8px; font-size: 0.95rem; width: 130px;
-      background: var(--input-bg,#fff); color: var(--text,#1e293b);
+    .settings-row input[type=number]{
+      padding:0.5rem 0.75rem;border:1px solid var(--border,#e2e8f0);
+      border-radius:8px;font-size:0.95rem;width:130px;
+      background:var(--input-bg,#fff);color:var(--text,#1e293b);
     }
-    .btn-save {
-      padding: 0.52rem 1.1rem; background: var(--primary,#2563eb); color: #fff;
-      border: none; border-radius: 8px; font-size: 0.88rem;
-      font-weight: 600; cursor: pointer; transition: background 0.15s;
+    .btn-save{
+      padding:0.52rem 1.1rem;background:var(--primary,#2563eb);color:#fff;
+      border:none;border-radius:8px;font-size:0.88rem;
+      font-weight:600;cursor:pointer;transition:background 0.15s;
     }
-    .btn-save:hover { background: #1d4ed8; }
+    .btn-save:hover{background:#1d4ed8;}
 
-    .perf-bar-wrap { background: #e2e8f0; border-radius: 999px; height: 8px; min-width: 80px; }
-    .perf-bar { background: #2563eb; border-radius: 999px; height: 8px; }
+    .perf-bar-wrap{background:#e2e8f0;border-radius:999px;height:8px;min-width:80px;}
+    .perf-bar{background:#2563eb;border-radius:999px;height:8px;}
 
-    .filter-row {
-      display: flex; gap: 0.6rem; flex-wrap: wrap;
-      margin-bottom: 0.85rem; align-items: center;
+    .filter-row{
+      display:flex;gap:0.6rem;flex-wrap:wrap;
+      margin-bottom:0.85rem;align-items:center;
     }
-    .filter-row select, .filter-row input {
-      padding: 0.45rem 0.75rem; border: 1px solid var(--border,#e2e8f0);
-      border-radius: 8px; font-size: 0.85rem;
-      background: var(--input-bg,#fff); color: var(--text,#1e293b);
-      flex: 1; min-width: 155px;
+    .filter-row select,.filter-row input{
+      padding:0.45rem 0.75rem;border:1px solid var(--border,#e2e8f0);
+      border-radius:8px;font-size:0.85rem;
+      background:var(--input-bg,#fff);color:var(--text,#1e293b);
+      flex:1;min-width:150px;
     }
-    .filter-row select { flex: 0 0 auto; min-width: 155px; }
+    .filter-row select{flex:0 0 auto;min-width:150px;}
 
-    .progress-wrap {
-      background: #e2e8f0; border-radius: 999px; height: 10px;
-      margin: 0.35rem 0 1rem; overflow: hidden;
+    .progress-wrap{
+      background:#e2e8f0;border-radius:999px;height:10px;
+      margin:0.35rem 0 1rem;overflow:hidden;
     }
-    .progress-fill { background: #2563eb; border-radius: 999px; height: 100%; transition: width 0.5s; }
-    .progress-lbl { font-size: 0.78rem; color: var(--text-muted,#888); margin-bottom: 0.3rem; }
+    .progress-fill{background:#2563eb;border-radius:999px;height:100%;transition:width 0.5s;}
+    .progress-lbl{font-size:0.78rem;color:var(--text-muted,#888);margin-bottom:0.3rem;}
 
-    .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--text-muted,#888); font-size: 0.9rem; }
-    .empty-state .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .empty-state{text-align:center;padding:2.5rem 1rem;color:var(--text-muted,#888);font-size:0.9rem;}
+    .empty-state .icon{font-size:2rem;margin-bottom:0.5rem;}
 
-    .role-badge {
-      display: inline-block; font-size: 0.7rem; font-weight: 600;
-      padding: 0.15rem 0.6rem; border-radius: 999px;
-      background: #e2e8f0; color: #334155; margin-left: 0.5rem;
+    .role-badge{
+      display:inline-block;font-size:0.7rem;font-weight:600;
+      padding:0.15rem 0.6rem;border-radius:999px;
+      background:#e2e8f0;color:#334155;margin-left:0.5rem;
     }
-    .role-badge.admin { background: #dbeafe; color: #1d4ed8; }
-    .role-badge.limited { background: #fef3c7; color: #b45309; }
+    .role-badge.admin{background:#dbeafe;color:#1d4ed8;}
+    .role-badge.limited{background:#fef3c7;color:#b45309;}
 
-    .pill {
-      display: inline-block; font-size: 0.71rem; font-weight: 600;
-      padding: 0.18rem 0.55rem; border-radius: 999px;
-    }
-    .pill-call { background: #dbeafe; color: #1d4ed8; }
-    .pill-wa   { background: #dcfce7; color: #15803d; }
-    .pill-done { background: #dcfce7; color: #15803d; }
-    .pill-pending { background: #fef3c7; color: #b45309; }
-    .pill-carry { background: #fef3c7; color: #b45309; font-size: 0.68rem; margin-left: 0.3rem; }
+    .pill{display:inline-block;font-size:0.71rem;font-weight:600;padding:0.18rem 0.55rem;border-radius:999px;}
+    .pill-call{background:#dbeafe;color:#1d4ed8;}
+    .pill-wa{background:#dcfce7;color:#15803d;}
+    .pill-done{background:#dcfce7;color:#15803d;}
+    .pill-pos{background:#dcfce7;color:#15803d;}
+    .pill-neg{background:#fee2e2;color:#dc2626;}
+    .pill-nopickup{background:#fef3c7;color:#b45309;}
+    .pill-oos{background:#f1f5f9;color:#475569;}
+    .pill-carry{background:#fef3c7;color:#b45309;font-size:0.68rem;margin-left:0.3rem;}
 
-    .info-note {
-      background: #eff6ff; border: 1px solid #bfdbfe;
-      border-radius: 8px; padding: 0.6rem 0.85rem;
-      font-size: 0.82rem; color: #1d4ed8; margin-bottom: 0.9rem;
+    .info-note{
+      background:#eff6ff;border:1px solid #bfdbfe;
+      border-radius:8px;padding:0.6rem 0.85rem;
+      font-size:0.82rem;color:#1d4ed8;margin-bottom:0.9rem;
     }
-    .warn-note {
-      background: #fffbeb; border: 1px solid #fde68a;
-      border-radius: 8px; padding: 0.6rem 0.85rem;
-      font-size: 0.82rem; color: #92400e; margin-bottom: 0.9rem;
+    .warn-note{
+      background:#fffbeb;border:1px solid #fde68a;
+      border-radius:8px;padding:0.6rem 0.85rem;
+      font-size:0.82rem;color:#92400e;margin-bottom:0.9rem;
     }
 
-    .toast {
-      position: fixed; bottom: 1.5rem; right: 1.5rem;
-      padding: 0.75rem 1.2rem; border-radius: 10px;
-      font-size: 0.88rem; font-weight: 600; color: #fff;
-      z-index: 9999; opacity: 0; transform: translateY(10px);
-      transition: opacity 0.25s, transform 0.25s; pointer-events: none;
+    .toast{
+      position:fixed;bottom:1.5rem;right:1.5rem;
+      padding:0.75rem 1.2rem;border-radius:10px;
+      font-size:0.88rem;font-weight:600;color:#fff;
+      z-index:9999;opacity:0;transform:translateY(10px);
+      transition:opacity 0.25s,transform 0.25s;pointer-events:none;
     }
-    .toast.show { opacity: 1; transform: translateY(0); }
-    .toast.success { background: #16a34a; }
-    .toast.error   { background: #dc2626; }
-    .toast.info    { background: #2563eb; }
+    .toast.show{opacity:1;transform:translateY(0);}
+    .toast.success{background:#16a34a;}
+    .toast.error{background:#dc2626;}
+    .toast.info{background:#2563eb;}
 
-    .tbl-actions { display: flex; gap: 0.35rem; }
-    .btn-sm-call {
-      display: inline-flex; align-items: center; gap: 0.2rem;
-      padding: 0.25rem 0.55rem; background: #2563eb; color: #fff;
-      border: none; border-radius: 6px; font-size: 0.76rem;
-      font-weight: 600; cursor: pointer; text-decoration: none;
+    .tbl-actions{display:flex;gap:0.35rem;align-items:center;flex-wrap:wrap;}
+    .btn-sm-call{
+      display:inline-flex;align-items:center;gap:0.2rem;
+      padding:0.25rem 0.55rem;background:#2563eb;color:#fff;
+      border:none;border-radius:6px;font-size:0.76rem;
+      font-weight:600;cursor:pointer;text-decoration:none;
     }
-    .btn-sm-wa {
-      display: inline-flex; align-items: center; gap: 0.2rem;
-      padding: 0.25rem 0.55rem; background: #16a34a; color: #fff;
-      border: none; border-radius: 6px; font-size: 0.76rem;
-      font-weight: 600; cursor: pointer; text-decoration: none;
+    .btn-sm-wa{
+      display:inline-flex;align-items:center;gap:0.2rem;
+      padding:0.25rem 0.55rem;background:#16a34a;color:#fff;
+      border:none;border-radius:6px;font-size:0.76rem;
+      font-weight:600;cursor:pointer;text-decoration:none;
     }
+    .btn-sm-del{
+      display:inline-flex;align-items:center;gap:0.2rem;
+      padding:0.25rem 0.55rem;background:#fff1f2;color:#dc2626;
+      border:1px solid #fecaca;border-radius:6px;font-size:0.76rem;
+      font-weight:600;cursor:pointer;
+    }
+    .btn-sm-del:hover{background:#fee2e2;}
 
-    @media (max-width: 600px) {
-      .doctor-card { flex-direction: column; align-items: flex-start; }
-      .call-btns { width: 100%; }
-      .btn-call, .btn-wa, .btn-done { flex: 1; justify-content: center; }
-      .stat-card .stat-val { font-size: 1.25rem; }
+    /* ── Call Outcome Modal ── */
+    .modal-overlay{
+      position:fixed;inset:0;
+      background:rgba(15,23,42,0.5);
+      z-index:1000;
+      display:flex;align-items:center;justify-content:center;
+      padding:1rem;
+      opacity:0;pointer-events:none;
+      transition:opacity 0.2s;
+    }
+    .modal-overlay.open{opacity:1;pointer-events:all;}
+    .modal-box{
+      background:var(--card-bg,#fff);
+      border-radius:16px;
+      width:100%;max-width:420px;
+      padding:1.5rem;
+      box-shadow:0 24px 64px rgba(0,0,0,0.2);
+      transform:translateY(20px);
+      transition:transform 0.2s;
+    }
+    .modal-overlay.open .modal-box{transform:translateY(0);}
+    .modal-title{font-size:1rem;font-weight:700;margin:0 0 1.1rem;display:flex;align-items:center;gap:0.5rem;}
+
+    /* outcome step groups */
+    .outcome-step{margin-bottom:0.9rem;}
+    .outcome-step-label{
+      font-size:0.72rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:0.08em;color:var(--text-muted,#888);margin-bottom:0.45rem;
+    }
+    .outcome-btn-group{display:flex;gap:0.5rem;flex-wrap:wrap;}
+    .outcome-btn{
+      flex:1;min-width:110px;
+      padding:0.55rem 0.7rem;
+      border:2px solid var(--border,#e2e8f0);
+      border-radius:10px;background:var(--card-bg,#fff);
+      font-size:0.84rem;font-weight:600;cursor:pointer;
+      text-align:center;
+      transition:border-color 0.15s,background 0.15s,color 0.15s;
+      color:var(--text,#1e293b);
+    }
+    .outcome-btn:hover{border-color:#2563eb;color:#2563eb;background:#eff6ff;}
+    .outcome-btn.sel-noresponse{border-color:#d97706;background:#fffbeb;color:#b45309;}
+    .outcome-btn.sel-response{border-color:#2563eb;background:#eff6ff;color:#1d4ed8;}
+    .outcome-btn.sel-nopickup{border-color:#d97706;background:#fef3c7;color:#b45309;}
+    .outcome-btn.sel-oos{border-color:#94a3b8;background:#f1f5f9;color:#475569;}
+    .outcome-btn.sel-positive{border-color:#16a34a;background:#f0fdf4;color:#15803d;}
+    .outcome-btn.sel-negative{border-color:#dc2626;background:#fff1f2;color:#dc2626;}
+
+    .remark-area{
+      width:100%;box-sizing:border-box;
+      padding:0.55rem 0.75rem;
+      border:1px solid var(--border,#e2e8f0);
+      border-radius:8px;font-size:0.88rem;
+      background:var(--input-bg,#fff);color:var(--text,#1e293b);
+      resize:vertical;min-height:70px;font-family:inherit;
+      margin-top:0.35rem;
+    }
+    .remark-area:focus{outline:2px solid #2563eb;border-color:transparent;}
+    .modal-err{color:#dc2626;font-size:0.82rem;margin:0.4rem 0 0;min-height:1.1em;}
+    .modal-actions{display:flex;gap:0.6rem;margin-top:1.1rem;}
+    .btn-modal-cancel{
+      flex:1;padding:0.58rem 1rem;
+      background:var(--hover-bg,#f1f5f9);color:var(--text,#1e293b);
+      border:1px solid var(--border,#e2e8f0);border-radius:8px;
+      font-size:0.9rem;font-weight:600;cursor:pointer;
+    }
+    .btn-modal-confirm{
+      flex:2;padding:0.58rem 1rem;
+      background:#16a34a;color:#fff;
+      border:none;border-radius:8px;
+      font-size:0.9rem;font-weight:600;cursor:pointer;
+      transition:background 0.15s;
+    }
+    .btn-modal-confirm:hover{background:#15803d;}
+    .btn-modal-confirm:disabled{opacity:0.5;pointer-events:none;}
+
+    @media(max-width:600px){
+      .doctor-card{flex-direction:column;align-items:flex-start;}
+      .call-btns{width:100%;}
+      .btn-call,.btn-wa,.btn-done{flex:1;justify-content:center;}
+      .stat-card .stat-val{font-size:1.25rem;}
+      .outcome-btn{min-width:90px;}
     }
   </style>
 </head>
@@ -212,7 +292,7 @@
 <div class="page">
   <h1>📞 Call Refer <span id="roleIndicator" class="role-badge"></span></h1>
   <p style="color:var(--text-muted,#888);font-size:0.9rem;margin-top:-0.25rem;margin-bottom:1.25rem;">
-    Daily rotating call batches for Gramin Doctors — track calls, WhatsApp, and team performance.
+    Daily rotating call batches for Gramin Doctors — track calls, outcomes, and team performance.
   </p>
 
   <div class="page-card">
@@ -244,6 +324,13 @@
         <select id="filterCompletedDate" onchange="renderCompleted()">
           <option value="">📅 All Dates</option>
         </select>
+        <select id="filterCompletedOutcome" onchange="renderCompleted()">
+          <option value="">📊 All Outcomes</option>
+          <option value="positive">✅ Positive</option>
+          <option value="negative">❌ Negative</option>
+          <option value="nopickup">📵 No Pickup</option>
+          <option value="oos">📴 Out of Service</option>
+        </select>
       </div>
       <div id="completedContainer">
         <div class="empty-state"><div class="icon">⏳</div>Loading…</div>
@@ -253,7 +340,7 @@
     <!-- HISTORY -->
     <div id="tab-history" class="tab-panel">
       <div class="filter-row">
-        <input id="searchHistory" placeholder="🔍 Search name or mobile…" oninput="renderHistory()"/>
+        <input id="searchHistory" placeholder="🔍 Search name, mobile, remark…" oninput="renderHistory()"/>
         <select id="filterHistoryDate" onchange="renderHistory()">
           <option value="">📅 All Dates</option>
         </select>
@@ -262,6 +349,13 @@
           <option value="call">📞 Call</option>
           <option value="whatsapp">💬 WhatsApp</option>
           <option value="done">✅ Marked Done</option>
+        </select>
+        <select id="filterHistoryOutcome" onchange="renderHistory()">
+          <option value="">📊 All Outcomes</option>
+          <option value="positive">✅ Positive</option>
+          <option value="negative">❌ Negative</option>
+          <option value="nopickup">📵 No Pickup</option>
+          <option value="oos">📴 Out of Service</option>
         </select>
       </div>
       <div id="historyContainer">
@@ -297,32 +391,89 @@
           <button class="btn-save" onclick="saveBatchSize()">💾 Save</button>
         </div>
         <p style="font-size:0.82rem;color:var(--text-muted,#888);margin:0.4rem 0 0">
-          Determines how many doctors appear in each day's call list. The system
-          rotates through all doctors in order and repeats. New doctors are added to
-          the end of the queue. Incomplete calls carry over to the next day automatically.
+          Determines how many doctors appear in each day's call list. The system rotates through
+          all doctors in order and repeats. Incomplete calls carry over to the next day automatically.
         </p>
       </div>
-
       <div class="settings-card">
         <h3>📊 Rotation Overview</h3>
-        <div id="rotationStatus">
-          <div class="empty-state"><div class="icon">⏳</div>Loading…</div>
-        </div>
+        <div id="rotationStatus"><div class="empty-state"><div class="icon">⏳</div>Loading…</div></div>
       </div>
-
       <div class="settings-card">
         <h3>ℹ️ How It Works</h3>
         <ul style="font-size:0.84rem;color:var(--text-muted,#888);margin:0;padding-left:1.2rem;line-height:1.9">
           <li>Doctors are ordered by the date they were added.</li>
           <li>Each day the system picks the next <em>batch_size</em> doctors in sequence.</li>
-          <li>Any calls not marked Done by end-of-day carry over to <strong>tomorrow's batch first</strong>, then fresh records fill the rest.</li>
+          <li>Any calls not marked Done carry over to tomorrow's batch first.</li>
           <li>Once all doctors are covered the cycle repeats from the top.</li>
           <li>New doctors join the end of the queue automatically.</li>
-          <li>The offset is tracked per-user, so multiple users can run independent batches simultaneously.</li>
+          <li>Each user has an independent rotation offset.</li>
         </ul>
       </div>
     </div>
-  </div><!-- .page-card -->
+  </div>
+</div>
+
+<!-- ══ CALL OUTCOME MODAL ══ -->
+<div class="modal-overlay" id="outcomeOverlay">
+  <div class="modal-box">
+    <div class="modal-title">📋 Call Outcome — <span id="outcomeDocName" style="color:var(--primary,#2563eb)"></span></div>
+
+    <!-- Step 1: Response? -->
+    <div class="outcome-step" id="step1">
+      <div class="outcome-step-label">Did the doctor respond?</div>
+      <div class="outcome-btn-group">
+        <button class="outcome-btn" id="btnNoResponse" onclick="selectResponseType('noresponse')">
+          📵 Not Responding
+        </button>
+        <button class="outcome-btn" id="btnResponse" onclick="selectResponseType('response')">
+          📞 Responded
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2A: Not responding sub-options -->
+    <div class="outcome-step" id="step2a" style="display:none">
+      <div class="outcome-step-label">Reason for no response</div>
+      <div class="outcome-btn-group">
+        <button class="outcome-btn" id="btnNopickup" onclick="selectSubOutcome('nopickup')">
+          🔔 Ring, No Pickup
+        </button>
+        <button class="outcome-btn" id="btnOos" onclick="selectSubOutcome('oos')">
+          📴 Out of Service
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2B: Responded sub-options -->
+    <div class="outcome-step" id="step2b" style="display:none">
+      <div class="outcome-step-label">Doctor's response</div>
+      <div class="outcome-btn-group">
+        <button class="outcome-btn" id="btnPositive" onclick="selectSubOutcome('positive')">
+          ✅ Positive
+        </button>
+        <button class="outcome-btn" id="btnNegative" onclick="selectSubOutcome('negative')">
+          ❌ Negative
+        </button>
+      </div>
+    </div>
+
+    <!-- Remark -->
+    <div class="outcome-step" id="stepRemark" style="display:none">
+      <div class="outcome-step-label">
+        Remark <span id="remarkRequired" style="color:#dc2626;display:none">— Required for Negative</span>
+      </div>
+      <textarea class="remark-area" id="outcomeRemark" placeholder="Enter any notes about this call…"></textarea>
+    </div>
+
+    <div class="modal-err" id="outcomeErr"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeOutcomeModal()">Cancel</button>
+      <button class="btn-modal-confirm" id="btnConfirmOutcome" onclick="confirmOutcome()" disabled>
+        ✅ Confirm & Mark Done
+      </button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -332,19 +483,16 @@
 <script src="../assets/page.js"></script>
 <script>
 /* ════════════════════════════════════════════════════
-   CALL REFER PAGE
-   Tables used:
-     gramin_doctor_visits  — master list (read-only here)
-     gramin_call_log       — every call / WA / done action
-     gramin_call_batch_log — daily incomplete-count per user
-     gramin_settings       — key/value (call_batch_size, call_offset_<user>)
+   CALL REFER  —  gramin doctor batch calling system
+   New columns needed in gramin_call_log:
+     call_outcome  TEXT  — 'positive','negative','nopickup','oos'
+     call_remark   TEXT  — free-text note (mandatory when negative)
    ════════════════════════════════════════════════════ */
 
-  BNH_PAGE.requireRole(["admin","manager","accountant","viewer",, "reception"]);
+  BNH_PAGE.requireRole(["admin","manager","accountant","viewer", "reception"]);
 
-  // ── Role ──────────────────────────────────────────
-  const FULL_ROLES    = ["admin"];
-  let   currentRole   = "viewer";
+  const FULL_ROLES  = ["admin"];
+  let   currentRole = "viewer";
   try { currentRole = BNH_PAGE.user?.role || currentRole; } catch(_) {}
   const isAdmin  = FULL_ROLES.includes(currentRole);
   const me       = BNH_PAGE.user?.username || "unknown";
@@ -354,27 +502,26 @@
   // Role badge
   (() => {
     const b = document.getElementById('roleIndicator');
-    if (isAdmin) { b.textContent = '🔑 Admin'; b.className = 'role-badge admin'; }
-    else         { b.textContent = '👁️ Viewer'; b.className = 'role-badge limited'; }
+    if (isAdmin) { b.textContent='🔑 Admin'; b.className='role-badge admin'; }
+    else         { b.textContent='👁️ Viewer'; b.className='role-badge limited'; }
   })();
 
-  // ── Build tabs ────────────────────────────────────
+  // ── Build tabs ──────────────────────────────────────
   const TABS = [
-    { id:'batch',       label:'📋 Today\'s Batch' },
-    { id:'pending',     label:'⏳ Pending'         },
-    { id:'completed',   label:'✅ Completed'       },
-    { id:'history',     label:'📜 Call History'    },
+    {id:'batch',       label:"📋 Today's Batch"},
+    {id:'pending',     label:'⏳ Pending'},
+    {id:'completed',   label:'✅ Completed'},
+    {id:'history',     label:'📜 Call History'},
     ...(isAdmin ? [
-      { id:'performance', label:'📊 Performance'   },
-      { id:'settings',    label:'⚙️ Settings'      },
+      {id:'performance', label:'📊 Performance'},
+      {id:'settings',    label:'⚙️ Settings'},
     ] : []),
   ];
-
   (() => {
     const bar = document.getElementById('tabBar');
-    TABS.forEach((t, i) => {
+    TABS.forEach((t,i) => {
       const btn = document.createElement('button');
-      btn.className = 'tab-btn' + (i===0 ? ' active' : '');
+      btn.className = 'tab-btn'+(i===0?' active':'');
       btn.textContent = t.label;
       btn.onclick = () => switchTab(t.id, btn);
       bar.appendChild(btn);
@@ -383,385 +530,421 @@
   })();
 
   function switchTab(name, btn) {
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.getElementById('tab-'+name).classList.add('active');
     btn.classList.add('active');
   }
 
   // ── State ──────────────────────────────────────────
-  let allDoctors = [];   // gramin_doctor_visits, asc by recorded_at
-  let callLogs   = [];   // gramin_call_log, desc by called_at
-  let batchLog   = [];   // gramin_call_batch_log, desc
+  let allDoctors = [];
+  let callLogs   = [];
+  let batchLog   = [];
   let batchSize  = 50;
-  let myOffset   = 0;    // rotation offset for current user
-  let todayBatch = [];   // computed
+  let myOffset   = 0;
+  let todayBatch = [];
 
-  // ── Toast ─────────────────────────────────────────
+  // outcome modal state
+  let pendingDoneId  = null;
+  let selectedRType  = null;  // 'response' | 'noresponse'
+  let selectedOutcome = null; // 'positive'|'negative'|'nopickup'|'oos'
+
+  // ── Toast ──────────────────────────────────────────
   function showToast(msg, type='success') {
     const t = document.getElementById('toast');
-    t.textContent = msg; t.className = 'toast show '+type;
-    setTimeout(() => t.className = 'toast', 2800);
+    t.textContent=msg; t.className='toast show '+type;
+    setTimeout(()=>t.className='toast', 2800);
   }
 
-  // ── Load all data ─────────────────────────────────
+  // ── Load data ──────────────────────────────────────
   async function loadAll() {
     document.getElementById('spinner').classList.remove('hidden');
     try {
-      // 1. Master doctor list
-      const { data: docs, error: e1 } = await BNH_PAGE.sb
+      const {data:docs,error:e1} = await BNH_PAGE.sb
         .from('gramin_doctor_visits')
         .select('id,doctor_name,mobile,address,recorded_at')
-        .order('recorded_at', { ascending: true });
-      if (e1) throw e1;
-      allDoctors = docs || [];
+        .order('recorded_at',{ascending:true});
+      if(e1) throw e1;
+      allDoctors = docs||[];
 
-      // 2. Call logs (all users — admin sees all, limited sees filtered in UI)
-      const { data: logs, error: e2 } = await BNH_PAGE.sb
+      const {data:logs,error:e2} = await BNH_PAGE.sb
         .from('gramin_call_log')
         .select('*')
-        .order('called_at', { ascending: false });
-      if (e2) throw e2;
-      callLogs = logs || [];
+        .order('called_at',{ascending:false});
+      if(e2) throw e2;
+      callLogs = logs||[];
 
-      // 3. Batch performance log
-      const { data: blog, error: e3 } = await BNH_PAGE.sb
+      const {data:blog,error:e3} = await BNH_PAGE.sb
         .from('gramin_call_batch_log')
         .select('*')
-        .order('log_date', { ascending: false });
-      if (e3) throw e3;
-      batchLog = blog || [];
+        .order('log_date',{ascending:false});
+      if(e3) throw e3;
+      batchLog = blog||[];
 
-      // 4. Settings: batch size + per-user offset
-      const { data: cfg, error: e4 } = await BNH_PAGE.sb
-        .from('gramin_settings')
-        .select('key,value');
-      if (!e4 && cfg) {
-        cfg.forEach(row => {
-          if (row.key === 'call_batch_size') batchSize = parseInt(row.value) || 50;
-          if (row.key === `call_offset_${me}`) myOffset = parseInt(row.value) || 0;
+      const {data:cfg,error:e4} = await BNH_PAGE.sb
+        .from('gramin_settings').select('key,value');
+      if(!e4&&cfg) {
+        cfg.forEach(r=>{
+          if(r.key==='call_batch_size')        batchSize=parseInt(r.value)||50;
+          if(r.key===`call_offset_${me}`)      myOffset=parseInt(r.value)||0;
         });
       }
 
-      // 5. Compute today's batch for current user
       computeBatch();
-
-      // 6. Render all tabs
-      renderBatch();
-      renderPending();
-      renderCompleted();
-      renderHistory();
-      if (isAdmin) { renderPerformance(); renderSettings(); }
-
+      renderBatch(); renderPending(); renderCompleted(); renderHistory();
+      if(isAdmin){ renderPerformance(); renderSettings(); }
     } catch(err) {
-      showToast(err.message, 'error');
+      showToast(err.message,'error');
     } finally {
       document.getElementById('spinner').classList.add('hidden');
     }
   }
 
-  // ── Compute today's batch ─────────────────────────
-  /*
-    Algorithm:
-    1. Carry-forward: find doctor IDs in gramin_call_batch_log for yesterday
-       where recorded_by = me (i.e. yesterday's leftovers).
-    2. Fresh slice: starting at myOffset, pick batchSize doctors in rotation.
-       Skip any already in carry-forward to avoid duplicates.
-    3. Merge: carryover first, then fresh, capped at batchSize.
-    4. Mark each as done if gramin_call_log has a 'done' entry for today by me.
-  */
+  // ── Compute batch ──────────────────────────────────
   function computeBatch() {
     const n = allDoctors.length;
-    if (!n) { todayBatch = []; return; }
+    if(!n){ todayBatch=[]; return; }
 
     const yesterday = prevDate(todayStr);
-
-    // IDs of yesterday's incomplete calls (from batch_log)
-    const carryIds = new Set(
-      batchLog
-        .filter(l => l.log_date === yesterday && l.recorded_by === me)
-        .map(l => l.doctor_id)
+    const carryIds  = new Set(
+      batchLog.filter(l=>l.log_date===yesterday&&l.recorded_by===me).map(l=>l.doctor_id)
     );
-
-    // IDs completed today (marked done)
     const doneToday = new Set(
-      callLogs
-        .filter(l => l.called_by === me && l.call_date === todayStr && l.call_type === 'done')
-        .map(l => l.doctor_id)
+      callLogs.filter(l=>l.called_by===me&&l.call_date===todayStr&&l.call_type==='done').map(l=>l.doctor_id)
     );
-
-    // All IDs called today at all (any action)
-    const touchedToday = new Set(
-      callLogs
-        .filter(l => l.called_by === me && l.call_date === todayStr)
-        .map(l => l.doctor_id)
-    );
-
-    // Build carryover list (only those not yet done)
     const carryList = allDoctors
-      .filter(d => carryIds.has(d.id))
-      .map(d => ({ ...d, isCarryover: true, isDone: doneToday.has(d.id) }));
+      .filter(d=>carryIds.has(d.id))
+      .map(d=>({...d,isCarryover:true,isDone:doneToday.has(d.id)}));
 
-    // Fresh slice from rotation (skip carryover ids)
     const freshNeeded = Math.max(0, batchSize - carryList.length);
-    const freshList = [];
-    for (let i = 0; i < n && freshList.length < freshNeeded; i++) {
-      const doc = allDoctors[(myOffset + i) % n];
-      if (!carryIds.has(doc.id)) {
-        freshList.push({ ...doc, isCarryover: false, isDone: doneToday.has(doc.id) });
-      }
+    const freshList   = [];
+    for(let i=0; i<n&&freshList.length<freshNeeded; i++){
+      const doc = allDoctors[(myOffset+i)%n];
+      if(!carryIds.has(doc.id))
+        freshList.push({...doc,isCarryover:false,isDone:doneToday.has(doc.id)});
     }
-
-    todayBatch = [...carryList, ...freshList];
+    todayBatch = [...carryList,...freshList];
   }
 
-  // ── Save today's pending to batch_log ─────────────
-  // Called when "Mark Done" is toggled so we always have an up-to-date snapshot.
   async function flushPendingToBatchLog() {
-    const pendingIds = todayBatch.filter(d => !d.isDone).map(d => ({
-      doctor_id:        d.id,
-      doctor_name:      d.doctor_name,
-      log_date:         todayStr,
-      recorded_by:      me,
-      recorded_by_name: myName,
+    const rows = todayBatch.filter(d=>!d.isDone).map(d=>({
+      doctor_id:d.id, doctor_name:d.doctor_name,
+      log_date:todayStr, recorded_by:me, recorded_by_name:myName,
     }));
-
-    // Delete today's rows for this user first, then re-insert
-    await BNH_PAGE.sb
-      .from('gramin_call_batch_log')
-      .delete()
-      .eq('log_date', todayStr)
-      .eq('recorded_by', me);
-
-    if (pendingIds.length) {
-      await BNH_PAGE.sb.from('gramin_call_batch_log').insert(pendingIds);
-    }
+    await BNH_PAGE.sb.from('gramin_call_batch_log').delete().eq('log_date',todayStr).eq('recorded_by',me);
+    if(rows.length) await BNH_PAGE.sb.from('gramin_call_batch_log').insert(rows);
   }
 
-  // ── Advance offset after batch is fully done ───────
   async function advanceOffsetIfNeeded() {
-    const allDone = todayBatch.every(d => d.isDone);
-    if (!allDone) return;
+    if(!todayBatch.every(d=>d.isDone)) return;
     const n = allDoctors.length;
-    const freshCount = todayBatch.filter(d => !d.isCarryover).length;
-    const newOffset  = (myOffset + freshCount) % n;
-    if (newOffset === myOffset) return;
+    const freshCount = todayBatch.filter(d=>!d.isCarryover).length;
+    const newOffset  = (myOffset+freshCount)%n;
+    if(newOffset===myOffset) return;
     myOffset = newOffset;
-    await BNH_PAGE.sb.from('gramin_settings').upsert(
-      { key: `call_offset_${me}`, value: String(newOffset) },
-      { onConflict: 'key' }
-    );
+    await BNH_PAGE.sb.from('gramin_settings')
+      .upsert({key:`call_offset_${me}`,value:String(newOffset)},{onConflict:'key'});
   }
 
-  // ── Render: Today's Batch ─────────────────────────
-  function renderBatch() {
-    const total   = todayBatch.length;
-    const done    = todayBatch.filter(d => d.isDone).length;
-    const pending = total - done;
-    const pct     = total ? Math.round(done / total * 100) : 0;
-    const carry   = todayBatch.filter(d => d.isCarryover).length;
+  // ── Outcome helpers ────────────────────────────────
+  const OUTCOME_LABEL = {
+    positive: '<span class="pill pill-pos">✅ Positive</span>',
+    negative: '<span class="pill pill-neg">❌ Negative</span>',
+    nopickup: '<span class="pill pill-nopickup">📵 No Pickup</span>',
+    oos:      '<span class="pill pill-oos">📴 Out of Service</span>',
+  };
+  function outcomeLabel(o){ return OUTCOME_LABEL[o]||'<span class="pill" style="background:#f1f5f9;color:#94a3b8">—</span>'; }
 
-    document.getElementById('batchStats').innerHTML = `
-      <div class="stat-card blue"><div class="stat-val">${total}</div><div class="stat-lbl">Today's Batch</div></div>
-      <div class="stat-card green"><div class="stat-val">${done}</div><div class="stat-lbl">Completed</div></div>
-      <div class="stat-card orange"><div class="stat-val">${pending}</div><div class="stat-lbl">Remaining</div></div>
-      <div class="stat-card ${pct===100?'green':'blue'}"><div class="stat-val">${pct}%</div><div class="stat-lbl">Progress</div></div>
-    `;
-    document.getElementById('progressLbl').textContent = `Progress: ${done} of ${total} calls completed`;
-    document.getElementById('progressFill').style.width = pct+'%';
+  // ── Open outcome modal ─────────────────────────────
+  function openOutcomeModal(doctorId) {
+    pendingDoneId   = doctorId;
+    selectedRType   = null;
+    selectedOutcome = null;
 
-    const noteEl = document.getElementById('batchNote');
-    if (!total) {
-      noteEl.innerHTML = '<div class="warn-note">⚠️ No batch configured. Ask admin to set a batch size.</div>';
-    } else if (carry) {
-      noteEl.innerHTML = `<div class="info-note">↩️ <strong>${carry}</strong> call(s) carried over from yesterday appear first.</div>`;
+    const doc = allDoctors.find(d=>d.id===doctorId);
+    document.getElementById('outcomeDocName').textContent = doc?.doctor_name || doctorId;
+    document.getElementById('step2a').style.display      = 'none';
+    document.getElementById('step2b').style.display      = 'none';
+    document.getElementById('stepRemark').style.display  = 'none';
+    document.getElementById('outcomeRemark').value       = '';
+    document.getElementById('outcomeErr').textContent    = '';
+    document.getElementById('btnConfirmOutcome').disabled = true;
+
+    // Reset button styles
+    ['btnNoResponse','btnResponse','btnNopickup','btnOos','btnPositive','btnNegative']
+      .forEach(id=>document.getElementById(id).className='outcome-btn');
+
+    document.getElementById('remarkRequired').style.display='none';
+    document.getElementById('outcomeOverlay').classList.add('open');
+  }
+
+  function closeOutcomeModal() {
+    document.getElementById('outcomeOverlay').classList.remove('open');
+    pendingDoneId=null; selectedRType=null; selectedOutcome=null;
+  }
+
+  function selectResponseType(type) {
+    selectedRType   = type;
+    selectedOutcome = null;
+    document.getElementById('btnConfirmOutcome').disabled = true;
+    document.getElementById('outcomeErr').textContent     = '';
+
+    if(type==='noresponse'){
+      document.getElementById('btnNoResponse').className = 'outcome-btn sel-noresponse';
+      document.getElementById('btnResponse').className   = 'outcome-btn';
+      document.getElementById('step2a').style.display    = 'block';
+      document.getElementById('step2b').style.display    = 'none';
+      document.getElementById('stepRemark').style.display= 'none';
+      ['btnNopickup','btnOos'].forEach(id=>document.getElementById(id).className='outcome-btn');
     } else {
-      noteEl.innerHTML = '';
+      document.getElementById('btnResponse').className   = 'outcome-btn sel-response';
+      document.getElementById('btnNoResponse').className = 'outcome-btn';
+      document.getElementById('step2b').style.display    = 'block';
+      document.getElementById('step2a').style.display    = 'none';
+      document.getElementById('stepRemark').style.display= 'none';
+      ['btnPositive','btnNegative'].forEach(id=>document.getElementById(id).className='outcome-btn');
+    }
+  }
+
+  function selectSubOutcome(outcome) {
+    selectedOutcome = outcome;
+    document.getElementById('outcomeErr').textContent = '';
+
+    // Clear sub-button styles in current group
+    if(selectedRType==='noresponse'){
+      document.getElementById('btnNopickup').className = outcome==='nopickup' ? 'outcome-btn sel-nopickup' : 'outcome-btn';
+      document.getElementById('btnOos').className      = outcome==='oos'      ? 'outcome-btn sel-oos'      : 'outcome-btn';
+    } else {
+      document.getElementById('btnPositive').className = outcome==='positive' ? 'outcome-btn sel-positive' : 'outcome-btn';
+      document.getElementById('btnNegative').className = outcome==='negative' ? 'outcome-btn sel-negative' : 'outcome-btn';
     }
 
-    const container = document.getElementById('batchContainer');
-    if (!total) { container.innerHTML = ''; return; }
+    // Show remark field; mark required only for negative
+    document.getElementById('stepRemark').style.display  = 'block';
+    document.getElementById('remarkRequired').style.display = outcome==='negative' ? 'inline' : 'none';
 
-    container.innerHTML = todayBatch.map((d, i) => `
-      <div class="doctor-card ${d.isDone?'done':''}" id="dcard-${d.id}">
+    // Enable confirm button (remark validation happens on confirm)
+    document.getElementById('btnConfirmOutcome').disabled = false;
+  }
+
+  async function confirmOutcome() {
+    if(!pendingDoneId||!selectedOutcome){ return; }
+
+    const remark = document.getElementById('outcomeRemark').value.trim();
+    if(selectedOutcome==='negative'&&!remark){
+      document.getElementById('outcomeErr').textContent = '⚠️ Remark is required for a Negative response.';
+      return;
+    }
+
+    closeOutcomeModal();
+    await saveDone(pendingDoneId, selectedOutcome, remark);
+  }
+
+  // ── Render batch / pending cards ──────────────────
+  function makeDoctorCard(d, i, showDoneStyling) {
+    const doneLog = callLogs.find(l=>l.called_by===me&&l.call_date===todayStr&&l.call_type==='done'&&l.doctor_id===d.id);
+    const outcomeHtml = doneLog?.call_outcome
+      ? `<div class="doc-outcome">${outcomeLabel(doneLog.call_outcome)}${doneLog.call_remark?` <span style="font-size:0.77rem;color:var(--text-muted,#888)">${esc(doneLog.call_remark)}</span>`:''}</div>`
+      : '';
+
+    return `
+      <div class="doctor-card ${d.isDone&&showDoneStyling?'done':''}" id="dcard-${d.id}">
         <div class="doc-seq">${i+1}</div>
         <div class="doc-info">
           <div class="doc-name">
             ${esc(d.doctor_name)}
-            ${d.isCarryover ? '<span class="pill pill-carry">↩ Carry</span>' : ''}
+            ${d.isCarryover?'<span class="pill pill-carry">↩ Carry</span>':''}
           </div>
           <div class="doc-meta">📍 ${esc(d.address||'—')}</div>
           <div class="doc-mobile">📞 ${esc(d.mobile)}</div>
+          ${outcomeHtml}
         </div>
         <div class="call-btns">
-          <a class="btn-call" href="tel:${esc(d.mobile)}"
-             onclick="logAction('${d.id}','call')">📞 Call</a>
-          <a class="btn-wa" href="https://wa.me/91${esc(d.mobile)}" target="_blank"
-             onclick="logAction('${d.id}','whatsapp')">💬 WhatsApp</a>
-          <button class="btn-done ${d.isDone?'active':''}" id="donebtn-${d.id}"
-                  onclick="toggleDone('${d.id}')">
-            ${d.isDone ? '✅ Done' : '☑️ Mark Done'}
+          <a class="btn-call" href="tel:${esc(d.mobile)}" onclick="logAction('${d.id}','call')">📞 Call</a>
+          <a class="btn-wa"   href="https://wa.me/91${esc(d.mobile)}" target="_blank" onclick="logAction('${d.id}','whatsapp')">💬 WhatsApp</a>
+          <button class="btn-done ${d.isDone?'active':''}" id="donebtn-${d.id}" onclick="${d.isDone?`undoDone('${d.id}')`:`openOutcomeModal('${d.id}')`}">
+            ${d.isDone?'✅ Done':'☑️ Mark Done'}
           </button>
         </div>
-      </div>
-    `).join('');
+      </div>`;
   }
 
-  // ── Log call / WA action ──────────────────────────
+  function renderBatch() {
+    const total  = todayBatch.length;
+    const done   = todayBatch.filter(d=>d.isDone).length;
+    const pct    = total ? Math.round(done/total*100) : 0;
+    const carry  = todayBatch.filter(d=>d.isCarryover).length;
+
+    document.getElementById('batchStats').innerHTML=`
+      <div class="stat-card blue"><div class="stat-val">${total}</div><div class="stat-lbl">Today's Batch</div></div>
+      <div class="stat-card green"><div class="stat-val">${done}</div><div class="stat-lbl">Completed</div></div>
+      <div class="stat-card orange"><div class="stat-val">${total-done}</div><div class="stat-lbl">Remaining</div></div>
+      <div class="stat-card ${pct===100?'green':'blue'}"><div class="stat-val">${pct}%</div><div class="stat-lbl">Progress</div></div>
+    `;
+    document.getElementById('progressLbl').textContent=`Progress: ${done} of ${total} calls completed`;
+    document.getElementById('progressFill').style.width=pct+'%';
+
+    const noteEl=document.getElementById('batchNote');
+    if(!total) noteEl.innerHTML='<div class="warn-note">⚠️ No batch configured. Ask admin to set a batch size.</div>';
+    else if(carry) noteEl.innerHTML=`<div class="info-note">↩️ <strong>${carry}</strong> call(s) carried over from yesterday appear first.</div>`;
+    else noteEl.innerHTML='';
+
+    const el=document.getElementById('batchContainer');
+    if(!total){el.innerHTML='';return;}
+    el.innerHTML = todayBatch.map((d,i)=>makeDoctorCard(d,i,true)).join('');
+  }
+
+  function renderPending() {
+    const list = todayBatch.filter(d=>!d.isDone);
+    document.getElementById('pendingStats').innerHTML=`
+      <div class="stat-card orange"><div class="stat-val">${list.length}</div><div class="stat-lbl">Pending Today</div></div>
+      <div class="stat-card blue"><div class="stat-val">${todayBatch.length}</div><div class="stat-lbl">Total Batch</div></div>
+    `;
+    const el=document.getElementById('pendingContainer');
+    if(!list.length){el.innerHTML='<div class="empty-state"><div class="icon">🎉</div>All calls completed for today!</div>';return;}
+    el.innerHTML=list.map((d,i)=>makeDoctorCard(d,i,false)).join('');
+  }
+
+  // ── Log call / WA ──────────────────────────────────
   async function logAction(doctorId, type) {
-    // Non-blocking: insert then silently refresh
-    const doc = allDoctors.find(d => d.id === doctorId);
+    const doc = allDoctors.find(d=>d.id===doctorId);
     try {
-      const row = BNH_PAGE.stamp({
-        doctor_id:       doctorId,
-        doctor_name:     doc?.doctor_name || '',
-        mobile:          doc?.mobile      || '',
-        call_type:       type,           // 'call' | 'whatsapp' | 'done'
-        call_date:       todayStr,
-        call_status:     'attempted',
-        called_by:       me,
-        called_by_name:  myName,
-        called_at:       new Date().toISOString(),
-      });
-      await BNH_PAGE.sb.from('gramin_call_log').insert(row);
-      // Silent refresh of callLogs
-      const { data } = await BNH_PAGE.sb
-        .from('gramin_call_log').select('*').order('called_at',{ascending:false});
-      callLogs = data || [];
+      await BNH_PAGE.sb.from('gramin_call_log').insert(BNH_PAGE.stamp({
+        doctor_id:doctorId, doctor_name:doc?.doctor_name||'',
+        mobile:doc?.mobile||'', call_type:type,
+        call_date:todayStr, call_status:'attempted',
+        called_by:me, called_by_name:myName,
+        called_at:new Date().toISOString(),
+        call_outcome:null, call_remark:null,
+      }));
+      const {data}=await BNH_PAGE.sb.from('gramin_call_log').select('*').order('called_at',{ascending:false});
+      callLogs=data||[];
     } catch(_) {}
   }
 
-  // ── Toggle Mark Done ──────────────────────────────
-  async function toggleDone(doctorId) {
-    const entry = todayBatch.find(d => d.id === doctorId);
-    if (!entry) return;
-
+  // ── Save done with outcome ─────────────────────────
+  async function saveDone(doctorId, outcome, remark) {
+    const entry = todayBatch.find(d=>d.id===doctorId);
+    if(!entry) return;
     document.getElementById('spinner').classList.remove('hidden');
     try {
-      if (!entry.isDone) {
-        // Mark as done
-        const doc = allDoctors.find(d => d.id === doctorId);
-        const row = BNH_PAGE.stamp({
-          doctor_id:      doctorId,
-          doctor_name:    doc?.doctor_name || '',
-          mobile:         doc?.mobile      || '',
-          call_type:      'done',
-          call_date:      todayStr,
-          call_status:    'completed',
-          called_by:      me,
-          called_by_name: myName,
-          called_at:      new Date().toISOString(),
-        });
-        const { error } = await BNH_PAGE.sb.from('gramin_call_log').insert(row);
-        if (error) throw error;
-        entry.isDone = true;
-        showToast('Marked as done ✅');
-      } else {
-        // Undo done
-        const { error } = await BNH_PAGE.sb
-          .from('gramin_call_log')
-          .delete()
-          .eq('doctor_id', doctorId)
-          .eq('called_by', me)
-          .eq('call_date', todayStr)
-          .eq('call_type', 'done');
-        if (error) throw error;
-        entry.isDone = false;
-        showToast('Moved back to pending', 'info');
-      }
-
-      // Flush pending snapshot and maybe advance offset
-      await flushPendingToBatchLog();
-      await advanceOffsetIfNeeded();
-
-      // Reload call logs then re-render
-      const { data } = await BNH_PAGE.sb
-        .from('gramin_call_log').select('*').order('called_at',{ascending:false});
-      callLogs = data || [];
-
-      renderBatch();
-      renderPending();
-      renderCompleted();
-      renderHistory();
-      if (isAdmin) renderPerformance();
-
+      const doc = allDoctors.find(d=>d.id===doctorId);
+      const {error} = await BNH_PAGE.sb.from('gramin_call_log').insert(BNH_PAGE.stamp({
+        doctor_id:doctorId, doctor_name:doc?.doctor_name||'',
+        mobile:doc?.mobile||'', call_type:'done',
+        call_date:todayStr, call_status:'completed',
+        called_by:me, called_by_name:myName,
+        called_at:new Date().toISOString(),
+        call_outcome:outcome, call_remark:remark||null,
+      }));
+      if(error) throw error;
+      entry.isDone = true;
+      showToast('Marked done ✅ — '+outcomeName(outcome));
+      await postDoneActions();
     } catch(err) {
-      showToast(err.message, 'error');
+      showToast(err.message,'error');
     } finally {
       document.getElementById('spinner').classList.add('hidden');
     }
   }
 
-  // ── Render: Pending ───────────────────────────────
-  function renderPending() {
-    const list = todayBatch.filter(d => !d.isDone);
-    document.getElementById('pendingStats').innerHTML = `
-      <div class="stat-card orange"><div class="stat-val">${list.length}</div><div class="stat-lbl">Pending Today</div></div>
-      <div class="stat-card blue"><div class="stat-val">${todayBatch.length}</div><div class="stat-lbl">Total Batch</div></div>
-    `;
-    const el = document.getElementById('pendingContainer');
-    if (!list.length) {
-      el.innerHTML = '<div class="empty-state"><div class="icon">🎉</div>All calls completed for today!</div>';
-      return;
+  // ── Undo done ──────────────────────────────────────
+  async function undoDone(doctorId) {
+    const entry = todayBatch.find(d=>d.id===doctorId);
+    if(!entry) return;
+    document.getElementById('spinner').classList.remove('hidden');
+    try {
+      const {error} = await BNH_PAGE.sb.from('gramin_call_log').delete()
+        .eq('doctor_id',doctorId).eq('called_by',me)
+        .eq('call_date',todayStr).eq('call_type','done');
+      if(error) throw error;
+      entry.isDone = false;
+      showToast('Moved back to pending','info');
+      await postDoneActions();
+    } catch(err) {
+      showToast(err.message,'error');
+    } finally {
+      document.getElementById('spinner').classList.add('hidden');
     }
-    el.innerHTML = list.map((d,i) => `
-      <div class="doctor-card">
-        <div class="doc-seq">${i+1}</div>
-        <div class="doc-info">
-          <div class="doc-name">${esc(d.doctor_name)}${d.isCarryover?'<span class="pill pill-carry">↩ Carry</span>':''}</div>
-          <div class="doc-meta">📍 ${esc(d.address||'—')}</div>
-          <div class="doc-mobile">📞 ${esc(d.mobile)}</div>
-        </div>
-        <div class="call-btns">
-          <a class="btn-call" href="tel:${esc(d.mobile)}" onclick="logAction('${d.id}','call')">📞 Call</a>
-          <a class="btn-wa"   href="https://wa.me/91${esc(d.mobile)}" target="_blank" onclick="logAction('${d.id}','whatsapp')">💬 WhatsApp</a>
-          <button class="btn-done" onclick="toggleDone('${d.id}')">☑️ Mark Done</button>
-        </div>
-      </div>
-    `).join('');
+  }
+
+  // ── Admin: delete from Completed → back to pending ─
+  async function adminDeleteDone(logId, doctorId) {
+    if(!isAdmin){ showToast('Admin only','error'); return; }
+    document.getElementById('spinner').classList.remove('hidden');
+    try {
+      const {error} = await BNH_PAGE.sb.from('gramin_call_log').delete().eq('id',logId);
+      if(error) throw error;
+      // Update in-memory batch
+      const entry = todayBatch.find(d=>d.id===doctorId);
+      if(entry) entry.isDone=false;
+      showToast('Moved back to pending','info');
+      await postDoneActions();
+    } catch(err) {
+      showToast(err.message,'error');
+    } finally {
+      document.getElementById('spinner').classList.add('hidden');
+    }
+  }
+
+  async function postDoneActions() {
+    await flushPendingToBatchLog();
+    await advanceOffsetIfNeeded();
+    const {data}=await BNH_PAGE.sb.from('gramin_call_log').select('*').order('called_at',{ascending:false});
+    callLogs=data||[];
+    // Reload batchLog too
+    const {data:bl}=await BNH_PAGE.sb.from('gramin_call_batch_log').select('*').order('log_date',{ascending:false});
+    batchLog=bl||[];
+    computeBatch();
+    renderBatch(); renderPending(); renderCompleted(); renderHistory();
+    if(isAdmin) renderPerformance();
   }
 
   // ── Render: Completed ─────────────────────────────
   function renderCompleted() {
-    const q    = document.getElementById('searchCompleted').value.toLowerCase();
-    const date = document.getElementById('filterCompletedDate').value;
+    const q       = document.getElementById('searchCompleted').value.toLowerCase();
+    const date    = document.getElementById('filterCompletedDate').value;
+    const outcome = document.getElementById('filterCompletedOutcome').value;
 
-    // Source: done entries for current user
-    let rows = callLogs.filter(l => l.called_by === me && l.call_type === 'done');
+    let rows = callLogs.filter(l=>l.called_by===me&&l.call_type==='done');
 
-    // Populate date filter
-    const allDates = [...new Set(rows.map(l => l.call_date))].sort().reverse();
-    const sel = document.getElementById('filterCompletedDate');
-    const selVal = sel.value;
-    sel.innerHTML = '<option value="">📅 All Dates</option>' +
-      allDates.map(d => `<option value="${d}" ${selVal===d?'selected':''}>${fmtDate(d)}</option>`).join('');
+    const allDates = [...new Set(rows.map(l=>l.call_date))].sort().reverse();
+    const sel=document.getElementById('filterCompletedDate'), sv=sel.value;
+    sel.innerHTML='<option value="">📅 All Dates</option>'+
+      allDates.map(d=>`<option value="${d}" ${sv===d?'selected':''}>${fmtDate(d)}</option>`).join('');
 
-    if (date) rows = rows.filter(l => l.call_date === date);
-    if (q)    rows = rows.filter(l =>
-      l.doctor_name?.toLowerCase().includes(q) || l.mobile?.includes(q)
+    if(date)    rows=rows.filter(l=>l.call_date===date);
+    if(outcome) rows=rows.filter(l=>l.call_outcome===outcome);
+    if(q)       rows=rows.filter(l=>
+      l.doctor_name?.toLowerCase().includes(q)||l.mobile?.includes(q)||
+      l.call_remark?.toLowerCase().includes(q)
     );
 
-    const el = document.getElementById('completedContainer');
-    if (!rows.length) {
-      el.innerHTML = '<div class="empty-state"><div class="icon">📭</div>No completed calls found.</div>';
-      return;
-    }
-    el.innerHTML = `
+    const el=document.getElementById('completedContainer');
+    if(!rows.length){el.innerHTML='<div class="empty-state"><div class="icon">📭</div>No completed calls found.</div>';return;}
+    el.innerHTML=`
       <div style="font-size:0.8rem;color:var(--text-muted,#888);margin-bottom:0.5rem">${rows.length} record(s)</div>
       <div style="overflow-x:auto">
         <table class="records-table">
-          <thead><tr><th>#</th><th>Doctor</th><th>Mobile</th><th>Date</th><th>Time</th><th>Actions</th></tr></thead>
+          <thead><tr>
+            <th>#</th><th>Doctor</th><th>Mobile</th>
+            <th>Outcome</th><th>Remark</th>
+            <th>Date</th><th>Time</th><th>Actions</th>
+          </tr></thead>
           <tbody>
-            ${rows.map((l,i) => `<tr>
+            ${rows.map((l,i)=>`<tr>
               <td style="color:var(--text-muted,#888);font-size:0.78rem">${i+1}</td>
               <td><strong>${esc(l.doctor_name)}</strong></td>
               <td>${esc(l.mobile)}</td>
+              <td>${outcomeLabel(l.call_outcome)}</td>
+              <td style="font-size:0.8rem;color:var(--text-muted,#888);max-width:160px">${esc(l.call_remark||'—')}</td>
               <td>${fmtDate(l.call_date)}</td>
               <td style="font-size:0.78rem;color:var(--text-muted,#888)">${fmtTime(l.called_at||l.recorded_at)}</td>
               <td>
                 <div class="tbl-actions">
                   <a class="btn-sm-call" href="tel:${esc(l.mobile)}" onclick="logAction('${l.doctor_id}','call')">📞</a>
                   <a class="btn-sm-wa"   href="https://wa.me/91${esc(l.mobile)}" target="_blank" onclick="logAction('${l.doctor_id}','whatsapp')">💬</a>
+                  ${isAdmin?`<button class="btn-sm-del" onclick="adminDeleteDone('${l.id}','${l.doctor_id}')">↩ Pending</button>`:''}
                 </div>
               </td>
             </tr>`).join('')}
@@ -772,54 +955,53 @@
 
   // ── Render: History ───────────────────────────────
   function renderHistory() {
-    const q    = document.getElementById('searchHistory').value.toLowerCase();
-    const date = document.getElementById('filterHistoryDate').value;
-    const type = document.getElementById('filterHistoryType').value;
+    const q       = document.getElementById('searchHistory').value.toLowerCase();
+    const date    = document.getElementById('filterHistoryDate').value;
+    const type    = document.getElementById('filterHistoryType').value;
+    const outcome = document.getElementById('filterHistoryOutcome').value;
 
-    // Limited users see only their own history; admin sees all
-    let rows = isAdmin ? callLogs : callLogs.filter(l => l.called_by === me);
+    let rows = isAdmin ? callLogs : callLogs.filter(l=>l.called_by===me);
 
-    // Populate date filter
-    const allDates = [...new Set(rows.map(l => l.call_date))].sort().reverse();
-    const sel = document.getElementById('filterHistoryDate');
-    const selVal = sel.value;
-    sel.innerHTML = '<option value="">📅 All Dates</option>' +
-      allDates.map(d => `<option value="${d}" ${selVal===d?'selected':''}>${fmtDate(d)}</option>`).join('');
+    const allDates=[...new Set(rows.map(l=>l.call_date))].sort().reverse();
+    const sel=document.getElementById('filterHistoryDate'), sv=sel.value;
+    sel.innerHTML='<option value="">📅 All Dates</option>'+
+      allDates.map(d=>`<option value="${d}" ${sv===d?'selected':''}>${fmtDate(d)}</option>`).join('');
 
-    if (date) rows = rows.filter(l => l.call_date === date);
-    if (type) rows = rows.filter(l => l.call_type === type);
-    if (q)    rows = rows.filter(l =>
-      l.doctor_name?.toLowerCase().includes(q) || l.mobile?.includes(q) ||
-      l.called_by_name?.toLowerCase().includes(q)
+    if(date)    rows=rows.filter(l=>l.call_date===date);
+    if(type)    rows=rows.filter(l=>l.call_type===type);
+    if(outcome) rows=rows.filter(l=>l.call_outcome===outcome);
+    if(q)       rows=rows.filter(l=>
+      l.doctor_name?.toLowerCase().includes(q)||l.mobile?.includes(q)||
+      l.called_by_name?.toLowerCase().includes(q)||l.call_remark?.toLowerCase().includes(q)
     );
 
-    const el = document.getElementById('historyContainer');
-    if (!rows.length) {
-      el.innerHTML = '<div class="empty-state"><div class="icon">📭</div>No history found.</div>';
-      return;
-    }
+    const el=document.getElementById('historyContainer');
+    if(!rows.length){el.innerHTML='<div class="empty-state"><div class="icon">📭</div>No history found.</div>';return;}
 
-    const typeLabel = t =>
+    const typeLabel = t=>
       t==='call'?'<span class="pill pill-call">📞 Call</span>':
       t==='whatsapp'?'<span class="pill pill-wa">💬 WhatsApp</span>':
       '<span class="pill pill-done">✅ Done</span>';
 
-    el.innerHTML = `
+    el.innerHTML=`
       <div style="font-size:0.8rem;color:var(--text-muted,#888);margin-bottom:0.5rem">${rows.length} record(s)</div>
       <div style="overflow-x:auto">
         <table class="records-table">
           <thead><tr>
             <th>#</th><th>Doctor</th><th>Mobile</th>
             ${isAdmin?'<th>User</th>':''}
-            <th>Action</th><th>Date</th><th>Time</th>
+            <th>Action</th><th>Outcome</th><th>Remark</th>
+            <th>Date</th><th>Time</th>
           </tr></thead>
           <tbody>
-            ${rows.map((l,i) => `<tr>
+            ${rows.map((l,i)=>`<tr>
               <td style="color:var(--text-muted,#888);font-size:0.78rem">${i+1}</td>
               <td><strong>${esc(l.doctor_name)}</strong></td>
               <td>${esc(l.mobile)}</td>
               ${isAdmin?`<td style="font-size:0.8rem">${esc(l.called_by_name||l.called_by)}</td>`:''}
               <td>${typeLabel(l.call_type)}</td>
+              <td>${l.call_outcome?outcomeLabel(l.call_outcome):'<span style="color:var(--text-muted,#888);font-size:0.78rem">—</span>'}</td>
+              <td style="font-size:0.79rem;color:var(--text-muted,#888);max-width:150px">${esc(l.call_remark||'—')}</td>
               <td>${fmtDate(l.call_date)}</td>
               <td style="font-size:0.78rem;color:var(--text-muted,#888)">${fmtTime(l.called_at||l.recorded_at)}</td>
             </tr>`).join('')}
@@ -828,112 +1010,87 @@
       </div>`;
   }
 
-  // ── Render: Performance (admin only) ──────────────
+  // ── Render: Performance ───────────────────────────
   function renderPerformance() {
     const date = document.getElementById('filterPerfDate').value;
     const user = document.getElementById('filterPerfUser').value;
 
-    // Populate date filter
-    const allDates = [...new Set(callLogs.map(l => l.call_date))].sort().reverse();
-    const dateEl = document.getElementById('filterPerfDate');
-    const curDate = dateEl.value;
-    dateEl.innerHTML = '<option value="">📅 All Dates</option>' +
-      allDates.map(d => `<option value="${d}" ${curDate===d?'selected':''}>${fmtDate(d)}</option>`).join('');
+    const allDates=[...new Set(callLogs.map(l=>l.call_date))].sort().reverse();
+    const dateEl=document.getElementById('filterPerfDate'),cd=dateEl.value;
+    dateEl.innerHTML='<option value="">📅 All Dates</option>'+
+      allDates.map(d=>`<option value="${d}" ${cd===d?'selected':''}>${fmtDate(d)}</option>`).join('');
 
-    // Populate user filter
-    const allUsers = [...new Set(callLogs.map(l => l.called_by))];
-    const userEl = document.getElementById('filterPerfUser');
-    const curUser = userEl.value;
-    userEl.innerHTML = '<option value="">👤 All Users</option>' +
-      allUsers.map(u => {
-        const name = callLogs.find(l=>l.called_by===u)?.called_by_name || u;
-        return `<option value="${u}" ${curUser===u?'selected':''}>${esc(name)}</option>`;
+    const allUsers=[...new Set(callLogs.map(l=>l.called_by))];
+    const userEl=document.getElementById('filterPerfUser'),cu=userEl.value;
+    userEl.innerHTML='<option value="">👤 All Users</option>'+
+      allUsers.map(u=>{
+        const name=callLogs.find(l=>l.called_by===u)?.called_by_name||u;
+        return `<option value="${u}" ${cu===u?'selected':''}>${esc(name)}</option>`;
       }).join('');
 
-    // Build per-user per-date stats
-    // Source: gramin_call_log (done entries) + gramin_call_batch_log (pending counts)
-    let doneLogs = callLogs.filter(l => l.call_type === 'done');
-    if (date) doneLogs = doneLogs.filter(l => l.call_date === date);
-    if (user) doneLogs = doneLogs.filter(l => l.called_by === user);
+    let doneLogs=callLogs.filter(l=>l.call_type==='done');
+    if(date) doneLogs=doneLogs.filter(l=>l.call_date===date);
+    if(user) doneLogs=doneLogs.filter(l=>l.called_by===user);
 
-    // Group completed by user+date
-    const completed = {};
-    doneLogs.forEach(l => {
-      const k = `${l.called_by}||${l.call_date}`;
-      if (!completed[k]) completed[k] = {
-        user: l.called_by, userName: l.called_by_name||l.called_by,
-        date: l.call_date, done: 0
+    // Group by user+date with outcome breakdown
+    const grouped={};
+    doneLogs.forEach(l=>{
+      const k=`${l.called_by}||${l.call_date}`;
+      if(!grouped[k]) grouped[k]={
+        user:l.called_by, userName:l.called_by_name||l.called_by,
+        date:l.call_date, done:0, positive:0, negative:0, nopickup:0, oos:0
       };
-      completed[k].done++;
+      grouped[k].done++;
+      if(l.call_outcome) grouped[k][l.call_outcome]=(grouped[k][l.call_outcome]||0)+1;
     });
 
-    // Pending from batchLog
-    let pendLogs = batchLog;
-    if (date) pendLogs = pendLogs.filter(l => l.log_date === date);
-    if (user) pendLogs = pendLogs.filter(l => l.recorded_by === user);
-    const pending = {};
-    pendLogs.forEach(l => {
-      const k = `${l.recorded_by}||${l.log_date}`;
-      pending[k] = (pending[k]||0) + 1;
-    });
+    let pendLogs=batchLog;
+    if(date) pendLogs=pendLogs.filter(l=>l.log_date===date);
+    if(user) pendLogs=pendLogs.filter(l=>l.recorded_by===user);
+    const pending={};
+    pendLogs.forEach(l=>{ const k=`${l.recorded_by}||${l.log_date}`; pending[k]=(pending[k]||0)+1; });
 
-    // Merge
-    const rows = Object.entries(completed).map(([k,v]) => ({
-      ...v,
-      pending: pending[k] || 0,
-    })).sort((a,b) => b.date.localeCompare(a.date) || a.user.localeCompare(b.user));
+    const rows=Object.entries(grouped).map(([k,v])=>({...v,pending:pending[k]||0}))
+      .sort((a,b)=>b.date.localeCompare(a.date)||a.user.localeCompare(b.user));
 
-    // Summary pills
-    const totalDone    = rows.reduce((s,r) => s+r.done, 0);
-    const totalPending = rows.reduce((s,r) => s+r.pending, 0);
-    const avgPct       = rows.length
-      ? Math.round(rows.reduce((s,r) => {
-          const t = r.done + r.pending;
-          return s + (t ? r.done/t*100 : 100);
-        }, 0) / rows.length)
-      : 0;
+    const totalDone=rows.reduce((s,r)=>s+r.done,0);
+    const totalPend=rows.reduce((s,r)=>s+r.pending,0);
+    const avgPct=rows.length?Math.round(rows.reduce((s,r)=>{const t=r.done+r.pending;return s+(t?r.done/t*100:100);},0)/rows.length):0;
 
-    document.getElementById('perfSummary').innerHTML = `
-      <div class="stat-card green"><div class="stat-val">${totalDone}</div><div class="stat-lbl">Total Completed</div></div>
-      <div class="stat-card orange"><div class="stat-val">${totalPending}</div><div class="stat-lbl">Total Pending</div></div>
+    document.getElementById('perfSummary').innerHTML=`
+      <div class="stat-card green"><div class="stat-val">${totalDone}</div><div class="stat-lbl">Total Done</div></div>
+      <div class="stat-card orange"><div class="stat-val">${totalPend}</div><div class="stat-lbl">Total Pending</div></div>
       <div class="stat-card blue"><div class="stat-val">${avgPct}%</div><div class="stat-lbl">Avg Completion</div></div>
     `;
 
-    const el = document.getElementById('perfContainer');
-    if (!rows.length) {
-      el.innerHTML = '<div class="empty-state"><div class="icon">📭</div>No performance data yet.</div>';
-      return;
-    }
-
-    el.innerHTML = `
+    const el=document.getElementById('perfContainer');
+    if(!rows.length){el.innerHTML='<div class="empty-state"><div class="icon">📭</div>No performance data yet.</div>';return;}
+    el.innerHTML=`
       <div style="overflow-x:auto">
         <table class="records-table">
           <thead><tr>
             <th>User</th><th>Date</th>
             <th>✅ Done</th><th>⏳ Pending</th>
-            <th>Batch</th><th>Progress</th>
+            <th>Positive</th><th>Negative</th><th>No Pickup</th><th>OOS</th>
+            <th>Progress</th>
           </tr></thead>
           <tbody>
-            ${rows.map(r => {
-              const total = r.done + r.pending || batchSize;
-              const pct   = Math.round(r.done / total * 100);
-              const barColor = pct===100 ? '#16a34a' : pct>=60 ? '#2563eb' : '#d97706';
+            ${rows.map(r=>{
+              const total=r.done+r.pending||batchSize;
+              const pct=Math.round(r.done/total*100);
+              const bc=pct===100?'#16a34a':pct>=60?'#2563eb':'#d97706';
               return `<tr>
-                <td>
-                  <strong>${esc(r.userName)}</strong>
-                  <div style="font-size:0.74rem;color:var(--text-muted,#888)">${esc(r.user)}</div>
-                </td>
+                <td><strong>${esc(r.userName)}</strong><div style="font-size:0.74rem;color:var(--text-muted,#888)">${esc(r.user)}</div></td>
                 <td>${fmtDate(r.date)}</td>
                 <td style="color:#16a34a;font-weight:700">${r.done}</td>
-                <td style="color:${r.pending?'#d97706':'var(--text-muted,#888)'};font-weight:${r.pending?700:400}">
-                  ${r.pending||'—'}
-                </td>
-                <td>${total}</td>
+                <td style="color:${r.pending?'#d97706':'var(--text-muted,#888)'};font-weight:${r.pending?700:400}">${r.pending||'—'}</td>
+                <td style="color:#16a34a">${r.positive||'—'}</td>
+                <td style="color:#dc2626">${r.negative||'—'}</td>
+                <td style="color:#b45309">${r.nopickup||'—'}</td>
+                <td style="color:#475569">${r.oos||'—'}</td>
                 <td>
                   <div style="display:flex;align-items:center;gap:0.5rem">
-                    <div class="perf-bar-wrap">
-                      <div class="perf-bar" style="width:${pct}%;background:${barColor}"></div>
-                    </div>
+                    <div class="perf-bar-wrap"><div class="perf-bar" style="width:${pct}%;background:${bc}"></div></div>
                     <span style="font-size:0.78rem;color:var(--text-muted,#888);white-space:nowrap">${pct}%</span>
                   </div>
                 </td>
@@ -946,69 +1103,49 @@
 
   // ── Render: Settings ──────────────────────────────
   function renderSettings() {
-    document.getElementById('batchInput').value = batchSize;
-
-    const n        = allDoctors.length;
-    const cycDays  = n && batchSize ? Math.ceil(n / batchSize) : '—';
-    const covered  = myOffset;
-    const cyclePct = n ? Math.round(myOffset / n * 100) : 0;
-
-    document.getElementById('rotationStatus').innerHTML = `
+    document.getElementById('batchInput').value=batchSize;
+    const n=allDoctors.length;
+    const cycDays=n&&batchSize?Math.ceil(n/batchSize):'—';
+    const cyclePct=n?Math.round(myOffset/n*100):0;
+    document.getElementById('rotationStatus').innerHTML=`
       <div class="stat-row">
         <div class="stat-card blue"><div class="stat-val">${n}</div><div class="stat-lbl">Total Doctors</div></div>
         <div class="stat-card green"><div class="stat-val">${batchSize}</div><div class="stat-lbl">Batch Size</div></div>
         <div class="stat-card orange"><div class="stat-val">${cycDays}</div><div class="stat-lbl">Days / Cycle</div></div>
-        <div class="stat-card blue"><div class="stat-val">${covered}</div><div class="stat-lbl">Your Offset</div></div>
+        <div class="stat-card blue"><div class="stat-val">${myOffset}</div><div class="stat-lbl">Your Offset</div></div>
       </div>
       <p style="font-size:0.83rem;color:var(--text-muted,#888);margin:0.5rem 0 0">
-        Current rotation is at position <strong>${covered}</strong> of <strong>${n}</strong> doctors
-        (<strong>${cyclePct}%</strong> through the cycle). One full cycle covers all doctors in
-        <strong>${cycDays} day(s)</strong>.
+        Rotation at position <strong>${myOffset}</strong> of <strong>${n}</strong>
+        (<strong>${cyclePct}%</strong> through the cycle).
+        Full cycle = <strong>${cycDays} day(s)</strong>.
       </p>`;
   }
 
-  // ── Save batch size ────────────────────────────────
   async function saveBatchSize() {
-    const val = parseInt(document.getElementById('batchInput').value);
-    if (!val || val < 1) { showToast('Enter a valid number', 'error'); return; }
+    const val=parseInt(document.getElementById('batchInput').value);
+    if(!val||val<1){showToast('Enter a valid number','error');return;}
     document.getElementById('spinner').classList.remove('hidden');
     try {
-      const { error } = await BNH_PAGE.sb
-        .from('gramin_settings')
-        .upsert({ key: 'call_batch_size', value: String(val) }, { onConflict: 'key' });
-      if (error) throw error;
-      batchSize = val;
-      computeBatch();
-      renderBatch();
-      renderPending();
-      renderSettings();
+      const {error}=await BNH_PAGE.sb.from('gramin_settings')
+        .upsert({key:'call_batch_size',value:String(val)},{onConflict:'key'});
+      if(error) throw error;
+      batchSize=val;
+      computeBatch(); renderBatch(); renderPending(); renderSettings();
       showToast('Batch size updated ✅');
-    } catch(err) {
-      showToast(err.message, 'error');
-    } finally {
-      document.getElementById('spinner').classList.add('hidden');
-    }
+    } catch(err){showToast(err.message,'error');}
+    finally{document.getElementById('spinner').classList.add('hidden');}
   }
 
   // ── Utilities ──────────────────────────────────────
-  function esc(s) {
-    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
-  }
-  function fmtDate(d) {
-    if (!d) return '—';
-    const dt = d.length===10 ? new Date(d+'T00:00:00') : new Date(d);
-    return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  }
-  function fmtTime(ts) {
-    if (!ts) return '—';
-    return new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
-  }
-  function prevDate(s) {
-    const d = new Date(s+'T00:00:00'); d.setDate(d.getDate()-1);
-    return d.toISOString().slice(0,10);
-  }
+  function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');}
+  function fmtDate(d){if(!d)return'—';const dt=d.length===10?new Date(d+'T00:00:00'):new Date(d);return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}
+  function fmtTime(ts){if(!ts)return'—';return new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});}
+  function prevDate(s){const d=new Date(s+'T00:00:00');d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);}
+  function outcomeName(o){return{positive:'Positive',negative:'Negative',nopickup:'No Pickup',oos:'Out of Service'}[o]||o;}
 
-  // ── Boot ──────────────────────────────────────────
+  // Close modal on backdrop click
+  document.getElementById('outcomeOverlay').addEventListener('click',function(e){if(e.target===this)closeOutcomeModal();});
+
   loadAll();
 </script>
 </body>
