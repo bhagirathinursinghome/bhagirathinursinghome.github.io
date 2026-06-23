@@ -156,7 +156,7 @@
         BNH_PAGE.sb.from('ipd_cash_receipts').select('*').eq('admission_id', admId).order('receipt_date'),
         BNH_PAGE.sb.from('ipd_additional_charges').select('*').eq('admission_id', admId),
         BNH_PAGE.sb.from('ipd_medicine_indens').select('*').eq('admission_id', admId),
-        BNH_PAGE.sb.from('opd_cases').select('*').eq('ipd_admission_id', admId),
+        BNH_PAGE.sb.from('opd_case').select('case_no,case_date,patient_name,total_amount,type,refer_name').eq('ipd_link', adm.admission_no),
         adm.refer_id
           ? BNH_PAGE.sb.from('ipd_refer_payments').select('*').eq('refer_id', adm.refer_id)
           : Promise.resolve({ data: [] })
@@ -170,9 +170,7 @@
       const pkgAmt    = parseFloat(amtEntry?.package_amount||amtEntry?.nh_fees||0);
       const ipdDue    = pkgAmt - totalRcpt - totalDisc;
       const indenAmt  = (indens||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
-      const totalOpd  = (opdBills||[]).reduce((a,b)=>a+parseFloat(b.bill_amount||0),0);
-      const paidOpd   = (opdBills||[]).reduce((a,b)=>a+parseFloat(b.paid_amount||0)+parseFloat(b.discount||0),0);
-      const opdDue    = totalOpd - paidOpd;
+      const totalOpd  = (opdBills||[]).reduce((a,b)=>a+parseFloat(b.total_amount||0),0);
       const referPaid = (referPays||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
 
       document.getElementById('detailPatientName').textContent = `${adm.patient_name} (${adm.admission_no})`;
@@ -279,21 +277,18 @@
 
       if (opdBills && opdBills.length > 0) {
         html += `<div class="detail-section">
-          <h3>📄 OPD Bills</h3>
+          <h3>📄 Linked OPD Cases</h3>
           <table><thead><tr>
-            <th>Case No.</th><th>Date</th><th>Patient</th><th class="r">Bill</th>
-            <th class="r">Paid</th><th class="r">Discount</th><th class="r">Due</th>
+            <th>Case No.</th><th>Date</th><th>Patient</th>
+            <th>Type</th><th>Refer</th><th class="r">Bill Amount</th>
           </tr></thead>
-          <tbody>${opdBills.map(b=>{
-            const d=parseFloat(b.bill_amount||0)-parseFloat(b.paid_amount||0)-parseFloat(b.discount||0);
-            return `<tr><td>${b.case_no||'-'}</td><td>${b.case_date||'-'}</td><td>${b.patient_name}</td>
-              <td class="r">${fmt(b.bill_amount)}</td><td class="r">${fmt(b.paid_amount)}</td>
-              <td class="r">${fmt(b.discount)}</td>
-              <td class="r" style="color:${d>0?'#dc2626':'#059669'}">${fmt(d)}</td></tr>`;
-          }).join('')}</tbody>
-          <tfoot><tr><td colspan="3">Total</td>
-            <td class="r">${fmt(totalOpd)}</td><td class="r">${fmt(paidOpd)}</td>
-            <td></td><td class="r">${fmt(opdDue)}</td>
+          <tbody>${opdBills.map(b=>`<tr>
+              <td>${b.case_no||'-'}</td><td>${b.case_date||'-'}</td><td>${b.patient_name||'-'}</td>
+              <td>${b.type||'-'}</td><td>${b.refer_name||'N/A'}</td>
+              <td class="r">${fmt(b.total_amount)}</td></tr>`
+          ).join('')}</tbody>
+          <tfoot><tr><td colspan="5">Total OPD Bill</td>
+            <td class="r">${fmt(totalOpd)}</td>
           </tr></tfoot></table>
         </div>`;
       }
