@@ -9,18 +9,83 @@
     .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
     .form-row > * { flex:1; min-width:200px; }
     .hidden { display:none!important; }
-    table { width:100%; border-collapse:collapse; margin-top:.75rem; }
-    th { background:#f0f0f0; padding:7px 8px; text-align:left; font-size:.82rem; }
-    td { padding:7px 8px; border-bottom:1px solid #eee; font-size:.82rem; }
-    .patient-card { background:#f8f9ff; border:1px solid #c7d2fe; border-radius:8px;
-                    padding:.75rem 1rem; margin-bottom:.6rem; cursor:pointer; transition:all .2s; }
-    .patient-card:hover { background:#e0e7ff; border-color:#818cf8; }
-    .patient-card .pname { font-weight:600; color:#1e1b4b; }
-    .patient-card .pmeta { font-size:.82rem; color:#6b7280; margin-top:2px; }
     .back-btn { background:none; border:none; color:#6366f1; font-weight:600;
                 cursor:pointer; font-size:.9rem; margin-bottom:1rem; padding:0; }
-    .date-filter { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1rem; }
-    .date-filter > * { flex:1; min-width:140px; }
+
+    /* ── Side-by-side panels ── */
+    .dual-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    @media (max-width: 768px) {
+      .dual-panel { grid-template-columns: 1fr; }
+    }
+
+    .panel-card {
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .65rem 1rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .pending-panel .panel-header { background: #f8f9ff; }
+    .completed-panel .panel-header { background: #f0fdf4; }
+
+    .panel-title { font-weight: 700; font-size: .9rem; color: #1e1b4b; }
+    .completed-panel .panel-title { color: #14532d; }
+
+    .badge {
+      font-size: .72rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 99px;
+    }
+    .badge-pending { background: #e0e7ff; color: #4338ca; }
+    .badge-done    { background: #dcfce7; color: #166534; }
+
+    .search-input {
+      display: block;
+      width: 100%; box-sizing: border-box;
+      padding: .4rem .75rem;
+      border: none;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: .83rem;
+      outline: none;
+      background: #fafafa;
+    }
+    .search-input:focus { background: #fff; border-bottom-color: #818cf8; }
+
+    .panel-body {
+      padding: .6rem .75rem;
+      max-height: 68vh;
+      overflow-y: auto;
+    }
+
+    /* Pending cards */
+    .patient-card {
+      background: #f8f9ff; border: 1px solid #c7d2fe; border-radius: 8px;
+      padding: .6rem .85rem; margin-bottom: .5rem; cursor: pointer; transition: all .18s;
+    }
+    .patient-card:hover { background: #e0e7ff; border-color: #818cf8; }
+    .patient-card .pname { font-weight: 600; color: #1e1b4b; font-size: .88rem; }
+    .patient-card .pmeta { font-size: .78rem; color: #6b7280; margin-top: 2px; }
+
+    /* Completed table */
+    .completed-table { width: 100%; border-collapse: collapse; }
+    .completed-table th {
+      background: #f0fdf4; padding: 6px 8px;
+      text-align: left; font-size: .78rem; color: #166534;
+      position: sticky; top: 0;
+    }
+    .completed-table td { padding: 6px 8px; border-bottom: 1px solid #f3f4f6; font-size: .78rem; }
+    .completed-table tr:hover td { background: #f7fef9; }
   </style>
 </head>
 <body>
@@ -30,21 +95,32 @@
 
   <!-- PATIENT LIST VIEW -->
   <div id="listView">
-    <div class="page-card">
-      <h2 style="font-size:1rem;margin-bottom:.75rem">🏥 Patients Pending OT Entry</h2>
-      <div id="pendingList">Loading…</div>
-    </div>
+    <div class="dual-panel">
 
-    <div class="page-card" style="margin-top:1.5rem">
-      <h2 style="font-size:1rem;margin-bottom:.75rem">✅ OT Entries Done – Filter by Date</h2>
-      <div class="date-filter">
-        <div><label>From</label><input id="histFrom" type="date"/></div>
-        <div><label>To</label><input id="histTo" type="date"/></div>
-        <div style="display:flex;align-items:flex-end">
-          <button class="btn-primary" style="width:auto" onclick="loadHistory()">Show</button>
+      <!-- LEFT: PENDING -->
+      <div class="panel-card pending-panel">
+        <div class="panel-header">
+          <span class="panel-title">🏥 Pending OT</span>
+          <span class="badge badge-pending" id="pendingCount">…</span>
         </div>
+        <input id="pendingSearch" type="text" class="search-input"
+          placeholder="🔍 Search name / adm no…"
+          oninput="filterPending()"/>
+        <div id="pendingList" class="panel-body">Loading…</div>
       </div>
-      <div id="histList" style="font-size:.85rem;color:#555">Select date range and click Show.</div>
+
+      <!-- RIGHT: COMPLETED -->
+      <div class="panel-card completed-panel">
+        <div class="panel-header">
+          <span class="panel-title">✅ Completed OT</span>
+          <span class="badge badge-done" id="completedCount">…</span>
+        </div>
+        <input id="searchBox" type="text" class="search-input"
+          placeholder="🔍 Search name / adm no…"
+          oninput="filterCompleted()"/>
+        <div id="histList" class="panel-body">Loading…</div>
+      </div>
+
     </div>
   </div>
 
@@ -116,6 +192,9 @@
 <script>
   BNH_PAGE.requireRole(["admin","accountant","ot","manager"]);
 
+  let _pendingData   = [];
+  let _completedData = [];
+
   async function loadDoctors() {
     const { data } = await BNH_PAGE.sb.from('ipd_doctors')
       .select('id,doctor_name,doctor_type').eq('is_active',true).order('doctor_name');
@@ -138,31 +217,70 @@
       .select('id,admission_date,admission_no,patient_name')
       .eq('is_discharged', false)
       .order('admission_date', { ascending: false });
-    if (error || !data || data.length === 0) { div.textContent = 'No active patients.'; return; }
-    const pending = data.filter(r => !doneIds.includes(r.id));
-    if (pending.length === 0) { div.textContent = 'All admitted patients have OT entries done.'; return; }
-    div.innerHTML = pending.map(r=>`
+    if (error || !data) { div.textContent = 'No active patients.'; return; }
+    _pendingData = data.filter(r => !doneIds.includes(r.id));
+    renderPending(_pendingData);
+  }
+
+  function renderPending(rows) {
+    const div = document.getElementById('pendingList');
+    document.getElementById('pendingCount').textContent = rows.length;
+    if (rows.length === 0) {
+      div.innerHTML = '<p style="color:#6b7280;font-size:.83rem;padding:.5rem 0">No pending patients.</p>';
+      return;
+    }
+    div.innerHTML = rows.map(r=>`
       <div class="patient-card" onclick="openForm('${r.id}','${r.admission_no}','${r.patient_name.replace(/'/g,"\\'")}','${r.admission_date}')">
         <div class="pname">${r.patient_name}</div>
         <div class="pmeta">📅 ${r.admission_date} &nbsp;|&nbsp; Adm: ${r.admission_no}</div>
       </div>`).join('');
   }
 
-  async function loadHistory() {
-    const from = document.getElementById('histFrom').value;
-    const to   = document.getElementById('histTo').value;
-    if (!from || !to) { document.getElementById('histList').textContent='Please select both dates.'; return; }
+  function filterPending() {
+    const q = document.getElementById('pendingSearch').value.trim().toLowerCase();
+    if (!q) { renderPending(_pendingData); return; }
+    renderPending(_pendingData.filter(r =>
+      r.patient_name.toLowerCase().includes(q) ||
+      r.admission_no.toLowerCase().includes(q)
+    ));
+  }
+
+  async function loadCompleted() {
     const div = document.getElementById('histList');
     div.textContent = 'Loading…';
     const { data, error } = await BNH_PAGE.sb.from('ipd_ot_entries')
-      .select('*').gte('ot_date',from).lte('ot_date',to).order('ot_date',{ascending:false});
-    if (error||!data||data.length===0){div.textContent='No OT entries in this range.';return;}
-    div.innerHTML=`<table>
-      <thead><tr><th>Date</th><th>Adm No.</th><th>Patient</th><th>Surgent</th><th>Anaesthesia</th><th>Case Detail</th></tr></thead>
-      <tbody>${data.map(r=>`<tr>
-        <td>${r.ot_date}</td><td>${r.admission_no}</td><td>${r.patient_name}</td>
-        <td>${r.surgent_name||'-'}</td><td>${r.anaesthesia_name||'N/A'}</td><td>${r.case_detail}</td>
-      </tr>`).join('')}</tbody></table>`;
+      .select('*').order('ot_date', { ascending: false });
+    if (error) { div.textContent = 'Error loading entries.'; return; }
+    _completedData = data || [];
+    renderCompleted(_completedData);
+  }
+
+  function renderCompleted(rows) {
+    const div = document.getElementById('histList');
+    document.getElementById('completedCount').textContent = rows.length;
+    if (rows.length === 0) {
+      div.innerHTML = '<p style="color:#6b7280;font-size:.83rem;padding:.5rem 0">No completed OT entries.</p>';
+      return;
+    }
+    div.innerHTML = `<table class="completed-table">
+      <thead><tr><th>Date</th><th>Adm No.</th><th>Patient</th><th>Surgent</th><th>Anaesthesia</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td>${r.ot_date}</td>
+        <td>${r.admission_no}</td>
+        <td>${r.patient_name}</td>
+        <td>${r.surgent_name||'-'}</td>
+        <td>${r.anaesthesia_name||'N/A'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  function filterCompleted() {
+    const q = document.getElementById('searchBox').value.trim().toLowerCase();
+    if (!q) { renderCompleted(_completedData); return; }
+    renderCompleted(_completedData.filter(r =>
+      r.patient_name.toLowerCase().includes(q) ||
+      r.admission_no.toLowerCase().includes(q)
+    ));
   }
 
   function openForm(admId, admNo, patName, admDate) {
@@ -220,7 +338,7 @@
       if (error) throw error;
       ok.style.display = 'block';
       ok.textContent = '✅ OT Entry saved successfully!';
-      setTimeout(() => { showList(); loadPending(); }, 1500);
+      setTimeout(() => { showList(); loadPending(); loadCompleted(); }, 1500);
     } catch(ex) {
       err.textContent = ex.message;
     } finally {
@@ -231,6 +349,7 @@
   // Init
   loadDoctors();
   loadPending();
+  loadCompleted();
 </script>
 </body>
 </html>
