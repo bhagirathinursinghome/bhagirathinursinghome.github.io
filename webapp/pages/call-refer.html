@@ -736,8 +736,11 @@
       return;
     }
 
+    // Capture values BEFORE closeOutcomeModal() clears pendingDoneId / selectedOutcome
+    const doctorId = pendingDoneId;
+    const outcome  = selectedOutcome;
     closeOutcomeModal();
-    await saveDone(pendingDoneId, selectedOutcome, remark);
+    await saveDone(doctorId, outcome, remark);
   }
 
   // ── Render batch / pending cards ──────────────────
@@ -809,7 +812,7 @@
   async function logAction(doctorId, type) {
     const doc = allDoctors.find(d=>d.id===doctorId);
     try {
-      await BNH_PAGE.sb.from('gramin_call_log').insert(BNH_PAGE.stamp({
+      const {error} = await BNH_PAGE.sb.from('gramin_call_log').insert(BNH_PAGE.stamp({
         doctor_id:doctorId, doctor_name:doc?.doctor_name||'',
         mobile:doc?.mobile||'', call_type:type,
         call_date:todayStr, call_status:'attempted',
@@ -817,9 +820,14 @@
         called_at:new Date().toISOString(),
         call_outcome:null, call_remark:null,
       }));
+      if(error) throw error;
       const {data}=await BNH_PAGE.sb.from('gramin_call_log').select('*').order('called_at',{ascending:false});
       callLogs=data||[];
-    } catch(_) {}
+      renderHistory();
+      if(isAdmin) renderPerformance();
+    } catch(err) {
+      showToast('Log failed: '+err.message, 'error');
+    }
   }
 
   // ── Save done with outcome ─────────────────────────
