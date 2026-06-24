@@ -326,8 +326,9 @@
   }
 
   async function loadReferPayments(){
-    const{data,error}=await BNH_PAGE.sb.from('opd_refer_payments').select('*').order('recorded_at',{ascending:false});
-    if(error){console.warn('opd_refer_payments:',error.message);allReferPayments=[];return;}
+    // New table: opd_refer_payment (singular), ordered by created_at
+    const{data,error}=await BNH_PAGE.sb.from('opd_refer_payment').select('*').order('created_at',{ascending:false});
+    if(error){console.warn('opd_refer_payment:',error.message);allReferPayments=[];return;}
     allReferPayments=data||[];
   }
 
@@ -339,7 +340,7 @@
 
   async function loadPaymentsData(){
     const{data,error}=await BNH_PAGE.sb.from('opd_payments').select('*').order('payment_date',{ascending:false});
-    if(error){showErr('Load payments: '+error.message);return;}
+    if(error){console.warn('opd_payments (legacy): '+error.message);allPayments=[];if(isFullAccess)filterPayments();return;}
     allPayments=data||[];
     if(isFullAccess)filterPayments();
   }
@@ -376,14 +377,14 @@
       <tbody>${rows.map(r=>{
         const ps=gps(r.case_no,r.total_amount);
         const c=cashByCase[r.case_no]||{paid:0,discount:0,due:Number(r.total_amount||0)};
-        const rp=allReferPayments.find(x=>x.case_no===r.case_no);
         const referAmt=r.refer_amount?fmt(r.refer_amount):(r.refer_name?'<span style="color:#aaa;font-size:.78rem">Not set</span>':'—');
+        // refer_payment_status on opd_case is the single source of truth ('paid' | 'pending')
         const referPay=r.refer_name
           ?(r.refer_payment_status==='paid'
               ?'<span class="badge badge-paid">✅ Paid</span>'
-              :(rp&&rp.payment_status==='paid'
-                  ?'<span class="badge badge-paid">✅ Paid</span>'
-                  :'<span class="badge badge-due">⏳ Pending</span>'))
+              :(r.refer_amount&&Number(r.refer_amount)>0
+                  ?'<span class="badge badge-due">⏳ Pending</span>'
+                  :'<span class="badge badge-partial" style="font-size:.72rem">Amt Not Set</span>'))
           :'<span style="color:#ccc">—</span>';
         return`<tr onclick="openDetail('${esc(r.case_no)}')">
           <td class="case-no">${esc(r.case_no)}</td>
@@ -564,22 +565,30 @@
           <div class="info-note">ℹ️ ${c.due<=0?'Payment collected at registration — no itemised cash register records.':'No cash register entries recorded for this case.'}</div></div>`;
       }
 
-      // Refer section — reads directly from opd_case fields
+      // Refer section — opd_case fields + opd_refer_payment lookup
       let referHTML='';
       if(r.refer_name){
+        // Find latest payment record from opd_refer_payment (new table)
         const rp=allReferPayments.find(x=>x.case_no===caseNo);
+        const isPaid=r.refer_payment_status==='paid';
         const raDisplay=r.refer_amount?fmt(r.refer_amount):'<span style="color:#999">Not yet set</span>';
-        const rpStatus=(r.refer_payment_status==='paid'||(rp&&rp.payment_status==='paid'))
+        const rpStatus=isPaid
           ?'<span style="color:#28a745;font-weight:600">✅ Paid</span>'
-          :'<span style="color:#dc3545;font-weight:600">⏳ Pending</span>';
+          :(r.refer_amount&&Number(r.refer_amount)>0
+              ?'<span style="color:#dc3545;font-weight:600">⏳ Pending</span>'
+              :'<span style="color:#999">Amount not set</span>');
         let rpDetail='';
-        if(rp&&rp.payment_status==='paid'){
+        if(isPaid&&rp){
+          const netPaid=Number(r.refer_amount||0)-Number(rp.discount||0);
           rpDetail=`<div class="detail-grid" style="margin-top:.6rem">
             <div><div class="detail-label">Voucher No</div><div class="detail-value">${esc(rp.voucher_no||'—')}</div></div>
-            <div><div class="detail-label">Paid Date</div><div class="detail-value">${fmtDate(rp.paid_date)}</div></div>
-            <div><div class="detail-label">Mode</div><div class="detail-value">${esc(rp.pay_mode||rp.mode||'—')}</div></div>
-            <div><div class="detail-label">Discount</div><div class="detail-value">${fmt(rp.discount)}</div></div>
-            ${rp.remark?`<div style="grid-column:1/-1"><div class="detail-label">Remark</div><div class="detail-value">${esc(rp.remark)}</div></div>`:''}
+            <div><div class="detail-label">Payment Date</div><div class="detail-value">${fmtDate(rp.payment_date)}</div></div>
+            <div><div class="detail-label">Mode</div><div class="detail-value">${esc(rp.mode||'—')}</div></div>
+            <div><div class="detail-label">Discount</div><div class="detail-value">${Number(rp.discount||0)>0?fmt(rp.discount):'—'}</div></div>
+            <div><div class="detail-label">Net Paid</div><div class="detail-value" style="color:#28a745;font-weight:700">${fmt(netPaid)}</div></div>
+            <div><div class="detail-label">Payment To</div><div class="detail-value">${esc(rp.payment_to||'—')}</div></div>
+            <div><div class="detail-label">Paid By</div><div class="detail-value">${esc(rp.created_by_name||rp.created_by||'—')}</div></div>
+            ${rp.remarks?`<div style="grid-column:1/-1"><div class="detail-label">Remarks</div><div class="detail-value">${esc(rp.remarks)}</div></div>`:''}
           </div>`;
         }
         referHTML=`<div class="detail-section"><h3>👥 Referral Information</h3>
@@ -590,8 +599,8 @@
               <div><div class="detail-label">IPD Link</div><div class="detail-value">${esc(r.ipd_link||'N/A')}</div></div>
               <div><div class="detail-label">Refer Amount</div><div class="detail-value">${raDisplay}</div></div>
               <div><div class="detail-label">Refer Pay Status</div><div class="detail-value">${rpStatus}</div></div>
-              <div><div class="detail-label">Entered By</div><div class="detail-value">${esc(r.refer_enter_by||'—')}</div></div>
-              <div><div class="detail-label">Entered On</div><div class="detail-value">${fmtDate(r.refer_enter_time)}</div></div>
+              <div><div class="detail-label">Refer Entered By</div><div class="detail-value">${esc(r.refer_enter_by||'—')}</div></div>
+              <div><div class="detail-label">Refer Entered On</div><div class="detail-value">${fmtDate(r.refer_enter_time)}</div></div>
             </div>
             ${rpDetail}
           </div></div>`;
