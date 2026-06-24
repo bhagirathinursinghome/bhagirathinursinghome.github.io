@@ -16,6 +16,21 @@
     .refer-type-btn { padding:0.4rem 0.9rem; border:1px solid #ccc; background:#f8f9fa; border-radius:3px; cursor:pointer; font-size:0.85rem; }
     .refer-type-btn.active { background:#007bff; color:white; border-color:#007bff; }
     .quack-info-box { background:#fff3e0; padding:0.6rem 0.9rem; border-radius:3px; border-left:3px solid #ff9800; font-size:0.85rem; margin-top:0.5rem; }
+    .refer-select-row { display:flex; gap:0.5rem; align-items:center; }
+    .refer-select-row select { flex:1; }
+    .btn-add-refer { padding:0.45rem 0.85rem; background:#16a34a; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.82rem; white-space:nowrap; font-weight:600; }
+    .btn-add-refer:hover { background:#15803d; }
+
+    /* Modal */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; display:flex; align-items:center; justify-content:center; }
+    .modal-overlay.hidden { display:none!important; }
+    .modal-box { background:#fff; border-radius:10px; padding:1.5rem; width:min(96vw,460px); box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+    .modal-box h3 { margin:0 0 1rem; font-size:1rem; }
+    .modal-box label { display:block; font-size:0.83rem; font-weight:600; margin:0.7rem 0 0.25rem; }
+    .modal-box input { width:100%; box-sizing:border-box; padding:0.42rem 0.6rem; border:1px solid #ccc; border-radius:4px; font-size:0.9rem; }
+    .modal-footer { display:flex; gap:0.6rem; justify-content:flex-end; margin-top:1.2rem; }
+    .btn-cancel { padding:0.45rem 1rem; border:1px solid #ccc; background:#f8f9fa; border-radius:4px; cursor:pointer; font-size:0.85rem; }
+    .modal-err { color:#dc2626; font-size:0.82rem; margin-top:0.5rem; min-height:1.1em; }
   </style>
 </head>
 <body>
@@ -47,6 +62,17 @@
         <div>
           <label>Address</label>
           <input id="address" placeholder="Optional"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label>Mobile No. <span style="color:red">*</span></label>
+          <input id="patientMobile" type="tel" placeholder="10-digit mobile number" maxlength="10" required/>
+        </div>
+        <div>
+          <label>Aadhaar No. <span style="color:#888;font-weight:400">(optional)</span></label>
+          <input id="patientAdhar" placeholder="12-digit Aadhaar number" maxlength="12"/>
         </div>
       </div>
 
@@ -93,9 +119,12 @@
       <!-- Quack Doctor -->
       <div id="referQuackSection">
         <label>Select Refer</label>
-        <select id="quackDoctor" onchange="onQuackSelect()">
-          <option value="">Loading Refer…</option>
-        </select>
+        <div class="refer-select-row">
+          <select id="quackDoctor" onchange="onQuackSelect()">
+            <option value="">Loading Refer…</option>
+          </select>
+          <button type="button" class="btn-add-refer" onclick="openAddReferModal()">➕ Add New Refer</button>
+        </div>
         <div id="quackInfoBox" class="quack-info-box" style="display:none;"></div>
       </div>
 
@@ -113,6 +142,29 @@
   <div class="page-card" style="margin-top:1.5rem">
     <h2 style="font-size:1rem;margin-bottom:.75rem">📋 Recent Admissions</h2>
     <div id="admList" style="font-size:.85rem;color:#555">Loading…</div>
+  </div>
+</div>
+
+<!-- Add New Refer Modal -->
+<div class="modal-overlay hidden" id="addReferModal">
+  <div class="modal-box">
+    <h3>➕ Add New Refer Doctor</h3>
+
+    <label>Doctor Name <span style="color:red">*</span></label>
+    <input id="nr_name" placeholder="Dr. Ramesh Kumar"/>
+
+    <label>Address <span style="color:red">*</span></label>
+    <input id="nr_address" placeholder="Village, Block, District"/>
+
+    <label>Mobile <span style="color:red">*</span></label>
+    <input id="nr_mobile" type="tel" placeholder="10-digit mobile number" maxlength="10"/>
+
+    <p class="modal-err" id="modalErr"></p>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" onclick="closeAddReferModal()">Cancel</button>
+      <button type="button" class="btn-primary" style="width:auto;padding:0.45rem 1.2rem" id="saveReferBtn" onclick="saveNewRefer()">💾 Save &amp; Select</button>
+    </div>
   </div>
 </div>
 
@@ -164,7 +216,7 @@
   }
 
   // Load quack doctors from gramin_doctor_visits
-  async function loadQuackDoctors() {
+  async function loadQuackDoctors(autoSelect) {
     const { data } = await BNH_PAGE.sb.from('gramin_doctor_visits')
       .select('doctor_name,mobile,recorded_by_name').order('doctor_name');
     if (!data) return;
@@ -176,10 +228,54 @@
       return true;
     });
     const sel = document.getElementById('quackDoctor');
-    sel.innerHTML = '<option value="">-- Select Quack Doctor --</option>' +
+    sel.innerHTML = '<option value="">-- Select Refer --</option>' +
       quackData.map(d =>
         `<option value="${d.doctor_name}|${d.mobile}|${d.recorded_by_name||''}">${d.doctor_name} — 📞 ${d.mobile} (${d.recorded_by_name||'Unknown Team'})</option>`
       ).join('');
+    if (autoSelect) {
+      sel.value = autoSelect;
+      onQuackSelect();
+    }
+  }
+
+  // ── Add New Refer Modal ──
+  function openAddReferModal() {
+    ['nr_name','nr_address','nr_mobile'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('modalErr').textContent = '';
+    document.getElementById('addReferModal').classList.remove('hidden');
+    document.getElementById('nr_name').focus();
+  }
+  function closeAddReferModal() {
+    document.getElementById('addReferModal').classList.add('hidden');
+  }
+  document.getElementById('addReferModal').addEventListener('click', function(e) {
+    if (e.target === this) closeAddReferModal();
+  });
+
+  async function saveNewRefer() {
+    const errEl = document.getElementById('modalErr');
+    errEl.textContent = '';
+    const name    = document.getElementById('nr_name').value.trim();
+    const address = document.getElementById('nr_address').value.trim();
+    const mobile  = document.getElementById('nr_mobile').value.trim();
+    if (!name)    { errEl.textContent = 'Doctor name is required.'; return; }
+    if (!address) { errEl.textContent = 'Address is required.'; return; }
+    if (!/^[6-9][0-9]{9}$/.test(mobile)) { errEl.textContent = 'Enter a valid 10-digit mobile number.'; return; }
+
+    const btn = document.getElementById('saveReferBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const payload = BNH_PAGE.stamp({ doctor_name: name, address, mobile });
+      const { error } = await BNH_PAGE.sb.from('gramin_doctor_visits').insert(payload);
+      if (error) throw error;
+      closeAddReferModal();
+      const autoVal = `${name}|${mobile}|${BNH_PAGE.user.name}`;
+      await loadQuackDoctors(autoVal);
+    } catch(ex) {
+      errEl.textContent = ex.message;
+    } finally {
+      btn.disabled = false; btn.textContent = '💾 Save & Select';
+    }
   }
 
   async function loadAdmissions() {
@@ -202,7 +298,7 @@
     </table>`;
   }
 
-  loadQuackDoctors();
+  loadQuackDoctors(null);
   loadAdmissions();
 
   document.getElementById('admForm').onsubmit = async (e) => {
@@ -219,6 +315,15 @@
     }
     if (caseType === 'Other' && !document.getElementById('caseTypeOther').value.trim()) {
       err.textContent = 'Please specify the Case Type.'; return;
+    }
+
+    const patientMobile = document.getElementById('patientMobile').value.trim();
+    const patientAdhar  = document.getElementById('patientAdhar').value.trim();
+    if (!/^[6-9][0-9]{9}$/.test(patientMobile)) {
+      err.textContent = 'Enter a valid 10-digit mobile number.'; return;
+    }
+    if (patientAdhar && !/^[0-9]{12}$/.test(patientAdhar)) {
+      err.textContent = 'Aadhaar must be exactly 12 digits.'; return;
     }
 
     let referId = null;
@@ -240,6 +345,8 @@
         admission_no:    document.getElementById('admNo').value.trim(),
         patient_name:    document.getElementById('patientName').value.trim(),
         address:         document.getElementById('address').value.trim() || null,
+        mobile:          patientMobile,
+        adhar:           patientAdhar || null,
         case_mode:       caseMode,
         case_mode_other: caseMode === 'Other' ? document.getElementById('caseModeOther').value.trim() : null,
         case_type:       caseType,
