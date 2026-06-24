@@ -62,7 +62,7 @@
     .pagination button.active{background:#28a745;color:white;border-color:#28a745}
     .role-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:600;margin-left:.5rem;vertical-align:middle}
     .role-full{background:#d1e7dd;color:#0a3622}.role-limited{background:#fff3cd;color:#856404}
-    .btn-del{background:#dc3545;color:white;border:none;border-radius:3px;cursor:pointer}
+    .btn-del{background:#dc3545;color:white;border:none;border-radius:3px;cursor:pointer;padding:.5rem 1rem;font-size:.85rem}
     .btn-del:hover{background:#a71d2a}
   </style>
 </head>
@@ -76,6 +76,7 @@
       <button class="tab-btn" data-tab="completed">✅ Paid <span id="paidCount" class="badge badge-paid" style="margin-left:.3rem"></span></button>
     </div>
 
+    <!-- PENDING TAB -->
     <div class="tab-content active" id="tab-pending">
       <div class="stats-row" id="pendStats"></div>
       <div class="filter-bar">
@@ -90,6 +91,7 @@
       <div class="pagination" id="pendPager"></div>
     </div>
 
+    <!-- PAID TAB -->
     <div class="tab-content" id="tab-completed">
       <div class="stats-row" id="paidStats"></div>
       <div class="filter-bar">
@@ -116,6 +118,7 @@
   </div>
 </div>
 
+<!-- DETAIL / PAYMENT MODAL -->
 <div class="modal-overlay hidden" id="detailModal">
   <div class="modal-box">
     <div class="modal-header">
@@ -133,6 +136,19 @@
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
 <script>
+  /*
+   * Data model (new schema):
+   *  opd_case            – holds refer_name, refer_amount, refer_payment_status ('pending'|'paid'), refer_payment_id
+   *  opd_refer_payment   – one row per payment record; FK: case_no → opd_case.case_no
+   *                        cols: id, case_no, payment_date, voucher_no, remarks, payment_to,
+   *                              mode, amount, discount, created_by, created_by_name, created_at
+   *
+   * Pending = opd_case rows where refer_name IS NOT NULL AND refer_amount > 0
+   *           AND refer_payment_status != 'paid'
+   * Paid    = opd_case rows where refer_payment_status = 'paid'
+   *           (payment detail fetched from opd_refer_payment by case_no)
+   */
+
   const FULL_ACCESS_ROLES    = ["admin"];
   const LIMITED_ACCESS_ROLES = ["accountant"];
   BNH_PAGE.requireRole([...FULL_ACCESS_ROLES,...LIMITED_ACCESS_ROLES]);
@@ -140,25 +156,19 @@
   const userRole     = BNH_PAGE.user?.role||'';
   const isFullAccess = FULL_ACCESS_ROLES.includes(userRole);
 
-  // Role badge
   const rb = document.getElementById('roleBadge');
   rb.textContent = isFullAccess ? '🔓 Full Access' : '✍️ Entry Only';
   rb.className   = 'role-badge '+(isFullAccess?'role-full':'role-limited');
 
-  // TABLE: opd_refer_payments
-  // Existing cols: id, payment_date, opd_case_id, refer_id, refer_name, amount, mode, remark, recorded_by, recorded_at
-  // Added cols:    case_no, patient_name, case_date, refer_amount, payment_status,
-  //               voucher_no, paid_date, discount, pay_mode, paid_by, paid_by_name, paid_at, recorded_by_name
-  //
-  // This page shows rows WHERE refer_amount > 0 (set by Refer Amount Entry page)
-  // Pending  = payment_status != 'paid'
-  // Paid     = payment_status = 'paid'
+  // ── State ──────────────────────────────────────────────────────────────────
+  let allCases  = [];   // opd_case rows with refer_name set and refer_amount > 0
+  let payByCase = {};   // case_no → opd_refer_payment row (most recent)
 
-  let allEntries=[];
   let pendList=[], filteredPend=[], currentPendPage=1;
   let paidList=[], filteredPaid=[], currentPaidPage=1;
   const PER=20;
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
   function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
   function fmt(n){return n!=null&&n!==''?'₹'+Number(n).toLocaleString('en-IN'):'—';}
   function fmtDate(d){return d?String(d).slice(0,10):'—';}
@@ -167,6 +177,7 @@
   function showErr(msg){const e=document.getElementById('err');e.textContent=msg;setTimeout(()=>e.textContent='',6000);}
   function showOk(msg){const o=document.getElementById('ok');o.style.display='block';o.textContent=msg;setTimeout(()=>o.style.display='none',3500);}
 
+  // ── Tabs ───────────────────────────────────────────────────────────────────
   document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
       document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -176,19 +187,36 @@
     });
   });
 
+  // ── Load data ──────────────────────────────────────────────────────────────
   async function loadData(){
     showSpinner(true);
     try{
-      // Only rows where refer_amount has been set (> 0)
-      const{data,error}=await BNH_PAGE.sb
-        .from('opd_refer_payments')
-        .select('*')
+      // Cases that have a refer AND a refer_amount set
+      const{data:cases,error:cErr}=await BNH_PAGE.sb
+        .from('opd_case')
+        .select('case_no,case_date,patient_name,refer_name,refer_amount,refer_amount_enter_by,refer_amount_enter_time,refer_payment_status,refer_payment_id,total_amount')
+        .not('refer_name','is',null)
         .gt('refer_amount',0)
-        .order('recorded_at',{ascending:false});
-      if(error)throw error;
-      allEntries=data||[];
-      pendList=allEntries.filter(x=>x.payment_status!=='paid');
-      paidList=allEntries.filter(x=>x.payment_status==='paid');
+        .order('case_date',{ascending:false});
+      if(cErr)throw cErr;
+      allCases=cases||[];
+
+      // All payment records from opd_refer_payment
+      const{data:pays,error:pErr}=await BNH_PAGE.sb
+        .from('opd_refer_payment')
+        .select('*')
+        .order('created_at',{ascending:false});
+      if(pErr)throw pErr;
+
+      // Index by case_no — keep most recent payment per case
+      payByCase={};
+      (pays||[]).forEach(p=>{
+        if(!payByCase[p.case_no])payByCase[p.case_no]=p;
+      });
+
+      pendList=allCases.filter(c=>c.refer_payment_status!=='paid');
+      paidList=allCases.filter(c=>c.refer_payment_status==='paid');
+
       buildReferFilters();
       renderStats();
       filterPending();
@@ -197,18 +225,23 @@
     finally{showSpinner(false);}
   }
 
+  // ── Refer filter dropdowns ─────────────────────────────────────────────────
   function buildReferFilters(){
-    const refers=[...new Set(allEntries.map(x=>x.refer_name).filter(Boolean))].sort();
+    const refers=[...new Set(allCases.map(c=>c.refer_name).filter(Boolean))].sort();
     ['pendReferFilter','paidReferFilter'].forEach(id=>{
       document.getElementById(id).innerHTML='<option value="">All Refers</option>'+
         refers.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
     });
   }
 
+  // ── Stats ──────────────────────────────────────────────────────────────────
   function renderStats(){
-    const pendAmt=pendList.reduce((s,x)=>s+Number(x.refer_amount||0),0);
-    const paidAmt=paidList.reduce((s,x)=>s+Number(x.refer_amount||0),0);
-    const paidDisc=paidList.reduce((s,x)=>s+Number(x.discount||0),0);
+    const pendAmt=pendList.reduce((s,c)=>s+Number(c.refer_amount||0),0);
+    const paidAmt=paidList.reduce((s,c)=>s+Number(c.refer_amount||0),0);
+    const paidDisc=paidList.reduce((s,c)=>{
+      const p=payByCase[c.case_no];
+      return s+Number(p?.discount||0);
+    },0);
     const paidNet=paidAmt-paidDisc;
     document.getElementById('pendStats').innerHTML=`
       <div class="stat-box"><div class="val" style="color:#dc3545">${pendList.length}</div><div class="lbl">Pending Cases</div></div>
@@ -224,15 +257,16 @@
     document.getElementById('paidCount').textContent=paidList.length;
   }
 
+  // ── Filters ────────────────────────────────────────────────────────────────
   function doFilter(src,searchId,dfId,dtId,refId){
     const q=(document.getElementById(searchId).value||'').toLowerCase();
     const df=document.getElementById(dfId).value,dt=document.getElementById(dtId).value;
     const rf=document.getElementById(refId).value;
-    return src.filter(x=>{
-      if(q&&!(x.case_no||'').toLowerCase().includes(q)&&!(x.patient_name||'').toLowerCase().includes(q)&&!(x.refer_name||'').toLowerCase().includes(q))return false;
-      const d=String(x.case_date||x.recorded_at||'').slice(0,10);
+    return src.filter(c=>{
+      if(q&&!(c.case_no||'').toLowerCase().includes(q)&&!(c.patient_name||'').toLowerCase().includes(q)&&!(c.refer_name||'').toLowerCase().includes(q))return false;
+      const d=String(c.case_date||'').slice(0,10);
       if(df&&d<df)return false;if(dt&&d>dt)return false;
-      if(rf&&x.refer_name!==rf)return false;
+      if(rf&&c.refer_name!==rf)return false;
       return true;
     });
   }
@@ -244,32 +278,37 @@
   function filterPaid(){
     let base=doFilter(paidList,'paidSearch','paidDateFrom','paidDateTo','paidReferFilter');
     const mode=document.getElementById('paidModeFilter').value;
-    if(mode)base=base.filter(x=>x.pay_mode===mode);
+    if(mode)base=base.filter(c=>{
+      const p=payByCase[c.case_no];
+      return (p?.mode||'')=== mode;
+    });
     filteredPaid=base;currentPaidPage=1;renderPaidTable();
   }
 
+  // ── Render: Pending table ──────────────────────────────────────────────────
   function renderPendingTable(){
     const div=document.getElementById('pendingTable');
     if(!filteredPend.length){div.innerHTML='<div class="empty-state">🎉 No pending refer payments.</div>';document.getElementById('pendPager').innerHTML='';return;}
     const rows=filteredPend.slice((currentPendPage-1)*PER,currentPendPage*PER);
     div.innerHTML=`<table>
-      <thead><tr><th>Case No</th><th>Case Date</th><th>Patient</th><th>Refer</th><th>Refer Amount</th><th>Entered On</th><th>Action</th></tr></thead>
-      <tbody>${rows.map(x=>`<tr onclick="openModal('${x.id}','pending')">
-        <td class="case-no">${esc(x.case_no||'—')}</td>
-        <td>${fmtDate(x.case_date||x.payment_date)}</td>
-        <td>${esc(x.patient_name||'—')}</td>
-        <td><strong>${esc(x.refer_name||'—')}</strong></td>
-        <td style="color:#dc3545;font-weight:700">${fmt(x.refer_amount)}</td>
-        <td style="font-size:.8rem">${fmtDate(x.recorded_at)}</td>
+      <thead><tr><th>Case No</th><th>Case Date</th><th>Patient</th><th>Refer</th><th>Refer Amount</th><th>Amount Set On</th><th>Action</th></tr></thead>
+      <tbody>${rows.map(c=>`<tr onclick="openModal('${esc(c.case_no)}','pending')">
+        <td class="case-no">${esc(c.case_no)}</td>
+        <td>${fmtDate(c.case_date)}</td>
+        <td>${esc(c.patient_name)}</td>
+        <td><strong>${esc(c.refer_name)}</strong></td>
+        <td style="color:#dc3545;font-weight:700">${fmt(c.refer_amount)}</td>
+        <td style="font-size:.8rem">${fmtDate(c.refer_amount_enter_time)}</td>
         <td onclick="event.stopPropagation()">
           <button class="btn-primary" style="width:auto;padding:4px 10px;font-size:.78rem;background:#28a745"
-            onclick="openModal('${x.id}','pending')">💳 Mark Paid</button>
+            onclick="openModal('${esc(c.case_no)}','pending')">💳 Mark Paid</button>
         </td>
       </tr>`).join('')}</tbody>
     </table>`;
     renderPager('pendPager',filteredPend.length,currentPendPage,'pend');
   }
 
+  // ── Render: Paid table ─────────────────────────────────────────────────────
   function renderPaidTable(){
     const div=document.getElementById('paidTable');
     if(!filteredPaid.length){div.innerHTML='<div class="empty-state">No paid refer records found.</div>';document.getElementById('paidPager').innerHTML='';return;}
@@ -277,27 +316,30 @@
     div.innerHTML=`<table>
       <thead><tr>
         <th>Case No</th><th>Case Date</th><th>Patient</th><th>Refer</th>
-        <th>Refer Amt</th><th>Discount</th><th>Net Paid</th><th>Mode</th><th>Voucher</th><th>Paid Date</th>
+        <th>Refer Amt</th><th>Discount</th><th>Net Paid</th><th>Mode</th><th>Voucher</th><th>Pay Date</th>
       </tr></thead>
-      <tbody>${rows.map(x=>{
-        const net=Number(x.refer_amount||0)-Number(x.discount||0);
-        return`<tr onclick="openModal('${x.id}','paid')">
-          <td class="case-no">${esc(x.case_no||'—')}</td>
-          <td>${fmtDate(x.case_date||x.payment_date)}</td>
-          <td>${esc(x.patient_name||'—')}</td>
-          <td><strong>${esc(x.refer_name||'—')}</strong></td>
-          <td>${fmt(x.refer_amount)}</td>
-          <td style="color:#6c757d">${Number(x.discount||0)>0?fmt(x.discount):'—'}</td>
+      <tbody>${rows.map(c=>{
+        const p=payByCase[c.case_no];
+        const disc=Number(p?.discount||0);
+        const net=Number(c.refer_amount||0)-disc;
+        return`<tr onclick="openModal('${esc(c.case_no)}','paid')">
+          <td class="case-no">${esc(c.case_no)}</td>
+          <td>${fmtDate(c.case_date)}</td>
+          <td>${esc(c.patient_name)}</td>
+          <td><strong>${esc(c.refer_name)}</strong></td>
+          <td>${fmt(c.refer_amount)}</td>
+          <td style="color:#6c757d">${disc>0?fmt(disc):'—'}</td>
           <td style="color:#28a745;font-weight:700">${fmt(net)}</td>
-          <td><span class="badge badge-paid">${esc(x.pay_mode||'—')}</span></td>
-          <td style="font-size:.8rem">${esc(x.voucher_no||'—')}</td>
-          <td>${fmtDate(x.paid_date)}</td>
+          <td><span class="badge badge-paid">${esc(p?.mode||'—')}</span></td>
+          <td style="font-size:.8rem">${esc(p?.voucher_no||'—')}</td>
+          <td>${fmtDate(p?.payment_date)}</td>
         </tr>`;
       }).join('')}</tbody>
     </table>`;
     renderPager('paidPager',filteredPaid.length,currentPaidPage,'paid');
   }
 
+  // ── Pagination ─────────────────────────────────────────────────────────────
   function renderPager(pagerId,total,page,key){
     const tp=Math.ceil(total/PER),p=document.getElementById(pagerId);
     if(tp<=1){p.innerHTML='';return;}
@@ -313,18 +355,20 @@
     else{currentPaidPage=page;renderPaidTable();}
   }
 
-  function openModal(entryId,mode){
-    const x=allEntries.find(e=>e.id===entryId);
-    if(!x)return;
+  // ── Modal ──────────────────────────────────────────────────────────────────
+  function openModal(caseNo, mode){
+    const c=allCases.find(x=>x.case_no===caseNo);
+    if(!c)return;
+    const p=payByCase[caseNo]; // existing payment row (if any)
 
     const caseInfoHTML=`<div class="detail-section"><h3>📝 Case Information</h3>
       <div class="detail-grid">
-        <div><div class="detail-label">Case No</div><div class="detail-value">${esc(x.case_no||'—')}</div></div>
-        <div><div class="detail-label">Case Date</div><div class="detail-value">${fmtDate(x.case_date||x.payment_date)}</div></div>
-        <div><div class="detail-label">Patient</div><div class="detail-value">${esc(x.patient_name||'—')}</div></div>
-        <div><div class="detail-label">Refer</div><div class="detail-value"><strong>${esc(x.refer_name||'—')}</strong></div></div>
-        <div><div class="detail-label">Refer Amount</div><div class="detail-value" style="color:#dc3545;font-weight:700">${fmt(x.refer_amount)}</div></div>
-        <div><div class="detail-label">Entered By</div><div class="detail-value">${esc(x.recorded_by_name||x.recorded_by||'—')}</div></div>
+        <div><div class="detail-label">Case No</div><div class="detail-value">${esc(c.case_no)}</div></div>
+        <div><div class="detail-label">Case Date</div><div class="detail-value">${fmtDate(c.case_date)}</div></div>
+        <div><div class="detail-label">Patient</div><div class="detail-value">${esc(c.patient_name)}</div></div>
+        <div><div class="detail-label">Refer</div><div class="detail-value"><strong>${esc(c.refer_name)}</strong></div></div>
+        <div><div class="detail-label">Refer Amount</div><div class="detail-value" style="color:#dc3545;font-weight:700">${fmt(c.refer_amount)}</div></div>
+        <div><div class="detail-label">Amount Set By</div><div class="detail-value">${esc(c.refer_amount_enter_by||'—')}</div></div>
       </div></div>`;
 
     let bodyHTML='', footerHTML='';
@@ -335,8 +379,8 @@
           <h4>💳 Record Refer Payment</h4>
           <div class="refer-pending-box">
             <strong>Pending Refer Amount:</strong>
-            <span style="color:#dc3545;font-weight:700">${fmt(x.refer_amount)}</span>
-            &nbsp;|&nbsp;<strong>Refer:</strong> ${esc(x.refer_name||'—')}
+            <span style="color:#dc3545;font-weight:700">${fmt(c.refer_amount)}</span>
+            &nbsp;|&nbsp;<strong>Refer:</strong> ${esc(c.refer_name)}
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -344,7 +388,7 @@
               <input id="rp_voucher" type="text" placeholder="Voucher / Receipt No" required/>
             </div>
             <div class="form-group">
-              <label>Paid Date <span style="color:red">*</span></label>
+              <label>Payment Date <span style="color:red">*</span></label>
               <input id="rp_date" type="date" value="${today()}" required/>
             </div>
           </div>
@@ -352,7 +396,7 @@
             <div class="form-group">
               <label>Discount (₹)</label>
               <input id="rp_discount" type="number" min="0" step="0.01" value="0"
-                oninput="calcNet(${Number(x.refer_amount||0)})"/>
+                oninput="calcNet(${Number(c.refer_amount||0)})"/>
             </div>
             <div class="form-group">
               <label>Pay Mode <span style="color:red">*</span></label>
@@ -364,57 +408,75 @@
               </select>
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Payment To</label>
+              <input id="rp_payment_to" type="text" placeholder="Payee name (optional)" value="${esc(c.refer_name)}"/>
+            </div>
+            <div class="form-group">
+              <label>Remarks (optional)</label>
+              <input id="rp_remarks" type="text" placeholder="Optional note…"/>
+            </div>
+          </div>
           <div class="net-pay-display">
             <strong>Net Amount to Pay:</strong>
-            <span id="netPayAmt" style="color:#28a745;font-weight:700;font-size:1.05rem;margin-left:.5rem">${fmt(x.refer_amount)}</span>
-          </div>
-          <div class="form-group">
-            <label>Remark (optional)</label>
-            <input id="rp_remark" type="text" placeholder="Optional note…"/>
+            <span id="netPayAmt" style="color:#28a745;font-weight:700;font-size:1.05rem;margin-left:.5rem">${fmt(c.refer_amount)}</span>
           </div>
           <p class="err" id="modalErr" style="margin-top:.25rem"></p>
         </div>`;
       footerHTML=`
         <button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeModal()">Cancel</button>
         <button class="btn-primary" style="width:auto;background:#28a745"
-          onclick="submitPayment('${x.id}',${Number(x.refer_amount||0)})">✅ Confirm Payment</button>`;
+          onclick="submitPayment('${esc(caseNo)}',${Number(c.refer_amount||0)})">✅ Confirm Payment</button>`;
+
     } else {
-      const net=Number(x.refer_amount||0)-Number(x.discount||0);
+      // Paid mode — show payment detail, allow edit/undo for full access
+      const disc=Number(p?.discount||0);
+      const net=Number(c.refer_amount||0)-disc;
       const paidGridHTML = isFullAccess
         ? `<div class="form-row">
-            <div class="form-group"><label>Voucher No</label><input id="rpe_voucher" type="text" value="${esc(x.voucher_no||'')}"/></div>
-            <div class="form-group"><label>Paid Date</label><input id="rpe_date" type="date" value="${x.paid_date?String(x.paid_date).slice(0,10):''}"/></div>
+            <div class="form-group"><label>Voucher No</label>
+              <input id="rpe_voucher" type="text" value="${esc(p?.voucher_no||'')}"/></div>
+            <div class="form-group"><label>Payment Date</label>
+              <input id="rpe_date" type="date" value="${p?.payment_date?String(p.payment_date).slice(0,10):''}"/></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label>Discount (₹)</label>
-              <input id="rpe_discount" type="number" min="0" step="0.01" value="${Number(x.discount||0)}"
-                oninput="calcNetEdit(${Number(x.refer_amount||0)})"/>
+              <input id="rpe_discount" type="number" min="0" step="0.01" value="${Number(p?.discount||0)}"
+                oninput="calcNetEdit(${Number(c.refer_amount||0)})"/>
             </div>
             <div class="form-group"><label>Pay Mode</label>
               <select id="rpe_mode">
-                <option value="Cash" ${x.pay_mode==='Cash'?'selected':''}>Cash</option>
-                <option value="Bank" ${x.pay_mode==='Bank'?'selected':''}>Bank</option>
-                <option value="PhonePe" ${x.pay_mode==='PhonePe'?'selected':''}>PhonePe</option>
-                <option value="Other" ${x.pay_mode==='Other'?'selected':''}>Other</option>
+                <option value="Cash" ${(p?.mode)==='Cash'?'selected':''}>Cash</option>
+                <option value="Bank" ${(p?.mode)==='Bank'?'selected':''}>Bank</option>
+                <option value="PhonePe" ${(p?.mode)==='PhonePe'?'selected':''}>PhonePe</option>
+                <option value="Other" ${(p?.mode)==='Other'?'selected':''}>Other</option>
               </select>
             </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Payment To</label>
+              <input id="rpe_payment_to" type="text" value="${esc(p?.payment_to||'')}"/></div>
+            <div class="form-group"><label>Remarks</label>
+              <input id="rpe_remarks" type="text" value="${esc(p?.remarks||'')}" placeholder="Optional note…"/></div>
           </div>
           <div class="net-pay-display">
             <strong>Net Paid:</strong>
             <span id="netPayAmtEdit" style="color:#28a745;font-weight:700;font-size:1.05rem;margin-left:.5rem">${fmt(net)}</span>
           </div>
-          <div class="form-group"><label>Remark</label><input id="rpe_remark" type="text" value="${esc(x.remark||'')}" placeholder="Optional note…"/></div>
           <p class="err" id="modalErr" style="margin-top:.25rem"></p>`
         : `<div class="detail-grid">
-              <div><div class="detail-label">Voucher No</div><div class="detail-value">${esc(x.voucher_no||'—')}</div></div>
-              <div><div class="detail-label">Paid Date</div><div class="detail-value">${fmtDate(x.paid_date)}</div></div>
-              <div><div class="detail-label">Refer Amount</div><div class="detail-value">${fmt(x.refer_amount)}</div></div>
-              <div><div class="detail-label">Discount</div><div class="detail-value" style="color:#6c757d">${fmt(x.discount)}</div></div>
+              <div><div class="detail-label">Voucher No</div><div class="detail-value">${esc(p?.voucher_no||'—')}</div></div>
+              <div><div class="detail-label">Payment Date</div><div class="detail-value">${fmtDate(p?.payment_date)}</div></div>
+              <div><div class="detail-label">Refer Amount</div><div class="detail-value">${fmt(c.refer_amount)}</div></div>
+              <div><div class="detail-label">Discount</div><div class="detail-value" style="color:#6c757d">${fmt(p?.discount)}</div></div>
               <div><div class="detail-label">Net Paid</div><div class="detail-value" style="color:#28a745">${fmt(net)}</div></div>
-              <div><div class="detail-label">Pay Mode</div><div class="detail-value">${esc(x.pay_mode||'—')}</div></div>
-              <div><div class="detail-label">Paid By</div><div class="detail-value">${esc(x.paid_by_name||x.paid_by||'—')}</div></div>
-              ${x.remark?`<div style="grid-column:1/-1"><div class="detail-label">Remark</div><div class="detail-value">${esc(x.remark)}</div></div>`:''}
+              <div><div class="detail-label">Pay Mode</div><div class="detail-value">${esc(p?.mode||'—')}</div></div>
+              <div><div class="detail-label">Payment To</div><div class="detail-value">${esc(p?.payment_to||'—')}</div></div>
+              <div><div class="detail-label">Paid By</div><div class="detail-value">${esc(p?.created_by_name||p?.created_by||'—')}</div></div>
+              ${p?.remarks?`<div style="grid-column:1/-1"><div class="detail-label">Remarks</div><div class="detail-value">${esc(p.remarks)}</div></div>`:''}
             </div>`;
+
       bodyHTML=caseInfoHTML+`
         <div class="detail-section"><h3>💳 Payment Detail</h3>
           <div class="paid-detail-box">
@@ -422,26 +484,27 @@
             ${paidGridHTML}
           </div>
         </div>`;
+
       footerHTML=`<button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeModal()">Close</button>`;
-      if(isFullAccess){
-        footerHTML+=`<button class="btn-del" style="padding:.5rem 1rem;font-size:.85rem" onclick="deletePaidEntry('${x.id}')">↩️ Undo Payment</button>`;
-        footerHTML+=`<button class="btn-primary" style="width:auto;background:#28a745" onclick="savePaidEdit('${x.id}')">💾 Save Changes</button>`;
+      if(isFullAccess && p){
+        footerHTML+=`<button class="btn-del" onclick="undoPayment('${esc(caseNo)}','${p.id}')">↩️ Undo Payment</button>`;
+        footerHTML+=`<button class="btn-primary" style="width:auto;background:#28a745" onclick="savePaidEdit('${esc(caseNo)}','${p.id}',${Number(c.refer_amount||0)})">💾 Save Changes</button>`;
       }
     }
 
-    document.getElementById('modalTitle').textContent=`${x.case_no||'—'} — ${x.patient_name||''}`;
+    document.getElementById('modalTitle').textContent=`${c.case_no} — ${c.patient_name}`;
     document.getElementById('modalBody').innerHTML=bodyHTML;
     document.getElementById('modalFooter').innerHTML=footerHTML;
     document.getElementById('detailModal').classList.remove('hidden');
   }
 
+  // ── Net calculators ────────────────────────────────────────────────────────
   function calcNet(referAmt){
     const disc=parseFloat(document.getElementById('rp_discount')?.value)||0;
     const net=referAmt-disc;
     const el=document.getElementById('netPayAmt');
     if(el){el.textContent=fmt(net<0?0:net);el.style.color=net<0?'#dc3545':'#28a745';}
   }
-
   function calcNetEdit(referAmt){
     const disc=parseFloat(document.getElementById('rpe_discount')?.value)||0;
     const net=referAmt-disc;
@@ -449,31 +512,94 @@
     if(el){el.textContent=fmt(net<0?0:net);el.style.color=net<0?'#dc3545':'#28a745';}
   }
 
-  async function savePaidEdit(entryId){
+  // ── Submit new payment ─────────────────────────────────────────────────────
+  async function submitPayment(caseNo, referAmt){
+    const errEl=document.getElementById('modalErr');
+    errEl.textContent='';
+    const voucher   =document.getElementById('rp_voucher')?.value.trim();
+    const payDate   =document.getElementById('rp_date')?.value;
+    const discount  =parseFloat(document.getElementById('rp_discount')?.value)||0;
+    const mode      =document.getElementById('rp_mode')?.value;
+    const paymentTo =document.getElementById('rp_payment_to')?.value.trim()||null;
+    const remarks   =document.getElementById('rp_remarks')?.value.trim()||null;
+
+    if(!voucher){errEl.textContent='⚠️ Voucher No is required.';return;}
+    if(!payDate){errEl.textContent='⚠️ Payment Date is required.';return;}
+    if(!mode){errEl.textContent='⚠️ Pay Mode is required.';return;}
+    const net=referAmt-discount;
+    if(net<0){errEl.textContent='⚠️ Discount cannot exceed refer amount.';return;}
+
+    showSpinner(true);
+    try{
+      // 1. Insert into opd_refer_payment
+      const payPayload={
+        case_no:      caseNo,
+        payment_date: payDate,
+        voucher_no:   voucher,
+        remarks:      remarks,
+        payment_to:   paymentTo,
+        mode:         mode,
+        amount:       net,
+        discount:     discount,
+        created_by:      BNH_PAGE.user?.username||null,
+        created_by_name: BNH_PAGE.user?.name||null
+      };
+      const{data:payRow,error:pErr}=await BNH_PAGE.sb
+        .from('opd_refer_payment')
+        .insert(payPayload)
+        .select('id')
+        .single();
+      if(pErr)throw pErr;
+
+      // 2. Update opd_case status
+      const{error:cErr}=await BNH_PAGE.sb
+        .from('opd_case')
+        .update({
+          refer_payment_status: 'paid',
+          refer_payment_id:     payRow.id,
+          updated_at:           new Date().toISOString()
+        })
+        .eq('case_no',caseNo);
+      if(cErr)throw cErr;
+
+      showOk('✅ Refer payment recorded successfully!');
+      closeModal();
+      await loadData();
+    }catch(e){errEl.textContent='Error: '+e.message;}
+    finally{showSpinner(false);}
+  }
+
+  // ── Save edit on paid record ───────────────────────────────────────────────
+  async function savePaidEdit(caseNo, payId, referAmt){
     if(!isFullAccess)return;
     const errEl=document.getElementById('modalErr');
     errEl.textContent='';
-    const voucher=document.getElementById('rpe_voucher')?.value.trim();
-    const paidDate=document.getElementById('rpe_date')?.value;
-    const discount=parseFloat(document.getElementById('rpe_discount')?.value)||0;
-    const mode=document.getElementById('rpe_mode')?.value;
-    const remark=document.getElementById('rpe_remark')?.value.trim()||null;
+    const voucher   =document.getElementById('rpe_voucher')?.value.trim();
+    const payDate   =document.getElementById('rpe_date')?.value;
+    const discount  =parseFloat(document.getElementById('rpe_discount')?.value)||0;
+    const mode      =document.getElementById('rpe_mode')?.value;
+    const paymentTo =document.getElementById('rpe_payment_to')?.value.trim()||null;
+    const remarks   =document.getElementById('rpe_remarks')?.value.trim()||null;
+
     if(!voucher){errEl.textContent='⚠️ Voucher No is required.';return;}
-    if(!paidDate){errEl.textContent='⚠️ Paid Date is required.';return;}
-    const entry=allEntries.find(e=>e.id===entryId);
-    const referAmt=Number(entry?.refer_amount||0);
+    if(!payDate){errEl.textContent='⚠️ Payment Date is required.';return;}
     if(discount>referAmt){errEl.textContent='⚠️ Discount cannot exceed refer amount.';return;}
+
     showSpinner(true);
     try{
-      const payload={
-        voucher_no: voucher,
-        paid_date:  paidDate,
-        discount:   discount,
-        pay_mode:   mode,
-        mode:       mode,
-        remark:     remark
-      };
-      const{error}=await BNH_PAGE.sb.from('opd_refer_payments').update(payload).eq('id',entryId);
+      const net=referAmt-discount;
+      const{error}=await BNH_PAGE.sb
+        .from('opd_refer_payment')
+        .update({
+          voucher_no:   voucher,
+          payment_date: payDate,
+          discount:     discount,
+          amount:       net,
+          mode:         mode,
+          payment_to:   paymentTo,
+          remarks:      remarks
+        })
+        .eq('id',payId);
       if(error)throw error;
       showOk('✅ Payment record updated successfully!');
       closeModal();
@@ -482,72 +608,42 @@
     finally{showSpinner(false);}
   }
 
-  async function deletePaidEntry(entryId){
+  // ── Undo payment (admin only) ──────────────────────────────────────────────
+  async function undoPayment(caseNo, payId){
     if(!isFullAccess)return;
-    if(!confirm('⚠️ Undo this payment?\n\nThis will clear the voucher/paid details and move the case back to "Pending Payment". The refer amount itself will NOT be deleted — to delete the refer amount entirely, use the Refer Amount Entry page instead.'))return;
+    if(!confirm('⚠️ Undo this payment?\n\nThis will delete the payment record and move the case back to "Pending Payment". The refer amount itself will NOT be deleted — to delete it, use the Refer Amount Entry page.'))return;
     showSpinner(true);
     try{
-      const payload={
-        payment_status: 'pending',
-        voucher_no:     null,
-        paid_date:      null,
-        discount:       0,
-        pay_mode:       null,
-        mode:           null,
-        remark:         null,
-        paid_by:        null,
-        paid_by_name:   null,
-        paid_at:        null
-      };
-      const{error}=await BNH_PAGE.sb.from('opd_refer_payments').update(payload).eq('id',entryId);
-      if(error)throw error;
-      showOk('↩️ Payment undone — moved back to Pending.');
+      // Delete payment record
+      const{error:dErr}=await BNH_PAGE.sb
+        .from('opd_refer_payment')
+        .delete()
+        .eq('id',payId);
+      if(dErr)throw dErr;
+
+      // Reset case status
+      const{error:cErr}=await BNH_PAGE.sb
+        .from('opd_case')
+        .update({
+          refer_payment_status: 'pending',
+          refer_payment_id:     null,
+          updated_at:           new Date().toISOString()
+        })
+        .eq('case_no',caseNo);
+      if(cErr)throw cErr;
+
+      showOk('↩️ Payment undone — case moved back to Pending.');
       closeModal();
       await loadData();
     }catch(e){showErr('Undo error: '+e.message);}
     finally{showSpinner(false);}
   }
 
+  // ── Modal helpers ──────────────────────────────────────────────────────────
   function closeModal(){document.getElementById('detailModal').classList.add('hidden');}
   document.getElementById('detailModal').addEventListener('click',e=>{if(e.target===document.getElementById('detailModal'))closeModal();});
 
-  async function submitPayment(entryId,referAmt){
-    const errEl=document.getElementById('modalErr');
-    errEl.textContent='';
-    const voucher=document.getElementById('rp_voucher')?.value.trim();
-    const paidDate=document.getElementById('rp_date')?.value;
-    const discount=parseFloat(document.getElementById('rp_discount')?.value)||0;
-    const mode=document.getElementById('rp_mode')?.value;
-    const remark=document.getElementById('rp_remark')?.value.trim()||null;
-    if(!voucher){errEl.textContent='⚠️ Voucher No is required.';return;}
-    if(!paidDate){errEl.textContent='⚠️ Paid Date is required.';return;}
-    if(!mode){errEl.textContent='⚠️ Pay Mode is required.';return;}
-    const net=referAmt-discount;
-    if(net<0){errEl.textContent='⚠️ Discount cannot exceed refer amount.';return;}
-    showSpinner(true);
-    try{
-      const payload={
-        payment_status: 'paid',
-        voucher_no:     voucher,
-        paid_date:      paidDate,
-        discount:       discount,
-        pay_mode:       mode,
-        // also update 'mode' (existing col) to stay consistent
-        mode:           mode,
-        remark:         remark,
-        paid_by:        BNH_PAGE.user?.username||null,
-        paid_by_name:   BNH_PAGE.user?.name||null,
-        paid_at:        new Date().toISOString()
-      };
-      const{error}=await BNH_PAGE.sb.from('opd_refer_payments').update(payload).eq('id',entryId);
-      if(error)throw error;
-      showOk('✅ Refer payment recorded successfully!');
-      closeModal();
-      await loadData();
-    }catch(e){errEl.textContent='Error: '+e.message;}
-    finally{showSpinner(false);}
-  }
-
+  // ── Init ───────────────────────────────────────────────────────────────────
   loadData();
 </script>
 </body>
