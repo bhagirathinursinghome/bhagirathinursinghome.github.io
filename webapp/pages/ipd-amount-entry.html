@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Amount Entry – IPD</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .form-row > * { flex:1; min-width:200px; }
+    .hidden { display:none!important; }
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; }
+    th { background:#f0f0f0; padding:7px 8px; text-align:left; font-size:.82rem; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; font-size:.82rem; }
+    .patient-card { background:#f8f9ff; border:1px solid #c7d2fe; border-radius:8px;
+                    padding:.75rem 1rem; margin-bottom:.6rem; cursor:pointer; transition:all .2s; }
+    .patient-card:hover { background:#e0e7ff; border-color:#818cf8; }
+    .patient-card .pname { font-weight:600; color:#1e1b4b; }
+    .patient-card .pmeta { font-size:.82rem; color:#6b7280; margin-top:2px; }
+    .badge-warn { background:#fef3c7; color:#92400e; border:1px solid #fcd34d;
+                  padding:2px 8px; border-radius:12px; font-size:.75rem; font-weight:600; }
+    .info-box { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;
+                padding:.75rem; margin-bottom:1rem; font-size:.85rem; }
+    .na-label { color:#6b7280; font-style:italic; font-size:.85rem; }
+    .back-btn { background:none; border:none; color:#6366f1; font-weight:600;
+                cursor:pointer; font-size:.9rem; margin-bottom:1rem; padding:0; }
+    .date-filter { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1rem; }
+    .date-filter > * { flex:1; min-width:140px; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>💰 Amount Entry – IPD</h1>
+
+  <!-- LIST VIEW -->
+  <div id="listView">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">🏥 Admitted Patients – Pending Amount Entry</h2>
+      <div id="pendingList">Loading…</div>
+    </div>
+    <div class="page-card" style="margin-top:1.5rem">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">✅ Amount Entries Done – Filter by Date</h2>
+      <div class="date-filter">
+        <div><label>From</label><input id="histFrom" type="date"/></div>
+        <div><label>To</label><input id="histTo" type="date"/></div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn-primary" style="width:auto" onclick="loadHistory()">Show</button>
+        </div>
+      </div>
+      <div id="histList" style="font-size:.85rem;color:#555">Select date range and click Show.</div>
+    </div>
+  </div>
+
+  <!-- FORM VIEW -->
+  <div id="formView" class="hidden">
+    <div class="page-card">
+      <button class="back-btn" onclick="showList()">← Back to Patient List</button>
+      <h2 style="font-size:1rem;margin-bottom:.75rem" id="formTitle">Amount Entry</h2>
+
+      <div class="info-box" id="patientInfo"></div>
+
+      <form id="amtForm">
+        <label>Recorded By</label>
+        <input id="recBy" readonly/>
+
+        <!-- Refer Amount -->
+        <div id="referSection">
+          <label>Refer Amount (₹) <span style="color:red">*</span></label>
+          <input id="referAmount" type="number" min="0" step="0.01" placeholder="0.00"/>
+        </div>
+        <div id="referNA" class="hidden na-label">🔗 Refer: Not Applicable</div>
+
+        <!-- NH / Other type: Surgent, Anaesthesia, Package -->
+        <div id="nhSection" class="hidden">
+          <div class="form-row" style="margin-top:.75rem">
+            <div>
+              <label>Surgent Fees (₹) <span style="color:red">*</span></label>
+              <input id="surgentFees" type="number" min="0" step="0.01" placeholder="0.00"/>
+            </div>
+            <div id="aneFeeWrap">
+              <label>Anaesthesia Fees (₹) <span style="color:red">*</span></label>
+              <input id="anaFees" type="number" min="0" step="0.01" placeholder="0.00"/>
+            </div>
+          </div>
+          <div id="aneNA" class="hidden na-label" style="margin-top:.4rem">💉 Anaesthesia: Not Applicable</div>
+          <label style="margin-top:.75rem">Package Amount (₹) <span style="color:red">*</span></label>
+          <input id="packageAmt" type="number" min="0" step="0.01" placeholder="0.00"/>
+        </div>
+
+        <!-- Doctor Case: only NH Fees -->
+        <div id="dcSection" class="hidden">
+          <label style="margin-top:.75rem">NH Fees (₹) <span style="color:red">*</span></label>
+          <input id="nhFees" type="number" min="0" step="0.01" placeholder="0.00"/>
+        </div>
+
+        <label style="margin-top:.75rem">Entry Date</label>
+        <input id="entryDate" type="date"/>
+
+        <label>Remark</label>
+        <textarea id="remark" rows="2" placeholder="Optional…"></textarea>
+
+        <input type="hidden" id="admissionId"/>
+        <input type="hidden" id="admissionNo"/>
+        <input type="hidden" id="patientNameH"/>
+        <input type="hidden" id="caseTypeH"/>
+        <input type="hidden" id="hasRefer"/>
+        <input type="hidden" id="hasAnaesthesia"/>
+
+        <div style="margin-top:1rem">
+          <button type="submit" class="btn-primary" style="width:auto">💾 Save Amount Entry</button>
+        </div>
+        <p class="err" id="err"></p>
+        <p class="info" id="ok" style="display:none"></p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant","manager"]);
+
+  const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+
+  async function loadPending() {
+    const div = document.getElementById('pendingList');
+    // Get admissions that already have amount entry
+    const { data: done } = await BNH_PAGE.sb.from('ipd_amount_entries').select('admission_id');
+    const doneIds = (done||[]).map(r=>r.admission_id);
+
+    const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
+      .select('id,admission_date,admission_no,patient_name,case_type,refer_name')
+      .eq('is_discharged', false)
+      .eq('is_cancelled', false)
+      .order('admission_date', { ascending: false });
+
+    if (error || !data || data.length === 0) { div.textContent = 'No active patients.'; return; }
+    const pending = data.filter(r => !doneIds.includes(r.id));
+    if (pending.length === 0) { div.textContent = 'All patients have amount entries done.'; return; }
+
+    // Check OT entry status
+    const { data: otDone } = await BNH_PAGE.sb.from('ipd_ot_entries').select('admission_id');
+    const otIds = (otDone||[]).map(r=>r.admission_id);
+
+    div.innerHTML = pending.map(r => {
+      const otPending = !otIds.includes(r.id);
+      return `<div class="patient-card" onclick="openForm('${r.id}')">
+        <div class="pname">${r.patient_name}
+          ${otPending ? '<span class="badge-warn" style="margin-left:.5rem">⚠ OT Entry Pending</span>' : ''}
+        </div>
+        <div class="pmeta">📅 ${r.admission_date} &nbsp;|&nbsp; Adm: ${r.admission_no} &nbsp;|&nbsp; Type: ${r.case_type} &nbsp;|&nbsp; Refer: ${r.refer_name||'N/A'}</div>
+      </div>`;
+    }).join('');
+  }
+  loadPending();
+
+  async function openForm(admId) {
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { data: admArr } = await BNH_PAGE.sb.from('ipd_admissions')
+        .select('*').eq('id', admId);
+      const adm = admArr && admArr.length > 0 ? admArr[0] : null;
+      if (!adm) { spinner.classList.add('hidden'); return; }
+      // Check OT entry for anaesthesia info
+      const { data: otArr } = await BNH_PAGE.sb.from('ipd_ot_entries')
+        .select('*').eq('admission_id', admId);
+      const ot = otArr && otArr.length > 0 ? otArr[0] : null;
+
+      document.getElementById('listView').classList.add('hidden');
+      document.getElementById('formView').classList.remove('hidden');
+      document.getElementById('admissionId').value = admId;
+      document.getElementById('admissionNo').value = adm.admission_no;
+      document.getElementById('patientNameH').value = adm.patient_name;
+      document.getElementById('caseTypeH').value = adm.case_type;
+      document.getElementById('hasRefer').value = adm.refer_id ? '1' : '0';
+      document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+      document.getElementById('entryDate').value = new Date().toISOString().slice(0,10);
+      document.getElementById('formTitle').textContent = `Amount Entry – ${adm.patient_name} (${adm.admission_no})`;
+      document.getElementById('err').textContent = '';
+      document.getElementById('ok').style.display = 'none';
+
+      // Build info box
+      document.getElementById('patientInfo').innerHTML =
+        `<strong>${adm.patient_name}</strong> &nbsp;|&nbsp; Adm: ${adm.admission_no} &nbsp;|&nbsp; Date: ${adm.admission_date}<br>
+         Case Mode: <strong>${adm.case_mode}</strong> &nbsp;|&nbsp; Case Type: <strong>${adm.case_type}</strong>
+         ${adm.refer_name ? ' &nbsp;|&nbsp; Refer: <strong>'+adm.refer_name+'</strong>' : ''}
+         ${ot ? '<br>Surgent: <strong>'+(ot.surgent_name||'-')+'</strong> &nbsp;|&nbsp; Anaesthesia: <strong>'+(ot.anaesthesia_name||'Not Applicable')+'</strong>' : '<br><span style="color:#dc2626">⚠ OT Entry not done yet</span>'}`;
+
+      // Show/hide refer section
+      if (adm.refer_id) {
+        document.getElementById('referSection').classList.remove('hidden');
+        document.getElementById('referNA').classList.add('hidden');
+      } else {
+        document.getElementById('referSection').classList.add('hidden');
+        document.getElementById('referNA').classList.remove('hidden');
+      }
+
+      // Show/hide NH vs Doctor Case sections
+      const caseType = adm.case_type;
+      if (caseType === 'Doctor Case') {
+        document.getElementById('nhSection').classList.add('hidden');
+        document.getElementById('dcSection').classList.remove('hidden');
+      } else {
+        document.getElementById('nhSection').classList.remove('hidden');
+        document.getElementById('dcSection').classList.add('hidden');
+        // Anaesthesia N/A?
+        const hasAne = ot && ot.anaesthesia_id;
+        document.getElementById('hasAnaesthesia').value = hasAne ? '1' : '0';
+        if (hasAne) {
+          document.getElementById('aneFeeWrap').classList.remove('hidden');
+          document.getElementById('aneNA').classList.add('hidden');
+        } else {
+          document.getElementById('aneFeeWrap').classList.add('hidden');
+          document.getElementById('aneNA').classList.remove('hidden');
+        }
+      }
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function showList() {
+    document.getElementById('formView').classList.add('hidden');
+    document.getElementById('listView').classList.remove('hidden');
+  }
+
+  async function loadHistory() {
+    const from = document.getElementById('histFrom').value;
+    const to   = document.getElementById('histTo').value;
+    if (!from || !to) return;
+    const div = document.getElementById('histList');
+    div.textContent = 'Loading…';
+    const { data, error } = await BNH_PAGE.sb.from('ipd_amount_entries')
+      .select('*').gte('amount_entry_date', from).lte('amount_entry_date', to)
+      .order('amount_entry_date', { ascending: false });
+    if (error || !data || data.length === 0) { div.textContent = 'No entries in this range.'; return; }
+    div.innerHTML = `<table>
+      <thead><tr><th>Date</th><th>Adm No.</th><th>Patient</th><th class="r">Refer Amt</th><th class="r">Surgent</th><th class="r">Anaesthesia</th><th class="r">Package/NH</th></tr></thead>
+      <tbody>${data.map(r=>`<tr>
+        <td>${r.amount_entry_date||'-'}</td>
+        <td>${r.admission_no}</td>
+        <td>${r.patient_name}</td>
+        <td class="r">${r.refer_amount!=null?fmt(r.refer_amount):'N/A'}</td>
+        <td class="r">${r.surgent_fees!=null?fmt(r.surgent_fees):'N/A'}</td>
+        <td class="r">${r.anaesthesia_fees!=null?fmt(r.anaesthesia_fees):'N/A'}</td>
+        <td class="r">${r.package_amount!=null?fmt(r.package_amount):r.nh_fees!=null?fmt(r.nh_fees):'-'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  document.getElementById('amtForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const spinner = document.getElementById('spinner');
+    const err = document.getElementById('err');
+    const ok  = document.getElementById('ok');
+    err.textContent = ''; ok.style.display = 'none';
+
+    const caseType = document.getElementById('caseTypeH').value;
+    const hasRefer = document.getElementById('hasRefer').value === '1';
+    const hasAne   = document.getElementById('hasAnaesthesia').value === '1';
+
+    spinner.classList.remove('hidden');
+    try {
+      const payload = BNH_PAGE.stamp({
+        admission_id:    document.getElementById('admissionId').value,
+        admission_no:    document.getElementById('admissionNo').value,
+        patient_name:    document.getElementById('patientNameH').value,
+        refer_amount:    hasRefer ? parseFloat(document.getElementById('referAmount').value||0) : null,
+        surgent_fees:    caseType !== 'Doctor Case' ? parseFloat(document.getElementById('surgentFees').value||0) : null,
+        anaesthesia_fees:caseType !== 'Doctor Case' && hasAne ? parseFloat(document.getElementById('anaFees').value||0) : null,
+        package_amount:  caseType !== 'Doctor Case' ? parseFloat(document.getElementById('packageAmt').value||0) : null,
+        nh_fees:         caseType === 'Doctor Case' ? parseFloat(document.getElementById('nhFees').value||0) : null,
+        amount_entry_date: document.getElementById('entryDate').value || null,
+        remark:          document.getElementById('remark').value.trim() || null
+      });
+      const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(payload);
+      if (error) throw error;
+      ok.style.display = 'block';
+      ok.textContent = '✅ Amount entry saved!';
+      setTimeout(() => { showList(); loadPending(); }, 1500);
+    } catch(ex) {
+      err.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  };
+</script>
+</body>
+</html>
