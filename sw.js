@@ -1,6 +1,8 @@
 // Bhagirathi Health Care — Service Worker
-// Version: bump this string to force cache refresh
-const CACHE_NAME = 'bhc-v1';
+// ⚠️  IMPORTANT: Bump CACHE_VERSION every time you deploy changes!
+//     e.g. v2 → v3 → v4 ...  This forces all users to get fresh files.
+const CACHE_VERSION = 'v2';
+const CACHE_NAME = `bhc-${CACHE_VERSION}`;
 
 // Core shell files to cache on install
 const SHELL_ASSETS = [
@@ -25,20 +27,23 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_ASSETS))
   );
-  self.skipWaiting();
+  self.skipWaiting(); // Activate new SW immediately
 });
 
-// ── Activate: clean up old caches ───────────────────────────────────────────
+// ── Activate: delete ALL old caches ─────────────────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => {
+        console.log('[SW] Deleting old cache:', k);
+        return caches.delete(k);
+      }))
     )
   );
-  self.clients.claim();
+  self.clients.claim(); // Take control of all open tabs immediately
 });
 
-// ── Fetch: network-first for API, cache-first for assets ────────────────────
+// ── Fetch: smart caching strategy ───────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
@@ -62,7 +67,22 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first for static assets (CSS, JS, images, fonts)
+  // Network-first for JS and CSS (so updates are always picked up)
+  if (request.destination === 'script' || request.destination === 'style') {
+    event.respondWith(
+      fetch(request)
+        .then(res => {
+          if (!res || res.status !== 200 || res.type === 'opaque') return res;
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          return res;
+        })
+        .catch(() => caches.match(request)) // Fallback to cache if offline
+    );
+    return;
+  }
+
+  // Cache-first for images and other static assets (they rarely change)
   event.respondWith(
     caches.match(request).then(cached => {
       if (cached) return cached;
