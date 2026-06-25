@@ -26,6 +26,14 @@
                 cursor:pointer; font-size:.9rem; margin-bottom:1rem; padding:0; }
     .date-filter { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1rem; }
     .date-filter > * { flex:1; min-width:140px; }
+    .ot-case-box { background:#f0fdf4; border:1px solid #86efac; border-radius:8px;
+                   padding:.75rem 1rem; margin-bottom:1rem; font-size:.85rem; }
+    .ot-case-box .ot-label { font-weight:700; color:#14532d; margin-bottom:.35rem; font-size:.82rem; }
+    .ot-case-box .ot-detail { color:#166534; white-space:pre-wrap; line-height:1.5; }
+    .section-divider { border:none; border-top:1px solid #e5e7eb; margin:1rem 0; }
+    .extra-section { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:.75rem 1rem; margin-top:.75rem; }
+    .extra-section label { color:#92400e; font-weight:600; }
+    .mandatory-note { font-size:.75rem; color:#dc2626; font-weight:600; margin-left:.3rem; }
   </style>
 </head>
 <body>
@@ -59,6 +67,12 @@
       <h2 style="font-size:1rem;margin-bottom:.75rem" id="formTitle">Amount Entry</h2>
 
       <div class="info-box" id="patientInfo"></div>
+
+      <!-- OT Case Detail Box -->
+      <div class="ot-case-box hidden" id="otCaseBox">
+        <div class="ot-label">🔬 OT Case Detail</div>
+        <div class="ot-detail" id="otCaseDetail"></div>
+      </div>
 
       <form id="amtForm">
         <label>Recorded By</label>
@@ -97,13 +111,34 @@
         <label style="margin-top:.75rem">Entry Date</label>
         <input id="entryDate" type="date"/>
 
-        <label>Remark</label>
+        <!-- Extra Expense Section -->
+        <hr class="section-divider"/>
+        <div class="extra-section" id="extraExpenseSection">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
+            <span style="font-size:1rem">💸</span>
+            <strong style="color:#92400e">Extra Expense</strong>
+            <span class="mandatory-note hidden" id="extraMandatoryNote">* Required for Swasthasathy</span>
+          </div>
+          <div class="form-row">
+            <div>
+              <label style="color:#92400e">Amount (₹) <span id="extraAmtStar" class="hidden" style="color:red">*</span></label>
+              <input id="extraAmount" type="number" min="0" step="0.01" placeholder="0.00"/>
+            </div>
+            <div>
+              <label style="color:#92400e">Expense Remark <span id="extraRemStar" class="hidden" style="color:red">*</span></label>
+              <input id="extraRemark" type="text" placeholder="e.g. Medicine, Oxygen, Consumables…"/>
+            </div>
+          </div>
+        </div>
+
+        <label style="margin-top:.75rem">Remark</label>
         <textarea id="remark" rows="2" placeholder="Optional…"></textarea>
 
         <input type="hidden" id="admissionId"/>
         <input type="hidden" id="admissionNo"/>
         <input type="hidden" id="patientNameH"/>
         <input type="hidden" id="caseTypeH"/>
+        <input type="hidden" id="caseModeH"/>
         <input type="hidden" id="hasRefer"/>
         <input type="hidden" id="hasAnaesthesia"/>
 
@@ -176,7 +211,10 @@
       document.getElementById('admissionNo').value = adm.admission_no;
       document.getElementById('patientNameH').value = adm.patient_name;
       document.getElementById('caseTypeH').value = adm.case_type;
-      document.getElementById('hasRefer').value = adm.refer_id ? '1' : '0';
+      document.getElementById('caseModeH').value = adm.case_mode || '';
+      // Fix: check both refer_id and refer_name — refer_id may come as UUID string or null
+      const hasReferVal = (adm.refer_id && adm.refer_id !== '' && adm.refer_id !== null) || (adm.refer_name && adm.refer_name.trim() !== '') ? '1' : '0';
+      document.getElementById('hasRefer').value = hasReferVal;
       document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
       document.getElementById('entryDate').value = new Date().toISOString().slice(0,10);
       document.getElementById('formTitle').textContent = `Amount Entry – ${adm.patient_name} (${adm.admission_no})`;
@@ -190,14 +228,32 @@
          ${adm.refer_name ? ' &nbsp;|&nbsp; Refer: <strong>'+adm.refer_name+'</strong>' : ''}
          ${ot ? '<br>Surgent: <strong>'+(ot.surgent_name||'-')+'</strong> &nbsp;|&nbsp; Anaesthesia: <strong>'+(ot.anaesthesia_name||'Not Applicable')+'</strong>' : '<br><span style="color:#dc2626">⚠ OT Entry not done yet</span>'}`;
 
-      // Show/hide refer section
-      if (adm.refer_id) {
+      // Show OT case detail box
+      if (ot && ot.case_detail) {
+        document.getElementById('otCaseBox').classList.remove('hidden');
+        document.getElementById('otCaseDetail').textContent = ot.case_detail;
+      } else {
+        document.getElementById('otCaseBox').classList.add('hidden');
+      }
+
+      // Show/hide refer section — use same robust check
+      if (hasReferVal === '1') {
         document.getElementById('referSection').classList.remove('hidden');
         document.getElementById('referNA').classList.add('hidden');
       } else {
         document.getElementById('referSection').classList.add('hidden');
         document.getElementById('referNA').classList.remove('hidden');
       }
+
+      // Extra Expense: mandatory for Swasthasathy, optional for others
+      const caseMode = (adm.case_mode || '').trim();
+      const isSwastha = caseMode.toLowerCase().includes('swastha');
+      document.getElementById('extraMandatoryNote').classList.toggle('hidden', !isSwastha);
+      document.getElementById('extraAmtStar').classList.toggle('hidden', !isSwastha);
+      document.getElementById('extraRemStar').classList.toggle('hidden', !isSwastha);
+      // Reset extra expense fields
+      document.getElementById('extraAmount').value = '';
+      document.getElementById('extraRemark').value = '';
 
       // Show/hide NH vs Doctor Case sections
       const caseType = adm.case_type;
@@ -239,7 +295,7 @@
       .order('amount_entry_date', { ascending: false });
     if (error || !data || data.length === 0) { div.textContent = 'No entries in this range.'; return; }
     div.innerHTML = `<table>
-      <thead><tr><th>Date</th><th>Adm No.</th><th>Patient</th><th class="r">Refer Amt</th><th class="r">Surgent</th><th class="r">Anaesthesia</th><th class="r">Package/NH</th></tr></thead>
+      <thead><tr><th>Date</th><th>Adm No.</th><th>Patient</th><th class="r">Refer Amt</th><th class="r">Surgent</th><th class="r">Anaesthesia</th><th class="r">Package/NH</th><th class="r">Extra Expense</th></tr></thead>
       <tbody>${data.map(r=>`<tr>
         <td>${r.amount_entry_date||'-'}</td>
         <td>${r.admission_no}</td>
@@ -248,6 +304,7 @@
         <td class="r">${r.surgent_fees!=null?fmt(r.surgent_fees):'N/A'}</td>
         <td class="r">${r.anaesthesia_fees!=null?fmt(r.anaesthesia_fees):'N/A'}</td>
         <td class="r">${r.package_amount!=null?fmt(r.package_amount):r.nh_fees!=null?fmt(r.nh_fees):'-'}</td>
+        <td class="r">${r.extra_expense_amount!=null?fmt(r.extra_expense_amount)+(r.extra_expense_remark?' <span style="color:#92400e;font-size:.75rem">('+r.extra_expense_remark+')</span>':''):'-'}</td>
       </tr>`).join('')}</tbody>
     </table>`;
   }
@@ -260,22 +317,34 @@
     err.textContent = ''; ok.style.display = 'none';
 
     const caseType = document.getElementById('caseTypeH').value;
+    const caseMode = document.getElementById('caseModeH').value;
     const hasRefer = document.getElementById('hasRefer').value === '1';
     const hasAne   = document.getElementById('hasAnaesthesia').value === '1';
+    const isSwastha = caseMode.toLowerCase().includes('swastha');
+
+    // Extra expense validation for Swasthasathy
+    const extraAmt = document.getElementById('extraAmount').value.trim();
+    const extraRem = document.getElementById('extraRemark').value.trim();
+    if (isSwastha) {
+      if (!extraAmt) { err.textContent = 'Extra Expense Amount is required for Swasthasathy.'; return; }
+      if (!extraRem) { err.textContent = 'Extra Expense Remark is required for Swasthasathy.'; return; }
+    }
 
     spinner.classList.remove('hidden');
     try {
       const payload = BNH_PAGE.stamp({
-        admission_id:    document.getElementById('admissionId').value,
-        admission_no:    document.getElementById('admissionNo').value,
-        patient_name:    document.getElementById('patientNameH').value,
-        refer_amount:    hasRefer ? parseFloat(document.getElementById('referAmount').value||0) : null,
-        surgent_fees:    caseType !== 'Doctor Case' ? parseFloat(document.getElementById('surgentFees').value||0) : null,
-        anaesthesia_fees:caseType !== 'Doctor Case' && hasAne ? parseFloat(document.getElementById('anaFees').value||0) : null,
-        package_amount:  caseType !== 'Doctor Case' ? parseFloat(document.getElementById('packageAmt').value||0) : null,
-        nh_fees:         caseType === 'Doctor Case' ? parseFloat(document.getElementById('nhFees').value||0) : null,
-        amount_entry_date: document.getElementById('entryDate').value || null,
-        remark:          document.getElementById('remark').value.trim() || null
+        admission_id:       document.getElementById('admissionId').value,
+        admission_no:       document.getElementById('admissionNo').value,
+        patient_name:       document.getElementById('patientNameH').value,
+        refer_amount:       hasRefer ? parseFloat(document.getElementById('referAmount').value||0) : null,
+        surgent_fees:       caseType !== 'Doctor Case' ? parseFloat(document.getElementById('surgentFees').value||0) : null,
+        anaesthesia_fees:   caseType !== 'Doctor Case' && hasAne ? parseFloat(document.getElementById('anaFees').value||0) : null,
+        package_amount:     caseType !== 'Doctor Case' ? parseFloat(document.getElementById('packageAmt').value||0) : null,
+        nh_fees:            caseType === 'Doctor Case' ? parseFloat(document.getElementById('nhFees').value||0) : null,
+        extra_expense_amount: extraAmt ? parseFloat(extraAmt) : null,
+        extra_expense_remark: extraRem || null,
+        amount_entry_date:  document.getElementById('entryDate').value || null,
+        remark:             document.getElementById('remark').value.trim() || null
       });
       const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(payload);
       if (error) throw error;
