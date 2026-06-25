@@ -31,9 +31,41 @@
     .ot-case-box .ot-label { font-weight:700; color:#14532d; margin-bottom:.35rem; font-size:.82rem; }
     .ot-case-box .ot-detail { color:#166534; white-space:pre-wrap; line-height:1.5; }
     .section-divider { border:none; border-top:1px solid #e5e7eb; margin:1rem 0; }
-    .extra-section { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:.75rem 1rem; margin-top:.75rem; }
-    .extra-section label { color:#92400e; font-weight:600; }
     .mandatory-note { font-size:.75rem; color:#dc2626; font-weight:600; margin-left:.3rem; }
+    .pending-count-badge {
+      display:inline-flex; align-items:center; justify-content:center;
+      background:#6366f1; color:#fff; border-radius:20px;
+      padding:2px 12px; font-size:.82rem; font-weight:700; margin-left:.6rem;
+    }
+    .search-bar-wrap { margin-bottom:.75rem; }
+    .search-bar-wrap input {
+      width:100%; padding:.45rem .75rem; border:1px solid #c7d2fe; border-radius:8px;
+      font-size:.9rem; background:#f8f9ff; box-sizing:border-box;
+    }
+    /* Multi-row income/expense section */
+    .multi-section { border-radius:8px; padding:.75rem 1rem; margin-top:.75rem; }
+    .multi-section.income-section { background:#f0fdf4; border:1px solid #86efac; }
+    .multi-section.expense-section { background:#fffbeb; border:1px solid #fcd34d; }
+    .multi-section-header { display:flex; align-items:center; gap:.5rem; margin-bottom:.6rem; }
+    .multi-section-header strong { font-size:.95rem; }
+    .income-section .multi-section-header strong { color:#14532d; }
+    .expense-section .multi-section-header strong { color:#92400e; }
+    .add-row-btn {
+      background:none; border:1px solid currentColor; border-radius:6px;
+      padding:2px 10px; font-size:.8rem; font-weight:700; cursor:pointer;
+      display:inline-flex; align-items:center; gap:4px; margin-left:auto;
+    }
+    .income-section .add-row-btn { color:#166534; }
+    .expense-section .add-row-btn { color:#92400e; }
+    .entry-row { display:flex; gap:.5rem; align-items:center; margin-bottom:.5rem; flex-wrap:wrap; }
+    .entry-row select, .entry-row input { flex:1; min-width:120px; padding:.35rem .5rem;
+      border:1px solid #d1d5db; border-radius:6px; font-size:.83rem; }
+    .entry-row .amt-input { max-width:120px; min-width:90px; flex:none; }
+    .remove-row-btn {
+      background:none; border:none; color:#dc2626; font-size:1.1rem;
+      cursor:pointer; padding:0 4px; line-height:1; flex-shrink:0;
+    }
+    .r { text-align:right; }
   </style>
 </head>
 <body>
@@ -44,7 +76,13 @@
   <!-- LIST VIEW -->
   <div id="listView">
     <div class="page-card">
-      <h2 style="font-size:1rem;margin-bottom:.75rem">🏥 Admitted Patients – Pending Amount Entry</h2>
+      <h2 style="font-size:1rem;margin-bottom:.75rem">
+        🏥 Admitted Patients – Pending Amount Entry
+        <span class="pending-count-badge" id="pendingCountBadge">0</span>
+      </h2>
+      <div class="search-bar-wrap">
+        <input id="pendingSearch" type="text" placeholder="🔍 Search by patient name or admission no…" oninput="filterPending()"/>
+      </div>
       <div id="pendingList">Loading…</div>
     </div>
     <div class="page-card" style="margin-top:1.5rem">
@@ -111,24 +149,25 @@
         <label style="margin-top:.75rem">Entry Date</label>
         <input id="entryDate" type="date"/>
 
-        <!-- Extra Expense Section -->
+        <!-- ── ADDITIONAL INCOME ── -->
         <hr class="section-divider"/>
-        <div class="extra-section" id="extraExpenseSection">
-          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
-            <span style="font-size:1rem">💸</span>
-            <strong style="color:#92400e">Extra Expense</strong>
-            <span class="mandatory-note hidden" id="extraMandatoryNote">* Required for Swasthasathy</span>
+        <div class="multi-section income-section">
+          <div class="multi-section-header">
+            <span>💰</span>
+            <strong>Additional Income</strong>
+            <button type="button" class="add-row-btn" onclick="addIncomeRow()">＋ Add Income</button>
           </div>
-          <div class="form-row">
-            <div>
-              <label style="color:#92400e">Amount (₹) <span id="extraAmtStar" class="hidden" style="color:red">*</span></label>
-              <input id="extraAmount" type="number" min="0" step="0.01" placeholder="0.00"/>
-            </div>
-            <div>
-              <label style="color:#92400e">Expense Remark <span id="extraRemStar" class="hidden" style="color:red">*</span></label>
-              <input id="extraRemark" type="text" placeholder="e.g. Medicine, Oxygen, Consumables…"/>
-            </div>
+          <div id="incomeRows"></div>
+        </div>
+
+        <!-- ── EXTRA EXPENSE ── -->
+        <div class="multi-section expense-section" style="margin-top:.75rem">
+          <div class="multi-section-header">
+            <span>💸</span>
+            <strong>Extra Expense <span class="mandatory-note hidden" id="extraMandatoryNote">* Required for Swasthasathy</span></strong>
+            <button type="button" class="add-row-btn" onclick="addExpenseRow()">＋ Add Expense</button>
           </div>
+          <div id="expenseRows"></div>
         </div>
 
         <label style="margin-top:.75rem">Remark</label>
@@ -160,9 +199,92 @@
 
   const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
 
+  const INCOME_OPTIONS = [
+    'Aaya Masi Charge',
+    'Oxizen Charge',
+    'Bed Charge',
+    'Nebulisation Charge',
+    'Monitoring Charge',
+    'Blood Transfusion Charge',
+    'Food Charge',
+    'Other'
+  ];
+
+  const EXPENSE_OPTIONS = [
+    'S.S. Traveling',
+    'Liga Clip',
+    'Fooding',
+    'Discharge Medicine Charge',
+    'Other'
+  ];
+
+  // ── Multi-row helpers ──────────────────────────────────────────────
+  function buildRow(containerId, options, accentColor) {
+    const container = document.getElementById(containerId);
+    const idx = container.children.length;
+    const div = document.createElement('div');
+    div.className = 'entry-row';
+    div.dataset.idx = idx;
+
+    const sel = document.createElement('select');
+    sel.innerHTML = `<option value="">-- Select --</option>` +
+      options.map(o => `<option value="${o}">${o}</option>`).join('');
+    sel.style.color = accentColor;
+
+    const customInput = document.createElement('input');
+    customInput.type = 'text';
+    customInput.placeholder = 'Custom label…';
+    customInput.style.display = 'none';
+    customInput.style.color = accentColor;
+
+    sel.onchange = () => {
+      customInput.style.display = sel.value === 'Other' ? '' : 'none';
+      if (sel.value !== 'Other') customInput.value = '';
+    };
+
+    const amtInput = document.createElement('input');
+    amtInput.type = 'number';
+    amtInput.min = '0';
+    amtInput.step = '0.01';
+    amtInput.placeholder = '₹ Amount';
+    amtInput.className = 'amt-input';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'remove-row-btn';
+    removeBtn.textContent = '✕';
+    removeBtn.onclick = () => div.remove();
+
+    div.appendChild(sel);
+    div.appendChild(customInput);
+    div.appendChild(amtInput);
+    div.appendChild(removeBtn);
+    container.appendChild(div);
+  }
+
+  function addIncomeRow()  { buildRow('incomeRows',  INCOME_OPTIONS,  '#166534'); }
+  function addExpenseRow() { buildRow('expenseRows', EXPENSE_OPTIONS, '#92400e'); }
+
+  function collectRows(containerId) {
+    const rows = [];
+    document.querySelectorAll(`#${containerId} .entry-row`).forEach(div => {
+      const sel = div.querySelector('select');
+      const custom = div.querySelector('input[type=text]');
+      const amtEl = div.querySelector('input[type=number]');
+      const label = sel.value === 'Other' ? (custom.value.trim()||'Other') : sel.value;
+      const amt = parseFloat(amtEl.value||0);
+      if (label && label !== '--Select--' && sel.value !== '' && amt > 0) {
+        rows.push({ label, amount: amt });
+      }
+    });
+    return rows;
+  }
+
+  // ── Pending list with search ───────────────────────────────────────
+  let _pendingCards = [];
+
   async function loadPending() {
     const div = document.getElementById('pendingList');
-    // Get admissions that already have amount entry
     const { data: done } = await BNH_PAGE.sb.from('ipd_amount_entries').select('admission_id');
     const doneIds = (done||[]).map(r=>r.admission_id);
 
@@ -174,24 +296,47 @@
 
     if (error || !data || data.length === 0) { div.textContent = 'No active patients.'; return; }
     const pending = data.filter(r => !doneIds.includes(r.id));
-    if (pending.length === 0) { div.textContent = 'All patients have amount entries done.'; return; }
 
-    // Check OT entry status
     const { data: otDone } = await BNH_PAGE.sb.from('ipd_ot_entries').select('admission_id');
     const otIds = (otDone||[]).map(r=>r.admission_id);
 
-    div.innerHTML = pending.map(r => {
-      const otPending = !otIds.includes(r.id);
-      return `<div class="patient-card" onclick="openForm('${r.id}')">
-        <div class="pname">${r.patient_name}
-          ${otPending ? '<span class="badge-warn" style="margin-left:.5rem">⚠ OT Entry Pending</span>' : ''}
-        </div>
-        <div class="pmeta">📅 ${r.admission_date} &nbsp;|&nbsp; Adm: ${r.admission_no} &nbsp;|&nbsp; Type: ${r.case_type} &nbsp;|&nbsp; Refer: ${r.refer_name||'N/A'}</div>
-      </div>`;
-    }).join('');
+    _pendingCards = pending.map(r => ({
+      id: r.id,
+      name: r.patient_name,
+      admNo: r.admission_no,
+      date: r.admission_date,
+      type: r.case_type,
+      refer: r.refer_name||'N/A',
+      otPending: !otIds.includes(r.id)
+    }));
+
+    document.getElementById('pendingCountBadge').textContent = _pendingCards.length;
+    renderPendingCards(_pendingCards);
   }
+
+  function renderPendingCards(list) {
+    const div = document.getElementById('pendingList');
+    if (list.length === 0) { div.textContent = 'No matching patients.'; return; }
+    div.innerHTML = list.map(r => `
+      <div class="patient-card" onclick="openForm('${r.id}')">
+        <div class="pname">${r.name}
+          ${r.otPending ? '<span class="badge-warn" style="margin-left:.5rem">⚠ OT Entry Pending</span>' : ''}
+        </div>
+        <div class="pmeta">📅 ${r.date} &nbsp;|&nbsp; Adm: ${r.admNo} &nbsp;|&nbsp; Type: ${r.type} &nbsp;|&nbsp; Refer: ${r.refer}</div>
+      </div>`).join('');
+  }
+
+  function filterPending() {
+    const q = document.getElementById('pendingSearch').value.toLowerCase().trim();
+    if (!q) { renderPendingCards(_pendingCards); return; }
+    renderPendingCards(_pendingCards.filter(r =>
+      r.name.toLowerCase().includes(q) || r.admNo.toLowerCase().includes(q)
+    ));
+  }
+
   loadPending();
 
+  // ── Open form ──────────────────────────────────────────────────────
   async function openForm(admId) {
     const spinner = document.getElementById('spinner');
     spinner.classList.remove('hidden');
@@ -200,7 +345,6 @@
         .select('*').eq('id', admId);
       const adm = admArr && admArr.length > 0 ? admArr[0] : null;
       if (!adm) { spinner.classList.add('hidden'); return; }
-      // Check OT entry for anaesthesia info
       const { data: otArr } = await BNH_PAGE.sb.from('ipd_ot_entries')
         .select('*').eq('admission_id', admId);
       const ot = otArr && otArr.length > 0 ? otArr[0] : null;
@@ -212,8 +356,8 @@
       document.getElementById('patientNameH').value = adm.patient_name;
       document.getElementById('caseTypeH').value = adm.case_type;
       document.getElementById('caseModeH').value = adm.case_mode || '';
-      // Fix: check both refer_id and refer_name — refer_id may come as UUID string or null
-      const hasReferVal = (adm.refer_id && adm.refer_id !== '' && adm.refer_id !== null) || (adm.refer_name && adm.refer_name.trim() !== '') ? '1' : '0';
+      const hasReferVal = (adm.refer_id && adm.refer_id !== '' && adm.refer_id !== null) ||
+        (adm.refer_name && adm.refer_name.trim() !== '') ? '1' : '0';
       document.getElementById('hasRefer').value = hasReferVal;
       document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
       document.getElementById('entryDate').value = new Date().toISOString().slice(0,10);
@@ -221,14 +365,16 @@
       document.getElementById('err').textContent = '';
       document.getElementById('ok').style.display = 'none';
 
-      // Build info box
+      // Clear dynamic rows
+      document.getElementById('incomeRows').innerHTML = '';
+      document.getElementById('expenseRows').innerHTML = '';
+
       document.getElementById('patientInfo').innerHTML =
         `<strong>${adm.patient_name}</strong> &nbsp;|&nbsp; Adm: ${adm.admission_no} &nbsp;|&nbsp; Date: ${adm.admission_date}<br>
          Case Mode: <strong>${adm.case_mode}</strong> &nbsp;|&nbsp; Case Type: <strong>${adm.case_type}</strong>
          ${adm.refer_name ? ' &nbsp;|&nbsp; Refer: <strong>'+adm.refer_name+'</strong>' : ''}
          ${ot ? '<br>Surgent: <strong>'+(ot.surgent_name||'-')+'</strong> &nbsp;|&nbsp; Anaesthesia: <strong>'+(ot.anaesthesia_name||'Not Applicable')+'</strong>' : '<br><span style="color:#dc2626">⚠ OT Entry not done yet</span>'}`;
 
-      // Show OT case detail box
       if (ot && ot.case_detail) {
         document.getElementById('otCaseBox').classList.remove('hidden');
         document.getElementById('otCaseDetail').textContent = ot.case_detail;
@@ -236,7 +382,6 @@
         document.getElementById('otCaseBox').classList.add('hidden');
       }
 
-      // Show/hide refer section — use same robust check
       if (hasReferVal === '1') {
         document.getElementById('referSection').classList.remove('hidden');
         document.getElementById('referNA').classList.add('hidden');
@@ -245,17 +390,10 @@
         document.getElementById('referNA').classList.remove('hidden');
       }
 
-      // Extra Expense: mandatory for Swasthasathy, optional for others
       const caseMode = (adm.case_mode || '').trim();
       const isSwastha = caseMode.toLowerCase().includes('swastha');
       document.getElementById('extraMandatoryNote').classList.toggle('hidden', !isSwastha);
-      document.getElementById('extraAmtStar').classList.toggle('hidden', !isSwastha);
-      document.getElementById('extraRemStar').classList.toggle('hidden', !isSwastha);
-      // Reset extra expense fields
-      document.getElementById('extraAmount').value = '';
-      document.getElementById('extraRemark').value = '';
 
-      // Show/hide NH vs Doctor Case sections
       const caseType = adm.case_type;
       if (caseType === 'Doctor Case') {
         document.getElementById('nhSection').classList.add('hidden');
@@ -263,7 +401,6 @@
       } else {
         document.getElementById('nhSection').classList.remove('hidden');
         document.getElementById('dcSection').classList.add('hidden');
-        // Anaesthesia N/A?
         const hasAne = ot && ot.anaesthesia_id;
         document.getElementById('hasAnaesthesia').value = hasAne ? '1' : '0';
         if (hasAne) {
@@ -284,6 +421,7 @@
     document.getElementById('listView').classList.remove('hidden');
   }
 
+  // ── History ────────────────────────────────────────────────────────
   async function loadHistory() {
     const from = document.getElementById('histFrom').value;
     const to   = document.getElementById('histTo').value;
@@ -294,21 +432,44 @@
       .select('*').gte('amount_entry_date', from).lte('amount_entry_date', to)
       .order('amount_entry_date', { ascending: false });
     if (error || !data || data.length === 0) { div.textContent = 'No entries in this range.'; return; }
+
+    // Fetch additional income/expense for these entries
+    const entryIds = data.map(r => r.id);
+    const { data: addl } = await BNH_PAGE.sb.from('ipd_additional_income_expense')
+      .select('*').in('amount_entry_id', entryIds);
+    const incomeMap  = {};
+    const expenseMap = {};
+    (addl||[]).forEach(r => {
+      const key = r.amount_entry_id;
+      if (r.type === 'income')  { incomeMap[key]  = incomeMap[key]  || []; incomeMap[key].push(r); }
+      if (r.type === 'expense') { expenseMap[key] = expenseMap[key] || []; expenseMap[key].push(r); }
+    });
+
     div.innerHTML = `<table>
-      <thead><tr><th>Date</th><th>Adm No.</th><th>Patient</th><th class="r">Refer Amt</th><th class="r">Surgent</th><th class="r">Anaesthesia</th><th class="r">Package/NH</th><th class="r">Extra Expense</th></tr></thead>
-      <tbody>${data.map(r=>`<tr>
-        <td>${r.amount_entry_date||'-'}</td>
-        <td>${r.admission_no}</td>
-        <td>${r.patient_name}</td>
-        <td class="r">${r.refer_amount!=null?fmt(r.refer_amount):'N/A'}</td>
-        <td class="r">${r.surgent_fees!=null?fmt(r.surgent_fees):'N/A'}</td>
-        <td class="r">${r.anaesthesia_fees!=null?fmt(r.anaesthesia_fees):'N/A'}</td>
-        <td class="r">${r.package_amount!=null?fmt(r.package_amount):r.nh_fees!=null?fmt(r.nh_fees):'-'}</td>
-        <td class="r">${r.extra_expense_amount!=null?fmt(r.extra_expense_amount)+(r.extra_expense_remark?' <span style="color:#92400e;font-size:.75rem">('+r.extra_expense_remark+')</span>':''):'-'}</td>
-      </tr>`).join('')}</tbody>
+      <thead><tr>
+        <th>Date</th><th>Adm No.</th><th>Patient</th>
+        <th class="r">Refer Amt</th><th class="r">Surgent</th><th class="r">Anaesthesia</th>
+        <th class="r">Package/NH</th><th>Add. Income</th><th>Extra Expense</th>
+      </tr></thead>
+      <tbody>${data.map(r => {
+        const inc = (incomeMap[r.id]||[]).map(x=>`${x.label}: ${fmt(x.amount)}`).join('<br>') || '-';
+        const exp = (expenseMap[r.id]||[]).map(x=>`${x.label}: ${fmt(x.amount)}`).join('<br>') || '-';
+        return `<tr>
+          <td>${r.amount_entry_date||'-'}</td>
+          <td>${r.admission_no}</td>
+          <td>${r.patient_name}</td>
+          <td class="r">${r.refer_amount!=null?fmt(r.refer_amount):'N/A'}</td>
+          <td class="r">${r.surgent_fees!=null?fmt(r.surgent_fees):'N/A'}</td>
+          <td class="r">${r.anaesthesia_fees!=null?fmt(r.anaesthesia_fees):'N/A'}</td>
+          <td class="r">${r.package_amount!=null?fmt(r.package_amount):r.nh_fees!=null?fmt(r.nh_fees):'-'}</td>
+          <td style="font-size:.78rem;color:#166534">${inc}</td>
+          <td style="font-size:.78rem;color:#92400e">${exp}</td>
+        </tr>`;
+      }).join('')}</tbody>
     </table>`;
   }
 
+  // ── Submit ─────────────────────────────────────────────────────────
   document.getElementById('amtForm').onsubmit = async (e) => {
     e.preventDefault();
     const spinner = document.getElementById('spinner');
@@ -316,19 +477,20 @@
     const ok  = document.getElementById('ok');
     err.textContent = ''; ok.style.display = 'none';
 
-    const caseType = document.getElementById('caseTypeH').value;
-    const caseMode = document.getElementById('caseModeH').value;
-    const hasRefer = document.getElementById('hasRefer').value === '1';
-    const hasAne   = document.getElementById('hasAnaesthesia').value === '1';
+    const caseType  = document.getElementById('caseTypeH').value;
+    const caseMode  = document.getElementById('caseModeH').value;
+    const hasRefer  = document.getElementById('hasRefer').value === '1';
+    const hasAne    = document.getElementById('hasAnaesthesia').value === '1';
     const isSwastha = caseMode.toLowerCase().includes('swastha');
 
-    // Extra expense validation for Swasthasathy
-    const extraAmt = document.getElementById('extraAmount').value.trim();
-    const extraRem = document.getElementById('extraRemark').value.trim();
-    if (isSwastha) {
-      if (!extraAmt) { err.textContent = 'Extra Expense Amount is required for Swasthasathy.'; return; }
-      if (!extraRem) { err.textContent = 'Extra Expense Remark is required for Swasthasathy.'; return; }
+    // Swasthasathy requires at least one expense row
+    const expenseRows = collectRows('expenseRows');
+    if (isSwastha && expenseRows.length === 0) {
+      err.textContent = 'At least one Extra Expense is required for Swasthasathy.';
+      return;
     }
+
+    const incomeRows = collectRows('incomeRows');
 
     spinner.classList.remove('hidden');
     try {
@@ -341,13 +503,30 @@
         anaesthesia_fees:   caseType !== 'Doctor Case' && hasAne ? parseFloat(document.getElementById('anaFees').value||0) : null,
         package_amount:     caseType !== 'Doctor Case' ? parseFloat(document.getElementById('packageAmt').value||0) : null,
         nh_fees:            caseType === 'Doctor Case' ? parseFloat(document.getElementById('nhFees').value||0) : null,
-        extra_expense_amount: extraAmt ? parseFloat(extraAmt) : null,
-        extra_expense_remark: extraRem || null,
         amount_entry_date:  document.getElementById('entryDate').value || null,
         remark:             document.getElementById('remark').value.trim() || null
       });
-      const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(payload);
+
+      const { data: inserted, error } = await BNH_PAGE.sb
+        .from('ipd_amount_entries').insert(payload).select('id').single();
       if (error) throw error;
+
+      // Insert additional income + expense rows
+      const entryId = inserted.id;
+      const allAddl = [
+        ...incomeRows.map(r => BNH_PAGE.stamp({ amount_entry_id: entryId,
+          admission_id: document.getElementById('admissionId').value,
+          type: 'income', label: r.label, amount: r.amount })),
+        ...expenseRows.map(r => BNH_PAGE.stamp({ amount_entry_id: entryId,
+          admission_id: document.getElementById('admissionId').value,
+          type: 'expense', label: r.label, amount: r.amount }))
+      ];
+      if (allAddl.length > 0) {
+        const { error: addlErr } = await BNH_PAGE.sb
+          .from('ipd_additional_income_expense').insert(allAddl);
+        if (addlErr) throw addlErr;
+      }
+
       ok.style.display = 'block';
       ok.textContent = '✅ Amount entry saved!';
       setTimeout(() => { showList(); loadPending(); }, 1500);
