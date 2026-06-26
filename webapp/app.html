@@ -29,8 +29,23 @@
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('SW registered:', reg.scope))
+        .then(reg => {
+          console.log('SW registered:', reg.scope);
+ 
+          // Poll for updates every 60 seconds (catches cases where SW
+          // update check didn't fire automatically)
+          setInterval(() => reg.update(), 60 * 1000);
+        })
         .catch(err => console.error('SW registration failed:', err));
+ 
+      // ✅ Listen for SW_UPDATED message → reload this tab automatically
+      navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data && event.data.type === 'SW_UPDATED') {
+          console.log('[App] New version available — reloading...');
+          // Small delay so all tabs don't hammer the server simultaneously
+          setTimeout(() => window.location.reload(), Math.random() * 2000);
+        }
+      });
     });
   }
 </script>
