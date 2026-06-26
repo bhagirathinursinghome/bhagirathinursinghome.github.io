@@ -96,6 +96,24 @@
       page: "pages/opd_refer_paid.html",
       roles: ["admin", "accountant"]
     },
+    // ==========================================
+    // LAB
+    // ==========================================
+    { label:"Lab Test Master",    
+      icon:"🧪",
+      page:"pages/lab_test_master.html",    
+      roles:["admin","manager"] 
+    },
+    { label:"Lab Work Entry",
+      icon:"🔬", 
+      page:"pages/lab_work_entry.html",      
+      roles:["admin","manager","lab"] 
+    },
+    { label:"Lab Agent Payments", 
+      icon:"💳", 
+      page:"pages/lab_agent_payments.html",  
+      roles:["admin","manager","accountant"] 
+    },
 
     // ==========================================
     // MARKETING
