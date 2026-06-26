@@ -181,6 +181,12 @@
       page: "pages/ipd-cash-discharge.html",
       roles: ["admin", "accountant", "manager", "reception"]
     },
+        {
+      label: "IPD - Refer Payment",
+      icon: "💵",
+      page: "pages/ipd-refer-payment.html",
+      roles: ["admin", "accountant", "manager"]
+    },
     {
       label: "IPD - Reports",
       icon: "📊",
