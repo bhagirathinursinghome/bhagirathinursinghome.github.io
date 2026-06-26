@@ -318,7 +318,7 @@ function filterPending(){
 async function loadDone(){
   spin(true);
   const { data, error } = await sb.from('lab_work_entry')
-    .select('*,lab_sample_agent(agent_name)')
+    .select('id,case_no,patient_name,entry_date,tests_snapshot,lab_amount,agent_id,agent_name_snapshot,agent_amount,biopsy_slides,is_cancelled,lab_sample_agent(agent_name)')
     .order('entry_date',{ascending:false});
   spin(false);
   if(error){ alert(error.message); return; }
@@ -345,7 +345,7 @@ function filterDone(){
       :`<span class="badge badge-done">Done</span>`;
     const actions=isFullAccess&&!r.is_cancelled
       ?`<button class="btn-sm btn-edit" onclick="openEditModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">✏️</button>
-         <button class="btn-sm btn-del" data-entry-id="${esc(String(r.id||''))}" data-case-no="${esc(r.case_no)}" onclick="askCancelFromBtn(this)">✖</button>`
+         <button class="btn-sm btn-del" data-entry-id="${r.id||''}" data-case-no="${esc(r.case_no)}" onclick="askCancelFromBtn(this)">✖</button>`
       :'—';
     return `<tr>
       <td>${i+1}</td>
@@ -503,14 +503,14 @@ function askCancelFromBtn(btn){
   const id=btn.getAttribute('data-entry-id');
   const caseNo=btn.getAttribute('data-case-no');
   if(!id||id==='null'||id==='undefined'||id===''){
-    alert('Cannot cancel: entry ID is missing. Please refresh and try again.');
+    alert('Cannot cancel: entry ID is missing. Please refresh the page and try again.');
     return;
   }
   askCancel(id,caseNo);
 }
 function askCancel(id,caseNo){
   if(!id||id==='null'||id==='undefined'||id===''){
-    alert('Cannot cancel: entry ID is missing. Please refresh and try again.');
+    alert('Cannot cancel: entry ID is missing. Please refresh the page and try again.');
     return;
   }
   cancelTarget=id;
@@ -520,7 +520,7 @@ function askCancel(id,caseNo){
 function closeCancelModal(){ document.getElementById('cancelModal').classList.remove('open'); cancelTarget=null; }
 async function confirmCancel(){
   if(!cancelTarget||cancelTarget==='null'||cancelTarget==='undefined'||cancelTarget===''){
-    alert('Cannot cancel: no valid entry selected. Please refresh and try again.');
+    alert('Cannot cancel: no valid entry selected. Please refresh the page and try again.');
     closeCancelModal();
     return;
   }
