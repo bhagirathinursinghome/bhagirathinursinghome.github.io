@@ -156,7 +156,7 @@
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
 <script>
-  BNH_PAGE.requireRole(["admin","accountant","manager","viewer"]);
+  BNH_PAGE.requireRole(["admin","accountant","manager","viewer", "reception"]);
 
   const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
   const fmtN = n => parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
