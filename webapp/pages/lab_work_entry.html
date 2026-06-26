@@ -318,7 +318,8 @@ function filterPending(){
 async function loadDone(){
   spin(true);
   const { data, error } = await sb.from('lab_work_entry')
-    .select('id,case_no,patient_name,entry_date,tests_snapshot,lab_amount,agent_id,agent_name_snapshot,agent_amount,biopsy_slides,is_cancelled,lab_sample_agent(agent_name)')
+    .select('id,case_no,patient_name,entry_date,tests_snapshot,lab_amount,agent_id,agent_name_snapshot,agent_amount,biopsy_slides,is_cancelled,agent:lab_sample_agent(agent_name)')
+    .eq('is_cancelled',false)
     .order('entry_date',{ascending:false});
   spin(false);
   if(error){ alert(error.message); return; }
@@ -339,13 +340,13 @@ function filterDone(){
   const tb=document.getElementById('doneTbody');
   if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#888">No records</td></tr>';return;}
   tb.innerHTML=list.map((r,i)=>{
-    const agName=(r.lab_sample_agent?.agent_name)||r.agent_name_snapshot||'—';
+    const agName=(r.agent?.agent_name)||r.agent_name_snapshot||'—';
     const status=r.is_cancelled
       ?`<span class="badge badge-cancel">Cancelled</span>`
       :`<span class="badge badge-done">Done</span>`;
     const actions=isFullAccess&&!r.is_cancelled
       ?`<button class="btn-sm btn-edit" onclick="openEditModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">✏️</button>
-         <button class="btn-sm btn-del" data-entry-id="${r.id||''}" data-case-no="${esc(r.case_no)}" onclick="askCancelFromBtn(this)">✖</button>`
+         <button class="btn-sm btn-del" data-id="${r.id||''}" data-case="${esc(r.case_no)}" onclick="askCancelFromBtn(this)">✖</button>`
       :'—';
     return `<tr>
       <td>${i+1}</td>
@@ -500,32 +501,36 @@ async function saveEntry(){
 
 // ══════════ CANCEL ══════════
 function askCancelFromBtn(btn){
-  const id=btn.getAttribute('data-entry-id');
-  const caseNo=btn.getAttribute('data-case-no');
-  if(!id||id==='null'||id==='undefined'||id===''){
-    alert('Cannot cancel: entry ID is missing. Please refresh the page and try again.');
+  const id = btn.getAttribute('data-id');
+  const caseNo = btn.getAttribute('data-case');
+  console.log('Delete clicked — entry id:', id);
+  if(!id || id === 'null' || id === 'undefined' || id.trim() === ''){
+    alert('Error: Entry ID is missing (got: ' + id + '). Check console for row data.');
     return;
   }
-  askCancel(id,caseNo);
+  cancelTarget = id;
+  document.getElementById('cancelMsg').textContent = 'Cancel work entry for case "' + caseNo + '"? The case will return to Pending list.';
+  document.getElementById('cancelModal').classList.add('open');
 }
 function askCancel(id,caseNo){
-  if(!id||id==='null'||id==='undefined'||id===''){
-    alert('Cannot cancel: entry ID is missing. Please refresh the page and try again.');
-    return;
+  // legacy — kept for safety
+  if(!id || id === 'null' || id === 'undefined'){
+    alert('Error: Entry ID is null. Please refresh and try again.'); return;
   }
-  cancelTarget=id;
-  document.getElementById('cancelMsg').textContent='Cancel work entry for case "'+caseNo+'"? The case will return to Pending list.';
+  cancelTarget = id;
+  document.getElementById('cancelMsg').textContent = 'Cancel work entry for case "' + caseNo + '"? The case will return to Pending list.';
   document.getElementById('cancelModal').classList.add('open');
 }
 function closeCancelModal(){ document.getElementById('cancelModal').classList.remove('open'); cancelTarget=null; }
 async function confirmCancel(){
-  if(!cancelTarget||cancelTarget==='null'||cancelTarget==='undefined'||cancelTarget===''){
-    alert('Cannot cancel: no valid entry selected. Please refresh the page and try again.');
-    closeCancelModal();
-    return;
+  if(!cancelTarget || cancelTarget === 'null' || cancelTarget === 'undefined'){
+    alert('Error: No valid entry ID. Please refresh and try again.');
+    closeCancelModal(); return;
   }
+  const targetId = cancelTarget;
   closeCancelModal(); spin(true);
-  const {error}=await sb.from('lab_work_entry').update({is_cancelled:true}).eq('id',cancelTarget);
+  console.log('Cancelling entry id:', targetId);
+  const {error}=await sb.from('lab_work_entry').update({is_cancelled:true}).eq('id',targetId);
   spin(false);
   if(error){ alert(error.message); return; }
   await loadPending(); await loadDone();
