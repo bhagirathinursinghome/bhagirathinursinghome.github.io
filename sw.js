@@ -1,10 +1,9 @@
 // Bhagirathi Health Care — Service Worker
 // ⚠️  IMPORTANT: Bump CACHE_VERSION every time you deploy changes!
 //     e.g. v2 → v3 → v4 ...  This forces all users to get fresh files.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `bhc-${CACHE_VERSION}`;
 
-// Core shell files to cache on install
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -27,20 +26,39 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_ASSETS))
   );
-  self.skipWaiting(); // Activate new SW immediately
+  self.skipWaiting(); // Activate new SW immediately, don't wait for tabs to close
 });
 
-// ── Activate: delete ALL old caches ─────────────────────────────────────────
+// ── Activate: delete old caches, then tell ALL open tabs to reload ───────────
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => {
-        console.log('[SW] Deleting old cache:', k);
-        return caches.delete(k);
-      }))
-    )
+    caches.keys()
+      .then(keys =>
+        Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => {
+          console.log('[SW] Deleting old cache:', k);
+          return caches.delete(k);
+        }))
+      )
+      .then(() => self.clients.claim()) // Take control of all open tabs
+      .then(() => {
+        // ✅ KEY FIX: Tell every open tab to reload so they get the new SW
+        return self.clients.matchAll({ type: 'window' }).then(clients => {
+          clients.forEach(client => {
+            client.postMessage({ type: 'SW_UPDATED' });
+          });
+        });
+      })
   );
-  self.clients.claim(); // Take control of all open tabs immediately
+});
+
+// ── Message handler: support admin-triggered force reload ────────────────────
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'FORCE_RELOAD_ALL') {
+    // Admin sent this from the Supabase realtime channel → relay to all tabs
+    self.clients.matchAll({ type: 'window' }).then(clients => {
+      clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
+    });
+  }
 });
 
 // ── Fetch: smart caching strategy ───────────────────────────────────────────
@@ -50,7 +68,7 @@ self.addEventListener('fetch', event => {
 
   // Always go to network for Supabase API calls
   if (url.hostname.includes('supabase.co') || url.pathname.startsWith('/rest/')) {
-    return; // let browser handle normally
+    return;
   }
 
   // Network-first for HTML pages (always fresh content)
@@ -77,12 +95,12 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
           return res;
         })
-        .catch(() => caches.match(request)) // Fallback to cache if offline
+        .catch(() => caches.match(request))
     );
     return;
   }
 
-  // Cache-first for images and other static assets (they rarely change)
+  // Cache-first for images and other static assets
   event.respondWith(
     caches.match(request).then(cached => {
       if (cached) return cached;
