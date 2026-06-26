@@ -345,7 +345,7 @@ function filterDone(){
       :`<span class="badge badge-done">Done</span>`;
     const actions=isFullAccess&&!r.is_cancelled
       ?`<button class="btn-sm btn-edit" onclick="openEditModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">✏️</button>
-         <button class="btn-sm btn-del" onclick="askCancel('${r.id}','${esc(r.case_no)}')">✖</button>`
+         <button class="btn-sm btn-del" data-entry-id="${esc(String(r.id||''))}" data-case-no="${esc(r.case_no)}" onclick="askCancelFromBtn(this)">✖</button>`
       :'—';
     return `<tr>
       <td>${i+1}</td>
@@ -499,13 +499,31 @@ async function saveEntry(){
 }
 
 // ══════════ CANCEL ══════════
+function askCancelFromBtn(btn){
+  const id=btn.getAttribute('data-entry-id');
+  const caseNo=btn.getAttribute('data-case-no');
+  if(!id||id==='null'||id==='undefined'||id===''){
+    alert('Cannot cancel: entry ID is missing. Please refresh and try again.');
+    return;
+  }
+  askCancel(id,caseNo);
+}
 function askCancel(id,caseNo){
+  if(!id||id==='null'||id==='undefined'||id===''){
+    alert('Cannot cancel: entry ID is missing. Please refresh and try again.');
+    return;
+  }
   cancelTarget=id;
-  document.getElementById('cancelMsg').textContent=`Cancel work entry for case "${caseNo}"? The case will return to Pending list.`;
+  document.getElementById('cancelMsg').textContent='Cancel work entry for case "'+caseNo+'"? The case will return to Pending list.';
   document.getElementById('cancelModal').classList.add('open');
 }
 function closeCancelModal(){ document.getElementById('cancelModal').classList.remove('open'); cancelTarget=null; }
 async function confirmCancel(){
+  if(!cancelTarget||cancelTarget==='null'||cancelTarget==='undefined'||cancelTarget===''){
+    alert('Cannot cancel: no valid entry selected. Please refresh and try again.');
+    closeCancelModal();
+    return;
+  }
   closeCancelModal(); spin(true);
   const {error}=await sb.from('lab_work_entry').update({is_cancelled:true}).eq('id',cancelTarget);
   spin(false);
