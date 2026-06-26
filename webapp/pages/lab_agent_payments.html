@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Lab Agent Payments</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .tabs { display:flex; border-bottom:2px solid #e9ecef; margin-bottom:1.5rem; flex-wrap:wrap; }
+    .tab-btn {
+      flex:1; min-width:120px; padding:.75rem .5rem; background:#f8f9fa; border:none;
+      cursor:pointer; font-size:.88rem; font-weight:500;
+      border-bottom:3px solid transparent; transition:all .2s;
+    }
+    .tab-btn:hover { background:#e9ecef; }
+    .tab-btn.active { background:#fff; color:#007bff; border-bottom-color:#007bff; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+
+    .summary-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .s-card { padding:1.1rem; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+    .s-card.blue  { background:linear-gradient(135deg,#cfe2ff,#b6d4fe); }
+    .s-card.green { background:linear-gradient(135deg,#d4edda,#b8dfc4); }
+    .s-card.warn  { background:linear-gradient(135deg,#fff3cd,#fde68a); }
+    .s-card.red   { background:linear-gradient(135deg,#fdecea,#f8c5c2); }
+    .s-label { font-size:.72rem; color:#555; font-weight:600; text-transform:uppercase; margin-bottom:.3rem; }
+    .s-val   { font-size:1.4rem; font-weight:bold; color:#333; }
+
+    .search-bar { display:flex; gap:.75rem; align-items:center; margin-bottom:1rem; flex-wrap:wrap; }
+    .search-bar input, .search-bar select {
+      flex:1; min-width:150px; padding:.5rem .75rem; border:1px solid #ccc;
+      border-radius:6px; font-size:.9rem;
+    }
+    .count-badge { background:#e9ecef; color:#555; padding:.3rem .8rem;
+      border-radius:20px; font-size:.8rem; font-weight:600; white-space:nowrap; }
+
+    .table-wrap { overflow-x:auto; border:1px solid #ddd; border-radius:6px; margin-top:.5rem; }
+    .data-table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    .data-table th { background:#f0f4ff; padding:10px 12px; text-align:left; font-weight:600;
+      border-bottom:2px solid #ddd; position:sticky; top:0; white-space:nowrap; }
+    .data-table td { padding:9px 12px; border-bottom:1px solid #eee; vertical-align:middle; }
+    .data-table tbody tr:hover { background:#f9f9f9; }
+
+    .pay-form { background:#f8fbff; border-radius:8px; padding:1.25rem;
+      border:1px solid #b6d4fe; margin-bottom:1.5rem; }
+    .pay-form h3 { margin:0 0 1rem; font-size:1rem; color:#084298; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    @media(max-width:600px){ .form-row { grid-template-columns:1fr; } }
+
+    .due-display { background:#fff3cd; border:1px solid #ffc107; border-radius:6px;
+      padding:.65rem 1rem; margin:.75rem 0; display:flex; justify-content:space-between; align-items:center; }
+    .due-display .dlabel { font-size:.82rem; color:#856404; font-weight:600; }
+    .due-display .dval { font-size:1.15rem; font-weight:bold; color:#333; }
+
+    .agent-card {
+      background:#fff; border:1px solid #e9ecef; border-radius:8px;
+      padding:1rem; cursor:pointer; transition:all .2s; margin-bottom:.75rem;
+    }
+    .agent-card:hover { border-color:#007bff; box-shadow:0 2px 8px rgba(0,123,255,.15); }
+    .agent-card.selected { border-color:#007bff; background:#f0f8ff; }
+    .agent-card-head { display:flex; justify-content:space-between; align-items:center; }
+    .agent-card-name { font-weight:700; font-size:.95rem; }
+    .agent-card-mobile { font-size:.8rem; color:#888; }
+    .agent-card-due { font-weight:bold; color:#c0392b; font-size:1.05rem; }
+    .agent-card-meta { display:flex; gap:1.5rem; margin-top:.4rem; font-size:.78rem; color:#666; flex-wrap:wrap; }
+
+    .modal-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
+      z-index:1000; align-items:flex-start; justify-content:center; padding:1rem; overflow-y:auto;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal-box {
+      background:#fff; border-radius:10px; padding:1.75rem;
+      width:100%; max-width:500px; box-shadow:0 8px 30px rgba(0,0,0,.25); margin:auto;
+    }
+    .modal-box h3 { margin:0 0 1.25rem; font-size:1.1rem; }
+    .modal-actions { display:flex; gap:.75rem; justify-content:flex-end; flex-wrap:wrap; margin-top:1.25rem; }
+
+    .btn-sm { padding:.3rem .75rem; font-size:.78rem; border:none; border-radius:4px; cursor:pointer; font-weight:500; }
+    .btn-del { background:#fdecea; color:#c0392b; }
+    .btn-del:hover { background:#f8c5c2; }
+
+    .ledger-type-earn { color:#c0392b; font-weight:600; }
+    .ledger-type-pay  { color:#155724; font-weight:600; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>💳 Lab Agent Payments</h1>
+
+  <div class="page-card">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab(event,'pay')">💰 Add Payment</button>
+      <button class="tab-btn" onclick="switchTab(event,'balance')">📊 Balance Sheet</button>
+      <button class="tab-btn" onclick="switchTab(event,'history')">🧾 Payment History</button>
+      <button class="tab-btn" onclick="switchTab(event,'ledger')">📋 Full Ledger</button>
+    </div>
+
+    <!-- ══════════ TAB 1: ADD PAYMENT ══════════ -->
+    <div id="pay-tab" class="tab-content active">
+      <div class="pay-form">
+        <h3>➕ Record Payment to Agent</h3>
+        <div style="margin-bottom:.75rem">
+          <label>Select Agent *</label>
+          <select id="payAgent" onchange="onAgentSelect()">
+            <option value="">— Choose Agent —</option>
+          </select>
+        </div>
+        <div class="due-display">
+          <span class="dlabel">Current Net Due</span>
+          <span class="dval" id="agentDueDisplay">—</span>
+        </div>
+        <div class="form-row">
+          <div>
+            <label>Payment Date *</label>
+            <input type="date" id="payDate" required/>
+          </div>
+          <div>
+            <label>Amount Paid (₹) *</label>
+            <input type="number" id="payAmount" min="0.01" step="0.01" placeholder="0.00" required/>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:.75rem">
+          <div>
+            <label>Payment Mode</label>
+            <select id="payMode">
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Cheque">Cheque</option>
+            </select>
+          </div>
+          <div>
+            <label>Voucher No</label>
+            <input id="payVoucher" placeholder="e.g. VCH-001"/>
+          </div>
+        </div>
+        <div style="margin-top:.75rem">
+          <label>Remarks</label>
+          <input id="payRemarks" placeholder="Optional note…"/>
+        </div>
+        <div style="margin-top:1rem">
+          <button class="btn-primary" style="width:auto" onclick="addPayment()">💾 Save Payment</button>
+        </div>
+        <p class="err" id="payErr"></p>
+        <p class="info" id="payOk" style="display:none"></p>
+      </div>
+
+      <h3 style="margin-top:0">Recent Payments (Last 10)</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>#</th><th>Date</th><th>Agent</th><th>Amount</th><th>Mode</th><th>Voucher No</th><th>Remarks</th><th>By</th><th>Action</th>
+          </tr></thead>
+          <tbody id="recentPayTbody"><tr><td colspan="9" style="text-align:center;color:#888">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ TAB 2: BALANCE SHEET ══════════ -->
+    <div id="balance-tab" class="tab-content">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
+        <button class="btn-primary" style="width:auto" onclick="loadBalance()">🔄 Refresh</button>
+      </div>
+      <div class="summary-cards">
+        <div class="s-card blue"><div class="s-label">Agents</div><div class="s-val" id="bsAgents">—</div></div>
+        <div class="s-card warn"><div class="s-label">Total Earned</div><div class="s-val" id="bsEarned">—</div></div>
+        <div class="s-card green"><div class="s-label">Total Paid</div><div class="s-val" id="bsPaid">—</div></div>
+        <div class="s-card red"><div class="s-label">Net Payable</div><div class="s-val" id="bsNet">—</div></div>
+      </div>
+      <div class="search-bar">
+        <input id="balSearch" placeholder="🔍 Search agent…" oninput="filterBalance()"/>
+        <span class="count-badge" id="balCount">0 agents</span>
+      </div>
+      <div id="agentCards"></div>
+    </div>
+
+    <!-- ══════════ TAB 3: PAYMENT HISTORY ══════════ -->
+    <div id="history-tab" class="tab-content">
+      <div class="search-bar">
+        <input id="histSearch" placeholder="🔍 Search agent or remark…" oninput="filterHistory()"/>
+        <select id="histAgent" onchange="filterHistory()">
+          <option value="">All Agents</option>
+        </select>
+        <input id="histDateFrom" type="date" onchange="filterHistory()" title="From date"/>
+        <input id="histDateTo" type="date" onchange="filterHistory()" title="To date"/>
+        <button class="btn-primary" style="width:auto" onclick="loadHistory()">🔄 Refresh</button>
+        <span class="count-badge" id="histCount">0 records</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>#</th><th>Date</th><th>Agent</th><th>Amount</th><th>Mode</th><th>Voucher No</th><th>Remarks</th><th>Recorded By</th><th>Action</th>
+          </tr></thead>
+          <tbody id="histTbody"><tr><td colspan="9" style="text-align:center;color:#888">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ TAB 4: FULL LEDGER ══════════ -->
+    <div id="ledger-tab" class="tab-content">
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem;">
+        <select id="ledgAgent" style="flex:1;min-width:180px;padding:.5rem;border:1px solid #ccc;border-radius:6px;font-size:.9rem;">
+          <option value="">— Select Agent —</option>
+        </select>
+        <button class="btn-primary" style="width:auto" onclick="loadFullLedger()">📋 Load Ledger</button>
+      </div>
+      <div class="summary-cards" id="ledgSumCards" style="display:none">
+        <div class="s-card blue"><div class="s-label">Opening</div><div class="s-val" id="lsOpen">—</div></div>
+        <div class="s-card warn"><div class="s-label">Earned</div><div class="s-val" id="lsEarned">—</div></div>
+        <div class="s-card green"><div class="s-label">Paid</div><div class="s-val" id="lsPaid">—</div></div>
+        <div class="s-card red"><div class="s-label">Net Due</div><div class="s-val" id="lsNet">—</div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Date</th><th>Type</th><th>Description</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th>
+          </tr></thead>
+          <tbody id="ledgTbody"><tr><td colspan="6" style="text-align:center;color:#888">Select an agent to view ledger</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="delModal">
+  <div class="modal-box">
+    <h3>⚠️ Delete Payment</h3>
+    <p id="delMsg"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" style="width:auto" onclick="closeDelModal()">Cancel</button>
+      <button class="btn-primary" style="width:auto;background:#dc3545" onclick="confirmDel()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+BNH_PAGE.requireRole(["admin","manager","accountant"]);
+const sb = BNH_PAGE.sb;
+const isAdmin = ["admin","manager"].includes(BNH_PAGE.user.role);
+
+let allAgents=[], allPayments=[], allHistory=[], allBalance=[];
+let delTarget=null;
+
+// ══════════ TABS ══════════
+function switchTab(e,name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  e.target.classList.add('active');
+  document.getElementById(name+'-tab').classList.add('active');
+  if(name==='balance') loadBalance();
+  if(name==='history') loadHistory();
+  if(name==='ledger')  populateLedgerDrop();
+}
+
+// ══════════ HELPERS ══════════
+const fmt = n => '₹'+parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+function spin(on){ document.getElementById('spinner').classList.toggle('hidden',!on); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(d){ if(!d) return '—'; const dt=new Date(d); return isNaN(dt)?d:dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+function showErr(id,msg){ const el=document.getElementById(id); el.textContent=msg; el.style.display='block'; }
+function showOk(id,msg){ const el=document.getElementById(id); el.textContent=msg; el.style.display='block'; setTimeout(()=>el.style.display='none',3500); }
+
+// ══════════ INIT ══════════
+async function init(){
+  spin(true);
+  const {data,error}=await sb.from('lab_sample_agent').select('*').order('agent_name');
+  spin(false);
+  if(error){alert(error.message);return;}
+  allAgents=data||[];
+
+  const opts='<option value="">— Choose Agent —</option>'+allAgents.map(a=>`<option value="${a.id}">${esc(a.agent_name)} (${esc(a.mobile_no||'')})</option>`).join('');
+  document.getElementById('payAgent').innerHTML=opts;
+
+  const histOpts='<option value="">All Agents</option>'+allAgents.map(a=>`<option value="${a.id}">${esc(a.agent_name)}</option>`).join('');
+  document.getElementById('histAgent').innerHTML=histOpts;
+
+  // Set today as default date
+  document.getElementById('payDate').value=new Date().toISOString().split('T')[0];
+  await loadRecent();
+}
+
+// ══════════ AGENT SELECT ══════════
+async function onAgentSelect(){
+  const agentId=document.getElementById('payAgent').value;
+  document.getElementById('agentDueDisplay').textContent='—';
+  if(!agentId) return;
+  spin(true);
+  const agent=allAgents.find(a=>a.id===agentId);
+  const [workRes,payRes]=await Promise.all([
+    sb.from('lab_work_entry').select('agent_amount').eq('agent_id',agentId).eq('is_cancelled',false),
+    sb.from('lab_agent_payment').select('amount_paid').eq('agent_id',agentId),
+  ]);
+  spin(false);
+  const earned=(workRes.data||[]).reduce((s,r)=>s+parseFloat(r.agent_amount||0),0);
+  const paid=(payRes.data||[]).reduce((s,r)=>s+parseFloat(r.amount_paid||0),0);
+  const net=parseFloat(agent.opening_balance||0)+earned-paid;
+  document.getElementById('agentDueDisplay').textContent=fmt(net)+' due';
+  document.getElementById('agentDueDisplay').style.color=net>0?'#c0392b':'#155724';
+}
+
+// ══════════ ADD PAYMENT ══════════
+async function addPayment(){
+  document.getElementById('payErr').textContent='';
+  const agentId=document.getElementById('payAgent').value;
+  const date=document.getElementById('payDate').value;
+  const amount=parseFloat(document.getElementById('payAmount').value);
+  const mode=document.getElementById('payMode').value;
+  const voucher=document.getElementById('payVoucher').value.trim();
+  const remarks=document.getElementById('payRemarks').value.trim();
+
+  if(!agentId){ showErr('payErr','Please select an agent.'); return; }
+  if(!date){ showErr('payErr','Payment date is required.'); return; }
+  if(!amount||amount<=0){ showErr('payErr','Enter a valid amount.'); return; }
+
+  const agent=allAgents.find(a=>a.id===agentId);
+  const payload=BNH_PAGE.stamp({
+    agent_id:agentId,
+    agent_name_snapshot:agent?.agent_name||'',
+    payment_date:date,
+    amount_paid:amount,
+    payment_mode:mode,
+    voucher_no:voucher||null,
+    remarks:remarks||null,
+  });
+  spin(true);
+  const {error}=await sb.from('lab_agent_payment').insert(payload);
+  spin(false);
+  if(error){showErr('payErr',error.message);return;}
+  showOk('payOk','Payment recorded successfully!');
+  document.getElementById('payAmount').value='';
+  document.getElementById('payVoucher').value='';
+  document.getElementById('payRemarks').value='';
+  await onAgentSelect();
+  await loadRecent();
+}
+
+// ══════════ RECENT PAYMENTS ══════════
+async function loadRecent(){
+  const {data}=await sb.from('lab_agent_payment')
+    .select('*').order('payment_date',{ascending:false}).limit(10);
+  allPayments=data||[];
+  renderRecent(allPayments);
+}
+function renderRecent(list){
+  const tb=document.getElementById('recentPayTbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#888">No payments yet</td></tr>';return;}
+  tb.innerHTML=list.map((r,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td style="white-space:nowrap">${fmtDate(r.payment_date)}</td>
+      <td>${esc(r.agent_name_snapshot||'')}</td>
+      <td style="font-weight:bold;color:#155724">${fmt(r.amount_paid)}</td>
+      <td>${esc(r.payment_mode||'')}</td>
+      <td style="font-size:.8rem;font-weight:600">${esc(r.voucher_no||'—')}</td>
+      <td style="font-size:.8rem">${esc(r.remarks||'—')}</td>
+      <td style="font-size:.78rem;color:#666">${esc(r.recorded_by_name||'')}</td>
+      <td>${isAdmin?`<button class="btn-sm btn-del" onclick="askDel('${r.id}','${esc(r.agent_name_snapshot)}','${fmt(r.amount_paid)}')">🗑️</button>`:'—'}</td>
+    </tr>`).join('');
+}
+
+// ══════════ BALANCE SHEET ══════════
+async function loadBalance(){
+  spin(true);
+  const [agRes,workRes,payRes]=await Promise.all([
+    sb.from('lab_sample_agent').select('*'),
+    sb.from('lab_work_entry').select('agent_id,agent_amount').eq('is_cancelled',false),
+    sb.from('lab_agent_payment').select('agent_id,amount_paid'),
+  ]);
+  spin(false);
+  const agents=agRes.data||[];
+  const workMap={}, payMap={};
+  (workRes.data||[]).forEach(r=>{ workMap[r.agent_id]=(workMap[r.agent_id]||0)+parseFloat(r.agent_amount||0); });
+  (payRes.data||[]).forEach(r=>{ payMap[r.agent_id]=(payMap[r.agent_id]||0)+parseFloat(r.amount_paid||0); });
+
+  allBalance=agents.map(a=>({
+    ...a,
+    earned:workMap[a.id]||0,
+    paid:payMap[a.id]||0,
+    net:(parseFloat(a.opening_balance)||0)+(workMap[a.id]||0)-(payMap[a.id]||0),
+  }));
+
+  const totEarned=allBalance.reduce((s,a)=>s+(parseFloat(a.opening_balance)||0)+a.earned,0);
+  const totPaid=allBalance.reduce((s,a)=>s+a.paid,0);
+  document.getElementById('bsAgents').textContent=allBalance.length;
+  document.getElementById('bsEarned').textContent=fmt(totEarned);
+  document.getElementById('bsPaid').textContent=fmt(totPaid);
+  document.getElementById('bsNet').textContent=fmt(totEarned-totPaid);
+  filterBalance();
+}
+function filterBalance(){
+  const q=(document.getElementById('balSearch').value||'').toLowerCase();
+  const list=allBalance.filter(a=>a.agent_name.toLowerCase().includes(q)||(a.mobile_no||'').includes(q));
+  document.getElementById('balCount').textContent=list.length+' agents';
+  const container=document.getElementById('agentCards');
+  if(!list.length){container.innerHTML='<p style="text-align:center;color:#888">No agents found</p>';return;}
+  container.innerHTML=list.map(a=>`
+    <div class="agent-card" onclick="goToLedger('${a.id}')">
+      <div class="agent-card-head">
+        <div>
+          <div class="agent-card-name">${esc(a.agent_name)}</div>
+          <div class="agent-card-mobile">📱 ${esc(a.mobile_no||'—')}</div>
+        </div>
+        <div class="agent-card-due">${fmt(a.net)}</div>
+      </div>
+      <div class="agent-card-meta">
+        <span>Opening: ${fmt(a.opening_balance)}</span>
+        <span>Earned: ${fmt(a.earned)}</span>
+        <span>Paid: ${fmt(a.paid)}</span>
+        <span style="color:${a.net>0?'#c0392b':'#155724'};font-weight:600">Net Due: ${fmt(a.net)}</span>
+      </div>
+    </div>`).join('');
+}
+function goToLedger(agentId){
+  document.querySelectorAll('.tab-btn')[3].click();
+  document.getElementById('ledgAgent').value=agentId;
+  loadFullLedger();
+}
+
+// ══════════ PAYMENT HISTORY ══════════
+async function loadHistory(){
+  spin(true);
+  const {data}=await sb.from('lab_agent_payment').select('*').order('payment_date',{ascending:false});
+  spin(false);
+  allHistory=data||[];
+  filterHistory();
+}
+function filterHistory(){
+  const q=(document.getElementById('histSearch').value||'').toLowerCase();
+  const ag=document.getElementById('histAgent').value;
+  const from=document.getElementById('histDateFrom').value;
+  const to=document.getElementById('histDateTo').value;
+  let list=allHistory.filter(r=>{
+    const matchQ=!q||(r.agent_name_snapshot||'').toLowerCase().includes(q)||(r.remarks||'').toLowerCase().includes(q);
+    const matchAg=!ag||r.agent_id===ag;
+    const matchFrom=!from||r.payment_date>=from;
+    const matchTo=!to||r.payment_date<=to;
+    return matchQ&&matchAg&&matchFrom&&matchTo;
+  });
+  document.getElementById('histCount').textContent=list.length+' records';
+  const tb=document.getElementById('histTbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#888">No records</td></tr>';return;}
+  const total=list.reduce((s,r)=>s+parseFloat(r.amount_paid||0),0);
+  tb.innerHTML=list.map((r,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td style="white-space:nowrap">${fmtDate(r.payment_date)}</td>
+      <td>${esc(r.agent_name_snapshot||'')}</td>
+      <td style="font-weight:bold;color:#155724">${fmt(r.amount_paid)}</td>
+      <td>${esc(r.payment_mode||'')}</td>
+      <td style="font-size:.8rem;font-weight:600">${esc(r.voucher_no||'—')}</td>
+      <td style="font-size:.8rem">${esc(r.remarks||'—')}</td>
+      <td style="font-size:.78rem;color:#666">${esc(r.recorded_by_name||'')}</td>
+      <td>${isAdmin?`<button class="btn-sm btn-del" onclick="askDel('${r.id}','${esc(r.agent_name_snapshot)}','${fmt(r.amount_paid)}')">🗑️</button>`:'—'}</td>
+    </tr>`).join('')
+    +`<tr style="background:#d4edda;font-weight:bold">
+        <td colspan="3" style="text-align:right">Total Paid:</td>
+        <td>${fmt(total)}</td><td colspan="5"></td></tr>`;
+}
+
+// ══════════ FULL LEDGER ══════════
+function populateLedgerDrop(){
+  const sel=document.getElementById('ledgAgent');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Select Agent —</option>'+
+    allAgents.map(a=>`<option value="${a.id}">${esc(a.agent_name)} (${esc(a.mobile_no||'')})</option>`).join('');
+  if(cur) sel.value=cur;
+}
+async function loadFullLedger(){
+  const agentId=document.getElementById('ledgAgent').value;
+  if(!agentId){alert('Please select an agent.');return;}
+  spin(true);
+  const agent=allAgents.find(a=>a.id===agentId)||{};
+  const [workRes,payRes]=await Promise.all([
+    sb.from('lab_work_entry').select('*').eq('agent_id',agentId).eq('is_cancelled',false).order('entry_date'),
+    sb.from('lab_agent_payment').select('*').eq('agent_id',agentId).order('payment_date'),
+  ]);
+  spin(false);
+
+  const opening=parseFloat(agent.opening_balance||0);
+  const rows=[];
+  if(opening>0) rows.push({date:agent.recorded_at||'',type:'Opening',desc:'Opening Balance',dr:opening,cr:0});
+  (workRes.data||[]).forEach(w=>rows.push({date:w.entry_date,type:'Work',desc:`Case: ${w.case_no||''} | ${w.patient_name||''} | ${w.tests_snapshot||''}`,dr:parseFloat(w.agent_amount||0),cr:0}));
+  (payRes.data||[]).forEach(p=>rows.push({date:p.payment_date,type:'Payment',desc:`${p.payment_mode||''}${p.voucher_no?' | Voucher: '+p.voucher_no:''}${p.remarks?' — '+p.remarks:''}`,dr:0,cr:parseFloat(p.amount_paid||0)}));
+  rows.sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+  let bal=0, totDr=0, totCr=0;
+  const mapped=rows.map(r=>{bal+=r.dr-r.cr;totDr+=r.dr;totCr+=r.cr;return {...r,bal};});
+
+  document.getElementById('lsOpen').textContent=fmt(opening);
+  document.getElementById('lsEarned').textContent=fmt(totDr-opening);
+  document.getElementById('lsPaid').textContent=fmt(totCr);
+  document.getElementById('lsNet').textContent=fmt(bal);
+  document.getElementById('ledgSumCards').style.display='grid';
+
+  const tb=document.getElementById('ledgTbody');
+  if(!mapped.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#888">No transactions</td></tr>';return;}
+  tb.innerHTML=mapped.map(r=>`
+    <tr>
+      <td style="white-space:nowrap">${fmtDate(r.date)}</td>
+      <td><span style="background:${r.type==='Payment'?'#d4edda':r.type==='Opening'?'#cfe2ff':'#fff3cd'};
+        padding:2px 8px;border-radius:10px;font-size:.75rem;font-weight:600">${r.type}</span></td>
+      <td style="font-size:.82rem">${esc(r.desc)}</td>
+      <td class="ledger-type-earn">${r.dr>0?fmt(r.dr):'—'}</td>
+      <td class="ledger-type-pay">${r.cr>0?fmt(r.cr):'—'}</td>
+      <td style="font-weight:bold;color:${r.bal>0?'#c0392b':'#155724'}">${fmt(r.bal)}</td>
+    </tr>`).join('');
+}
+
+// ══════════ DELETE ══════════
+function askDel(id,name,amount){
+  delTarget=id;
+  document.getElementById('delMsg').textContent=`Delete payment of ${amount} to "${name}"? This cannot be undone.`;
+  document.getElementById('delModal').classList.add('open');
+}
+function closeDelModal(){ document.getElementById('delModal').classList.remove('open'); delTarget=null; }
+async function confirmDel(){
+  closeDelModal(); spin(true);
+  const {error}=await sb.from('lab_agent_payment').delete().eq('id',delTarget);
+  spin(false);
+  if(error){alert(error.message);return;}
+  await loadRecent();
+  await loadHistory();
+}
+
+init();
+</script>
+</body>
+</html>

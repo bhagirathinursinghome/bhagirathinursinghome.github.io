@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Lab Test Master & Agents</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .tabs { display:flex; border-bottom:2px solid #e9ecef; margin-bottom:1.5rem; flex-wrap:wrap; }
+    .tab-btn {
+      flex:1; min-width:120px; padding:.75rem .5rem; background:#f8f9fa; border:none;
+      cursor:pointer; font-size:.88rem; font-weight:500;
+      border-bottom:3px solid transparent; transition:all .2s;
+    }
+    .tab-btn:hover { background:#e9ecef; }
+    .tab-btn.active { background:#fff; color:#007bff; border-bottom-color:#007bff; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    @media(max-width:600px){ .form-row { grid-template-columns:1fr; } }
+
+    .table-wrap { overflow-x:auto; border:1px solid #ddd; border-radius:6px; margin-top:1rem; }
+    .data-table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    .data-table th { background:#f0f4ff; padding:10px 12px; text-align:left; font-weight:600;
+      border-bottom:2px solid #ddd; position:sticky; top:0; white-space:nowrap; }
+    .data-table td { padding:9px 12px; border-bottom:1px solid #eee; }
+    .data-table tbody tr:hover { background:#f9f9f9; }
+
+    .search-bar { display:flex; gap:.75rem; align-items:center; margin-bottom:1rem; flex-wrap:wrap; }
+    .search-bar input { flex:1; min-width:180px; padding:.5rem .75rem; border:1px solid #ccc;
+      border-radius:6px; font-size:.9rem; }
+    .count-badge { background:#e9ecef; color:#555; padding:.3rem .8rem;
+      border-radius:20px; font-size:.8rem; font-weight:600; white-space:nowrap; }
+
+    .btn-sm { padding:.3rem .75rem; font-size:.78rem; border:none; border-radius:4px; cursor:pointer; font-weight:500; }
+    .btn-edit { background:#e7f3ff; color:#0056b3; }
+    .btn-edit:hover { background:#cce0ff; }
+    .btn-del  { background:#fdecea; color:#c0392b; }
+    .btn-del:hover  { background:#f8c5c2; }
+
+    .modal-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+      z-index:1000; align-items:center; justify-content:center;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal-box {
+      background:#fff; border-radius:10px; padding:1.75rem;
+      width:100%; max-width:480px; box-shadow:0 8px 30px rgba(0,0,0,.2);
+      max-height:90vh; overflow-y:auto;
+    }
+    .modal-box h3 { margin:0 0 1.25rem; font-size:1.1rem; }
+    .modal-actions { display:flex; gap:.75rem; margin-top:1.25rem; justify-content:flex-end; }
+
+    .summary-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .s-card { padding:1.1rem; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+    .s-card.blue  { background:linear-gradient(135deg,#cfe2ff,#b6d4fe); }
+    .s-card.green { background:linear-gradient(135deg,#d4edda,#b8dfc4); }
+    .s-card.warn  { background:linear-gradient(135deg,#fff3cd,#fde68a); }
+    .s-card.red   { background:linear-gradient(135deg,#fdecea,#f8c5c2); }
+    .s-label { font-size:.72rem; color:#555; font-weight:600; text-transform:uppercase; margin-bottom:.3rem; }
+    .s-val   { font-size:1.5rem; font-weight:bold; color:#333; }
+
+    .agent-row { background:#fffbe6; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>🧪 Lab Test Master & Agents</h1>
+
+  <div class="page-card">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab(event,'tests')">🔬 Test Catalogue</button>
+      <button class="tab-btn" onclick="switchTab(event,'agents')">👤 Sample Agents</button>
+      <button class="tab-btn" onclick="switchTab(event,'agent-summary')">📊 Agent Due Summary</button>
+      <button class="tab-btn" onclick="switchTab(event,'agent-ledger')">📋 Agent Ledger</button>
+    </div>
+
+    <!-- ══════════ TAB 1: TEST CATALOGUE ══════════ -->
+    <div id="tests-tab" class="tab-content active">
+      <div class="page-card" style="background:#f8fbff;margin-bottom:1.5rem;">
+        <h3 style="margin-top:0">➕ Add / Edit Test</h3>
+        <input type="hidden" id="editTestId"/>
+        <div class="form-row">
+          <div>
+            <label>Test Name *</label>
+            <input id="testName" placeholder="e.g. CBC, LFT, KFT…" required/>
+          </div>
+          <div>
+            <label>Test Cost (₹) *</label>
+            <input id="testCost" type="number" min="0" step="0.01" placeholder="0.00" required/>
+          </div>
+        </div>
+        <div style="margin-top:.75rem">
+          <label>Biopsy Per Slide Cost (₹) <span style="color:#888;font-size:.8rem">(leave 0 if not biopsy)</span></label>
+          <input id="biopsyCost" type="number" min="0" step="0.01" placeholder="0.00"/>
+        </div>
+        <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+          <button class="btn-primary" style="width:auto" onclick="saveTest()">💾 Save Test</button>
+          <button class="btn-secondary" style="width:auto" onclick="cancelEditTest()" id="cancelTestBtn" hidden>✖ Cancel</button>
+        </div>
+        <p class="err" id="testErr"></p>
+        <p class="info" id="testOk" style="display:none"></p>
+      </div>
+
+      <div class="search-bar">
+        <input id="testSearch" placeholder="🔍 Search tests…" oninput="filterTests()"/>
+        <span class="count-badge" id="testCount">0 tests</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>#</th><th>Test Name</th><th>Test Cost</th><th>Biopsy/Slide</th><th>Added By</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="testsTbody"><tr><td colspan="6" style="text-align:center;color:#888">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ TAB 2: SAMPLE AGENTS ══════════ -->
+    <div id="agents-tab" class="tab-content">
+      <div class="page-card" style="background:#fffbe6;margin-bottom:1.5rem;">
+        <h3 style="margin-top:0">➕ Add / Edit Sample Agent</h3>
+        <input type="hidden" id="editAgentId"/>
+        <div class="form-row">
+          <div>
+            <label>Agent Name *</label>
+            <input id="agentName" placeholder="Full name" required/>
+          </div>
+          <div>
+            <label>Mobile No *</label>
+            <input id="agentMobile" placeholder="10-digit number" maxlength="10" required/>
+          </div>
+        </div>
+        <div style="margin-top:.75rem">
+          <label>Opening Balance (₹) <span style="color:#888;font-size:.8rem">(amount already due at start)</span></label>
+          <input id="agentOpening" type="number" min="0" step="0.01" placeholder="0.00"/>
+        </div>
+        <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+          <button class="btn-primary" style="width:auto" onclick="saveAgent()">💾 Save Agent</button>
+          <button class="btn-secondary" style="width:auto" onclick="cancelEditAgent()" id="cancelAgentBtn" hidden>✖ Cancel</button>
+        </div>
+        <p class="err" id="agentErr"></p>
+        <p class="info" id="agentOk" style="display:none"></p>
+      </div>
+
+      <div class="search-bar">
+        <input id="agentSearch" placeholder="🔍 Search agents…" oninput="filterAgents()"/>
+        <span class="count-badge" id="agentCount">0 agents</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>#</th><th>Agent Name</th><th>Mobile</th><th>Opening Bal.</th><th>Added By</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="agentsTbody"><tr><td colspan="6" style="text-align:center;color:#888">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ TAB 3: AGENT DUE SUMMARY ══════════ -->
+    <div id="agent-summary-tab" class="tab-content">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
+        <button class="btn-primary" style="width:auto" onclick="loadSummary()">🔄 Refresh</button>
+      </div>
+      <div class="summary-cards" id="summaryCards">
+        <div class="s-card blue"><div class="s-label">Total Agents</div><div class="s-val" id="scAgents">—</div></div>
+        <div class="s-card warn"><div class="s-label">Total Due</div><div class="s-val" id="scDue">—</div></div>
+        <div class="s-card green"><div class="s-label">Total Paid</div><div class="s-val" id="scPaid">—</div></div>
+        <div class="s-card red"><div class="s-label">Net Payable</div><div class="s-val" id="scNet">—</div></div>
+      </div>
+      <div class="search-bar">
+        <input id="summarySearch" placeholder="🔍 Search agent…" oninput="filterSummary()"/>
+        <span class="count-badge" id="summaryCount">0 agents</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>#</th><th>Agent Name</th><th>Mobile</th>
+            <th>Opening (₹)</th><th>Earned (₹)</th><th>Paid (₹)</th><th>Net Due (₹)</th>
+          </tr></thead>
+          <tbody id="summaryTbody"><tr><td colspan="7" style="text-align:center;color:#888">Click Refresh to load</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ TAB 4: AGENT LEDGER ══════════ -->
+    <div id="agent-ledger-tab" class="tab-content">
+      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
+        <select id="ledgerAgentSel" style="flex:1;min-width:180px;padding:.5rem;border:1px solid #ccc;border-radius:6px;font-size:.9rem;">
+          <option value="">— Select Agent —</option>
+        </select>
+        <button class="btn-primary" style="width:auto" onclick="loadLedger()">📋 Load Ledger</button>
+      </div>
+      <div class="summary-cards" id="ledgerSummary" style="display:none">
+        <div class="s-card blue"><div class="s-label">Opening Bal.</div><div class="s-val" id="lsOpen">—</div></div>
+        <div class="s-card warn"><div class="s-label">Total Earned</div><div class="s-val" id="lsEarned">—</div></div>
+        <div class="s-card green"><div class="s-label">Total Paid</div><div class="s-val" id="lsPaid">—</div></div>
+        <div class="s-card red"><div class="s-label">Net Due</div><div class="s-val" id="lsDue">—</div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Date</th><th>Type</th><th>Description</th><th>Dr (₹)</th><th>Cr (₹)</th><th>Balance (₹)</th>
+          </tr></thead>
+          <tbody id="ledgerTbody"><tr><td colspan="6" style="text-align:center;color:#888">Select an agent above</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- /page-card -->
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="delModal">
+  <div class="modal-box">
+    <h3>⚠️ Confirm Delete</h3>
+    <p id="delMsg">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn-secondary" style="width:auto" onclick="closeDelModal()">Cancel</button>
+      <button class="btn-primary" style="width:auto;background:#dc3545" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+BNH_PAGE.requireRole(["admin","manager"]);
+
+const sb = BNH_PAGE.sb;
+let allTests=[], allAgents=[], allSummary=[];
+let delTarget=null, delType=null;
+
+// ══════════ TABS ══════════
+function switchTab(e,name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  e.target.classList.add('active');
+  document.getElementById(name+'-tab').classList.add('active');
+  if(name==='tests' && allTests.length===0) loadTests();
+  if(name==='agents' && allAgents.length===0) loadAgents();
+  if(name==='agent-summary') loadSummary();
+  if(name==='agent-ledger') loadAgentDropdown();
+}
+
+// ══════════ HELPERS ══════════
+const fmt = n => '₹'+parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+function spin(on){ document.getElementById('spinner').classList.toggle('hidden',!on); }
+function showErr(id,msg){ const el=document.getElementById(id); el.textContent=msg; el.style.display='block'; }
+function showOk(id,msg){ const el=document.getElementById(id); el.textContent=msg; el.style.display='block'; setTimeout(()=>el.style.display='none',3000); }
+function hideMsg(id){ document.getElementById(id).textContent=''; }
+
+// ══════════ TESTS ══════════
+async function loadTests(){
+  spin(true);
+  const {data,error}=await sb.from('lab_test_catalogue').select('*').order('test_name');
+  spin(false);
+  if(error){showErr('testErr',error.message);return;}
+  allTests=data||[];
+  renderTests(allTests);
+}
+function renderTests(list){
+  document.getElementById('testCount').textContent=list.length+' tests';
+  const tb=document.getElementById('testsTbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#888">No tests found</td></tr>';return;}
+  tb.innerHTML=list.map((t,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td><strong>${esc(t.test_name)}</strong></td>
+      <td>${fmt(t.test_cost)}</td>
+      <td>${parseFloat(t.biopsy_per_slide||0)>0?fmt(t.biopsy_per_slide):'—'}</td>
+      <td style="font-size:.78rem;color:#666">${esc(t.recorded_by_name||'')}</td>
+      <td>
+        <button class="btn-sm btn-edit" onclick="editTest(${JSON.stringify(t).replace(/"/g,'&quot;')})">✏️</button>
+        <button class="btn-sm btn-del" onclick="askDelete('test','${t.id}','${esc(t.test_name)}')">🗑️</button>
+      </td>
+    </tr>`).join('');
+}
+function filterTests(){
+  const q=document.getElementById('testSearch').value.toLowerCase();
+  renderTests(allTests.filter(t=>t.test_name.toLowerCase().includes(q)));
+}
+async function saveTest(){
+  hideMsg('testErr');
+  const id=document.getElementById('editTestId').value;
+  const name=document.getElementById('testName').value.trim();
+  const cost=parseFloat(document.getElementById('testCost').value)||0;
+  const biopsy=parseFloat(document.getElementById('biopsyCost').value)||0;
+  if(!name||cost<=0){showErr('testErr','Test name and cost are required.');return;}
+  spin(true);
+  const payload=BNH_PAGE.stamp({test_name:name,test_cost:cost,biopsy_per_slide:biopsy});
+  let error;
+  if(id){ ({error}=await sb.from('lab_test_catalogue').update(payload).eq('id',id)); }
+  else   { ({error}=await sb.from('lab_test_catalogue').insert(payload)); }
+  spin(false);
+  if(error){showErr('testErr',error.message);return;}
+  showOk('testOk',id?'Test updated!':'Test added!');
+  cancelEditTest(); await loadTests();
+}
+function editTest(t){
+  document.getElementById('editTestId').value=t.id;
+  document.getElementById('testName').value=t.test_name;
+  document.getElementById('testCost').value=t.test_cost;
+  document.getElementById('biopsyCost').value=t.biopsy_per_slide||0;
+  document.getElementById('cancelTestBtn').hidden=false;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function cancelEditTest(){
+  document.getElementById('editTestId').value='';
+  document.getElementById('testName').value='';
+  document.getElementById('testCost').value='';
+  document.getElementById('biopsyCost').value='';
+  document.getElementById('cancelTestBtn').hidden=true;
+}
+
+// ══════════ AGENTS ══════════
+async function loadAgents(){
+  spin(true);
+  const {data,error}=await sb.from('lab_sample_agent').select('*').order('agent_name');
+  spin(false);
+  if(error){showErr('agentErr',error.message);return;}
+  allAgents=data||[];
+  renderAgents(allAgents);
+  populateLedgerDropdown();
+}
+function renderAgents(list){
+  document.getElementById('agentCount').textContent=list.length+' agents';
+  const tb=document.getElementById('agentsTbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#888">No agents found</td></tr>';return;}
+  tb.innerHTML=list.map((a,i)=>`
+    <tr class="agent-row">
+      <td>${i+1}</td>
+      <td><strong>${esc(a.agent_name)}</strong></td>
+      <td>${esc(a.mobile_no||'—')}</td>
+      <td>${fmt(a.opening_balance)}</td>
+      <td style="font-size:.78rem;color:#666">${esc(a.recorded_by_name||'')}</td>
+      <td>
+        <button class="btn-sm btn-edit" onclick="editAgent(${JSON.stringify(a).replace(/"/g,'&quot;')})">✏️</button>
+        <button class="btn-sm btn-del" onclick="askDelete('agent','${a.id}','${esc(a.agent_name)}')">🗑️</button>
+      </td>
+    </tr>`).join('');
+}
+function filterAgents(){
+  const q=document.getElementById('agentSearch').value.toLowerCase();
+  renderAgents(allAgents.filter(a=>a.agent_name.toLowerCase().includes(q)||(a.mobile_no||'').includes(q)));
+}
+async function saveAgent(){
+  hideMsg('agentErr');
+  const id=document.getElementById('editAgentId').value;
+  const name=document.getElementById('agentName').value.trim();
+  const mobile=document.getElementById('agentMobile').value.trim();
+  const opening=parseFloat(document.getElementById('agentOpening').value)||0;
+  if(!name||!mobile){showErr('agentErr','Name and mobile are required.');return;}
+  if(!/^\d{10}$/.test(mobile)){showErr('agentErr','Mobile must be 10 digits.');return;}
+  spin(true);
+  const payload=BNH_PAGE.stamp({agent_name:name,mobile_no:mobile,opening_balance:opening});
+  let error;
+  if(id){ ({error}=await sb.from('lab_sample_agent').update(payload).eq('id',id)); }
+  else   { ({error}=await sb.from('lab_sample_agent').insert(payload)); }
+  spin(false);
+  if(error){showErr('agentErr',error.message);return;}
+  showOk('agentOk',id?'Agent updated!':'Agent added!');
+  cancelEditAgent(); await loadAgents();
+}
+function editAgent(a){
+  document.getElementById('editAgentId').value=a.id;
+  document.getElementById('agentName').value=a.agent_name;
+  document.getElementById('agentMobile').value=a.mobile_no||'';
+  document.getElementById('agentOpening').value=a.opening_balance||0;
+  document.getElementById('cancelAgentBtn').hidden=false;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function cancelEditAgent(){
+  document.getElementById('editAgentId').value='';
+  document.getElementById('agentName').value='';
+  document.getElementById('agentMobile').value='';
+  document.getElementById('agentOpening').value='';
+  document.getElementById('cancelAgentBtn').hidden=true;
+}
+
+// ══════════ SUMMARY ══════════
+async function loadSummary(){
+  spin(true);
+  const [agRes, workRes, payRes] = await Promise.all([
+    sb.from('lab_sample_agent').select('id,agent_name,mobile_no,opening_balance'),
+    sb.from('lab_work_entry').select('agent_id,agent_amount').eq('is_cancelled',false),
+    sb.from('lab_agent_payment').select('agent_id,amount_paid'),
+  ]);
+  spin(false);
+  if(agRes.error){alert(agRes.error.message);return;}
+  const agents=agRes.data||[];
+  const workMap={}, payMap={};
+  (workRes.data||[]).forEach(r=>{ workMap[r.agent_id]=(workMap[r.agent_id]||0)+parseFloat(r.agent_amount||0); });
+  (payRes.data||[]).forEach(r=>{ payMap[r.agent_id]=(payMap[r.agent_id]||0)+parseFloat(r.amount_paid||0); });
+
+  allSummary=agents.map(a=>({
+    ...a,
+    earned: workMap[a.id]||0,
+    paid:   payMap[a.id]||0,
+    net:    (parseFloat(a.opening_balance)||0)+(workMap[a.id]||0)-(payMap[a.id]||0)
+  }));
+
+  const totDue=allSummary.reduce((s,a)=>s+(parseFloat(a.opening_balance)||0)+a.earned,0);
+  const totPaid=allSummary.reduce((s,a)=>s+a.paid,0);
+  document.getElementById('scAgents').textContent=allSummary.length;
+  document.getElementById('scDue').textContent=fmt(totDue);
+  document.getElementById('scPaid').textContent=fmt(totPaid);
+  document.getElementById('scNet').textContent=fmt(totDue-totPaid);
+  filterSummary();
+}
+function filterSummary(){
+  const q=document.getElementById('summarySearch').value.toLowerCase();
+  const list=allSummary.filter(a=>a.agent_name.toLowerCase().includes(q)||(a.mobile_no||'').includes(q));
+  document.getElementById('summaryCount').textContent=list.length+' agents';
+  const tb=document.getElementById('summaryTbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#888">No data</td></tr>';return;}
+  tb.innerHTML=list.map((a,i)=>`
+    <tr>
+      <td>${i+1}</td><td><strong>${esc(a.agent_name)}</strong></td><td>${esc(a.mobile_no||'')}</td>
+      <td>${fmt(a.opening_balance)}</td><td>${fmt(a.earned)}</td><td>${fmt(a.paid)}</td>
+      <td style="color:${a.net>0?'#c0392b':'#155724'};font-weight:bold">${fmt(a.net)}</td>
+    </tr>`).join('');
+}
+
+// ══════════ LEDGER ══════════
+function populateLedgerDropdown(){
+  const sel=document.getElementById('ledgerAgentSel');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Select Agent —</option>'+
+    allAgents.map(a=>`<option value="${a.id}">${esc(a.agent_name)} (${esc(a.mobile_no||'')})</option>`).join('');
+  if(cur) sel.value=cur;
+}
+async function loadAgentDropdown(){
+  if(allAgents.length===0) await loadAgents();
+  populateLedgerDropdown();
+}
+async function loadLedger(){
+  const agentId=document.getElementById('ledgerAgentSel').value;
+  if(!agentId){alert('Please select an agent.');return;}
+  spin(true);
+  const agent=allAgents.find(a=>a.id===agentId)||{};
+  const [workRes,payRes]=await Promise.all([
+    sb.from('lab_work_entry').select('*').eq('agent_id',agentId).eq('is_cancelled',false).order('entry_date'),
+    sb.from('lab_agent_payment').select('*').eq('agent_id',agentId).order('payment_date'),
+  ]);
+  spin(false);
+
+  const opening=parseFloat(agent.opening_balance||0);
+  const rows=[];
+  if(opening>0) rows.push({date:agent.recorded_at||'',type:'Opening',desc:'Opening Balance',dr:opening,cr:0});
+  (workRes.data||[]).forEach(w=>rows.push({date:w.entry_date,type:'Work',desc:`Case: ${w.case_no||''} | Patient: ${w.patient_name||''}`,dr:parseFloat(w.agent_amount||0),cr:0}));
+  (payRes.data||[]).forEach(p=>rows.push({date:p.payment_date,type:'Payment',desc:`Payment — ${p.remarks||''}`,dr:0,cr:parseFloat(p.amount_paid||0)}));
+  rows.sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+  let bal=0, totDr=0, totCr=0;
+  const mapped=rows.map(r=>{
+    bal+=r.dr-r.cr; totDr+=r.dr; totCr+=r.cr;
+    return {...r,bal};
+  });
+
+  document.getElementById('lsOpen').textContent=fmt(opening);
+  document.getElementById('lsEarned').textContent=fmt(totDr-opening);
+  document.getElementById('lsPaid').textContent=fmt(totCr);
+  document.getElementById('lsDue').textContent=fmt(bal);
+  document.getElementById('ledgerSummary').style.display='grid';
+
+  const tb=document.getElementById('ledgerTbody');
+  if(!mapped.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#888">No transactions</td></tr>';return;}
+  tb.innerHTML=mapped.map(r=>`
+    <tr>
+      <td style="white-space:nowrap">${fmtDate(r.date)}</td>
+      <td><span style="background:${r.type==='Payment'?'#d4edda':r.type==='Opening'?'#cfe2ff':'#fff3cd'};
+        padding:2px 8px;border-radius:10px;font-size:.75rem;font-weight:600">${r.type}</span></td>
+      <td style="font-size:.83rem">${esc(r.desc)}</td>
+      <td style="color:#c0392b;font-weight:600">${r.dr>0?fmt(r.dr):'—'}</td>
+      <td style="color:#155724;font-weight:600">${r.cr>0?fmt(r.cr):'—'}</td>
+      <td style="font-weight:bold;color:${r.bal>0?'#c0392b':'#155724'}">${fmt(r.bal)}</td>
+    </tr>`).join('');
+}
+
+// ══════════ DELETE ══════════
+function askDelete(type,id,name){
+  delType=type; delTarget=id;
+  document.getElementById('delMsg').textContent=`Delete "${name}"? This cannot be undone.`;
+  document.getElementById('delModal').classList.add('open');
+}
+function closeDelModal(){ document.getElementById('delModal').classList.remove('open'); delTarget=null; delType=null; }
+async function confirmDelete(){
+  closeDelModal(); spin(true);
+  const table=delType==='test'?'lab_test_catalogue':'lab_sample_agent';
+  const {error}=await sb.from(table).delete().eq('id',delTarget);
+  spin(false);
+  if(error){alert('Delete failed: '+error.message);return;}
+  if(delType==='test') await loadTests();
+  else await loadAgents();
+}
+
+// ══════════ UTILS ══════════
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(d){ if(!d) return '—'; const dt=new Date(d); return isNaN(dt)?d:dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+
+// ══════════ INIT ══════════
+loadTests();
+</script>
+</body>
+</html>
