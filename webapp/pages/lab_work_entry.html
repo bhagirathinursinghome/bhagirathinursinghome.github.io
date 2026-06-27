@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Lab Work Entry</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .tabs { display:flex; border-bottom:2px solid #e9ecef; margin-bottom:1.5rem; flex-wrap:wrap; }
+    .tab-btn {
+      flex:1; min-width:120px; padding:.75rem .5rem; background:#f8f9fa; border:none;
+      cursor:pointer; font-size:.88rem; font-weight:500;
+      border-bottom:3px solid transparent; transition:all .2s;
+    }
+    .tab-btn:hover { background:#e9ecef; }
+    .tab-btn.active { background:#fff; color:#007bff; border-bottom-color:#007bff; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+
+    .search-bar { display:flex; gap:.75rem; align-items:center; margin-bottom:1rem; flex-wrap:wrap; }
+    .search-bar input, .search-bar select {
+      flex:1; min-width:160px; padding:.5rem .75rem; border:1px solid #ccc;
+      border-radius:6px; font-size:.9rem;
+    }
+    .count-badge { background:#e9ecef; color:#555; padding:.3rem .8rem;
+      border-radius:20px; font-size:.8rem; font-weight:600; white-space:nowrap; }
+
+    .table-wrap { overflow-x:auto; border:1px solid #ddd; border-radius:6px; margin-top:.5rem; }
+    .data-table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    .data-table th { background:#f0f4ff; padding:10px 12px; text-align:left; font-weight:600;
+      border-bottom:2px solid #ddd; position:sticky; top:0; white-space:nowrap; }
+    .data-table td { padding:9px 12px; border-bottom:1px solid #eee; vertical-align:middle; }
+    .data-table tbody tr:hover { background:#f9f9f9; }
+
+    .badge { display:inline-block; padding:3px 9px; border-radius:12px; font-size:.73rem; font-weight:600; }
+    .badge-pending  { background:#fff3cd; color:#856404; }
+    .badge-done     { background:#d4edda; color:#155724; }
+    .badge-cancel   { background:#f8d7da; color:#721c24; }
+
+    /* Case Detail Modal */
+    .modal-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
+      z-index:1000; align-items:flex-start; justify-content:center; padding:1rem; overflow-y:auto;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal-box {
+      background:#fff; border-radius:10px; padding:1.75rem;
+      width:100%; max-width:560px; box-shadow:0 8px 30px rgba(0,0,0,.25);
+      margin:auto;
+    }
+    .modal-box h3 { margin:0 0 1.25rem; font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:.75rem; }
+
+    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:.75rem 1.5rem; margin-bottom:1.25rem; }
+    @media(max-width:480px){ .detail-grid { grid-template-columns:1fr; } }
+    .detail-item .dlabel { font-size:.72rem; color:#888; font-weight:600; text-transform:uppercase; }
+    .detail-item .dval  { font-weight:600; color:#222; margin-top:.15rem; font-size:.95rem; }
+
+    .test-list { background:#f8fbff; border-radius:6px; padding:.75rem 1rem; margin-bottom:1.25rem; }
+    .test-list h4 { margin:0 0 .5rem; font-size:.85rem; color:#555; }
+    .test-item { display:flex; justify-content:space-between; padding:.35rem 0; border-bottom:1px solid #e9ecef; font-size:.88rem; }
+    .test-item:last-child { border:none; }
+
+    .amount-row { background:#fff3cd; border:1px solid #ffc107; border-radius:6px;
+      padding:.75rem 1rem; margin-bottom:1rem; display:flex; justify-content:space-between;
+      align-items:center; }
+    .amount-row .alabel { font-size:.82rem; color:#856404; font-weight:600; }
+    .amount-row .aval   { font-size:1.2rem; font-weight:bold; color:#333; }
+
+    .modal-actions { display:flex; gap:.75rem; justify-content:flex-end; flex-wrap:wrap; }
+
+    .btn-sm { padding:.3rem .75rem; font-size:.78rem; border:none; border-radius:4px; cursor:pointer; font-weight:500; }
+    .btn-edit { background:#e7f3ff; color:#0056b3; }
+    .btn-del  { background:#fdecea; color:#c0392b; }
+
+    .info-panel { background:#e8f4fd; border:1px solid #b6d4fe; border-radius:6px;
+      padding:.75rem 1rem; margin-bottom:1rem; font-size:.85rem; color:#084298; }
+
+    /* Per-test allocation rows */
+    .test-alloc-block { border:1px solid #dee2e6; border-radius:8px; margin-bottom:.75rem; overflow:hidden; }
+    .test-alloc-header { display:flex; justify-content:space-between; align-items:center;
+      background:#f0f4ff; padding:.5rem .9rem; font-size:.88rem; font-weight:600; }
+    .test-alloc-header .test-cost { color:#0056b3; }
+    .test-alloc-body { padding:.6rem .9rem; background:#fff; display:flex; flex-direction:column; gap:.5rem; }
+    .test-alloc-body select { width:100%; padding:.4rem .65rem; border:1px solid #ccc;
+      border-radius:5px; font-size:.85rem; }
+    /* biopsy slide input inside block */
+    .biopsy-inline { display:flex; align-items:center; gap:.6rem;
+      background:#fff8e1; border:1px solid #ffc107; border-radius:5px; padding:.45rem .7rem; }
+    .biopsy-inline label { font-size:.82rem; color:#856404; font-weight:600; flex:1; }
+    .biopsy-inline input { width:80px; padding:.3rem .45rem; border:1px solid #ccc;
+      border-radius:4px; font-size:.88rem; text-align:center; }
+    .biopsy-calc-note { font-size:.75rem; color:#856404; margin-top:.15rem; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>🔬 Lab Work Entry</h1>
+
+  <div class="page-card">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab(event,'pending')">⏳ Pending Cases</button>
+      <button class="tab-btn" onclick="switchTab(event,'done')">✅ Completed</button>
+    </div>
+
+    <!-- ══════════ PENDING TAB ══════════ -->
+    <div id="pending-tab" class="tab-content active">
+      <div class="info-panel">📋 Cases below have lab tests ordered in OPD. Open each case to assign a Sample Agent and mark as done.</div>
+      <div class="search-bar">
+        <input id="pendSearch" placeholder="🔍 Search by name / case no…" oninput="filterPending()"/>
+        <input id="pendDate" type="date" onchange="filterPending()" title="Filter by case date"/>
+        <button class="btn-primary" style="width:auto;white-space:nowrap" onclick="loadPending()">🔄 Refresh</button>
+        <span class="count-badge" id="pendCount">0 cases</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>#</th><th>Case Date</th><th>Case No</th><th>Patient Name</th>
+            <th>Tests</th><th>Lab Amount</th><th>Agent</th><th>Status</th><th>Action</th>
+          </tr></thead>
+          <tbody id="pendTbody"><tr><td colspan="9" style="text-align:center;color:#888">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ DONE TAB ══════════ -->
+    <div id="done-tab" class="tab-content">
+      <div class="search-bar">
+        <input id="doneSearch" placeholder="🔍 Search by name / case no…" oninput="filterDone()"/>
+        <input id="doneDate" type="date" onchange="filterDone()" title="Filter by date"/>
+        <select id="doneAgent" onchange="filterDone()">
+          <option value="">All Agents</option>
+        </select>
+        <button class="btn-primary" style="width:auto;white-space:nowrap" onclick="loadDone()">🔄 Refresh</button>
+        <span class="count-badge" id="doneCount">0 records</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>#</th><th>Entry Date</th><th>Case No</th><th>Patient Name</th>
+            <th>Tests</th><th>Lab Amount</th><th>Agent</th><th>Agent Amount</th>
+            <th id="actionColHead">Actions</th>
+          </tr></thead>
+          <tbody id="doneTbody"><tr><td colspan="9" style="text-align:center;color:#888">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ CASE DETAIL MODAL ══════════ -->
+<div class="modal-overlay" id="caseModal">
+  <div class="modal-box">
+    <h3 id="modalTitle">🔬 Lab Work Entry</h3>
+
+    <div class="detail-grid" id="detailGrid"></div>
+
+    <div class="test-list" style="padding:.5rem .75rem .25rem">
+      <h4 style="margin-bottom:.6rem">🧪 Tests — Assign Agent Per Test</h4>
+      <div id="testAllocDiv"></div>
+    </div>
+
+    <div class="amount-row">
+      <span class="alabel">💰 Total Agent Amount (auto)</span>
+      <span class="aval" id="modalAmount">₹0.00</span>
+    </div>
+
+    <input type="hidden" id="modalCaseNo"/>
+    <input type="hidden" id="modalEntryId"/>
+    <input type="hidden" id="modalPatient"/>
+
+    <p class="err" id="modalErr"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" style="width:auto" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" style="width:auto" id="modalSaveBtn" onclick="saveEntry()">✅ Mark Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ CANCEL CONFIRM MODAL ══════════ -->
+<div class="modal-overlay" id="cancelModal">
+  <div class="modal-box">
+    <h3>⚠️ Cancel Entry</h3>
+    <p id="cancelMsg"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" style="width:auto" onclick="closeCancelModal()">Go Back</button>
+      <button class="btn-primary" style="width:auto;background:#dc3545" onclick="confirmCancel()">Yes, Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+// Lab staff can enter & view; admin/manager can also edit/delete
+const FULL_ACCESS = ["admin","manager"];
+const ALL_ACCESS  = ["admin","manager","lab"];
+BNH_PAGE.requireRole(ALL_ACCESS);
+
+const isFullAccess = FULL_ACCESS.includes(BNH_PAGE.user.role);
+const sb = BNH_PAGE.sb;
+
+let allTests=[], allAgents=[], allPending=[], allDone=[];
+let cancelTarget=null;
+let currentCaseTests=[];
+
+// ══════════ TABS ══════════
+function switchTab(e,name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  e.target.classList.add('active');
+  document.getElementById(name+'-tab').classList.add('active');
+  if(name==='done') loadDone();
+}
+
+// ══════════ HELPERS ══════════
+const fmt = n => '₹'+parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+function spin(on){ document.getElementById('spinner').classList.toggle('hidden',!on); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(d){ if(!d) return '—'; const dt=new Date(d); return isNaN(dt)?d:dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+
+// ══════════ INIT ══════════
+async function init(){
+  spin(true);
+  const [catRes, agRes] = await Promise.all([
+    sb.from('lab_test_catalogue').select('*'),
+    sb.from('lab_sample_agent').select('*').order('agent_name'),
+  ]);
+  spin(false);
+  allTests = catRes.data||[];
+  allAgents = agRes.data||[];
+
+  const doneOpts = '<option value="">All Agents</option>'
+    + allAgents.map(a=>`<option value="${a.id}">${esc(a.agent_name)}</option>`).join('');
+  document.getElementById('doneAgent').innerHTML = doneOpts;
+
+  if(!isFullAccess) document.getElementById('actionColHead').textContent='';
+  await loadPending();
+}
+
+// ══════════ PENDING ══════════
+async function loadPending(){
+  spin(true);
+  // Get cases that have lab tests in opd_test, NOT already in lab_work_entry (non-cancelled)
+  const { data: entriesData } = await sb.from('lab_work_entry').select('case_no').eq('is_cancelled',false);
+  const doneCases = new Set((entriesData||[]).map(e=>e.case_no));
+
+  // Get opd_test rows that match lab_test_catalogue
+  const catalogueNames = allTests.map(t=>t.test_name.toLowerCase());
+  const { data: testData, error } = await sb.from('opd_test').select('*').order('case_date',{ascending:false});
+  spin(false);
+
+  if(error){ alert(error.message); return; }
+
+  // Group by case_no, keep only those with at least one lab test
+  const caseMap = {};
+  (testData||[]).forEach(row=>{
+    if(!catalogueNames.includes(row.test_name.toLowerCase())) return;
+    if(!caseMap[row.case_number]) caseMap[row.case_number]={
+      case_no:row.case_number, case_date:row.case_date,
+      patient_name:row.patient_name, tests:[]
+    };
+    caseMap[row.case_number].tests.push(row);
+  });
+
+  allPending = Object.values(caseMap).filter(c=>!doneCases.has(c.case_no));
+  filterPending();
+}
+
+function filterPending(){
+  const q=(document.getElementById('pendSearch').value||'').toLowerCase();
+  const d=document.getElementById('pendDate').value;
+  let list=allPending.filter(c=>{
+    const matchQ=!q||(c.patient_name||'').toLowerCase().includes(q)||c.case_no.toLowerCase().includes(q);
+    const matchD=!d||(c.case_date||'').startsWith(d);
+    return matchQ&&matchD;
+  });
+  document.getElementById('pendCount').textContent=list.length+' cases';
+  const tb=document.getElementById('pendTbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#888">No pending cases</td></tr>';return;}
+  tb.innerHTML=list.map((c,i)=>{
+    const totalAmt=c.tests.reduce((s,t)=>{
+      const cat=allTests.find(x=>x.test_name.toLowerCase()===t.test_name.toLowerCase());
+      return s+parseFloat(cat?cat.test_cost:t.test_amount||0);
+    },0);
+    return `<tr>
+      <td>${i+1}</td>
+      <td style="white-space:nowrap">${fmtDate(c.case_date)}</td>
+      <td><strong>${esc(c.case_no)}</strong></td>
+      <td>${esc(c.patient_name)}</td>
+      <td>${c.tests.length} test(s)</td>
+      <td>${fmt(totalAmt)}</td>
+      <td>—</td>
+      <td><span class="badge badge-pending">Pending</span></td>
+      <td><button class="btn-primary" style="width:auto;padding:.3rem .8rem;font-size:.8rem"
+        onclick="openCaseModal(${JSON.stringify(c).replace(/"/g,'&quot;')})">Open</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════ DONE ══════════
+async function loadDone(){
+  spin(true);
+  const { data, error } = await sb.from('lab_work_entry')
+    .select('id,case_no,patient_name,entry_date,tests_snapshot,lab_amount,agent_id,agent_name_snapshot,agent_amount,biopsy_slides,is_cancelled,agent_alloc_snapshot,agent:lab_sample_agent(agent_name)')
+    .eq('is_cancelled',false)
+    .order('entry_date',{ascending:false});
+  spin(false);
+  if(error){ alert(error.message); return; }
+  allDone=data||[];
+  filterDone();
+}
+function filterDone(){
+  const q=(document.getElementById('doneSearch').value||'').toLowerCase();
+  const d=document.getElementById('doneDate').value;
+  const ag=document.getElementById('doneAgent').value;
+  let list=allDone.filter(r=>{
+    const matchQ=!q||(r.patient_name||'').toLowerCase().includes(q)||((r.case_no||'').toLowerCase().includes(q));
+    const matchD=!d||(r.entry_date||'').startsWith(d);
+    const matchAg=!ag||r.agent_id===ag;
+    return matchQ&&matchD&&matchAg;
+  });
+  document.getElementById('doneCount').textContent=list.length+' records';
+  const tb=document.getElementById('doneTbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#888">No records</td></tr>';return;}
+  tb.innerHTML=list.map((r,i)=>{
+    const agName=(r.agent?.agent_name)||r.agent_name_snapshot||'—';
+    const status=r.is_cancelled
+      ?`<span class="badge badge-cancel">Cancelled</span>`
+      :`<span class="badge badge-done">Done</span>`;
+    const actions=isFullAccess&&!r.is_cancelled
+      ?`<button class="btn-sm btn-edit" onclick="openEditModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">✏️</button>
+         <button class="btn-sm btn-del" data-id="${r.id||''}" data-case="${esc(r.case_no)}" onclick="askCancelFromBtn(this)">✖</button>`
+      :'—';
+    return `<tr>
+      <td>${i+1}</td>
+      <td style="white-space:nowrap">${fmtDate(r.entry_date)}</td>
+      <td><strong>${esc(r.case_no)}</strong></td>
+      <td>${esc(r.patient_name)}</td>
+      <td style="font-size:.8rem">${esc(r.tests_snapshot||'')}</td>
+      <td>${fmt(r.lab_amount)}</td>
+      <td>${esc(agName)}</td>
+      <td style="font-weight:600;color:#c0392b">${fmt(r.agent_amount)}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════ MODAL ══════════
+function openCaseModal(c){
+  currentCaseTests=c.tests;
+  document.getElementById('modalCaseNo').value=c.case_no;
+  document.getElementById('modalPatient').value=c.patient_name;
+  document.getElementById('modalEntryId').value='';
+  document.getElementById('modalTitle').textContent='🔬 Lab Work Entry — '+c.case_no;
+  document.getElementById('modalErr').textContent='';
+
+  document.getElementById('detailGrid').innerHTML=`
+    <div class="detail-item"><div class="dlabel">Case No</div><div class="dval">${esc(c.case_no)}</div></div>
+    <div class="detail-item"><div class="dlabel">Case Date</div><div class="dval">${fmtDate(c.case_date)}</div></div>
+    <div class="detail-item"><div class="dlabel">Patient Name</div><div class="dval">${esc(c.patient_name)}</div></div>
+    <div class="detail-item"><div class="dlabel">Total Tests</div><div class="dval">${c.tests.length}</div></div>
+  `;
+
+  buildTestAllocUI({},{});
+  document.getElementById('modalSaveBtn').textContent='✅ Mark Done';
+  recalcAmount();
+  document.getElementById('caseModal').classList.add('open');
+}
+
+function openEditModal(r){
+  currentCaseTests=(r.tests_snapshot||'').split(',').map(n=>n.trim()).map(name=>{
+    const cat=allTests.find(x=>x.test_name.toLowerCase()===name.toLowerCase());
+    return {test_name:name,test_amount:cat?cat.test_cost:0};
+  });
+
+  document.getElementById('modalCaseNo').value=r.case_no;
+  document.getElementById('modalPatient').value=r.patient_name;
+  document.getElementById('modalEntryId').value=r.id;
+  document.getElementById('modalTitle').textContent='✏️ Edit Entry — '+r.case_no;
+  document.getElementById('modalErr').textContent='';
+
+  document.getElementById('detailGrid').innerHTML=`
+    <div class="detail-item"><div class="dlabel">Case No</div><div class="dval">${esc(r.case_no)}</div></div>
+    <div class="detail-item"><div class="dlabel">Entry Date</div><div class="dval">${fmtDate(r.entry_date)}</div></div>
+    <div class="detail-item"><div class="dlabel">Patient Name</div><div class="dval">${esc(r.patient_name)}</div></div>
+    <div class="detail-item"><div class="dlabel">Lab Amount</div><div class="dval">${fmt(r.lab_amount)}</div></div>
+  `;
+
+  // Restore per-test agent assignments from agent_alloc_snapshot
+  let savedAgents={}, savedSlides={};
+  try {
+    const snap=JSON.parse(r.agent_alloc_snapshot||'[]');
+    snap.forEach((s,i)=>{ savedAgents[i]=s.agent_id||''; savedSlides[i]=s.slides||''; });
+  } catch(e){}
+  // Fallback: old single-agent record — pre-fill all with that agent
+  if(!r.agent_alloc_snapshot && r.agent_id){
+    currentCaseTests.forEach((_,i)=>{ savedAgents[i]=r.agent_id; });
+    const biopsyIdx=currentCaseTests.findIndex(t=>isBiopsy(t.test_name));
+    if(biopsyIdx>=0 && r.biopsy_slides) savedSlides[biopsyIdx]=r.biopsy_slides;
+  }
+
+  buildTestAllocUI(savedAgents,savedSlides);
+  document.getElementById('modalSaveBtn').textContent='💾 Update Entry';
+  recalcAmount();
+  document.getElementById('caseModal').classList.add('open');
+}
+
+// ── Helpers: per-test agent dropdown builder ─────────────────────────────────
+function isBiopsy(name){ return (name||'').trim().toLowerCase().startsWith('biopsy'); }
+
+function agentSelectHtml(idx,selectedId){
+  return `<select id="agentSel_${idx}" onchange="recalcAmount()">
+    <option value=""${!selectedId?' selected':''}>— Not Allocable (in-house) —</option>
+    ${allAgents.map(a=>`<option value="${a.id}"${a.id===selectedId?' selected':''}>${esc(a.agent_name)}</option>`).join('')}
+  </select>`;
+}
+
+function buildTestAllocUI(savedAgents,savedSlides){
+  document.getElementById('testAllocDiv').innerHTML=currentCaseTests.map((t,i)=>{
+    const cat=allTests.find(x=>x.test_name.toLowerCase()===t.test_name.toLowerCase());
+    const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
+    const biopsy=isBiopsy(t.test_name);
+    const perSlide=biopsy&&cat?parseFloat(cat.biopsy_per_slide||0):0;
+    const slidesVal=savedSlides[i]||'';
+    return `<div class="test-alloc-block">
+      <div class="test-alloc-header">
+        <span>🧪 ${esc(t.test_name)}</span>
+        <span class="test-cost">${fmt(cost)}</span>
+      </div>
+      <div class="test-alloc-body">
+        ${agentSelectHtml(i,savedAgents[i]||'')}
+        ${biopsy&&perSlide>0?`
+        <div class="biopsy-inline">
+          <label>🔬 Slides used</label>
+          <input type="number" id="bioSlides_${i}" min="1" placeholder="qty"
+            value="${esc(String(slidesVal))}" oninput="recalcAmount()"/>
+        </div>
+        <div class="biopsy-calc-note" id="biopsyNote_${i}">₹${cost} base + ₹${perSlide} × slides</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function recalcAmount(){
+  let total=0;
+  currentCaseTests.forEach((t,i)=>{
+    const agentId=(document.getElementById('agentSel_'+i)||{}).value||'';
+    if(!agentId) return; // not allocable — skip agent amount
+    const cat=allTests.find(x=>x.test_name.toLowerCase()===t.test_name.toLowerCase());
+    const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
+    total+=cost;
+    if(isBiopsy(t.test_name)&&cat){
+      const perSlide=parseFloat(cat.biopsy_per_slide||0);
+      const slides=parseInt((document.getElementById('bioSlides_'+i)||{}).value)||0;
+      if(perSlide>0&&slides>0){
+        total+=perSlide*slides;
+        const note=document.getElementById('biopsyNote_'+i);
+        if(note) note.textContent=`₹${cost} base + ₹${perSlide} × ${slides} slides = ₹${cost+perSlide*slides}`;
+      }
+    }
+  });
+  document.getElementById('modalAmount').textContent=fmt(total);
+}
+
+function closeModal(){ document.getElementById('caseModal').classList.remove('open'); }
+
+async function saveEntry(){
+  const caseNo=document.getElementById('modalCaseNo').value;
+  const patient=document.getElementById('modalPatient').value;
+  const entryId=document.getElementById('modalEntryId').value;
+  document.getElementById('modalErr').textContent='';
+
+  // Build per-test alloc array
+  const allocArr=currentCaseTests.map((t,i)=>{
+    const cat=allTests.find(x=>x.test_name.toLowerCase()===t.test_name.toLowerCase());
+    const agentId=(document.getElementById('agentSel_'+i)||{}).value||'';
+    const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
+    let slides=0,perSlide=0;
+    if(isBiopsy(t.test_name)&&cat){
+      perSlide=parseFloat(cat.biopsy_per_slide||0);
+      slides=parseInt((document.getElementById('bioSlides_'+i)||{}).value)||0;
+    }
+    const agentObj=allAgents.find(a=>a.id===agentId);
+    const agentAmt=agentId?(cost+(perSlide>0&&slides>0?perSlide*slides:0)):0;
+    return {test_name:t.test_name,agent_id:agentId||null,agent_name:agentObj?.agent_name||'Not Allocable',slides:slides||null,agent_amount:agentAmt};
+  });
+
+  // Lab amount = sum of ALL tests + biopsy slide cost (regardless of agent)
+  let labAmount=0,agentAmount=0,totalBiopsySlides=0;
+  allocArr.forEach(a=>{
+    const cat=allTests.find(x=>x.test_name.toLowerCase()===a.test_name.toLowerCase());
+    const base=parseFloat(cat?cat.test_cost:0);
+    labAmount+=base;
+    if(isBiopsy(a.test_name)&&cat){
+      const perSlide=parseFloat(cat.biopsy_per_slide||0);
+      if(perSlide>0&&a.slides){ labAmount+=perSlide*a.slides; totalBiopsySlides+=a.slides; }
+    }
+    agentAmount+=a.agent_amount;
+  });
+
+  const primaryAlloc=allocArr.find(a=>a.agent_id);
+  const payload=BNH_PAGE.stamp({
+    case_no:caseNo, patient_name:patient,
+    entry_date:new Date().toISOString().split('T')[0],
+    tests_snapshot:currentCaseTests.map(t=>t.test_name).join(', '),
+    lab_amount:labAmount,
+    agent_id:primaryAlloc?.agent_id||null,
+    agent_name_snapshot:primaryAlloc?.agent_name||'Not Allocable',
+    agent_amount:agentAmount,
+    biopsy_slides:totalBiopsySlides||null,
+    agent_alloc_snapshot:JSON.stringify(allocArr),
+    is_cancelled:false,
+  });
+
+  spin(true);
+  let error;
+  if(entryId){
+    ({error}=await sb.from('lab_work_entry').update(payload).eq('id',entryId));
+  } else {
+    ({error}=await sb.from('lab_work_entry').insert(payload));
+  }
+  spin(false);
+  if(error){ document.getElementById('modalErr').textContent=error.message; return; }
+  closeModal();
+  await loadPending();
+  await loadDone();
+}
+
+// ══════════ CANCEL ══════════
+function askCancelFromBtn(btn){
+  const id = btn.getAttribute('data-id');
+  const caseNo = btn.getAttribute('data-case');
+  console.log('Delete clicked — entry id:', id);
+  if(!id || id === 'null' || id === 'undefined' || id.trim() === ''){
+    alert('Error: Entry ID is missing (got: ' + id + '). Check console for row data.');
+    return;
+  }
+  cancelTarget = id;
+  document.getElementById('cancelMsg').textContent = 'Cancel work entry for case "' + caseNo + '"? The case will return to Pending list.';
+  document.getElementById('cancelModal').classList.add('open');
+}
+function askCancel(id,caseNo){
+  // legacy — kept for safety
+  if(!id || id === 'null' || id === 'undefined'){
+    alert('Error: Entry ID is null. Please refresh and try again.'); return;
+  }
+  cancelTarget = id;
+  document.getElementById('cancelMsg').textContent = 'Cancel work entry for case "' + caseNo + '"? The case will return to Pending list.';
+  document.getElementById('cancelModal').classList.add('open');
+}
+function closeCancelModal(){ document.getElementById('cancelModal').classList.remove('open'); cancelTarget=null; }
+async function confirmCancel(){
+  if(!cancelTarget || cancelTarget === 'null' || cancelTarget === 'undefined'){
+    alert('Error: No valid entry ID. Please refresh and try again.');
+    closeCancelModal(); return;
+  }
+  const targetId = cancelTarget;
+  closeCancelModal(); spin(true);
+  console.log('Cancelling entry id:', targetId);
+  const {error}=await sb.from('lab_work_entry').update({is_cancelled:true}).eq('id',targetId);
+  spin(false);
+  if(error){ alert(error.message); return; }
+  await loadPending(); await loadDone();
+}
+
+init();
+</script>
+</body>
+</html>
