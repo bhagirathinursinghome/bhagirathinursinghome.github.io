@@ -77,6 +77,12 @@
     .hidden{display:none!important}
     .empty-state{text-align:center;padding:2.5rem;color:#aaa}
     .info-note{background:#e7f3ff;border:1px solid #b8daff;border-radius:4px;padding:.6rem .9rem;font-size:.83rem;color:#004085;margin-top:.5rem}
+    /* Cancelled case row */
+    tbody tr.row-cancelled td { background:#fff0f0!important; color:#a00!important; }
+    tbody tr.row-cancelled:hover td { background:#ffe0e0!important; }
+    tbody tr.row-cancelled .case-no { color:#c0392b!important; }
+    .badge-cancelled { background:#f8d7da; color:#721c24; }
+    .cancel-info-box { background:#fff0f0; border:1px solid #f5c6cb; border-radius:4px; padding:.75rem 1rem; margin-bottom:.75rem; border-left:3px solid #dc3545; }
   </style>
 </head>
 <body>
@@ -108,6 +114,11 @@
         <div class="filter-group"><label>Refer</label>
           <select id="allReferFilter" onchange="filterAll()">
             <option value="">All</option><option value="yes">With Refer</option><option value="no">No Refer</option>
+          </select>
+        </div>
+        <div class="filter-group"><label>Cancel Status</label>
+          <select id="allCancelFilter" onchange="filterAll()">
+            <option value="">All</option><option value="active">Active Only</option><option value="cancelled">Cancelled Only</option>
           </select>
         </div>
       </div>
@@ -277,7 +288,7 @@
   // ── Load data ─────────────────────────────────────────────────────────────
   async function loadAllCases(){
     const{data,error}=await BNH_PAGE.sb.from('opd_case')
-      .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,refer_amount,refer_payment_status,refer_payment_id,type,ipd_link,created_at,updated_at')
+      .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,refer_amount,refer_payment_status,refer_payment_id,type,ipd_link,created_at,updated_at,cancel_remark,cancelled_by,cancelled_at')
       .order('case_date',{ascending:false});
     if(error){showErr('Load cases: '+error.message);return;}
     allCases=data||[];
@@ -348,8 +359,9 @@
   // ── Stats ─────────────────────────────────────────────────────────────────
   function renderCaseStats(){
     const t=allCases.length;
-    const completed=allCases.filter(c=>!!c.refer_enter_by).length;
-    const pending=t-completed;
+    const cancelled=allCases.filter(c=>!!c.cancelled_by).length;
+    const completed=allCases.filter(c=>!!c.refer_enter_by&&!c.cancelled_by).length;
+    const pending=t-completed-cancelled;
     const tBill=allCases.reduce((s,c)=>s+Number(c.total_amount||0),0);
     const tPaid=Object.values(cashByCase).reduce((s,c)=>s+c.paid,0);
     const tDisc=Object.values(cashByCase).reduce((s,c)=>s+c.discount,0);
@@ -357,6 +369,7 @@
       <div class="stat-box"><div class="val">${t}</div><div class="lbl">Total Cases</div></div>
       <div class="stat-box"><div class="val" style="color:#dc3545">${pending}</div><div class="lbl">Pending Refer</div></div>
       <div class="stat-box"><div class="val" style="color:#28a745">${completed}</div><div class="lbl">Completed</div></div>
+      <div class="stat-box"><div class="val" style="color:#dc3545">${cancelled}</div><div class="lbl">Cancelled</div></div>
       <div class="stat-box"><div class="val">${fmt(tBill)}</div><div class="lbl">Total Bill</div></div>
       <div class="stat-box"><div class="val" style="color:#6c757d">${fmt(tDisc)}</div><div class="lbl">Discount</div></div>
       <div class="stat-box"><div class="val" style="color:#28a745">${fmt(tPaid)}</div><div class="lbl">Total Paid</div></div>
@@ -372,13 +385,13 @@
     div.innerHTML=`<table>
       <thead><tr>
         <th>Case No</th><th>Date</th><th>Patient</th><th>Bill</th><th>Paid</th><th>Discount</th><th>Due</th>
-        <th>Type</th><th>Refer</th><th>IPD Link</th><th>Pay Status</th><th>Refer Pay</th>
+        <th>Type</th><th>Refer</th><th>IPD Link</th><th>Pay Status</th><th>Refer Pay</th><th>Status</th>
       </tr></thead>
       <tbody>${rows.map(r=>{
+        const isCancelled=!!r.cancelled_by;
         const ps=gps(r.case_no,r.total_amount);
         const c=cashByCase[r.case_no]||{paid:0,discount:0,due:Number(r.total_amount||0)};
         const referAmt=r.refer_amount?fmt(r.refer_amount):(r.refer_name?'<span style="color:#aaa;font-size:.78rem">Not set</span>':'—');
-        // refer_payment_status on opd_case is the single source of truth ('paid' | 'pending')
         const referPay=r.refer_name
           ?(r.refer_payment_status==='paid'
               ?'<span class="badge badge-paid">✅ Paid</span>'
@@ -386,7 +399,10 @@
                   ?'<span class="badge badge-due">⏳ Pending</span>'
                   :'<span class="badge badge-partial" style="font-size:.72rem">Amt Not Set</span>'))
           :'<span style="color:#ccc">—</span>';
-        return`<tr onclick="openDetail('${esc(r.case_no)}')">
+        const statusBadge=isCancelled
+          ?'<span class="badge badge-cancelled">🚫 Cancelled</span>'
+          :'<span class="badge badge-completed">✓ Active</span>';
+        return`<tr class="${isCancelled?'row-cancelled':''}" onclick="openDetail('${esc(r.case_no)}')">
           <td class="case-no">${esc(r.case_no)}</td>
           <td>${fmtDate(r.case_date)}</td>
           <td>${esc(r.patient_name)}</td>
@@ -399,6 +415,7 @@
           <td style="font-size:.78rem">${esc(r.ipd_link||'—')}</td>
           <td><span class="badge ${ps.col}">${ps.t}</span></td>
           <td>${referPay}</td>
+          <td>${statusBadge}</td>
         </tr>`;
       }).join('')}</tbody>
     </table>`;
@@ -428,11 +445,14 @@
     const q=(document.getElementById('allSearch').value||'').toLowerCase();
     const df=document.getElementById('allDateFrom').value,dt=document.getElementById('allDateTo').value;
     const ps=document.getElementById('allPayStatus').value,rf=document.getElementById('allReferFilter').value;
+    const cf=document.getElementById('allCancelFilter').value;
     filteredAll=allCases.filter(r=>{
       if(q&&!(r.case_no||'').toLowerCase().includes(q)&&!(r.patient_name||'').toLowerCase().includes(q))return false;
       if(df&&r.case_date<df)return false;if(dt&&r.case_date>dt)return false;
       if(ps&&gps(r.case_no,r.total_amount).s!==ps)return false;
       if(rf==='yes'&&!r.refer_name)return false;if(rf==='no'&&r.refer_name)return false;
+      if(cf==='active'&&!!r.cancelled_by)return false;
+      if(cf==='cancelled'&&!r.cancelled_by)return false;
       return true;
     });
     currentPageAll=1;renderRecordsTable('allTable',filteredAll,1,'allPager','all');
@@ -608,6 +628,11 @@
 
       document.getElementById('detailTitle').textContent=`Case ${r.case_no} — ${r.patient_name}`;
       document.getElementById('detailBody').innerHTML=`
+        ${r.cancelled_by?`<div class="cancel-info-box">
+          <strong style="color:#dc3545">🚫 This case has been cancelled</strong><br>
+          <span style="font-size:.85rem">💬 Remark: <b>${esc(r.cancel_remark||'—')}</b></span><br>
+          <span style="font-size:.8rem;color:#999">Cancelled by ${esc(r.cancelled_by)} on ${fmtDate(r.cancelled_at)}</span>
+        </div>`:''}
         <div class="detail-section"><h3>📝 Patient & Case Information</h3>
           <div class="detail-grid">
             <div><div class="detail-label">Case No</div><div class="detail-value">${esc(r.case_no)}</div></div>
