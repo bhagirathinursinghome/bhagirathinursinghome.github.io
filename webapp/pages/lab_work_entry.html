@@ -255,9 +255,14 @@ async function loadPending(){
   if(error){ alert(error.message); return; }
 
   // Group by case_no, keep only those with at least one lab test
+  // For biopsy: OPD writes "BIOPSY 1 BLOCK", "BIOPSY 2 BLOCKS" etc.
+  // but catalogue only has "BIOPSY" — match on startsWith('biopsy') too
   const caseMap = {};
   (testData||[]).forEach(row=>{
-    if(!catalogueNames.includes(row.test_name.toLowerCase())) return;
+    const rowLower=row.test_name.toLowerCase();
+    const isInCatalogue=catalogueNames.includes(rowLower)
+      || (rowLower.startsWith('biopsy') && catalogueNames.some(n=>n.startsWith('biopsy')));
+    if(!isInCatalogue) return;
     if(!caseMap[row.case_number]) caseMap[row.case_number]={
       case_no:row.case_number, case_date:row.case_date,
       patient_name:row.patient_name, tests:[]
@@ -282,7 +287,7 @@ function filterPending(){
   if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#888">No pending cases</td></tr>';return;}
   tb.innerHTML=list.map((c,i)=>{
     const totalAmt=c.tests.reduce((s,t)=>{
-      const cat=allTests.find(x=>x.test_name.toLowerCase()===t.test_name.toLowerCase());
+      const cat=findCatEntry(t.test_name);
       return s+parseFloat(cat?cat.test_cost:t.test_amount||0);
     },0);
     return `<tr>
@@ -372,7 +377,7 @@ function openCaseModal(c){
 
 function openEditModal(r){
   currentCaseTests=(r.tests_snapshot||'').split(',').map(n=>n.trim()).map(name=>{
-    const cat=allTests.find(x=>x.test_name.toLowerCase()===name.toLowerCase());
+    const cat=findCatEntry(name);
     return {test_name:name,test_amount:cat?cat.test_cost:0};
   });
 
@@ -411,6 +416,25 @@ function openEditModal(r){
 // ── Helpers: per-test agent dropdown builder ─────────────────────────────────
 function isBiopsy(name){ return (name||'').trim().toLowerCase().startsWith('biopsy'); }
 
+// Extract number of blocks from OPD test name like "BIOPSY 2 BLOCKS" → 2
+function biopsyBlocks(name){
+  const m=(name||'').match(/biopsy\s+(\d+)\s*block/i);
+  return m?parseInt(m[1]):1;
+}
+
+// Find catalogue entry for a biopsy test (matches any "biopsy …" to "biopsy" in catalogue)
+function findCatEntry(testName){
+  const lower=(testName||'').trim().toLowerCase();
+  // Exact match first
+  let cat=allTests.find(x=>x.test_name.toLowerCase()===lower);
+  if(cat) return cat;
+  // For biopsy variants: match catalogue entry whose name is a prefix/root
+  if(isBiopsy(testName)){
+    cat=allTests.find(x=>isBiopsy(x.test_name));
+  }
+  return cat||null;
+}
+
 function agentSelectHtml(idx,selectedId){
   return `<select id="agentSel_${idx}" onchange="recalcAmount()">
     <option value=""${!selectedId?' selected':''}>— Not Allocable (in-house) —</option>
@@ -420,11 +444,13 @@ function agentSelectHtml(idx,selectedId){
 
 function buildTestAllocUI(savedAgents,savedSlides){
   document.getElementById('testAllocDiv').innerHTML=currentCaseTests.map((t,i)=>{
-    const cat=allTests.find(x=>x.test_name.toLowerCase()===t.test_name.toLowerCase());
+    const cat=findCatEntry(t.test_name);
     const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
     const biopsy=isBiopsy(t.test_name);
     const perSlide=biopsy&&cat?parseFloat(cat.biopsy_per_slide||0):0;
-    const slidesVal=savedSlides[i]||'';
+    const blocks=biopsy?biopsyBlocks(t.test_name):0;
+    // Pre-fill slides: use saved value if editing, else default to block count from OPD name
+    const slidesVal=savedSlides[i]!==undefined&&savedSlides[i]!==''?savedSlides[i]:(biopsy&&blocks?blocks:'');
     return `<div class="test-alloc-block">
       <div class="test-alloc-header">
         <span>🧪 ${esc(t.test_name)}</span>
@@ -432,16 +458,17 @@ function buildTestAllocUI(savedAgents,savedSlides){
       </div>
       <div class="test-alloc-body">
         ${agentSelectHtml(i,savedAgents[i]||'')}
-        ${biopsy&&perSlide>0?`
+        ${biopsy?`
         <div class="biopsy-inline">
-          <label>🔬 Slides used</label>
+          <label>🔬 No. of Slides used${blocks?` <span style="color:#aaa;font-weight:400">(OPD: ${blocks} block${blocks>1?'s':''})</span>`:''}:</label>
           <input type="number" id="bioSlides_${i}" min="1" placeholder="qty"
             value="${esc(String(slidesVal))}" oninput="recalcAmount()"/>
         </div>
-        <div class="biopsy-calc-note" id="biopsyNote_${i}">₹${cost} base + ₹${perSlide} × slides</div>`:''}
+        <div class="biopsy-calc-note" id="biopsyNote_${i}">${perSlide>0?`₹${cost} (base) + ₹${perSlide} × slides = calculating…`:`Base cost: ₹${cost}`}</div>`:''}
       </div>
     </div>`;
   }).join('');
+  recalcAmount();
 }
 
 function recalcAmount(){
@@ -449,7 +476,7 @@ function recalcAmount(){
   currentCaseTests.forEach((t,i)=>{
     const agentId=(document.getElementById('agentSel_'+i)||{}).value||'';
     if(!agentId) return; // not allocable — skip agent amount
-    const cat=allTests.find(x=>x.test_name.toLowerCase()===t.test_name.toLowerCase());
+    const cat=findCatEntry(t.test_name);
     const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
     total+=cost;
     if(isBiopsy(t.test_name)&&cat){
@@ -458,7 +485,10 @@ function recalcAmount(){
       if(perSlide>0&&slides>0){
         total+=perSlide*slides;
         const note=document.getElementById('biopsyNote_'+i);
-        if(note) note.textContent=`₹${cost} base + ₹${perSlide} × ${slides} slides = ₹${cost+perSlide*slides}`;
+        if(note) note.textContent=`₹${cost} (base) + ₹${perSlide} × ${slides} slides = ₹${cost+perSlide*slides}`;
+      } else {
+        const note=document.getElementById('biopsyNote_'+i);
+        if(note&&perSlide>0) note.textContent=`₹${cost} (base) + ₹${perSlide} × slides — enter slide count above`;
       }
     }
   });
@@ -475,7 +505,7 @@ async function saveEntry(){
 
   // Build per-test alloc array
   const allocArr=currentCaseTests.map((t,i)=>{
-    const cat=allTests.find(x=>x.test_name.toLowerCase()===t.test_name.toLowerCase());
+    const cat=findCatEntry(t.test_name);
     const agentId=(document.getElementById('agentSel_'+i)||{}).value||'';
     const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
     let slides=0,perSlide=0;
@@ -491,7 +521,7 @@ async function saveEntry(){
   // Lab amount = sum of ALL tests + biopsy slide cost (regardless of agent)
   let labAmount=0,agentAmount=0,totalBiopsySlides=0;
   allocArr.forEach(a=>{
-    const cat=allTests.find(x=>x.test_name.toLowerCase()===a.test_name.toLowerCase());
+    const cat=findCatEntry(a.test_name);
     const base=parseFloat(cat?cat.test_cost:0);
     labAmount+=base;
     if(isBiopsy(a.test_name)&&cat){
