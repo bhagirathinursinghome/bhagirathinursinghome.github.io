@@ -112,14 +112,14 @@
         <div class="ot-detail" id="otCaseDetail"></div>
       </div>
 
-      <form id="amtForm">
+      <form id="amtForm" autocomplete="off">
         <label>Recorded By</label>
         <input id="recBy" readonly/>
 
         <!-- Refer Amount -->
         <div id="referSection">
           <label>Refer Amount (₹) <span style="color:red">*</span></label>
-          <input id="referAmount" type="number" min="0" step="0.01" placeholder="0.00"/>
+          <input id="referAmount" type="number" min="0" step="0.01" placeholder="0.00" autocomplete="off"/>
         </div>
         <div id="referNA" class="hidden na-label">🔗 Refer: Not Applicable</div>
 
@@ -128,22 +128,22 @@
           <div class="form-row" style="margin-top:.75rem">
             <div>
               <label>Surgent Fees (₹) <span style="color:red">*</span></label>
-              <input id="surgentFees" type="number" min="0" step="0.01" placeholder="0.00"/>
+              <input id="surgentFees" type="number" min="0" step="0.01" placeholder="0.00" autocomplete="off"/>
             </div>
             <div id="aneFeeWrap">
               <label>Anaesthesia Fees (₹) <span style="color:red">*</span></label>
-              <input id="anaFees" type="number" min="0" step="0.01" placeholder="0.00"/>
+              <input id="anaFees" type="number" min="0" step="0.01" placeholder="0.00" autocomplete="off"/>
             </div>
           </div>
           <div id="aneNA" class="hidden na-label" style="margin-top:.4rem">💉 Anaesthesia: Not Applicable</div>
           <label style="margin-top:.75rem">Package Amount (₹) <span style="color:red">*</span></label>
-          <input id="packageAmt" type="number" min="0" step="0.01" placeholder="0.00"/>
+          <input id="packageAmt" type="number" min="0" step="0.01" placeholder="0.00" autocomplete="off"/>
         </div>
 
         <!-- Doctor Case: only NH Fees -->
         <div id="dcSection" class="hidden">
           <label style="margin-top:.75rem">NH Fees (₹) <span style="color:red">*</span></label>
-          <input id="nhFees" type="number" min="0" step="0.01" placeholder="0.00"/>
+          <input id="nhFees" type="number" min="0" step="0.01" placeholder="0.00" autocomplete="off"/>
         </div>
 
         <label style="margin-top:.75rem">Entry Date</label>
@@ -365,7 +365,13 @@
       document.getElementById('err').textContent = '';
       document.getElementById('ok').style.display = 'none';
 
-      // Clear dynamic rows
+      // Clear all amount fields and dynamic rows so previous values never bleed through
+      document.getElementById('referAmount').value = '';
+      document.getElementById('surgentFees').value = '';
+      document.getElementById('anaFees').value = '';
+      document.getElementById('packageAmt').value = '';
+      document.getElementById('nhFees').value = '';
+      document.getElementById('remark').value = '';
       document.getElementById('incomeRows').innerHTML = '';
       document.getElementById('expenseRows').innerHTML = '';
 
