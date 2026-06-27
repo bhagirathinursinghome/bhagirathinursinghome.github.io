@@ -59,6 +59,11 @@
     .pagination button.active { background: #007bff; color: white; border-color: #007bff; }
     .divider { border: none; border-top: 1px solid #e9ecef; margin: 0.75rem 0; }
 
+    /* ── Cancelled list styles ── */
+    .cancelled-item { background: #fff5f5; padding: 0.75rem; border-radius: 4px; margin-bottom: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; border-left: 3px solid #dc3545; font-size: 0.9rem; }
+    .cancelled-badge { background: #dc3545; color: white; padding: 0.25rem 0.75rem; border-radius: 3px; font-size: 0.75rem; white-space: nowrap; }
+    .cancel-remark-box { background: #fff0f0; border: 1px solid #f5c6cb; border-radius: 3px; padding: 0.4rem 0.7rem; font-size: 0.82rem; color: #721c24; margin-top: 0.15rem; }
+
     /* ── Modal Popup Styles ── */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
     .modal-overlay.active { display: flex; }
@@ -82,6 +87,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="pending">📋 Pending <span id="pendBadge" style="background:#dc3545;color:white;padding:1px 7px;border-radius:10px;font-size:.75rem;margin-left:.3rem"></span></button>
       <button class="tab-btn" data-tab="completed">✅ Completed <span id="compBadge" style="background:#28a745;color:white;padding:1px 7px;border-radius:10px;font-size:.75rem;margin-left:.3rem"></span></button>
+      <button class="tab-btn" data-tab="cancelled">🚫 Cancelled <span id="cancBadge" style="background:#dc3545;color:white;padding:1px 7px;border-radius:10px;font-size:.75rem;margin-left:.3rem"></span></button>
     </div>
 
     <div class="tab-content active" id="pending-tab">
@@ -128,6 +134,30 @@
         <li style="text-align:center;color:#999;padding:2rem;">No completed cases yet</li>
       </ul>
       <div class="pagination" id="compPager"></div>
+    </div>
+
+    <div class="tab-content" id="cancelled-tab">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Search</label>
+          <input id="cancSearch" placeholder="Case no / patient / remark…" oninput="filterAndRenderCancelled()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date From</label>
+          <input type="date" id="cancDateFrom" onchange="filterAndRenderCancelled()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date To</label>
+          <input type="date" id="cancDateTo" onchange="filterAndRenderCancelled()"/>
+        </div>
+      </div>
+      <div class="summary-box">
+        <div class="summary-row"><span>Cancelled Cases:</span><strong id="cancelledCount">0</strong></div>
+      </div>
+      <ul class="completed-list" id="cancelledList">
+        <li style="text-align:center;color:#999;padding:2rem;">No cancelled cases yet</li>
+      </ul>
+      <div class="pagination" id="cancPager"></div>
     </div>
 
     <p class="err" id="err"></p>
@@ -196,6 +226,30 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="cancelModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="cancelModalTitle">🚫 Cancel Case</h3>
+      <button class="modal-close" onclick="closeCancelModal()">&times;</button>
+    </div>
+    <form id="cancelCaseForm">
+      <div class="form-group">
+        <label style="color:#dc3545;font-weight:600;">⚠️ You are about to cancel this case. This action will move it to the Cancelled list.</label>
+      </div>
+      <div class="form-group">
+        <label>Cancellation Remark <span style="color:red">*</span></label>
+        <textarea name="cancel_remark" id="cancelRemarkInput" rows="3" placeholder="Enter reason for cancellation…" required
+          style="width:100%;padding:.5rem;border:1px solid #ccc;border-radius:3px;font-size:.9rem;box-sizing:border-box;resize:vertical;"></textarea>
+        <small style="color:#999;font-size:.78rem;">Remark is mandatory to cancel a case.</small>
+      </div>
+      <div class="case-actions" style="margin-top:1.5rem; justify-content: flex-end;">
+        <button type="button" class="btn-primary btn-sm" style="background:#6c757d;" onclick="closeCancelModal()">Back</button>
+        <button type="submit" class="btn-primary btn-sm" style="background:#dc3545;">🚫 Confirm Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
@@ -218,6 +272,7 @@
   // pagination
   let filteredPend = [], currentPendPage = 1;
   let filteredComp = [], currentCompPage = 1;
+  let filteredCanc = [], currentCancPage = 1;
   const PER = 15;
 
   /* ── helpers ── */
@@ -256,7 +311,7 @@
   /* ── load ALL opd_case rows ── */
   async function loadCases() {
     const { data, error } = await BNH_PAGE.sb.from('opd_case')
-      .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,type,ipd_link')
+      .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,type,ipd_link,cancel_remark,cancelled_by,cancelled_at')
       .order('case_date', { ascending: false });
     if (error) throw error;
     allCases = data || [];
@@ -336,7 +391,7 @@
 
   /* ── pending filter + render ── */
   function filterAndRenderPending() {
-    const pending = allCases.filter(c => !c.refer_enter_by);
+    const pending = allCases.filter(c => !c.refer_enter_by && !c.cancelled_by);
     filteredPend  = applyFilter(pending, 'pendSearch', 'pendDateFrom', 'pendDateTo');
     currentPendPage = 1;
     renderPendStats(pending);
@@ -434,6 +489,8 @@
             <button type="submit" class="btn-primary btn-sm btn-success">✅ Save & Complete</button>
             <button type="button" class="btn-primary btn-sm" style="background:#6c757d;"
               onclick="skipCase('${esc(c.case_no)}')">⏭ Skip</button>
+            <button type="button" class="btn-primary btn-sm" style="background:#dc3545;"
+              onclick="openCancelModal('${esc(c.case_no)}')">🚫 Cancel</button>
           </div>
         </form>
       </div>`;
@@ -542,7 +599,7 @@
 
   /* ── completed tab ── */
   function filterAndRenderCompleted() {
-    const completed = allCases.filter(c => !!c.refer_enter_by);
+    const completed = allCases.filter(c => !!c.refer_enter_by && !c.cancelled_by);
     filteredComp    = applyFilter(completed, 'compSearch', 'compDateFrom', 'compDateTo');
     currentCompPage = 1;
     document.getElementById('compBadge').textContent = completed.length;
@@ -757,6 +814,147 @@
     }
   }
 
+  /* ── cancelled tab ── */
+  function filterAndRenderCancelled() {
+    const cancelled = allCases.filter(c => !!c.cancelled_by);
+    const q  = (document.getElementById('cancSearch').value||'').toLowerCase();
+    const df = document.getElementById('cancDateFrom').value;
+    const dt = document.getElementById('cancDateTo').value;
+    filteredCanc = cancelled.filter(x => {
+      if (q && !(x.case_no||'').toLowerCase().includes(q) &&
+               !(x.patient_name||'').toLowerCase().includes(q) &&
+               !(x.cancel_remark||'').toLowerCase().includes(q)) return false;
+      const d = String(x.case_date||'').slice(0,10);
+      if (df && d < df) return false;
+      if (dt && d > dt) return false;
+      return true;
+    });
+    currentCancPage = 1;
+    document.getElementById('cancBadge').textContent = cancelled.length;
+    renderCancelledPage();
+  }
+
+  function renderCancelledPage() {
+    const list = document.getElementById('cancelledList');
+    document.getElementById('cancelledCount').textContent = filteredCanc.length;
+
+    if (filteredCanc.length === 0) {
+      list.innerHTML = '<li style="text-align:center;color:#999;padding:2rem;">No cancelled cases.</li>';
+      document.getElementById('cancPager').innerHTML = '';
+      return;
+    }
+
+    const slice = filteredCanc.slice((currentCancPage-1)*PER, currentCancPage*PER);
+    const isFullAccess = FULL_ACCESS_ROLES.includes(currentUserRole);
+
+    list.innerHTML = slice.map(c => {
+      const tests = (testsByCase[c.case_no] || []).join(', ') || '—';
+      const restoreBtn = isFullAccess
+        ? `<button class="btn-primary btn-sm" style="background:#007bff;margin-top:.5rem;" onclick="restoreCancelledCase('${esc(c.case_no)}')">↩️ Restore to Pending</button>`
+        : '';
+      return `
+      <li class="cancelled-item" id="cancelled-${esc(c.case_no)}">
+        <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+          <div>
+            <div class="case-no">${esc(c.case_no)}</div>
+            <div class="case-detail">👤 ${esc(c.patient_name)} &nbsp;|&nbsp; 📅 ${fmtD(c.case_date)}</div>
+          </div>
+          <span class="cancelled-badge">🚫 Cancelled</span>
+        </div>
+        ${payPills(c.case_no, c.total_amount)}
+        <div class="case-detail" style="margin-top:.25rem;">
+          <span title="Tests">🧪 ${esc(tests.substring(0,80))}${tests.length>80?'…':''}</span>
+        </div>
+        <div class="cancel-remark-box">
+          💬 Remark: <b>${esc(c.cancel_remark||'—')}</b>
+        </div>
+        <div class="case-detail" style="font-size:.78rem;color:#aaa;">
+          Cancelled: ${fmtD(c.cancelled_at)} by ${esc(c.cancelled_by||'—')}
+        </div>
+        ${restoreBtn}
+      </li>`;
+    }).join('');
+
+    renderPager('cancPager', filteredCanc.length, currentCancPage, 'canc');
+  }
+
+  /* ── cancel modal ── */
+  function openCancelModal(caseNo) {
+    const c = allCases.find(x => x.case_no === caseNo);
+    if (!c) return;
+    const form = document.getElementById('cancelCaseForm');
+    form.dataset.caseNo = caseNo;
+    document.getElementById('cancelModalTitle').textContent = `🚫 Cancel Case: ${caseNo} — ${c.patient_name||''}`;
+    document.getElementById('cancelRemarkInput').value = '';
+    document.getElementById('cancelModal').classList.add('active');
+  }
+
+  function closeCancelModal() {
+    document.getElementById('cancelModal').classList.remove('active');
+  }
+
+  document.getElementById('cancelCaseForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form   = e.target;
+    const caseNo = form.dataset.caseNo;
+    const remark = (form.elements['cancel_remark'].value || '').trim();
+    if (!remark) { showErr('⚠️ Cancellation remark is mandatory.'); return; }
+
+    const stamp = BNH_PAGE.stamp ? BNH_PAGE.stamp({}) : {};
+    const cancelledBy = stamp.recorded_by || BNH_PAGE.user?.name || 'Unknown';
+
+    showSpinner(true);
+    try {
+      const payload = {
+        cancel_remark: remark,
+        cancelled_by:  cancelledBy,
+        cancelled_at:  new Date().toISOString(),
+        updated_at:    new Date().toISOString()
+      };
+      const { error } = await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no', caseNo);
+      if (error) throw error;
+
+      const idx = allCases.findIndex(c => c.case_no === caseNo);
+      if (idx >= 0) Object.assign(allCases[idx], payload);
+
+      closeCancelModal();
+      filterAndRenderPending();
+      filterAndRenderCancelled();
+      showOk(`🚫 Case ${caseNo} has been cancelled.`);
+    } catch(err) {
+      showErr('Error: ' + err.message);
+    } finally {
+      showSpinner(false);
+    }
+  });
+
+  /* ── restore cancelled case back to pending (Full Access Only) ── */
+  async function restoreCancelledCase(caseNo) {
+    if (!confirm(`Restore case ${caseNo} back to Pending?`)) return;
+    showSpinner(true);
+    try {
+      const payload = {
+        cancel_remark: null,
+        cancelled_by:  null,
+        cancelled_at:  null,
+        updated_at:    new Date().toISOString()
+      };
+      const { error } = await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no', caseNo);
+      if (error) throw error;
+
+      const idx = allCases.findIndex(c => c.case_no === caseNo);
+      if (idx >= 0) Object.assign(allCases[idx], payload);
+
+      filterAndRenderPending();
+      filterAndRenderCancelled();
+      showOk(`↩️ Case ${caseNo} restored to pending.`);
+    } catch(err) {
+      showErr('Error: ' + err.message);
+    } finally {
+      showSpinner(false);
+    }
+  }
+
   /* ── pagination ── */
   function renderPager(pagerId, total, page, key) {
     const tp = Math.ceil(total / PER);
@@ -771,6 +969,7 @@
   }
   function goP(key, page) {
     if (key === 'pend') { currentPendPage = page; renderPendingPage(); }
+    else if (key === 'canc') { currentCancPage = page; renderCancelledPage(); }
     else                { currentCompPage = page; renderCompletedPage(); }
   }
 
@@ -806,6 +1005,7 @@
       await loadCash();
       filterAndRenderPending();
       filterAndRenderCompleted();
+      filterAndRenderCancelled();
     } catch(e) {
       showErr('Initialization error: ' + e.message);
       console.error(e);
