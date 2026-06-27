@@ -513,13 +513,26 @@
 
       // Insert additional income + expense rows
       const entryId = inserted.id;
+      const admId = document.getElementById('admissionId').value;
       const allAddl = [
-        ...incomeRows.map(r => BNH_PAGE.stamp({ amount_entry_id: entryId,
-          admission_id: document.getElementById('admissionId').value,
-          type: 'income', label: r.label, amount: r.amount })),
-        ...expenseRows.map(r => BNH_PAGE.stamp({ amount_entry_id: entryId,
-          admission_id: document.getElementById('admissionId').value,
-          type: 'expense', label: r.label, amount: r.amount }))
+        ...incomeRows.map(r => ({
+          amount_entry_id: entryId,
+          admission_id: admId,
+          type: 'income',
+          label: r.label,
+          amount: r.amount,
+          created_by: BNH_PAGE.user.username,
+          updated_by: BNH_PAGE.user.username
+        })),
+        ...expenseRows.map(r => ({
+          amount_entry_id: entryId,
+          admission_id: admId,
+          type: 'expense',
+          label: r.label,
+          amount: r.amount,
+          created_by: BNH_PAGE.user.username,
+          updated_by: BNH_PAGE.user.username
+        }))
       ];
       if (allAddl.length > 0) {
         const { error: addlErr } = await BNH_PAGE.sb
