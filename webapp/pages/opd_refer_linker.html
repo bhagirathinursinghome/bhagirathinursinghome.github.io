@@ -72,6 +72,20 @@
     .modal-header h3 { margin: 0; font-size: 1.2rem; color: #333; }
     .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
     .modal-close:hover { color: #333; }
+
+    /* ── Searchable Refer Autocomplete ── */
+    .refer-ac-wrap { position: relative; }
+    .refer-ac-input { width: 100%; box-sizing: border-box; padding: 0.5rem 2rem 0.5rem 0.6rem; border: 1px solid #ccc; border-radius: 3px; font-size: 0.9rem; }
+    .refer-ac-input:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,.15); }
+    .refer-ac-clear { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: #999; line-height: 1; padding: 0; }
+    .refer-ac-clear:hover { color: #333; }
+    .refer-ac-dropdown { position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 4px; max-height: 220px; overflow-y: auto; z-index: 600; box-shadow: 0 4px 12px rgba(0,0,0,.12); display: none; }
+    .refer-ac-dropdown.open { display: block; }
+    .refer-ac-option { padding: 0.45rem 0.7rem; cursor: pointer; font-size: 0.85rem; border-bottom: 1px solid #f0f0f0; }
+    .refer-ac-option:last-child { border-bottom: none; }
+    .refer-ac-option:hover, .refer-ac-option.ac-active { background: #e8f0fe; }
+    .refer-ac-option mark { background: #fff176; border-radius: 2px; font-style: normal; }
+    .refer-ac-option .ac-sub { color: #888; font-size: 0.78rem; margin-top: 1px; }
   </style>
 </head>
 <body>
@@ -184,9 +198,13 @@
 
       <div class="form-group" id="modal-refer-quack-row">
         <label>Select Refer Doctor</label>
-        <select name="quack_doctor" id="modalQuackSelect" onchange="showModalQuackInfo(this.value)">
-          <option value="">Choose Refer…</option>
-        </select>
+        <div class="refer-ac-wrap" id="modalReferWrap">
+          <input type="text" id="modalReferInput" class="refer-ac-input" placeholder="Type name, mobile or team…" autocomplete="off"
+            oninput="acOnInput('modal')" onfocus="acOnInput('modal')" onkeydown="acOnKeydown(event,'modal')"/>
+          <button type="button" class="refer-ac-clear" id="modalReferClear" onclick="acClear('modal')" style="display:none" title="Clear">✕</button>
+          <div class="refer-ac-dropdown" id="modalReferDropdown"></div>
+        </div>
+        <input type="hidden" name="quack_doctor" id="modalQuackSelect"/>
         <div class="quack-display" id="modal-quack-display" style="display:none;margin-top:.5rem;"></div>
       </div>
 
@@ -351,13 +369,131 @@
     });
   }
 
-  /* ── quack doctor options ── */
-  function quackOptions() {
-    return quackDoctors.map(d =>
-      `<option value="${esc(d.doctor_name)}|${esc(d.mobile||'')}|${esc(d.recorded_by_name||'')}">`+
-      `${esc(d.doctor_name)} — 📞 ${d.mobile||'—'} (${esc(d.recorded_by_name||'Unknown Team')})</option>`
-    ).join('');
+  /* ── quack doctor options (kept for backward compat if needed) ── */
+  function quackOptions() { return ''; }
+
+  /* ── Searchable Refer Autocomplete Engine ──
+     Supports two contexts:
+       • 'modal'   → uses modalReferInput / modalReferDropdown / modalReferClear / modalQuackSelect
+       • caseNo    → uses acInput-{id} / acDd-{id} / acClearBtn-{id} / acVal-{id}
+  */
+  const acActiveIdx = {};
+
+  function acInputEl(ctx)   { return document.getElementById(ctx==='modal' ? 'modalReferInput'   : `acInput-${ctx}`); }
+  function acDdEl(ctx)      { return document.getElementById(ctx==='modal' ? 'modalReferDropdown' : `acDd-${ctx}`); }
+  function acClearEl(ctx)   { return document.getElementById(ctx==='modal' ? 'modalReferClear'    : `acClearBtn-${ctx}`); }
+  function acValEl(ctx)     { return document.getElementById(ctx==='modal' ? 'modalQuackSelect'   : `acVal-${ctx}`); }
+  function acDisplayEl(ctx) { return document.getElementById(ctx==='modal' ? 'modal-quack-display': `quack-display-${ctx}`); }
+
+  function acHighlight(text, q) {
+    if (!q) return esc(text);
+    const i = text.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return esc(text);
+    return esc(text.slice(0,i)) + '<mark>' + esc(text.slice(i,i+q.length)) + '</mark>' + esc(text.slice(i+q.length));
   }
+
+  function acOnInput(ctx) {
+    const input = acInputEl(ctx);
+    const dd    = acDdEl(ctx);
+    if (!input || !dd) return;
+    const q = input.value.trim();
+    acClearEl(ctx).style.display = q ? '' : 'none';
+    // clear previous selection
+    const valEl = acValEl(ctx);
+    if (valEl) valEl.value = '';
+    const dispEl = acDisplayEl(ctx);
+    if (dispEl) dispEl.style.display = 'none';
+
+    const results = q
+      ? quackDoctors.filter(d =>
+          (d.doctor_name||'').toLowerCase().includes(q.toLowerCase()) ||
+          (d.mobile||'').includes(q) ||
+          (d.recorded_by_name||'').toLowerCase().includes(q.toLowerCase()))
+      : quackDoctors;
+
+    if (results.length === 0) {
+      dd.innerHTML = '<div class="refer-ac-option" style="color:#999;cursor:default;">No match found</div>';
+    } else {
+      dd.innerHTML = results.map((d, i) => {
+        const val   = `${d.doctor_name}|${d.mobile||''}|${d.recorded_by_name||''}`;
+        const nameH = acHighlight(d.doctor_name||'', q);
+        const mobH  = acHighlight(d.mobile||'—', q);
+        const teamH = acHighlight(d.recorded_by_name||'Unknown Team', q);
+        return `<div class="refer-ac-option" data-val="${val.replace(/"/g,'&quot;')}" data-name="${(d.doctor_name||'').replace(/"/g,'&quot;')}" data-idx="${i}">${nameH}<div class="ac-sub">📞 ${mobH} &nbsp;|&nbsp; 🏷️ ${teamH}</div></div>`;
+      }).join('');
+      dd.querySelectorAll('.refer-ac-option[data-val]').forEach(el => {
+        el.addEventListener('mousedown', function(ev) {
+          ev.preventDefault();
+          acSelect(ctx, this.dataset.val, this.dataset.name);
+        });
+      });
+    }
+    acActiveIdx[ctx] = -1;
+    dd.classList.add('open');
+  }
+
+  function acSelect(ctx, val, label) {
+    const input  = acInputEl(ctx);
+    const dd     = acDdEl(ctx);
+    const valEl  = acValEl(ctx);
+    const dispEl = acDisplayEl(ctx);
+    if (input)  input.value = label;
+    if (valEl)  valEl.value = val;
+    acClearEl(ctx).style.display = '';
+    if (dd) dd.classList.remove('open');
+    // show info
+    if (dispEl && val) {
+      const [name, mobile, team] = val.split('|');
+      dispEl.style.display = 'block';
+      dispEl.innerHTML = `<strong>👨‍⚕️ Refer Doctor</strong>
+        <span>Name: <b>${esc(name)}</b></span><br>
+        <span>📞 Mobile: <b>${esc(mobile||'—')}</b></span><br>
+        <span>🏷️ Team: <b>${esc(team||'N/A')}</b></span>`;
+    }
+  }
+
+  function acClear(ctx) {
+    const input  = acInputEl(ctx);
+    const dd     = acDdEl(ctx);
+    const valEl  = acValEl(ctx);
+    const dispEl = acDisplayEl(ctx);
+    if (input)  input.value = '';
+    if (valEl)  valEl.value = '';
+    acClearEl(ctx).style.display = 'none';
+    if (dd) dd.classList.remove('open');
+    if (dispEl) dispEl.style.display = 'none';
+  }
+
+  function acOnKeydown(e, ctx) {
+    const dd    = acDdEl(ctx);
+    const items = dd ? dd.querySelectorAll('.refer-ac-option[data-val]') : [];
+    if (!dd || !dd.classList.contains('open') || items.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      acActiveIdx[ctx] = Math.min((acActiveIdx[ctx]||0) + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      acActiveIdx[ctx] = Math.max((acActiveIdx[ctx]||0) - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const idx = acActiveIdx[ctx] || 0;
+      if (idx >= 0 && items[idx]) items[idx].dispatchEvent(new MouseEvent('mousedown'));
+      return;
+    } else if (e.key === 'Escape') {
+      dd.classList.remove('open'); return;
+    }
+    items.forEach((it, i) => it.classList.toggle('ac-active', i === (acActiveIdx[ctx]||0)));
+    if ((acActiveIdx[ctx]||0) >= 0 && items[acActiveIdx[ctx]||0])
+      items[acActiveIdx[ctx]||0].scrollIntoView({ block: 'nearest' });
+  }
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', function(e) {
+    document.querySelectorAll('.refer-ac-dropdown.open').forEach(dd => {
+      const wrap = dd.closest('.refer-ac-wrap');
+      if (wrap && !wrap.contains(e.target)) dd.classList.remove('open');
+    });
+  });
 
   /* ── payment pill HTML ── */
   function payPills(caseNo, billAmt) {
@@ -449,10 +585,16 @@
 
           <div class="form-group" id="refer-quack-${esc(c.case_no)}">
             <label>Select Refer Doctor</label>
-            <select name="quack_doctor" onchange="showQuackInfo('${esc(c.case_no)}', this.value)">
-              <option value="">Choose Refer…</option>
-              ${quackOptions()}
-            </select>
+            <div class="refer-ac-wrap" id="acWrap-${esc(c.case_no)}">
+              <input type="text" class="refer-ac-input" id="acInput-${esc(c.case_no)}"
+                placeholder="Type name, mobile or team…" autocomplete="off"
+                oninput="acOnInput('${esc(c.case_no)}')" onfocus="acOnInput('${esc(c.case_no)}')"
+                onkeydown="acOnKeydown(event,'${esc(c.case_no)}')"/>
+              <button type="button" class="refer-ac-clear" id="acClearBtn-${esc(c.case_no)}"
+                onclick="acClear('${esc(c.case_no)}')" style="display:none" title="Clear">✕</button>
+              <div class="refer-ac-dropdown" id="acDd-${esc(c.case_no)}"></div>
+            </div>
+            <input type="hidden" name="quack_doctor" id="acVal-${esc(c.case_no)}"/>
             <div class="quack-display" id="quack-display-${esc(c.case_no)}" style="display:none;margin-top:.5rem;"></div>
           </div>
 
@@ -520,18 +662,8 @@
     if (qd) qd.style.display = 'none';
   }
 
-  /* ── show quack info card ── */
-  function showQuackInfo(caseNo, val) {
-    const display = document.getElementById(`quack-display-${caseNo}`);
-    if (!val) { display.style.display = 'none'; return; }
-    const [name, mobile, team] = val.split('|');
-    display.style.display = 'block';
-    display.innerHTML = `
-      <strong>👨‍⚕️ Refer Doctor</strong>
-      <span>Name: <b>${esc(name)}</b></span><br>
-      <span>📞 Mobile: <b>${esc(mobile||'—')}</b></span><br>
-      <span>🏷️ Team: <b>${esc(team||'N/A')}</b></span>`;
-  }
+  /* ── showQuackInfo: legacy shim, not used (autocomplete handles display) ── */
+  function showQuackInfo(caseNo, val) { /* handled by acSelect */ }
 
   /* ── skip a case from the rendered list ── */
   function skipCase(caseNo) {
@@ -674,17 +806,7 @@
     else               { row.style.display = 'none';  if(sel) sel.required = false; }
   }
 
-  function showModalQuackInfo(val) {
-    const display = document.getElementById('modal-quack-display');
-    if (!val) { display.style.display = 'none'; return; }
-    const [name, mobile, team] = val.split('|');
-    display.style.display = 'block';
-    display.innerHTML = `
-      <strong>👨‍⚕️ Refer Doctor</strong>
-      <span>Name: <b>${esc(name)}</b></span><br>
-      <span>📞 Mobile: <b>${esc(mobile||'—')}</b></span><br>
-      <span>🏷️ Team: <b>${esc(team||'N/A')}</b></span>`;
-  }
+  function showModalQuackInfo(val) { acSelect('modal', val, val ? val.split('|')[0] : ''); }
 
   function closeEditModal() {
     document.getElementById('editModal').classList.remove('active');
@@ -705,18 +827,16 @@
 
     if (c.refer_name) {
       switchModalReferType('quack');
-      // Match textual refer string against doctor database to restore option state
       const matchedDoc = quackDoctors.find(d => c.refer_name.startsWith(d.doctor_name));
       if (matchedDoc) {
         const optionVal = `${matchedDoc.doctor_name}|${matchedDoc.mobile||''}|${matchedDoc.recorded_by_name||''}`;
-        form.elements['quack_doctor'].value = optionVal;
-        showModalQuackInfo(optionVal);
+        acSelect('modal', optionVal, matchedDoc.doctor_name);
       } else {
-        form.elements['quack_doctor'].value = '';
+        acClear('modal');
       }
     } else {
       switchModalReferType('none');
-      form.elements['quack_doctor'].value = '';
+      acClear('modal');
     }
 
     if (c.ipd_link) {
@@ -996,8 +1116,7 @@
       await loadQuackDoctors();
       await loadIPDPatients();
       
-      // Inject dropdown details safely inside modal select structures
-      document.getElementById('modalQuackSelect').innerHTML = '<option value="">Choose Refer…</option>' + quackOptions();
+      // Populate IPD patient select in modal
       document.getElementById('modalIpdSelect').innerHTML = '<option value="">Choose IPD Patient…</option>' + ipdPatients.map(p=>`<option value="${esc(p.admission_no)}">${esc(p.patient_name)} (${esc(p.admission_no)})</option>`).join('');
 
       await loadCases();
