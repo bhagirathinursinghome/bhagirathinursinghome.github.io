@@ -56,6 +56,12 @@
       page: "pages/salary_sheet.html",
       roles: ["admin", "accountant"]
     },
+    { 
+      label: "Attendance", 
+      icon: "🕐", 
+      page: "pages/attendance.html", 
+      roles: ["admin","manager","viewer"] 
+    },
     {
       label: "Credit Management",
       icon: "💳",
