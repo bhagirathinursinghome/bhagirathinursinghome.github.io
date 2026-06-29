@@ -21,6 +21,20 @@
     .btn-add-refer { padding:0.45rem 0.85rem; background:#16a34a; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.82rem; white-space:nowrap; font-weight:600; }
     .btn-add-refer:hover { background:#15803d; }
 
+    /* Searchable refer autocomplete */
+    .refer-search-wrap { position:relative; flex:1; }
+    .refer-search-input { width:100%; box-sizing:border-box; padding:0.42rem 2rem 0.42rem 0.6rem; border:1px solid #ccc; border-radius:4px; font-size:0.88rem; }
+    .refer-search-input:focus { outline:none; border-color:#007bff; box-shadow:0 0 0 2px rgba(0,123,255,.15); }
+    .refer-clear-btn { position:absolute; right:0.5rem; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1rem; color:#999; line-height:1; padding:0; }
+    .refer-clear-btn:hover { color:#333; }
+    .refer-dropdown { position:absolute; top:calc(100% + 3px); left:0; right:0; background:#fff; border:1px solid #ccc; border-radius:4px; max-height:220px; overflow-y:auto; z-index:500; box-shadow:0 4px 12px rgba(0,0,0,.12); display:none; }
+    .refer-dropdown.open { display:block; }
+    .refer-option { padding:0.45rem 0.7rem; cursor:pointer; font-size:0.85rem; border-bottom:1px solid #f0f0f0; }
+    .refer-option:last-child { border-bottom:none; }
+    .refer-option:hover, .refer-option.active { background:#e8f0fe; }
+    .refer-option mark { background:#fff176; border-radius:2px; font-style:normal; }
+    .refer-option .sub { color:#888; font-size:0.78rem; margin-top:1px; }
+
     /* Modal */
     .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; display:flex; align-items:center; justify-content:center; }
     .modal-overlay.hidden { display:none!important; }
@@ -116,15 +130,20 @@
         <button type="button" class="refer-type-btn" data-type="none" onclick="switchAdmReferType('none')">🚫 Not Applicable</button>
       </div>
 
-      <!-- Quack Doctor -->
+      <!-- Quack Doctor (searchable autocomplete) -->
       <div id="referQuackSection">
         <label>Select Refer</label>
         <div class="refer-select-row">
-          <select id="quackDoctor" onchange="onQuackSelect()">
-            <option value="">Loading Refer…</option>
-          </select>
+          <div class="refer-search-wrap" id="referSearchWrap">
+            <input type="text" id="referSearchInput" class="refer-search-input" placeholder="Type name, mobile or team…" autocomplete="off"
+              oninput="onReferSearch()" onfocus="onReferSearch()" onkeydown="onReferKeydown(event)"/>
+            <button type="button" class="refer-clear-btn" id="referClearBtn" onclick="clearReferSearch()" style="display:none" title="Clear">✕</button>
+            <div class="refer-dropdown" id="referDropdown"></div>
+          </div>
           <button type="button" class="btn-add-refer" onclick="openAddReferModal()">➕ Add New Refer</button>
         </div>
+        <!-- hidden value holder -->
+        <input type="hidden" id="quackDoctor"/>
         <div id="quackInfoBox" class="quack-info-box" style="display:none;"></div>
       </div>
 
@@ -204,16 +223,99 @@
     else { w.classList.add('hidden'); f.required = false; f.value=''; }
   });
 
-  // Show quack doctor info
-  function onQuackSelect() {
-    const sel = document.getElementById('quackDoctor');
-    const val = sel.value;
-    const box = document.getElementById('quackInfoBox');
-    if (!val) { box.style.display = 'none'; return; }
+  // ── Searchable Refer Autocomplete ──
+  let referActiveIdx = -1;
+
+  function highlightMatch(text, query) {
+    if (!query) return text;
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx < 0) return text;
+    return text.slice(0, idx) + '<mark>' + text.slice(idx, idx + query.length) + '</mark>' + text.slice(idx + query.length);
+  }
+
+  function onReferSearch() {
+    const input = document.getElementById('referSearchInput');
+    const dd    = document.getElementById('referDropdown');
+    const q     = input.value.trim();
+    document.getElementById('referClearBtn').style.display = q ? '' : 'none';
+    // clear selection if user is typing again
+    document.getElementById('quackDoctor').value = '';
+    document.getElementById('quackInfoBox').style.display = 'none';
+
+    const results = q
+      ? quackData.filter(d =>
+          (d.doctor_name||'').toLowerCase().includes(q.toLowerCase()) ||
+          (d.mobile||'').includes(q) ||
+          (d.recorded_by_name||'').toLowerCase().includes(q.toLowerCase()))
+      : quackData;
+
+    if (results.length === 0) {
+      dd.innerHTML = '<div class="refer-option" style="color:#999;cursor:default;">No match found</div>';
+    } else {
+      dd.innerHTML = results.map((d, i) => {
+        const val   = `${d.doctor_name}|${d.mobile}|${d.recorded_by_name||''}`;
+        const nameH = highlightMatch(d.doctor_name||'', q);
+        const mobH  = highlightMatch(d.mobile||'—', q);
+        const teamH = highlightMatch(d.recorded_by_name||'Unknown Team', q);
+        return `<div class="refer-option" data-val="${val.replace(/"/g,'&quot;')}" data-name="${(d.doctor_name||'').replace(/"/g,'&quot;')}" data-idx="${i}">${nameH}<div class="sub">📞 ${mobH} &nbsp;|&nbsp; 🏷️ ${teamH}</div></div>`;
+      }).join('');
+      dd.querySelectorAll('.refer-option[data-val]').forEach(el => {
+        el.addEventListener('mousedown', function(ev) {
+          ev.preventDefault();
+          selectReferOption(this.dataset.val, this.dataset.name);
+        });
+      });
+    }
+    referActiveIdx = -1;
+    dd.classList.add('open');
+  }
+
+  function selectReferOption(val, label) {
+    document.getElementById('referSearchInput').value = label;
+    document.getElementById('quackDoctor').value = val;
+    document.getElementById('referClearBtn').style.display = '';
+    document.getElementById('referDropdown').classList.remove('open');
+    // show info box
     const parts = val.split('|');
+    const box = document.getElementById('quackInfoBox');
     box.style.display = 'block';
     box.innerHTML = `<strong>👨‍⚕️ ${parts[0]}</strong><br>📞 Mobile: <b>${parts[1]}</b> | 🏷️ Team: <b>${parts[2] || 'N/A'}</b>`;
   }
+
+  function clearReferSearch() {
+    document.getElementById('referSearchInput').value = '';
+    document.getElementById('quackDoctor').value = '';
+    document.getElementById('referClearBtn').style.display = 'none';
+    document.getElementById('referDropdown').classList.remove('open');
+    document.getElementById('quackInfoBox').style.display = 'none';
+  }
+
+  function onReferKeydown(e) {
+    const dd = document.getElementById('referDropdown');
+    const items = dd.querySelectorAll('.refer-option[data-val]');
+    if (!dd.classList.contains('open') || items.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      referActiveIdx = Math.min(referActiveIdx + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      referActiveIdx = Math.max(referActiveIdx - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (referActiveIdx >= 0) items[referActiveIdx].dispatchEvent(new MouseEvent('mousedown'));
+      return;
+    } else if (e.key === 'Escape') {
+      dd.classList.remove('open'); return;
+    }
+    items.forEach((it, i) => it.classList.toggle('active', i === referActiveIdx));
+    if (referActiveIdx >= 0) items[referActiveIdx].scrollIntoView({ block: 'nearest' });
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!document.getElementById('referSearchWrap').contains(e.target))
+      document.getElementById('referDropdown').classList.remove('open');
+  });
 
   // Load quack doctors from gramin_doctor_visits
   async function loadQuackDoctors(autoSelect) {
@@ -227,14 +329,9 @@
       seen.add(key);
       return true;
     });
-    const sel = document.getElementById('quackDoctor');
-    sel.innerHTML = '<option value="">-- Select Refer --</option>' +
-      quackData.map(d =>
-        `<option value="${d.doctor_name}|${d.mobile}|${d.recorded_by_name||''}">${d.doctor_name} — 📞 ${d.mobile} (${d.recorded_by_name||'Unknown Team'})</option>`
-      ).join('');
     if (autoSelect) {
-      sel.value = autoSelect;
-      onQuackSelect();
+      const parts = autoSelect.split('|');
+      selectReferOption(autoSelect, parts[0]);
     }
   }
 
@@ -363,6 +460,7 @@
       document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
       currentReferType = 'quack';
       switchAdmReferType('quack');
+      clearReferSearch();
       loadAdmissions();
     } catch(ex) {
       err.textContent = ex.message;
