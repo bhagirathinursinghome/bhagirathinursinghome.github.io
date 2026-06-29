@@ -6,33 +6,33 @@
   <title>Attendance — BNH Portal</title>
   <link rel="stylesheet" href="../assets/style.css"/>
   <style>
-    /* ── Page-specific overrides ──────────────────────────── */
-    .att-controls {
+    /* ── View toggle ─────────────────────────────────────────── */
+    .view-toggle {
       display: flex;
-      flex-wrap: wrap;
-      gap: .75rem;
-      align-items: flex-end;
+      gap: 0;
+      border: 1px solid #1F4E79;
+      border-radius: 8px;
+      overflow: hidden;
       margin-bottom: 1.25rem;
+      width: fit-content;
     }
-    .att-controls label {
-      display: flex;
-      flex-direction: column;
-      font-size: .78rem;
+    .view-toggle button {
+      padding: .5rem 1.3rem;
+      border: none;
+      background: #fff;
+      color: #1F4E79;
+      font-size: .85rem;
       font-weight: 600;
-      color: var(--text-muted, #6b7280);
-      gap: .25rem;
+      cursor: pointer;
+      transition: background .15s, color .15s;
     }
-    .att-controls input[type="date"] {
-      padding: .42rem .65rem;
-      border: 1px solid var(--border, #d1d5db);
-      border-radius: 6px;
-      font-size: .9rem;
-      background: var(--input-bg, #fff);
-      color: var(--text, #111827);
-      min-width: 148px;
+    .view-toggle button.active {
+      background: #1F4E79;
+      color: #fff;
     }
+    .view-toggle button:not(:last-child) { border-right: 1px solid #1F4E79; }
 
-    /* ── Summary cards row ───────────────────────────────── */
+    /* ── Stats row ───────────────────────────────────────────── */
     .stat-row {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -44,190 +44,274 @@
       border: 1px solid var(--border, #e5e7eb);
       border-radius: 10px;
       padding: 1rem 1.1rem .85rem;
-      display: flex;
-      flex-direction: column;
-      gap: .25rem;
+      display: flex; flex-direction: column; gap: .25rem;
     }
-    .stat-card .s-val {
-      font-size: 1.75rem;
-      font-weight: 700;
-      color: var(--primary, #1F4E79);
-      line-height: 1;
-    }
-    .stat-card .s-lbl {
-      font-size: .72rem;
-      font-weight: 600;
-      color: var(--text-muted, #6b7280);
-      text-transform: uppercase;
-      letter-spacing: .04em;
-    }
+    .stat-card .s-val { font-size: 1.75rem; font-weight: 700; color: #1F4E79; line-height: 1; }
+    .stat-card .s-lbl { font-size: .72rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
 
-    /* ── Table ───────────────────────────────────────────── */
-    .tbl-wrap {
-      overflow-x: auto;
-      border-radius: 10px;
-      border: 1px solid var(--border, #e5e7eb);
+    /* ── Controls ────────────────────────────────────────────── */
+    .att-controls {
+      display: flex; flex-wrap: wrap; gap: .75rem;
+      align-items: flex-end; margin-bottom: 1.25rem;
     }
-    #attTable {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: .88rem;
+    .att-controls label {
+      display: flex; flex-direction: column;
+      font-size: .78rem; font-weight: 600; color: #6b7280; gap: .25rem;
     }
-    #attTable thead tr {
-      background: #1F4E79;
-      color: #fff;
+    .att-controls input[type="date"],
+    .att-controls select {
+      padding: .42rem .65rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px; font-size: .9rem;
+      background: #fff; color: #111827; min-width: 148px;
     }
+    .btn-export {
+      background: #059669; color: #fff; border: none; border-radius: 6px;
+      padding: .45rem .9rem; font-size: .85rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-export:hover { background: #047857; }
+
+    /* ── TABLE VIEW ──────────────────────────────────────────── */
+    .tbl-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid #e5e7eb; }
+    #attTable { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    #attTable thead tr { background: #1F4E79; color: #fff; }
     #attTable thead th {
-      padding: .7rem 1rem;
-      text-align: left;
-      font-weight: 600;
-      font-size: .78rem;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      white-space: nowrap;
-      cursor: pointer;
-      user-select: none;
+      padding: .7rem 1rem; text-align: left; font-weight: 600;
+      font-size: .78rem; letter-spacing: .04em; text-transform: uppercase;
+      white-space: nowrap; cursor: pointer; user-select: none;
     }
     #attTable thead th:hover { background: #17406b; }
     #attTable thead th .sort-icon { margin-left: .3rem; opacity: .55; }
-    #attTable tbody tr {
-      border-bottom: 1px solid var(--border, #f0f0f0);
-      transition: background .12s;
-    }
+    #attTable tbody tr { border-bottom: 1px solid #f0f0f0; transition: background .12s; }
     #attTable tbody tr:nth-child(even) { background: #f7fafd; }
-    #attTable tbody tr:hover           { background: #EBF3FB; }
-    #attTable tbody td {
-      padding: .6rem 1rem;
-      color: var(--text, #111827);
-      white-space: nowrap;
-    }
-    .badge {
-      display: inline-block;
-      padding: .18rem .55rem;
-      border-radius: 20px;
-      font-size: .72rem;
-      font-weight: 700;
-    }
+    #attTable tbody tr:hover { background: #EBF3FB; }
+    #attTable tbody td { padding: .6rem 1rem; color: #111827; white-space: nowrap; }
+    .badge { display: inline-block; padding: .18rem .55rem; border-radius: 20px; font-size: .72rem; font-weight: 700; }
     .badge-present { background: #d1fae5; color: #065f46; }
     .badge-absent  { background: #fee2e2; color: #991b1b; }
     .badge-late    { background: #fef3c7; color: #92400e; }
 
-    /* ── Empty / loading states ──────────────────────────── */
-    .empty-state {
-      text-align: center;
-      padding: 3.5rem 1rem;
-      color: var(--text-muted, #9ca3af);
-    }
-    .empty-state .icon { font-size: 2.8rem; display: block; margin-bottom: .5rem; }
-    .empty-state p     { font-size: .9rem; }
-
-    /* ── Search bar ──────────────────────────────────────── */
-    .search-wrap { position: relative; }
-    .search-wrap input {
-      padding: .42rem .65rem .42rem 2rem;
-      border: 1px solid var(--border, #d1d5db);
-      border-radius: 6px;
-      font-size: .9rem;
-      width: 200px;
-    }
-    .search-wrap::before {
-      content: "🔍";
-      position: absolute;
-      left: .5rem;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: .8rem;
-      pointer-events: none;
-    }
-
-    /* ── Export button ───────────────────────────────────── */
-    .btn-export {
-      background: #059669;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: .45rem .9rem;
-      font-size: .85rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: .35rem;
-      transition: background .15s;
-    }
-    .btn-export:hover { background: #047857; }
-
-    /* ── Pagination ──────────────────────────────────────── */
+    /* ── Pagination ──────────────────────────────────────────── */
     .pagination {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: .4rem;
-      margin-top: .85rem;
-      font-size: .82rem;
+      display: flex; align-items: center; justify-content: flex-end;
+      gap: .4rem; margin-top: .85rem; font-size: .82rem;
     }
     .pagination button {
-      padding: .28rem .65rem;
-      border: 1px solid var(--border, #d1d5db);
-      border-radius: 5px;
-      background: #fff;
-      cursor: pointer;
-      font-size: .82rem;
+      padding: .28rem .65rem; border: 1px solid #d1d5db;
+      border-radius: 5px; background: #fff; cursor: pointer; font-size: .82rem;
     }
     .pagination button:disabled { opacity: .4; cursor: default; }
-    .pagination button.active   { background: #1F4E79; color: #fff; border-color: #1F4E79; }
-    .pagination .pg-info        { color: #6b7280; }
+    .pagination button.active { background: #1F4E79; color: #fff; border-color: #1F4E79; }
+    .pagination .pg-info { color: #6b7280; }
+
+    /* ── CALENDAR VIEW ───────────────────────────────────────── */
+    #tableView    { display: block; }
+    #calendarView { display: none; }
+    .cal-top {
+      display: flex; flex-wrap: wrap; gap: .75rem;
+      align-items: flex-end; margin-bottom: 1.25rem;
+    }
+    .cal-top label {
+      display: flex; flex-direction: column;
+      font-size: .78rem; font-weight: 600; color: #6b7280; gap: .25rem;
+    }
+    .cal-top select {
+      padding: .42rem .65rem; border: 1px solid #d1d5db;
+      border-radius: 6px; font-size: .9rem; min-width: 200px;
+    }
+    .cal-nav {
+      display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem;
+    }
+    .cal-nav button {
+      background: #1F4E79; color: #fff; border: none; border-radius: 6px;
+      width: 32px; height: 32px; font-size: 1rem; cursor: pointer; transition: background .15s;
+    }
+    .cal-nav button:hover { background: #17406b; }
+    .cal-nav .cal-title { font-weight: 700; font-size: 1.05rem; color: #1F4E79; min-width: 160px; text-align: center; }
+
+    .cal-legend {
+      display: flex; gap: 1rem; margin-bottom: .85rem; flex-wrap: wrap;
+    }
+    .cal-legend span {
+      display: flex; align-items: center; gap: .35rem;
+      font-size: .78rem; font-weight: 600; color: #6b7280;
+    }
+    .leg-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      display: inline-block; flex-shrink: 0;
+    }
+    .leg-green  { background: #10b981; }
+    .leg-yellow { background: #f59e0b; }
+    .leg-red    { background: #ef4444; }
+    .leg-gray   { background: #d1d5db; }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .cal-dow {
+      text-align: center; font-size: .72rem; font-weight: 700;
+      color: #6b7280; text-transform: uppercase; padding: .3rem 0;
+      letter-spacing: .05em;
+    }
+    .cal-day {
+      border-radius: 8px; padding: .5rem .3rem;
+      min-height: 60px; display: flex; flex-direction: column;
+      align-items: center; gap: 4px;
+      border: 2px solid transparent;
+      transition: transform .1s, box-shadow .1s;
+      position: relative;
+    }
+    .cal-day.clickable { cursor: pointer; }
+    .cal-day.clickable:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,.15); z-index: 1; }
+    .cal-day.empty { background: transparent; border: none; min-height: 60px; }
+    .cal-day.future { background: #f9fafb; border-color: #f3f4f6; }
+    .cal-day .day-num {
+      font-size: .82rem; font-weight: 700; line-height: 1;
+    }
+    .cal-day .day-time {
+      font-size: .65rem; font-weight: 600; text-align: center; line-height: 1.3;
+    }
+    /* Status colours */
+    .cal-day.present  { background: #d1fae5; border-color: #6ee7b7; }
+    .cal-day.present  .day-num  { color: #065f46; }
+    .cal-day.present  .day-time { color: #047857; }
+    .cal-day.half     { background: #fef3c7; border-color: #fcd34d; }
+    .cal-day.half     .day-num  { color: #92400e; }
+    .cal-day.half     .day-time { color: #b45309; }
+    .cal-day.absent   { background: #fee2e2; border-color: #fca5a5; }
+    .cal-day.absent   .day-num  { color: #991b1b; }
+    .cal-day.absent   .day-time { color: #b91c1c; font-size: .7rem; }
+    .cal-day.today-marker { box-shadow: 0 0 0 2px #1F4E79; }
+
+    /* staff summary below calendar */
+    .cal-summary {
+      margin-top: 1.25rem; display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: .65rem;
+    }
+    .cal-sum-card {
+      border-radius: 8px; padding: .75rem .9rem;
+      display: flex; flex-direction: column; gap: .2rem;
+      border: 1px solid #e5e7eb;
+    }
+    .cal-sum-card .csv { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+    .cal-sum-card .csl { font-size: .7rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+    .sum-green  { background: #ecfdf5; } .sum-green  .csv { color: #065f46; }
+    .sum-yellow { background: #fffbeb; } .sum-yellow .csv { color: #92400e; }
+    .sum-red    { background: #fef2f2; } .sum-red    .csv { color: #991b1b; }
+    .sum-blue   { background: #eff6ff; } .sum-blue   .csv { color: #1e40af; }
+
+    /* ── POPUP MODAL ─────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000; opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal-box {
+      background: #fff; border-radius: 14px; padding: 1.5rem 1.75rem;
+      min-width: 300px; max-width: 420px; width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      transform: translateY(10px); transition: transform .2s;
+      position: relative;
+    }
+    .modal-overlay.open .modal-box { transform: translateY(0); }
+    .modal-close {
+      position: absolute; top: .9rem; right: .9rem;
+      background: #f3f4f6; border: none; border-radius: 50%;
+      width: 28px; height: 28px; font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: #6b7280; transition: background .15s;
+    }
+    .modal-close:hover { background: #e5e7eb; }
+    .modal-date {
+      font-size: .78rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: #6b7280; margin-bottom: .35rem;
+    }
+    .modal-name { font-size: 1.2rem; font-weight: 700; color: #1F4E79; margin-bottom: 1rem; }
+    .modal-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: .55rem 0; border-bottom: 1px solid #f3f4f6;
+      font-size: .9rem;
+    }
+    .modal-row:last-child { border-bottom: none; }
+    .modal-row .mr-label { color: #6b7280; font-weight: 500; }
+    .modal-row .mr-val   { font-weight: 700; color: #111827; }
+    .modal-status-bar {
+      margin-top: 1rem; padding: .55rem .75rem; border-radius: 8px;
+      text-align: center; font-weight: 700; font-size: .88rem;
+    }
+
+    /* ── Empty state ─────────────────────────────────────────── */
+    .empty-state { text-align: center; padding: 3.5rem 1rem; color: #9ca3af; }
+    .empty-state .icon { font-size: 2.8rem; display: block; margin-bottom: .5rem; }
+    .empty-state p { font-size: .9rem; }
   </style>
 </head>
 <body>
 <div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
 
+<!-- ── Day detail popup ──────────────────────────────────────── -->
+<div class="modal-overlay" id="dayModal" onclick="closeModal(event)">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-date" id="mDate"></div>
+    <div class="modal-name" id="mName"></div>
+    <div class="modal-row"><span class="mr-label">Entry Time</span><span class="mr-val" id="mEntry"></span></div>
+    <div class="modal-row"><span class="mr-label">Exit Time</span><span class="mr-val" id="mExit"></span></div>
+    <div class="modal-row"><span class="mr-label">Duration</span><span class="mr-val" id="mDur"></span></div>
+    <div class="modal-row"><span class="mr-label">Total Punches</span><span class="mr-val" id="mPunch"></span></div>
+    <div class="modal-status-bar" id="mStatus"></div>
+  </div>
+</div>
+
 <div class="page">
   <h1>🕐 Biometric Attendance</h1>
 
-  <!-- ── Stats row ───────────────────────────────────────── -->
-  <div class="stat-row" id="statRow">
+  <!-- stats -->
+  <div class="stat-row">
     <div class="stat-card"><span class="s-val" id="sTotal">—</span><span class="s-lbl">Total Records</span></div>
     <div class="stat-card"><span class="s-val" id="sPresent">—</span><span class="s-lbl">Present Days</span></div>
     <div class="stat-card"><span class="s-val" id="sStaff">—</span><span class="s-lbl">Staff Members</span></div>
     <div class="stat-card"><span class="s-val" id="sAvgDur">—</span><span class="s-lbl">Avg Duration</span></div>
   </div>
 
-  <div class="page-card">
+  <!-- view toggle -->
+  <div class="view-toggle">
+    <button class="active" id="btnTable"    onclick="switchView('table')">📋 Table View</button>
+    <button             id="btnCalendar" onclick="switchView('calendar')">📅 Calendar View</button>
+  </div>
 
-    <!-- ── Controls ──────────────────────────────────────── -->
-    <div class="att-controls">
-      <label>
-        From Date
-        <input type="date" id="fromDate"/>
-      </label>
-      <label>
-        To Date
-        <input type="date" id="toDate"/>
-      </label>
-      <label>
-        Staff Name
-        <select id="staffFilter" style="padding:.42rem .65rem;border:1px solid var(--border,#d1d5db);border-radius:6px;font-size:.9rem;min-width:160px">
-          <option value="">— All Staff —</option>
-        </select>
-      </label>
-      <div class="search-wrap">
-        <label style="display:flex;flex-direction:column;font-size:.78rem;font-weight:600;color:var(--text-muted,#6b7280);gap:.25rem;">
-          Search
-          <input type="text" id="searchBox" placeholder="Name or ID…" style="padding:.42rem .65rem .42rem 2rem;border:1px solid var(--border,#d1d5db);border-radius:6px;font-size:.9rem;width:180px"/>
+  <!-- ════════════════════════════════════════════════════════
+       TABLE VIEW
+  ═════════════════════════════════════════════════════════ -->
+  <div id="tableView">
+    <div class="page-card">
+      <div class="att-controls">
+        <label>From Date<input type="date" id="fromDate"/></label>
+        <label>To Date<input type="date" id="toDate"/></label>
+        <label>Staff
+          <select id="staffFilter">
+            <option value="">— All Staff —</option>
+          </select>
         </label>
+        <label>Search
+          <input type="text" id="searchBox" placeholder="Name or ID…"
+            style="padding:.42rem .65rem;border:1px solid #d1d5db;border-radius:6px;font-size:.9rem;width:180px"/>
+        </label>
+        <div style="display:flex;gap:.5rem;margin-left:auto;align-items:flex-end">
+          <button class="btn-primary" style="width:auto" onclick="loadData()">Load</button>
+          <button class="btn-export" onclick="exportCSV()">⬇ CSV</button>
+        </div>
       </div>
-      <div style="display:flex;gap:.5rem;margin-left:auto;align-items:flex-end">
-        <button class="btn-primary" style="width:auto" onclick="loadData()">Load</button>
-        <button class="btn-export" onclick="exportCSV()">⬇ CSV</button>
-      </div>
-    </div>
 
-    <!-- ── Table ─────────────────────────────────────────── -->
-    <div class="tbl-wrap">
-      <table id="attTable">
-        <thead>
-          <tr>
+      <div class="tbl-wrap">
+        <table id="attTable">
+          <thead><tr>
             <th onclick="sortBy('name')">Name <span class="sort-icon" id="sort-name">↕</span></th>
             <th onclick="sortBy('user_id')">Staff ID <span class="sort-icon" id="sort-user_id">↕</span></th>
             <th onclick="sortBy('date')">Date <span class="sort-icon" id="sort-date">↕</span></th>
@@ -236,174 +320,219 @@
             <th onclick="sortBy('duration')">Duration <span class="sort-icon" id="sort-duration">↕</span></th>
             <th onclick="sortBy('total_punches')">Punches <span class="sort-icon" id="sort-total_punches">↕</span></th>
             <th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="attBody">
-          <tr><td colspan="8">
-            <div class="empty-state">
-              <span class="icon">📅</span>
-              <p>Select a date range and click <strong>Load</strong>.</p>
-            </div>
-          </td></tr>
-        </tbody>
-      </table>
+          </tr></thead>
+          <tbody id="attBody">
+            <tr><td colspan="8">
+              <div class="empty-state">
+                <span class="icon">📅</span>
+                <p>Select a date range and click <strong>Load</strong>.</p>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
     </div>
+  </div>
 
-    <!-- ── Pagination ─────────────────────────────────────── -->
-    <div class="pagination" id="pagination"></div>
+  <!-- ════════════════════════════════════════════════════════
+       CALENDAR VIEW
+  ═════════════════════════════════════════════════════════ -->
+  <div id="calendarView">
+    <div class="page-card">
+      <div class="cal-top">
+        <label>Select Staff
+          <select id="calStaff" onchange="renderCalendar()">
+            <option value="">— Select a staff member —</option>
+          </select>
+        </label>
+        <div style="margin-left:auto;align-self:flex-end">
+          <button class="btn-primary" style="width:auto" onclick="loadData()">Refresh Data</button>
+        </div>
+      </div>
 
-  </div><!-- .page-card -->
+      <!-- month nav -->
+      <div class="cal-nav">
+        <button onclick="changeMonth(-1)">‹</button>
+        <span class="cal-title" id="calTitle">—</span>
+        <button onclick="changeMonth(1)">›</button>
+      </div>
+
+      <!-- legend -->
+      <div class="cal-legend">
+        <span><span class="leg-dot leg-green"></span> Present (with exit)</span>
+        <span><span class="leg-dot leg-yellow"></span> Punch-in only (no exit)</span>
+        <span><span class="leg-dot leg-red"></span> Absent</span>
+        <span><span class="leg-dot leg-gray"></span> Future / Weekend</span>
+      </div>
+
+      <!-- calendar grid -->
+      <div class="cal-grid" id="calGrid"></div>
+
+      <!-- per-month summary cards -->
+      <div class="cal-summary" id="calSummary"></div>
+    </div>
+  </div>
+
 </div><!-- .page -->
 
-<!-- Required scripts -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
-
 <script>
-// ── Role guard ────────────────────────────────────────────────
-BNH_PAGE.requireRole(["admin", "manager", "viewer", "reception"]);
+BNH_PAGE.requireRole(["admin","manager","viewer","reception"]);
 
-// ── State ─────────────────────────────────────────────────────
-let allRows   = [];      // full dataset from Supabase
-let filtered  = [];      // after search/filter
-let sortKey   = "date";
-let sortDir   = -1;      // -1 = desc, 1 = asc
-let page      = 1;
+// ════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════
+let allRows  = [];
+let filtered = [];
+let sortKey  = "date";
+let sortDir  = -1;
+let curPage  = 1;
 const PAGE_SIZE = 25;
 
-// ── Init: set default date range (last 7 days) ────────────────
-(function initDates() {
+let calYear  = new Date().getFullYear();
+let calMonth = new Date().getMonth(); // 0-based
+
+// ── default dates ─────────────────────────────────────────────
+(function() {
   const today = new Date();
-  const ago7  = new Date(today);
-  ago7.setDate(ago7.getDate() - 6);
-  document.getElementById("toDate").value   = fmt(today);
-  document.getElementById("fromDate").value = fmt(ago7);
+  const ago30 = new Date(today); ago30.setDate(ago30.getDate() - 29);
+  document.getElementById("toDate").value   = fmtDate(today);
+  document.getElementById("fromDate").value = fmtDate(ago30);
+  updateCalTitle();
 })();
 
-function fmt(d) {
-  return d.toISOString().split("T")[0];
+function fmtDate(d) { return d.toISOString().split("T")[0]; }
+
+// ════════════════════════════════════════════════════════════
+//  VIEW SWITCH
+// ════════════════════════════════════════════════════════════
+function switchView(v) {
+  document.getElementById("tableView").style.display    = v === "table"    ? "block" : "none";
+  document.getElementById("calendarView").style.display = v === "calendar" ? "block" : "none";
+  document.getElementById("btnTable").classList.toggle("active",    v === "table");
+  document.getElementById("btnCalendar").classList.toggle("active", v === "calendar");
+  if (v === "calendar") renderCalendar();
 }
 
-// ── Load data from Supabase ───────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  LOAD DATA FROM SUPABASE
+// ════════════════════════════════════════════════════════════
 async function loadData() {
   const from = document.getElementById("fromDate").value;
   const to   = document.getElementById("toDate").value;
+  if (!from || !to) { alert("Please select both From and To dates."); return; }
 
-  if (!from || !to) {
-    alert("Please select both From and To dates.");
-    return;
-  }
-
-  const spinner = document.getElementById("spinner");
-  spinner.classList.remove("hidden");
-
+  document.getElementById("spinner").classList.remove("hidden");
   try {
     const { data, error } = await BNH_PAGE.sb
-      .from("attendance")
-      .select("*")
-      .gte("date", from)
-      .lte("date", to)
-      .order("date",  { ascending: false })
-      .order("name",  { ascending: true });
-
+      .from("attendance").select("*")
+      .gte("date", from).lte("date", to)
+      .order("date", { ascending: false })
+      .order("name", { ascending: true });
     if (error) throw error;
-
     allRows = data || [];
-    populateStaffFilter();
+    populateStaffDropdowns();
     applyFilters();
     updateStats();
-
+    renderCalendar();
   } catch (err) {
     alert("Error loading data: " + err.message);
-    console.error(err);
   } finally {
-    spinner.classList.add("hidden");
+    document.getElementById("spinner").classList.add("hidden");
   }
 }
 
-// ── Populate staff dropdown ───────────────────────────────────
-function populateStaffFilter() {
-  const sel   = document.getElementById("staffFilter");
+// ════════════════════════════════════════════════════════════
+//  DROPDOWNS
+// ════════════════════════════════════════════════════════════
+function populateStaffDropdowns() {
   const names = [...new Set(allRows.map(r => r.name))].sort();
-  const prev  = sel.value;
-  sel.innerHTML = '<option value="">— All Staff —</option>';
+
+  // table filter
+  const tSel = document.getElementById("staffFilter");
+  const tPrev = tSel.value;
+  tSel.innerHTML = '<option value="">— All Staff —</option>';
   names.forEach(n => {
     const o = document.createElement("option");
     o.value = n; o.textContent = n;
-    if (n === prev) o.selected = true;
-    sel.appendChild(o);
+    if (n === tPrev) o.selected = true;
+    tSel.appendChild(o);
+  });
+
+  // calendar staff
+  const cSel = document.getElementById("calStaff");
+  const cPrev = cSel.value;
+  cSel.innerHTML = '<option value="">— Select a staff member —</option>';
+  names.forEach(n => {
+    const o = document.createElement("option");
+    o.value = n; o.textContent = n;
+    if (n === cPrev) o.selected = true;
+    cSel.appendChild(o);
   });
 }
 
-// ── Filter + render ───────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  TABLE VIEW LOGIC
+// ════════════════════════════════════════════════════════════
 function applyFilters() {
   const staff  = document.getElementById("staffFilter").value.toLowerCase();
   const search = document.getElementById("searchBox").value.toLowerCase().trim();
-
   filtered = allRows.filter(r => {
-    const matchStaff  = !staff  || r.name?.toLowerCase() === staff;
-    const matchSearch = !search ||
-      r.name?.toLowerCase().includes(search) ||
-      r.user_id?.toLowerCase().includes(search);
-    return matchStaff && matchSearch;
+    const ms = !staff  || r.name?.toLowerCase() === staff;
+    const mq = !search || r.name?.toLowerCase().includes(search) || r.user_id?.toLowerCase().includes(search);
+    return ms && mq;
   });
-
-  sortData();
-  page = 1;
-  renderTable();
-  renderPagination();
+  sortData(); curPage = 1; renderTable(); renderPagination();
 }
 
-// ── Sort ──────────────────────────────────────────────────────
 function sortBy(key) {
-  if (sortKey === key) sortDir *= -1;
-  else { sortKey = key; sortDir = 1; }
+  if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
   document.querySelectorAll(".sort-icon").forEach(el => el.textContent = "↕");
-  const icon = document.getElementById("sort-" + key);
-  if (icon) icon.textContent = sortDir === 1 ? "↑" : "↓";
-  sortData();
-  page = 1;
-  renderTable();
-  renderPagination();
+  const ic = document.getElementById("sort-" + key);
+  if (ic) ic.textContent = sortDir === 1 ? "↑" : "↓";
+  sortData(); curPage = 1; renderTable(); renderPagination();
 }
-
 function sortData() {
-  filtered.sort((a, b) => {
-    const av = a[sortKey] ?? "";
-    const bv = b[sortKey] ?? "";
+  filtered.sort((a,b) => {
+    const av = a[sortKey]??"", bv = b[sortKey]??"";
     return av < bv ? -sortDir : av > bv ? sortDir : 0;
   });
 }
 
-// ── Render table ─────────────────────────────────────────────
-function renderTable() {
-  const tbody  = document.getElementById("attBody");
-  const start  = (page - 1) * PAGE_SIZE;
-  const slice  = filtered.slice(start, start + PAGE_SIZE);
+function to12(t) {
+  // "14:32:00" → "2:32 PM"
+  if (!t || t === "—") return "—";
+  const [hh, mm] = t.split(":");
+  const h = parseInt(hh), ampm = h >= 12 ? "PM" : "AM";
+  return `${h % 12 || 12}:${mm} ${ampm}`;
+}
 
+function renderTable() {
+  const tbody = document.getElementById("attBody");
+  const start = (curPage - 1) * PAGE_SIZE;
+  const slice = filtered.slice(start, start + PAGE_SIZE);
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="8">
-      <div class="empty-state">
-        <span class="icon">🔍</span>
-        <p>No records found for the selected filters.</p>
-      </div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><span class="icon">🔍</span><p>No records found.</p></div></td></tr>`;
     return;
   }
-
   tbody.innerHTML = slice.map(r => {
     const isLate = r.entry_time && r.entry_time > "09:30:00";
-    const badge  = r.is_present
-      ? (isLate
-          ? '<span class="badge badge-late">Late</span>'
-          : '<span class="badge badge-present">Present</span>')
-      : '<span class="badge badge-absent">Absent</span>';
+    const noExit = !r.exit_time || r.exit_time === "—";
+    const badge  = noExit
+      ? '<span class="badge badge-late">No Exit</span>'
+      : r.is_present
+        ? (isLate ? '<span class="badge badge-late">Late</span>'
+                  : '<span class="badge badge-present">Present</span>')
+        : '<span class="badge badge-absent">Absent</span>';
     return `<tr>
       <td>${esc(r.name)}</td>
       <td>${esc(r.user_id)}</td>
       <td>${esc(r.date)}</td>
-      <td>${esc(r.entry_time)}</td>
-      <td>${esc(r.exit_time ?? "—")}</td>
+      <td>${to12(r.entry_time)}</td>
+      <td>${to12(r.exit_time)}</td>
       <td>${esc(r.duration ?? "—")}</td>
       <td style="text-align:center">${r.total_punches ?? 0}</td>
       <td>${badge}</td>
@@ -411,88 +540,232 @@ function renderTable() {
   }).join("");
 }
 
-// ── Pagination ────────────────────────────────────────────────
 function renderPagination() {
   const total = Math.ceil(filtered.length / PAGE_SIZE);
-  const pg    = document.getElementById("pagination");
+  const pg = document.getElementById("pagination");
   if (total <= 1) { pg.innerHTML = ""; return; }
-
-  let html = `<span class="pg-info">${filtered.length} records</span>`;
-  html += `<button onclick="goPage(${page-1})" ${page===1?"disabled":""}>‹</button>`;
-  for (let i = 1; i <= total; i++) {
-    if (i === 1 || i === total || Math.abs(i - page) <= 2)
-      html += `<button class="${i===page?"active":""}" onclick="goPage(${i})">${i}</button>`;
-    else if (Math.abs(i - page) === 3)
-      html += `<span>…</span>`;
+  let h = `<span class="pg-info">${filtered.length} records</span>`;
+  h += `<button onclick="goPage(${curPage-1})" ${curPage===1?"disabled":""}>‹</button>`;
+  for (let i=1; i<=total; i++) {
+    if (i===1||i===total||Math.abs(i-curPage)<=2)
+      h += `<button class="${i===curPage?"active":""}" onclick="goPage(${i})">${i}</button>`;
+    else if (Math.abs(i-curPage)===3) h += `<span>…</span>`;
   }
-  html += `<button onclick="goPage(${page+1})" ${page===total?"disabled":""}>›</button>`;
-  pg.innerHTML = html;
+  h += `<button onclick="goPage(${curPage+1})" ${curPage===total?"disabled":""}>›</button>`;
+  pg.innerHTML = h;
 }
-
 function goPage(n) {
   const total = Math.ceil(filtered.length / PAGE_SIZE);
-  if (n < 1 || n > total) return;
-  page = n;
-  renderTable();
-  renderPagination();
+  if (n<1||n>total) return;
+  curPage = n; renderTable(); renderPagination();
 }
 
-// ── Stats ─────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  STATS
+// ════════════════════════════════════════════════════════════
 function updateStats() {
   document.getElementById("sTotal").textContent   = allRows.length;
   document.getElementById("sPresent").textContent = allRows.filter(r => r.is_present).length;
   document.getElementById("sStaff").textContent   = new Set(allRows.map(r => r.user_id)).size;
-
-  // Average duration (only rows with real duration)
-  const durs = allRows
-    .map(r => r.duration)
-    .filter(d => d && d !== "—")
-    .map(d => {
-      const m = d.match(/(\d+)h\s*(\d+)m/);
-      return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : 0;
-    })
-    .filter(m => m > 0);
+  const durs = allRows.map(r => parseDurMins(r.duration)).filter(m => m > 0);
   if (durs.length) {
-    const avg = Math.round(durs.reduce((a, b) => a + b, 0) / durs.length);
+    const avg = Math.round(durs.reduce((a,b)=>a+b,0)/durs.length);
     document.getElementById("sAvgDur").textContent = `${Math.floor(avg/60)}h ${avg%60}m`;
-  } else {
-    document.getElementById("sAvgDur").textContent = "—";
-  }
+  } else document.getElementById("sAvgDur").textContent = "—";
+}
+function parseDurMins(dur) {
+  if (!dur || dur==="—") return 0;
+  const m = dur.match(/(\d+)h\s*(\d+)m/);
+  return m ? parseInt(m[1])*60 + parseInt(m[2]) : 0;
 }
 
-// ── Export CSV ───────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  CALENDAR VIEW
+// ════════════════════════════════════════════════════════════
+function updateCalTitle() {
+  const names = ["January","February","March","April","May","June",
+                 "July","August","September","October","November","December"];
+  document.getElementById("calTitle").textContent = `${names[calMonth]} ${calYear}`;
+}
+
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  updateCalTitle();
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const staffName = document.getElementById("calStaff").value;
+  const grid      = document.getElementById("calGrid");
+  const summary   = document.getElementById("calSummary");
+
+  if (!staffName) {
+    grid.innerHTML = `<div style="grid-column:1/-1"><div class="empty-state"><span class="icon">👤</span><p>Select a staff member to see their attendance calendar.</p></div></div>`;
+    summary.innerHTML = "";
+    return;
+  }
+
+  // Build lookup: date string → row
+  const staffRows = {};
+  allRows.filter(r => r.name === staffName).forEach(r => { staffRows[r.date] = r; });
+
+  const today    = new Date();
+  const todayStr = fmtDate(today);
+
+  // First day of month, total days
+  const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+  // Day-of-week headers
+  const dows = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  let html = dows.map(d => `<div class="cal-dow">${d}</div>`).join("");
+
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
+
+  let cntPresent = 0, cntHalf = 0, cntAbsent = 0;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const row     = staffRows[dateStr];
+    const isFuture = dateStr > todayStr;
+    const isToday  = dateStr === todayStr;
+    const isSun    = new Date(calYear, calMonth, d).getDay() === 0;
+
+    let cls = "cal-day clickable";
+    let timeHtml = "";
+    let status = "";
+
+    if (isFuture) {
+      cls = "cal-day future";
+      timeHtml = "";
+    } else if (row) {
+      const hasExit = row.exit_time && row.exit_time !== "—";
+      if (hasExit) {
+        cls += " present"; cntPresent++;
+        status = "present";
+        timeHtml = `<span class="day-time">${to12(row.entry_time)}<br>${to12(row.exit_time)}</span>`;
+      } else {
+        cls += " half"; cntHalf++;
+        status = "half";
+        timeHtml = `<span class="day-time">${to12(row.entry_time)}<br>No exit</span>`;
+      }
+    } else {
+      cls += " absent"; cntAbsent++;
+      status = "absent";
+      timeHtml = `<span class="day-time">Absent</span>`;
+    }
+
+    if (isToday) cls += " today-marker";
+
+    const clickAttr = (!isFuture && row)
+      ? `onclick="openModal('${dateStr}','${esc(staffName)}')"` : "";
+    const absentClick = (!isFuture && !row)
+      ? `onclick="openAbsentModal('${dateStr}','${esc(staffName)}')"` : "";
+
+    html += `<div class="${cls}" ${clickAttr || absentClick} data-date="${dateStr}" data-status="${status}">
+      <span class="day-num">${d}</span>
+      ${timeHtml}
+    </div>`;
+  }
+
+  grid.innerHTML = html;
+
+  // Summary cards
+  const workingDays = daysInMonth - firstDay; // rough
+  summary.innerHTML = `
+    <div class="cal-sum-card sum-green"><span class="csv">${cntPresent}</span><span class="csl">Present (full)</span></div>
+    <div class="cal-sum-card sum-yellow"><span class="csv">${cntHalf}</span><span class="csl">Punch-in only</span></div>
+    <div class="cal-sum-card sum-red"><span class="csv">${cntAbsent}</span><span class="csl">Absent</span></div>
+    <div class="cal-sum-card sum-blue"><span class="csv">${cntPresent + cntHalf}</span><span class="csl">Days attended</span></div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════
+//  POPUP MODAL
+// ════════════════════════════════════════════════════════════
+function openModal(dateStr, staffName) {
+  const row = allRows.find(r => r.date === dateStr && r.name === staffName);
+  if (!row) return;
+
+  const hasExit = row.exit_time && row.exit_time !== "—";
+
+  document.getElementById("mDate").textContent  = formatDisplayDate(dateStr);
+  document.getElementById("mName").textContent  = row.name;
+  document.getElementById("mEntry").textContent = to12(row.entry_time);
+  document.getElementById("mExit").textContent  = hasExit ? to12(row.exit_time) : "Not recorded";
+  document.getElementById("mDur").textContent   = row.duration || "—";
+  document.getElementById("mPunch").textContent = (row.total_punches ?? 0) + " punch" + (row.total_punches !== 1 ? "es" : "");
+
+  const sb = document.getElementById("mStatus");
+  if (hasExit) {
+    sb.style.background = "#d1fae5"; sb.style.color = "#065f46";
+    sb.textContent = "✅ Present — Full day recorded";
+  } else {
+    sb.style.background = "#fef3c7"; sb.style.color = "#92400e";
+    sb.textContent = "⚠️ Punch-in only — No exit recorded";
+  }
+
+  document.getElementById("dayModal").classList.add("open");
+}
+
+function openAbsentModal(dateStr, staffName) {
+  document.getElementById("mDate").textContent  = formatDisplayDate(dateStr);
+  document.getElementById("mName").textContent  = staffName;
+  document.getElementById("mEntry").textContent = "—";
+  document.getElementById("mExit").textContent  = "—";
+  document.getElementById("mDur").textContent   = "—";
+  document.getElementById("mPunch").textContent = "0 punches";
+  const sb = document.getElementById("mStatus");
+  sb.style.background = "#fee2e2"; sb.style.color = "#991b1b";
+  sb.textContent = "❌ Absent — No attendance recorded";
+  document.getElementById("dayModal").classList.add("open");
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById("dayModal"))
+    document.getElementById("dayModal").classList.remove("open");
+}
+
+function formatDisplayDate(str) {
+  const [y,m,d] = str.split("-");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const dow    = days[new Date(parseInt(y), parseInt(m)-1, parseInt(d)).getDay()];
+  return `${dow}, ${months[parseInt(m)-1]} ${parseInt(d)}, ${y}`;
+}
+
+// ════════════════════════════════════════════════════════════
+//  CSV EXPORT
+// ════════════════════════════════════════════════════════════
 function exportCSV() {
   if (!filtered.length) { alert("No data to export."); return; }
   const cols = ["user_id","name","date","entry_time","exit_time","duration","total_punches","is_present"];
   const lines = [cols.join(",")];
-  filtered.forEach(r => {
-    lines.push(cols.map(c => `"${(r[c] ?? "").toString().replace(/"/g,'""')}"`).join(","));
-  });
-  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  filtered.forEach(r => lines.push(cols.map(c=>`"${(r[c]??"").toString().replace(/"/g,'""')}"`).join(",")));
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  a.href = URL.createObjectURL(new Blob([lines.join("\n")], {type:"text/csv"}));
   a.download = `attendance_${document.getElementById("fromDate").value}_to_${document.getElementById("toDate").value}.csv`;
   a.click();
 }
 
-// ── Helpers ───────────────────────────────────────────────────
-function esc(str) {
-  if (str == null) return "—";
-  return String(str)
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+// ════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════
+function esc(s) {
+  if (s==null) return "—";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-// ── Live filter on typing ─────────────────────────────────────
-document.getElementById("searchBox").addEventListener("input",   applyFilters);
+// ── Live events ───────────────────────────────────────────────
+document.getElementById("searchBox").addEventListener("input",    applyFilters);
 document.getElementById("staffFilter").addEventListener("change", applyFilters);
-
-// ── Load on Enter in date fields ─────────────────────────────
-["fromDate","toDate"].forEach(id => {
-  document.getElementById(id).addEventListener("keydown", e => {
-    if (e.key === "Enter") loadData();
-  });
-});
+["fromDate","toDate"].forEach(id =>
+  document.getElementById(id).addEventListener("keydown", e => { if(e.key==="Enter") loadData(); })
+);
+document.addEventListener("keydown", e => { if(e.key==="Escape") closeModal(); });
 </script>
 </body>
 </html>
