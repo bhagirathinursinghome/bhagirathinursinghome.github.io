@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Attendance — BNH Portal</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    /* ── Page-specific overrides ──────────────────────────── */
+    .att-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      align-items: flex-end;
+      margin-bottom: 1.25rem;
+    }
+    .att-controls label {
+      display: flex;
+      flex-direction: column;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-muted, #6b7280);
+      gap: .25rem;
+    }
+    .att-controls input[type="date"] {
+      padding: .42rem .65rem;
+      border: 1px solid var(--border, #d1d5db);
+      border-radius: 6px;
+      font-size: .9rem;
+      background: var(--input-bg, #fff);
+      color: var(--text, #111827);
+      min-width: 148px;
+    }
+
+    /* ── Summary cards row ───────────────────────────────── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: .75rem;
+      margin-bottom: 1.25rem;
+    }
+    .stat-card {
+      background: var(--card-bg, #fff);
+      border: 1px solid var(--border, #e5e7eb);
+      border-radius: 10px;
+      padding: 1rem 1.1rem .85rem;
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+    }
+    .stat-card .s-val {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--primary, #1F4E79);
+      line-height: 1;
+    }
+    .stat-card .s-lbl {
+      font-size: .72rem;
+      font-weight: 600;
+      color: var(--text-muted, #6b7280);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    /* ── Table ───────────────────────────────────────────── */
+    .tbl-wrap {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border, #e5e7eb);
+    }
+    #attTable {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .88rem;
+    }
+    #attTable thead tr {
+      background: #1F4E79;
+      color: #fff;
+    }
+    #attTable thead th {
+      padding: .7rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: .78rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    #attTable thead th:hover { background: #17406b; }
+    #attTable thead th .sort-icon { margin-left: .3rem; opacity: .55; }
+    #attTable tbody tr {
+      border-bottom: 1px solid var(--border, #f0f0f0);
+      transition: background .12s;
+    }
+    #attTable tbody tr:nth-child(even) { background: #f7fafd; }
+    #attTable tbody tr:hover           { background: #EBF3FB; }
+    #attTable tbody td {
+      padding: .6rem 1rem;
+      color: var(--text, #111827);
+      white-space: nowrap;
+    }
+    .badge {
+      display: inline-block;
+      padding: .18rem .55rem;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 700;
+    }
+    .badge-present { background: #d1fae5; color: #065f46; }
+    .badge-absent  { background: #fee2e2; color: #991b1b; }
+    .badge-late    { background: #fef3c7; color: #92400e; }
+
+    /* ── Empty / loading states ──────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 3.5rem 1rem;
+      color: var(--text-muted, #9ca3af);
+    }
+    .empty-state .icon { font-size: 2.8rem; display: block; margin-bottom: .5rem; }
+    .empty-state p     { font-size: .9rem; }
+
+    /* ── Search bar ──────────────────────────────────────── */
+    .search-wrap { position: relative; }
+    .search-wrap input {
+      padding: .42rem .65rem .42rem 2rem;
+      border: 1px solid var(--border, #d1d5db);
+      border-radius: 6px;
+      font-size: .9rem;
+      width: 200px;
+    }
+    .search-wrap::before {
+      content: "🔍";
+      position: absolute;
+      left: .5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: .8rem;
+      pointer-events: none;
+    }
+
+    /* ── Export button ───────────────────────────────────── */
+    .btn-export {
+      background: #059669;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: .45rem .9rem;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+      transition: background .15s;
+    }
+    .btn-export:hover { background: #047857; }
+
+    /* ── Pagination ──────────────────────────────────────── */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: .4rem;
+      margin-top: .85rem;
+      font-size: .82rem;
+    }
+    .pagination button {
+      padding: .28rem .65rem;
+      border: 1px solid var(--border, #d1d5db);
+      border-radius: 5px;
+      background: #fff;
+      cursor: pointer;
+      font-size: .82rem;
+    }
+    .pagination button:disabled { opacity: .4; cursor: default; }
+    .pagination button.active   { background: #1F4E79; color: #fff; border-color: #1F4E79; }
+    .pagination .pg-info        { color: #6b7280; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>🕐 Biometric Attendance</h1>
+
+  <!-- ── Stats row ───────────────────────────────────────── -->
+  <div class="stat-row" id="statRow">
+    <div class="stat-card"><span class="s-val" id="sTotal">—</span><span class="s-lbl">Total Records</span></div>
+    <div class="stat-card"><span class="s-val" id="sPresent">—</span><span class="s-lbl">Present Days</span></div>
+    <div class="stat-card"><span class="s-val" id="sStaff">—</span><span class="s-lbl">Staff Members</span></div>
+    <div class="stat-card"><span class="s-val" id="sAvgDur">—</span><span class="s-lbl">Avg Duration</span></div>
+  </div>
+
+  <div class="page-card">
+
+    <!-- ── Controls ──────────────────────────────────────── -->
+    <div class="att-controls">
+      <label>
+        From Date
+        <input type="date" id="fromDate"/>
+      </label>
+      <label>
+        To Date
+        <input type="date" id="toDate"/>
+      </label>
+      <label>
+        Staff Name
+        <select id="staffFilter" style="padding:.42rem .65rem;border:1px solid var(--border,#d1d5db);border-radius:6px;font-size:.9rem;min-width:160px">
+          <option value="">— All Staff —</option>
+        </select>
+      </label>
+      <div class="search-wrap">
+        <label style="display:flex;flex-direction:column;font-size:.78rem;font-weight:600;color:var(--text-muted,#6b7280);gap:.25rem;">
+          Search
+          <input type="text" id="searchBox" placeholder="Name or ID…" style="padding:.42rem .65rem .42rem 2rem;border:1px solid var(--border,#d1d5db);border-radius:6px;font-size:.9rem;width:180px"/>
+        </label>
+      </div>
+      <div style="display:flex;gap:.5rem;margin-left:auto;align-items:flex-end">
+        <button class="btn-primary" style="width:auto" onclick="loadData()">Load</button>
+        <button class="btn-export" onclick="exportCSV()">⬇ CSV</button>
+      </div>
+    </div>
+
+    <!-- ── Table ─────────────────────────────────────────── -->
+    <div class="tbl-wrap">
+      <table id="attTable">
+        <thead>
+          <tr>
+            <th onclick="sortBy('name')">Name <span class="sort-icon" id="sort-name">↕</span></th>
+            <th onclick="sortBy('user_id')">Staff ID <span class="sort-icon" id="sort-user_id">↕</span></th>
+            <th onclick="sortBy('date')">Date <span class="sort-icon" id="sort-date">↕</span></th>
+            <th onclick="sortBy('entry_time')">Entry <span class="sort-icon" id="sort-entry_time">↕</span></th>
+            <th onclick="sortBy('exit_time')">Exit <span class="sort-icon" id="sort-exit_time">↕</span></th>
+            <th onclick="sortBy('duration')">Duration <span class="sort-icon" id="sort-duration">↕</span></th>
+            <th onclick="sortBy('total_punches')">Punches <span class="sort-icon" id="sort-total_punches">↕</span></th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="attBody">
+          <tr><td colspan="8">
+            <div class="empty-state">
+              <span class="icon">📅</span>
+              <p>Select a date range and click <strong>Load</strong>.</p>
+            </div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Pagination ─────────────────────────────────────── -->
+    <div class="pagination" id="pagination"></div>
+
+  </div><!-- .page-card -->
+</div><!-- .page -->
+
+<!-- Required scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+// ── Role guard ────────────────────────────────────────────────
+BNH_PAGE.requireRole(["admin", "manager", "viewer", "reception"]);
+
+// ── State ─────────────────────────────────────────────────────
+let allRows   = [];      // full dataset from Supabase
+let filtered  = [];      // after search/filter
+let sortKey   = "date";
+let sortDir   = -1;      // -1 = desc, 1 = asc
+let page      = 1;
+const PAGE_SIZE = 25;
+
+// ── Init: set default date range (last 7 days) ────────────────
+(function initDates() {
+  const today = new Date();
+  const ago7  = new Date(today);
+  ago7.setDate(ago7.getDate() - 6);
+  document.getElementById("toDate").value   = fmt(today);
+  document.getElementById("fromDate").value = fmt(ago7);
+})();
+
+function fmt(d) {
+  return d.toISOString().split("T")[0];
+}
+
+// ── Load data from Supabase ───────────────────────────────────
+async function loadData() {
+  const from = document.getElementById("fromDate").value;
+  const to   = document.getElementById("toDate").value;
+
+  if (!from || !to) {
+    alert("Please select both From and To dates.");
+    return;
+  }
+
+  const spinner = document.getElementById("spinner");
+  spinner.classList.remove("hidden");
+
+  try {
+    const { data, error } = await BNH_PAGE.sb
+      .from("attendance")
+      .select("*")
+      .gte("date", from)
+      .lte("date", to)
+      .order("date",  { ascending: false })
+      .order("name",  { ascending: true });
+
+    if (error) throw error;
+
+    allRows = data || [];
+    populateStaffFilter();
+    applyFilters();
+    updateStats();
+
+  } catch (err) {
+    alert("Error loading data: " + err.message);
+    console.error(err);
+  } finally {
+    spinner.classList.add("hidden");
+  }
+}
+
+// ── Populate staff dropdown ───────────────────────────────────
+function populateStaffFilter() {
+  const sel   = document.getElementById("staffFilter");
+  const names = [...new Set(allRows.map(r => r.name))].sort();
+  const prev  = sel.value;
+  sel.innerHTML = '<option value="">— All Staff —</option>';
+  names.forEach(n => {
+    const o = document.createElement("option");
+    o.value = n; o.textContent = n;
+    if (n === prev) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+// ── Filter + render ───────────────────────────────────────────
+function applyFilters() {
+  const staff  = document.getElementById("staffFilter").value.toLowerCase();
+  const search = document.getElementById("searchBox").value.toLowerCase().trim();
+
+  filtered = allRows.filter(r => {
+    const matchStaff  = !staff  || r.name?.toLowerCase() === staff;
+    const matchSearch = !search ||
+      r.name?.toLowerCase().includes(search) ||
+      r.user_id?.toLowerCase().includes(search);
+    return matchStaff && matchSearch;
+  });
+
+  sortData();
+  page = 1;
+  renderTable();
+  renderPagination();
+}
+
+// ── Sort ──────────────────────────────────────────────────────
+function sortBy(key) {
+  if (sortKey === key) sortDir *= -1;
+  else { sortKey = key; sortDir = 1; }
+  document.querySelectorAll(".sort-icon").forEach(el => el.textContent = "↕");
+  const icon = document.getElementById("sort-" + key);
+  if (icon) icon.textContent = sortDir === 1 ? "↑" : "↓";
+  sortData();
+  page = 1;
+  renderTable();
+  renderPagination();
+}
+
+function sortData() {
+  filtered.sort((a, b) => {
+    const av = a[sortKey] ?? "";
+    const bv = b[sortKey] ?? "";
+    return av < bv ? -sortDir : av > bv ? sortDir : 0;
+  });
+}
+
+// ── Render table ─────────────────────────────────────────────
+function renderTable() {
+  const tbody  = document.getElementById("attBody");
+  const start  = (page - 1) * PAGE_SIZE;
+  const slice  = filtered.slice(start, start + PAGE_SIZE);
+
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="8">
+      <div class="empty-state">
+        <span class="icon">🔍</span>
+        <p>No records found for the selected filters.</p>
+      </div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = slice.map(r => {
+    const isLate = r.entry_time && r.entry_time > "09:30:00";
+    const badge  = r.is_present
+      ? (isLate
+          ? '<span class="badge badge-late">Late</span>'
+          : '<span class="badge badge-present">Present</span>')
+      : '<span class="badge badge-absent">Absent</span>';
+    return `<tr>
+      <td>${esc(r.name)}</td>
+      <td>${esc(r.user_id)}</td>
+      <td>${esc(r.date)}</td>
+      <td>${esc(r.entry_time)}</td>
+      <td>${esc(r.exit_time ?? "—")}</td>
+      <td>${esc(r.duration ?? "—")}</td>
+      <td style="text-align:center">${r.total_punches ?? 0}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join("");
+}
+
+// ── Pagination ────────────────────────────────────────────────
+function renderPagination() {
+  const total = Math.ceil(filtered.length / PAGE_SIZE);
+  const pg    = document.getElementById("pagination");
+  if (total <= 1) { pg.innerHTML = ""; return; }
+
+  let html = `<span class="pg-info">${filtered.length} records</span>`;
+  html += `<button onclick="goPage(${page-1})" ${page===1?"disabled":""}>‹</button>`;
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || Math.abs(i - page) <= 2)
+      html += `<button class="${i===page?"active":""}" onclick="goPage(${i})">${i}</button>`;
+    else if (Math.abs(i - page) === 3)
+      html += `<span>…</span>`;
+  }
+  html += `<button onclick="goPage(${page+1})" ${page===total?"disabled":""}>›</button>`;
+  pg.innerHTML = html;
+}
+
+function goPage(n) {
+  const total = Math.ceil(filtered.length / PAGE_SIZE);
+  if (n < 1 || n > total) return;
+  page = n;
+  renderTable();
+  renderPagination();
+}
+
+// ── Stats ─────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById("sTotal").textContent   = allRows.length;
+  document.getElementById("sPresent").textContent = allRows.filter(r => r.is_present).length;
+  document.getElementById("sStaff").textContent   = new Set(allRows.map(r => r.user_id)).size;
+
+  // Average duration (only rows with real duration)
+  const durs = allRows
+    .map(r => r.duration)
+    .filter(d => d && d !== "—")
+    .map(d => {
+      const m = d.match(/(\d+)h\s*(\d+)m/);
+      return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : 0;
+    })
+    .filter(m => m > 0);
+  if (durs.length) {
+    const avg = Math.round(durs.reduce((a, b) => a + b, 0) / durs.length);
+    document.getElementById("sAvgDur").textContent = `${Math.floor(avg/60)}h ${avg%60}m`;
+  } else {
+    document.getElementById("sAvgDur").textContent = "—";
+  }
+}
+
+// ── Export CSV ───────────────────────────────────────────────
+function exportCSV() {
+  if (!filtered.length) { alert("No data to export."); return; }
+  const cols = ["user_id","name","date","entry_time","exit_time","duration","total_punches","is_present"];
+  const lines = [cols.join(",")];
+  filtered.forEach(r => {
+    lines.push(cols.map(c => `"${(r[c] ?? "").toString().replace(/"/g,'""')}"`).join(","));
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `attendance_${document.getElementById("fromDate").value}_to_${document.getElementById("toDate").value}.csv`;
+  a.click();
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function esc(str) {
+  if (str == null) return "—";
+  return String(str)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ── Live filter on typing ─────────────────────────────────────
+document.getElementById("searchBox").addEventListener("input",   applyFilters);
+document.getElementById("staffFilter").addEventListener("change", applyFilters);
+
+// ── Load on Enter in date fields ─────────────────────────────
+["fromDate","toDate"].forEach(id => {
+  document.getElementById(id).addEventListener("keydown", e => {
+    if (e.key === "Enter") loadData();
+  });
+});
+</script>
+</body>
+</html>
