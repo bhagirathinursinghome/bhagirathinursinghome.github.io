@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Pharmacy Daily Report</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    * { box-sizing: border-box; }
+
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6fb; margin: 0; }
+
+    /* ── Top Control Bar ── */
+    .control-bar {
+      background: #fff;
+      border-bottom: 2px solid #e5e7eb;
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .control-bar h1 {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #1e1b4b;
+      margin: 0;
+      flex: 1;
+      min-width: 180px;
+    }
+    .control-bar label { font-size: .82rem; font-weight: 600; color: #374151; white-space: nowrap; }
+    .control-bar input[type=date] {
+      padding: .42rem .7rem;
+      border: 1.5px solid #d1d5db;
+      border-radius: 8px;
+      font-size: .92rem;
+      outline: none;
+    }
+    .control-bar input[type=date]:focus { border-color: #6366f1; }
+    .btn-load {
+      padding: .45rem 1.3rem;
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-load:hover { background: #4f46e5; }
+    .btn-pdf {
+      padding: .45rem 1.3rem;
+      background: #059669;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-pdf:hover { background: #047857; }
+
+    /* ── Page ── */
+    .page { padding: 1.5rem; max-width: 900px; margin: 0 auto; }
+
+    /* ── Report Wrapper ── */
+    #reportWrap { display: none; }
+
+    /* ── Report Header ── */
+    .rpt-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 3px double #6366f1;
+    }
+    .rpt-header .shop-name {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #1e1b4b;
+      letter-spacing: .03em;
+    }
+    .rpt-header .rpt-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #6366f1;
+      margin-top: .2rem;
+    }
+    .rpt-header .rpt-date {
+      font-size: .88rem;
+      color: #6b7280;
+      margin-top: .2rem;
+    }
+
+    /* ── Section Card ── */
+    .rpt-section {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.07);
+      margin-bottom: 1.25rem;
+      overflow: hidden;
+    }
+    .rpt-section-header {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .7rem 1.1rem;
+      font-size: .88rem;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .hdr-purple  { background: #ede9fe; color: #5b21b6; border-left: 4px solid #7c3aed; }
+    .hdr-blue    { background: #dbeafe; color: #1e3a8a; border-left: 4px solid #2563eb; }
+    .hdr-green   { background: #d1fae5; color: #065f46; border-left: 4px solid #059669; }
+    .hdr-orange  { background: #ffedd5; color: #7c2d12; border-left: 4px solid #ea580c; }
+
+    /* ── Account Table ── */
+    .acc-table { width: 100%; border-collapse: collapse; }
+    .acc-table td {
+      padding: .55rem 1.1rem;
+      font-size: .88rem;
+      vertical-align: middle;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .acc-table tr:last-child td { border-bottom: none; }
+    .acc-table .lbl { color: #374151; padding-left: 1.5rem; }
+    .acc-table .lbl-indent { color: #6b7280; padding-left: 3rem; font-size: .84rem; }
+    .acc-table .val { text-align: right; font-weight: 600; color: #111827; white-space: nowrap; min-width: 110px; }
+    .acc-table .val-right { text-align: right; font-weight: 600; color: #111827; white-space: nowrap; min-width: 110px; }
+    .acc-table .subtotal td { background: #f9fafb; font-weight: 700; }
+    .acc-table .total-row td {
+      background: #1e1b4b;
+      color: #fff;
+      font-weight: 800;
+      font-size: .9rem;
+      border-bottom: none;
+    }
+    .acc-table .profit-row td {
+      background: #d1fae5;
+      color: #065f46;
+      font-weight: 800;
+      font-size: .95rem;
+    }
+    .acc-table .loss-row td {
+      background: #fee2e2;
+      color: #991b1b;
+      font-weight: 800;
+      font-size: .95rem;
+    }
+    .acc-table .net-profit-row td {
+      background: #1e1b4b;
+      color: #a5f3fc;
+      font-weight: 900;
+      font-size: 1rem;
+    }
+    .acc-table .section-divider td {
+      background: #f3f4f6;
+      font-size: .78rem;
+      font-weight: 700;
+      color: #6b7280;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      padding-top: .4rem;
+      padding-bottom: .4rem;
+    }
+    .debit-col { color: #374151; }
+    .credit-col { color: #374151; }
+
+    /* ── Two-column T-Account layout ── */
+    .t-account {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: 1px solid #e5e7eb;
+    }
+    .t-account .t-col { }
+    .t-account .t-col:first-child { border-right: 2px solid #e5e7eb; }
+    .t-col-header {
+      background: #f8faff;
+      font-size: .78rem;
+      font-weight: 800;
+      color: #4338ca;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      padding: .45rem 1.1rem;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+    }
+    .t-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .5rem 1.1rem;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: .87rem;
+    }
+    .t-row:last-child { border-bottom: none; }
+    .t-row .t-lbl { color: #374151; flex: 1; }
+    .t-row .t-lbl-indent { color: #6b7280; flex: 1; padding-left: 1rem; font-size: .83rem; }
+    .t-row .t-val { font-weight: 600; color: #111827; text-align: right; white-space: nowrap; }
+    .t-total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: .55rem 1.1rem;
+      background: #1e1b4b;
+      color: #fff;
+      font-weight: 800;
+      font-size: .88rem;
+    }
+    .t-subtotal-row {
+      display: flex;
+      justify-content: space-between;
+      padding: .5rem 1.1rem;
+      background: #f0f4ff;
+      font-weight: 700;
+      font-size: .86rem;
+      border-bottom: 1px solid #e0e7ff;
+    }
+
+    /* ── Cash Flow ── */
+    .cf-grid {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: 0;
+    }
+    .cf-col { border-right: 1px solid #e5e7eb; }
+    .cf-col:last-child { border-right: none; }
+    .cf-col-header {
+      background: #f8faff;
+      font-size: .8rem;
+      font-weight: 800;
+      color: #1e3a8a;
+      padding: .45rem .9rem;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: center;
+    }
+    .cf-row {
+      display: flex;
+      justify-content: space-between;
+      padding: .45rem .9rem;
+      font-size: .84rem;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .cf-row:last-child { border-bottom: none; }
+    .cf-lbl { color: #374151; flex: 1; }
+    .cf-val { font-weight: 600; color: #111827; text-align: right; white-space: nowrap; }
+    .cf-pos { color: #059669; }
+    .cf-neg { color: #dc2626; }
+    .cf-total {
+      display: flex;
+      justify-content: space-between;
+      padding: .55rem .9rem;
+      background: #1e1b4b;
+      color: #fff;
+      font-weight: 800;
+      font-size: .85rem;
+    }
+
+    /* ── Supplier row ── */
+    .sup-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto auto;
+      gap: .5rem;
+      padding: .5rem 1.1rem;
+      font-size: .86rem;
+      border-bottom: 1px solid #f3f4f6;
+      align-items: center;
+    }
+    .sup-total {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto auto;
+      gap: .5rem;
+      padding: .55rem 1.1rem;
+      font-size: .88rem;
+      font-weight: 800;
+      background: #1e1b4b;
+      color: #fff;
+    }
+    .sup-header {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto auto;
+      gap: .5rem;
+      padding: .4rem 1.1rem;
+      font-size: .76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #6b7280;
+      background: #f9fafb;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .num { text-align: right; min-width: 80px; }
+
+    /* ── Placeholder ── */
+    .placeholder {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: #9ca3af;
+    }
+    .placeholder .pi { font-size: 3rem; margin-bottom: .75rem; }
+
+    /* ── Highlight boxes ── */
+    .highlight-box {
+      display: flex;
+      gap: 1rem;
+      padding: .75rem 1.1rem;
+      background: #f0fdf4;
+      border-top: 1px solid #bbf7d0;
+    }
+    .hl-item { flex: 1; text-align: center; }
+    .hl-label { font-size: .75rem; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .hl-value { font-size: 1.1rem; font-weight: 900; color: #065f46; margin-top: .1rem; }
+    .hl-value.loss { color: #dc2626; }
+
+    /* ── Print / PDF styles ── */
+    @media print {
+      .control-bar { display: none !important; }
+      body { background: #fff; }
+      .page { padding: 0; max-width: 100%; }
+      .rpt-section { box-shadow: none; border: 1px solid #e5e7eb; page-break-inside: avoid; }
+      .btn-pdf { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<!-- ── Control Bar ── -->
+<div class="control-bar">
+  <h1>🏥 Pharmacy Daily Report</h1>
+  <label for="rptDate">Report Date</label>
+  <input type="date" id="rptDate"/>
+  <button class="btn-load" onclick="generateReport()">📊 Generate Report</button>
+  <button class="btn-pdf"  onclick="downloadPDF()">⬇ Download PDF</button>
+</div>
+
+<div class="page">
+  <!-- Placeholder -->
+  <div id="placeholder" class="placeholder">
+    <div class="pi">📋</div>
+    <div style="font-size:1.05rem;font-weight:700;color:#374151;margin-bottom:.4rem">Select a Date to Generate Report</div>
+    <div style="font-size:.88rem">Choose a date above and click <strong>Generate Report</strong> to view the full Pharmacy Daily Report.</div>
+  </div>
+
+  <!-- Report Wrap -->
+  <div id="reportWrap">
+
+    <!-- Report Header -->
+    <div class="rpt-header">
+      <div class="shop-name">Bhagirathi Nursing Home — Pharmacy</div>
+      <div class="rpt-title">Daily Trading & Profit / Loss Report</div>
+      <div class="rpt-date" id="rptDateDisplay"></div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         SECTION 1: TRADING & P&L ACCOUNT
+    ════════════════════════════════════════════════ -->
+    <div class="rpt-section">
+      <div class="rpt-section-header hdr-purple">📈 Trading &amp; Profit / Loss Account</div>
+      <div class="t-account">
+        <!-- DEBIT SIDE -->
+        <div class="t-col">
+          <div class="t-col-header">📤 Dr  (Outflows / Cost)</div>
+          <div class="t-row">
+            <span class="t-lbl">Opening Stock</span>
+            <span class="t-val" id="pl_openStock">—</span>
+          </div>
+          <div class="t-row">
+            <span class="t-lbl">Add: Purchases</span>
+            <span class="t-val" id="pl_purchase">—</span>
+          </div>
+          <div class="t-subtotal-row">
+            <span>Goods Available</span>
+            <span id="pl_goodsAvail">—</span>
+          </div>
+          <div class="t-row">
+            <span class="t-lbl">Less: Closing Stock</span>
+            <span class="t-val" id="pl_closeStock">—</span>
+          </div>
+          <div class="t-subtotal-row">
+            <span>Cost of Goods Sold</span>
+            <span id="pl_cogs">—</span>
+          </div>
+          <div class="t-row" id="grossProfitRow">
+            <span class="t-lbl" style="font-weight:700;color:#059669">Gross Profit c/d</span>
+            <span class="t-val" style="color:#059669;font-weight:800" id="pl_grossProfit">—</span>
+          </div>
+          <div class="t-row" id="grossLossRow" style="display:none">
+            <span class="t-lbl" style="font-weight:700;color:#dc2626">Gross Loss c/d</span>
+            <span class="t-val" style="color:#dc2626;font-weight:800" id="pl_grossLoss">—</span>
+          </div>
+          <!-- Voucher (expense) section -->
+          <div id="voucherSection">
+            <div style="background:#fff8ed;padding:.35rem 1.1rem;font-size:.76rem;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.04em;border-top:1px solid #fde68a">
+              Expenses (Vouchers)
+            </div>
+            <div class="t-row">
+              <span class="t-lbl-indent">Cash Vouchers</span>
+              <span class="t-val" id="pl_vcash">—</span>
+            </div>
+            <div class="t-row">
+              <span class="t-lbl-indent">Bank Vouchers</span>
+              <span class="t-val" id="pl_vbank">—</span>
+            </div>
+            <div class="t-row">
+              <span class="t-lbl-indent">PhonePe Vouchers</span>
+              <span class="t-val" id="pl_vpp">—</span>
+            </div>
+            <div class="t-subtotal-row">
+              <span>Total Vouchers / Expenses</span>
+              <span id="pl_vtotal">—</span>
+            </div>
+          </div>
+          <div class="t-total-row" id="drTotal">
+            <span>Total Dr</span>
+            <span id="pl_drTotal">—</span>
+          </div>
+        </div>
+
+        <!-- CREDIT SIDE -->
+        <div class="t-col">
+          <div class="t-col-header">📥 Cr  (Inflows / Revenue)</div>
+          <div class="t-row">
+            <span class="t-lbl" style="font-weight:700">Dispensary Sale</span>
+            <span class="t-val" style="color:#2563eb" id="pl_dispensarySale">—</span>
+          </div>
+          <div class="t-row">
+            <span class="t-lbl-indent">Cash</span>
+            <span class="t-val" id="pl_dCash">—</span>
+          </div>
+          <div class="t-row">
+            <span class="t-lbl-indent">Bank</span>
+            <span class="t-val" id="pl_dBank">—</span>
+          </div>
+          <div class="t-row">
+            <span class="t-lbl-indent">PhonePe</span>
+            <span class="t-val" id="pl_dPP">—</span>
+          </div>
+          <div class="t-row" style="margin-top:.25rem">
+            <span class="t-lbl" style="font-weight:700">IPD Medicine Inden</span>
+            <span class="t-val" style="color:#7c3aed" id="pl_ipdSale">—</span>
+          </div>
+          <div class="t-row">
+            <span class="t-lbl-indent">At Cost Price (= Sale)</span>
+            <span class="t-val" id="pl_ipdCost">—</span>
+          </div>
+
+          <!-- Gross Profit b/d (credit side) -->
+          <div id="grossProfitBdRow" class="t-row">
+            <span class="t-lbl" style="font-weight:700;color:#059669">Gross Profit b/d</span>
+            <span class="t-val" style="color:#059669;font-weight:800" id="pl_grossProfitBd">—</span>
+          </div>
+          <div id="grossLossBdRow" class="t-row" style="display:none">
+            <span class="t-lbl" style="font-weight:700;color:#dc2626">Gross Loss b/d</span>
+            <span class="t-val" style="color:#dc2626;font-weight:800" id="pl_grossLossBd">—</span>
+          </div>
+
+          <div class="t-total-row" id="crTotal">
+            <span>Total Cr</span>
+            <span id="pl_crTotal">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Net Profit / Loss bar -->
+      <div id="netProfitBar" style="padding:.8rem 1.1rem;background:#f0fdf4;border-top:2px solid #bbf7d0;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.95rem;font-weight:800;color:#065f46">🏆 NET PROFIT (for the day)</span>
+        <span style="font-size:1.15rem;font-weight:900;color:#059669" id="pl_netProfit">—</span>
+      </div>
+      <div id="netLossBar" style="display:none;padding:.8rem 1.1rem;background:#fee2e2;border-top:2px solid #fca5a5;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.95rem;font-weight:800;color:#991b1b">⚠ NET LOSS (for the day)</span>
+        <span style="font-size:1.15rem;font-weight:900;color:#dc2626" id="pl_netLoss">—</span>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         SECTION 2: CASH / BANK / PHONEPE FLOW
+    ════════════════════════════════════════════════ -->
+    <div class="rpt-section">
+      <div class="rpt-section-header hdr-blue">💵 Cash, Bank &amp; PhonePe Flow</div>
+      <div class="cf-grid">
+        <!-- CASH -->
+        <div class="cf-col">
+          <div class="cf-col-header">💵 Cash</div>
+          <div class="cf-row"><span class="cf-lbl">Opening Balance</span><span class="cf-val" id="cf_cashOpen">—</span></div>
+          <div class="cf-row"><span class="cf-lbl cf-pos">+ Dispensary Sale (Cash)</span><span class="cf-val cf-pos" id="cf_cashSale">—</span></div>
+          <div class="cf-row"><span class="cf-lbl cf-pos">+ Received from Bhagirathi</span><span class="cf-val cf-pos" id="cf_cashRcv">—</span></div>
+          <div class="cf-row"><span class="cf-lbl cf-neg">− Supplier Payment</span><span class="cf-val cf-neg" id="cf_cashSupPay">—</span></div>
+          <div class="cf-row"><span class="cf-lbl cf-neg">− Vouchers (Cash)</span><span class="cf-val cf-neg" id="cf_cashVch">—</span></div>
+          <div class="cf-total"><span>Closing Balance</span><span id="cf_cashClose">—</span></div>
+        </div>
+        <!-- BANK -->
+        <div class="cf-col">
+          <div class="cf-col-header">🏦 Bank</div>
+          <div class="cf-row"><span class="cf-lbl">Opening Balance</span><span class="cf-val" id="cf_bankOpen">—</span></div>
+          <div class="cf-row"><span class="cf-lbl cf-pos">+ Dispensary Sale (Bank)</span><span class="cf-val cf-pos" id="cf_bankSale">—</span></div>
+          <div class="cf-row"><span class="cf-lbl" style="color:#9ca3af">+ Received from Bhagirathi</span><span class="cf-val" style="color:#9ca3af">₹0.00</span></div>
+          <div class="cf-row"><span class="cf-lbl cf-neg">− Supplier Payment</span><span class="cf-val cf-neg" id="cf_bankSupPay">—</span></div>
+          <div class="cf-row"><span class="cf-lbl cf-neg">− Vouchers (Bank)</span><span class="cf-val cf-neg" id="cf_bankVch">—</span></div>
+          <div class="cf-total"><span>Closing Balance</span><span id="cf_bankClose">—</span></div>
+        </div>
+        <!-- PHONEPE -->
+        <div class="cf-col">
+          <div class="cf-col-header">📱 PhonePe</div>
+          <div class="cf-row"><span class="cf-lbl">Opening Balance</span><span class="cf-val" id="cf_ppOpen">—</span></div>
+          <div class="cf-row"><span class="cf-lbl cf-pos">+ Dispensary Sale (PP)</span><span class="cf-val cf-pos" id="cf_ppSale">—</span></div>
+          <div class="cf-row"><span class="cf-lbl" style="color:#9ca3af">+ Received from Bhagirathi</span><span class="cf-val" style="color:#9ca3af">₹0.00</span></div>
+          <div class="cf-row"><span class="cf-lbl cf-neg">− Supplier Payment</span><span class="cf-val cf-neg" id="cf_ppSupPay">—</span></div>
+          <div class="cf-row"><span class="cf-lbl cf-neg">− Vouchers (PhonePe)</span><span class="cf-val cf-neg" id="cf_ppVch">—</span></div>
+          <div class="cf-total"><span>Closing Balance</span><span id="cf_ppClose">—</span></div>
+        </div>
+      </div>
+      <!-- Totals -->
+      <div style="display:flex;background:#1e1b4b;color:#fff;font-weight:800;font-size:.9rem">
+        <div style="flex:1;padding:.65rem 1.1rem;text-align:center">
+          <div style="font-size:.72rem;font-weight:600;opacity:.7;text-transform:uppercase;letter-spacing:.04em">Total Opening</div>
+          <div id="cf_totOpen">—</div>
+        </div>
+        <div style="flex:1;padding:.65rem 1.1rem;text-align:center;border-left:1px solid rgba(255,255,255,.15)">
+          <div style="font-size:.72rem;font-weight:600;opacity:.7;text-transform:uppercase;letter-spacing:.04em">Total Inflows</div>
+          <div id="cf_totIn">—</div>
+        </div>
+        <div style="flex:1;padding:.65rem 1.1rem;text-align:center;border-left:1px solid rgba(255,255,255,.15)">
+          <div style="font-size:.72rem;font-weight:600;opacity:.7;text-transform:uppercase;letter-spacing:.04em">Total Outflows</div>
+          <div id="cf_totOut">—</div>
+        </div>
+        <div style="flex:1;padding:.65rem 1.1rem;text-align:center;border-left:1px solid rgba(255,255,255,.15);background:#059669">
+          <div style="font-size:.72rem;font-weight:600;opacity:.9;text-transform:uppercase;letter-spacing:.04em">Total Closing</div>
+          <div id="cf_totClose">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         SECTION 3: SUPPLIER BALANCE
+    ════════════════════════════════════════════════ -->
+    <div class="rpt-section">
+      <div class="rpt-section-header hdr-orange">🏪 Supplier Balance Statement</div>
+      <div class="sup-header">
+        <span>Supplier</span>
+        <span class="num">Opening Due</span>
+        <span class="num">+ Purchase</span>
+        <span class="num">− Payment</span>
+        <span class="num">Closing Due</span>
+      </div>
+      <div id="supplierRows">
+        <div style="padding:1rem;text-align:center;color:#9ca3af;font-size:.85rem">Loading…</div>
+      </div>
+      <div class="sup-total" id="supplierTotals" style="display:none">
+        <span>TOTAL</span>
+        <span class="num" id="st_open">—</span>
+        <span class="num" id="st_purchase">—</span>
+        <span class="num" id="st_pay">—</span>
+        <span class="num" id="st_close">—</span>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         SECTION 4: BHAGIRATHI DUE
+    ════════════════════════════════════════════════ -->
+    <div class="rpt-section">
+      <div class="rpt-section-header hdr-green">🏥 Bhagirathi Nursing Home — Due Account</div>
+      <div class="t-account">
+        <div class="t-col">
+          <div class="t-col-header">📤 Cr (Cleared)</div>
+          <div class="t-row">
+            <span class="t-lbl">Cash Received from Bhagirathi</span>
+            <span class="t-val cf-neg" id="bh_cashRcv">—</span>
+          </div>
+          <div class="t-row">
+            <span class="t-lbl" style="font-weight:700;color:#059669">Closing Due (Balance)</span>
+            <span class="t-val" style="color:#059669;font-weight:800" id="bh_closeBalance">—</span>
+          </div>
+          <div class="t-total-row">
+            <span>Total</span>
+            <span id="bh_crTotal">—</span>
+          </div>
+        </div>
+        <div class="t-col">
+          <div class="t-col-header">📥 Dr (Due / Owed)</div>
+          <div class="t-row">
+            <span class="t-lbl">Opening Due (Balance b/d)</span>
+            <span class="t-val" id="bh_openDue">—</span>
+          </div>
+          <div class="t-row">
+            <span class="t-lbl">+ IPD Medicine Inden (Today)</span>
+            <span class="t-val cf-pos" id="bh_todayInden">—</span>
+          </div>
+          <div class="t-total-row">
+            <span>Total</span>
+            <span id="bh_drTotal">—</span>
+          </div>
+        </div>
+      </div>
+      <div style="padding:.75rem 1.1rem;background:#f0fdf4;border-top:2px solid #bbf7d0;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.9rem;font-weight:800;color:#065f46">📌 Net Closing Due (Pharmacy ← Bhagirathi)</span>
+        <span style="font-size:1.1rem;font-weight:900;color:#059669" id="bh_netDue">—</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="text-align:center;font-size:.78rem;color:#9ca3af;margin:.75rem 0 1.5rem;padding-top:.75rem;border-top:1px solid #e5e7eb">
+      Generated on <span id="genTime"></span> &nbsp;·&nbsp; Bhagirathi Nursing Home — Pharmacy Management System
+    </div>
+
+  </div><!-- /reportWrap -->
+</div><!-- /page -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+BNH_PAGE.requireRole(["admin","accountant","manager","pharmacy"]);
+
+const fmt  = n => '₹' + parseFloat(n||0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+const spin = v => document.getElementById('spinner').classList[v ? 'remove' : 'add']('hidden');
+
+// Set today's date
+document.getElementById('rptDate').value = new Date().toISOString().slice(0,10);
+
+// ─── Helper: set element text ───────────────────────────────
+function set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// ─── MAIN REPORT GENERATOR ──────────────────────────────────
+async function generateReport() {
+  const date = document.getElementById('rptDate').value;
+  if (!date) { alert('Please select a report date.'); return; }
+  spin(true);
+
+  try {
+    // ── 1. Fetch all needed data in parallel ───────────────
+    const [
+      { data: suppliers     },   // pharmacy_suppliers  (opening_balance, supplier_name)
+      { data: allPurchases  },   // pharmacy_purchases  (all-time: for opening stock calc)
+      { data: allDispSales  },   // pharmacy_sales type=Dispensary (all-time)
+      { data: allIpdSales   },   // pharmacy_sales type=IPD (all-time)
+      { data: allSupPay     },   // pharmacy_supplier_payments (all-time)
+      { data: allVouchers   },   // pharmacy_vouchers (all-time)
+      { data: allIpdTxns    },   // ipd_transactions (all-time)
+      { data: cfSettings    },   // cash_flow_settings or opening_balances table
+    ] = await Promise.all([
+      BNH_PAGE.sb.from('pharmacy_suppliers').select('supplier_name, opening_balance').order('supplier_name'),
+      BNH_PAGE.sb.from('pharmacy_purchases').select('purchase_date, supplier_name, amount'),
+      BNH_PAGE.sb.from('pharmacy_sales').select('sale_date, cost_price, sale_price, mode_cash, mode_bank, mode_phonepe').eq('sale_type','Dispensary'),
+      BNH_PAGE.sb.from('pharmacy_sales').select('sale_date, cost_price, sale_price').eq('sale_type','IPD'),
+      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('pay_date, supplier_name, amount, mode'),
+      BNH_PAGE.sb.from('pharmacy_vouchers').select('voucher_date, amount, mode').order('voucher_date'),
+      BNH_PAGE.sb.from('ipd_transactions').select('txn_date, txn_type, amount, mode').order('txn_date'),
+      BNH_PAGE.sb.from('pharmacy_opening_balances').select('*').limit(1),
+    ]);
+
+    // ── 2. Derive "today" vs "before today" ───────────────
+    const before = r => (r.purchase_date || r.sale_date || r.pay_date || r.voucher_date || r.txn_date) < date;
+    const onDate  = r => (r.purchase_date || r.sale_date || r.pay_date || r.voucher_date || r.txn_date) === date;
+
+    // Sum helpers
+    const sum = (arr, field) => (arr||[]).reduce((a,r) => a + parseFloat(r[field]||0), 0);
+    const sumWhere = (arr, dateFn, field) => (arr||[]).filter(dateFn).reduce((a,r) => a + parseFloat(r[field]||0), 0);
+
+    // ── 3. STOCK CALCULATION ──────────────────────────────
+    // Opening Stock = sum of all purchases BEFORE date - sum of all cost prices of sales BEFORE date
+    const purchaseBefore     = sumWhere(allPurchases, r => r.purchase_date < date, 'amount');
+    const dispCostBefore     = sumWhere(allDispSales, r => r.sale_date < date, 'cost_price');
+    const ipdCostBefore      = sumWhere(allIpdSales,  r => r.sale_date < date, 'cost_price');
+    
+    // Opening balance from settings (if available)
+    const ob = (cfSettings && cfSettings[0]) || {};
+    const obStock  = parseFloat(ob.opening_stock  || 0);
+    const obCash   = parseFloat(ob.opening_cash   || 0);
+    const obBank   = parseFloat(ob.opening_bank   || 0);
+    const obPP     = parseFloat(ob.opening_phonepe || 0);
+
+    // Opening stock for the day = obStock + all purchases before - all cost sold before
+    const openingStock = obStock + purchaseBefore - dispCostBefore - ipdCostBefore;
+
+    // Today's purchase
+    const todayPurchase = sumWhere(allPurchases, r => r.purchase_date === date, 'amount');
+
+    // Today's Dispensary sale
+    const todayDispSale  = sumWhere(allDispSales, r => r.sale_date === date, 'sale_price');
+    const todayDispCost  = sumWhere(allDispSales, r => r.sale_date === date, 'cost_price');
+    const todayDispCash  = sumWhere(allDispSales, r => r.sale_date === date, 'mode_cash');
+    const todayDispBank  = sumWhere(allDispSales, r => r.sale_date === date, 'mode_bank');
+    const todayDispPP    = sumWhere(allDispSales, r => r.sale_date === date, 'mode_phonepe');
+
+    // Today's IPD sale (cost = sale price)
+    const todayIpdSale   = sumWhere(allIpdSales, r => r.sale_date === date, 'sale_price');
+
+    // Closing Stock
+    const closingStock = openingStock + todayPurchase - todayDispCost - todayIpdSale;
+
+    // Cost of Goods Sold
+    const cogs = openingStock + todayPurchase - closingStock;
+
+    // Gross Profit
+    const totalRevenue   = todayDispSale + todayIpdSale;
+    const grossProfit    = totalRevenue - cogs;
+
+    // ── 4. VOUCHERS ───────────────────────────────────────
+    const todayVouchers   = (allVouchers||[]).filter(r => r.voucher_date === date);
+    const vCash  = todayVouchers.filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const vBank  = todayVouchers.filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const vPP    = todayVouchers.filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const vTotal = vCash + vBank + vPP;
+    const hasVouchers = vTotal > 0;
+
+    // Net Profit
+    const netProfit = grossProfit - vTotal;
+
+    // ── 5. SUPPLIER PAYMENTS (today) ──────────────────────
+    const todaySupPay = (allSupPay||[]).filter(r => r.pay_date === date);
+    const supPayCash  = todaySupPay.filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const supPayBank  = todaySupPay.filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const supPayPP    = todaySupPay.filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
+    // ── 6. IPD TRANSACTIONS (today) ───────────────────────
+    const todayIpdTxns = (allIpdTxns||[]).filter(r => r.txn_date === date);
+    const cashRcvFromBh = todayIpdTxns.filter(r=>r.txn_type==='Receive').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
+    // ── 7. CASH FLOW CALCULATIONS ─────────────────────────
+    // Opening balances (from all transactions before date, starting from ob)
+    const cashOpenCalc  = obCash  + sumWhere(allDispSales, r=>r.sale_date<date,'mode_cash')
+                          + sumWhere(allIpdTxns, r=>r.txn_date<date&&r.txn_type==='Receive','amount')
+                          - sumWhere(allSupPay, r=>r.pay_date<date&&r.mode==='Cash','amount')
+                          - sumWhere(allVouchers, r=>r.voucher_date<date&&r.mode==='Cash','amount');
+    const bankOpenCalc  = obBank  + sumWhere(allDispSales, r=>r.sale_date<date,'mode_bank')
+                          - sumWhere(allSupPay, r=>r.pay_date<date&&r.mode==='Bank','amount')
+                          - sumWhere(allVouchers, r=>r.voucher_date<date&&r.mode==='Bank','amount');
+    const ppOpenCalc    = obPP    + sumWhere(allDispSales, r=>r.sale_date<date,'mode_phonepe')
+                          - sumWhere(allSupPay, r=>r.pay_date<date&&r.mode==='PhonePe','amount')
+                          - sumWhere(allVouchers, r=>r.voucher_date<date&&r.mode==='PhonePe','amount');
+
+    const cashClose = cashOpenCalc + todayDispCash + cashRcvFromBh - supPayCash - vCash;
+    const bankClose = bankOpenCalc + todayDispBank - supPayBank - vBank;
+    const ppClose   = ppOpenCalc   + todayDispPP   - supPayPP   - vPP;
+
+    // ── 8. SUPPLIER STATEMENT ─────────────────────────────
+    const suppRows = (suppliers||[]).map(s => {
+      const op  = parseFloat(s.opening_balance||0)
+                  + sumWhere(allPurchases, r=>r.purchase_date<date&&r.supplier_name===s.supplier_name,'amount')
+                  - sumWhere(allSupPay,    r=>r.pay_date<date&&r.supplier_name===s.supplier_name,'amount');
+      const pur = (allPurchases||[]).filter(r=>r.purchase_date===date&&r.supplier_name===s.supplier_name).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const pay = todaySupPay.filter(r=>r.supplier_name===s.supplier_name).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const cl  = op + pur - pay;
+      return { name: s.supplier_name, op, pur, pay, cl };
+    });
+    const suppTot = suppRows.reduce((a,r)=>({op:a.op+r.op,pur:a.pur+r.pur,pay:a.pay+r.pay,cl:a.cl+r.cl}),{op:0,pur:0,pay:0,cl:0});
+
+    // ── 9. BHAGIRATHI DUE ─────────────────────────────────
+    const allIndenBefore   = sumWhere(allIpdSales, r=>r.sale_date<date,'sale_price');
+    const allRcvBefore     = sumWhere(allIpdTxns,  r=>r.txn_date<date&&r.txn_type==='Receive','amount');
+    const bhOpenDue        = allIndenBefore - allRcvBefore;
+    const bhNetDue         = bhOpenDue + todayIpdSale - cashRcvFromBh;
+
+    // ─────────────────────────────────────────────────────
+    //  RENDER
+    // ─────────────────────────────────────────────────────
+
+    // Date display
+    const dateObj = new Date(date + 'T00:00:00');
+    const dateStr = dateObj.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    set('rptDateDisplay','Report for: ' + dateStr);
+
+    // P&L
+    set('pl_openStock',    fmt(openingStock));
+    set('pl_purchase',     fmt(todayPurchase));
+    set('pl_goodsAvail',   fmt(openingStock + todayPurchase));
+    set('pl_closeStock',   fmt(closingStock));
+    set('pl_cogs',         fmt(cogs));
+    set('pl_dispensarySale', fmt(todayDispSale));
+    set('pl_dCash',        fmt(todayDispCash));
+    set('pl_dBank',        fmt(todayDispBank));
+    set('pl_dPP',          fmt(todayDispPP));
+    set('pl_ipdSale',      fmt(todayIpdSale));
+    set('pl_ipdCost',      fmt(todayIpdSale));
+
+    if (grossProfit >= 0) {
+      set('pl_grossProfit',   fmt(grossProfit));
+      set('pl_grossProfitBd', fmt(grossProfit));
+      document.getElementById('grossProfitRow').style.display = 'flex';
+      document.getElementById('grossLossRow').style.display   = 'none';
+      document.getElementById('grossProfitBdRow').style.display = 'flex';
+      document.getElementById('grossLossBdRow').style.display   = 'none';
+    } else {
+      set('pl_grossLoss',   fmt(Math.abs(grossProfit)));
+      set('pl_grossLossBd', fmt(Math.abs(grossProfit)));
+      document.getElementById('grossLossRow').style.display   = 'flex';
+      document.getElementById('grossProfitRow').style.display = 'none';
+      document.getElementById('grossLossBdRow').style.display   = 'flex';
+      document.getElementById('grossProfitBdRow').style.display = 'none';
+    }
+
+    // Vouchers
+    const vSection = document.getElementById('voucherSection');
+    if (hasVouchers) {
+      vSection.style.display = 'block';
+      set('pl_vcash',  fmt(vCash));
+      set('pl_vbank',  fmt(vBank));
+      set('pl_vpp',    fmt(vPP));
+      set('pl_vtotal', fmt(vTotal));
+    } else {
+      vSection.style.display = 'none';
+    }
+
+    // Dr & Cr totals
+    const drT = cogs + (grossProfit>0?grossProfit:0) + (hasVouchers?vTotal:0);
+    const crT = totalRevenue + (grossProfit<0?Math.abs(grossProfit):0);
+    set('pl_drTotal', fmt(drT));
+    set('pl_crTotal', fmt(crT));
+
+    // Net profit
+    if (netProfit >= 0) {
+      document.getElementById('netProfitBar').style.display = 'flex';
+      document.getElementById('netLossBar').style.display   = 'none';
+      set('pl_netProfit', fmt(netProfit));
+    } else {
+      document.getElementById('netLossBar').style.display   = 'flex';
+      document.getElementById('netProfitBar').style.display = 'none';
+      set('pl_netLoss', fmt(Math.abs(netProfit)));
+    }
+
+    // Cash Flow
+    set('cf_cashOpen',   fmt(cashOpenCalc));
+    set('cf_cashSale',   fmt(todayDispCash));
+    set('cf_cashRcv',    fmt(cashRcvFromBh));
+    set('cf_cashSupPay', fmt(supPayCash));
+    set('cf_cashVch',    fmt(vCash));
+    set('cf_cashClose',  fmt(cashClose));
+
+    set('cf_bankOpen',   fmt(bankOpenCalc));
+    set('cf_bankSale',   fmt(todayDispBank));
+    set('cf_bankSupPay', fmt(supPayBank));
+    set('cf_bankVch',    fmt(vBank));
+    set('cf_bankClose',  fmt(bankClose));
+
+    set('cf_ppOpen',     fmt(ppOpenCalc));
+    set('cf_ppSale',     fmt(todayDispPP));
+    set('cf_ppSupPay',   fmt(supPayPP));
+    set('cf_ppVch',      fmt(vPP));
+    set('cf_ppClose',    fmt(ppClose));
+
+    const totOpen  = cashOpenCalc + bankOpenCalc + ppOpenCalc;
+    const totIn    = todayDispCash+todayDispBank+todayDispPP + cashRcvFromBh;
+    const totOut   = supPayCash+supPayBank+supPayPP + vTotal;
+    const totClose = cashClose + bankClose + ppClose;
+    set('cf_totOpen',  fmt(totOpen));
+    set('cf_totIn',    fmt(totIn));
+    set('cf_totOut',   fmt(totOut));
+    set('cf_totClose', fmt(totClose));
+
+    // Supplier Rows
+    const supRowsHtml = suppRows.map(s => `
+      <div class="sup-row">
+        <span>${s.name}</span>
+        <span class="num" style="color:#374151">${fmt(s.op)}</span>
+        <span class="num" style="color:#2563eb">${fmt(s.pur)}</span>
+        <span class="num" style="color:#dc2626">${fmt(s.pay)}</span>
+        <span class="num" style="color:${s.cl>0?'#dc2626':'#059669'};font-weight:700">${fmt(s.cl)}</span>
+      </div>`).join('');
+    document.getElementById('supplierRows').innerHTML = supRowsHtml ||
+      '<div style="padding:1rem;text-align:center;color:#9ca3af">No suppliers found.</div>';
+
+    document.getElementById('supplierTotals').style.display = 'grid';
+    set('st_open',     fmt(suppTot.op));
+    set('st_purchase', fmt(suppTot.pur));
+    set('st_pay',      fmt(suppTot.pay));
+    set('st_close',    fmt(suppTot.cl));
+
+    // Bhagirathi Due
+    set('bh_openDue',      fmt(bhOpenDue));
+    set('bh_todayInden',   fmt(todayIpdSale));
+    set('bh_cashRcv',      fmt(cashRcvFromBh));
+    set('bh_closeBalance', fmt(bhNetDue));
+    set('bh_drTotal',      fmt(bhOpenDue + todayIpdSale));
+    set('bh_crTotal',      fmt(cashRcvFromBh + bhNetDue));
+    set('bh_netDue',       fmt(bhNetDue));
+
+    // Gen time
+    set('genTime', new Date().toLocaleString('en-IN'));
+
+    // Show report
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('reportWrap').style.display  = 'block';
+
+  } catch(err) {
+    alert('Error generating report: ' + err.message);
+    console.error(err);
+  } finally {
+    spin(false);
+  }
+}
+
+// ─── PDF DOWNLOAD ──────────────────────────────────────────
+async function downloadPDF() {
+  const wrap = document.getElementById('reportWrap');
+  if (wrap.style.display === 'none') { alert('Please generate the report first.'); return; }
+
+  spin(true);
+  try {
+    const { jsPDF } = window.jspdf;
+    const canvas = await html2canvas(wrap, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW   = pdf.internal.pageSize.getWidth();
+    const pageH   = pdf.internal.pageSize.getHeight();
+    const margins = 10;
+    const imgW    = pageW - margins * 2;
+    const imgH    = (canvas.height * imgW) / canvas.width;
+
+    let posY = margins;
+    let remaining = imgH;
+    let page = 0;
+
+    while (remaining > 0) {
+      if (page > 0) { pdf.addPage(); posY = margins; }
+      const printH = Math.min(remaining, pageH - margins * 2);
+      const srcY   = page * (pageH - margins * 2) * (canvas.width / imgW);
+      const srcH   = printH * (canvas.width / imgW);
+
+      // Crop canvas for this page
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width  = canvas.width;
+      pageCanvas.height = srcH;
+      const ctx = pageCanvas.getContext('2d');
+      ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+
+      pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', margins, posY, imgW, printH);
+      remaining -= printH;
+      page++;
+    }
+
+    const date = document.getElementById('rptDate').value;
+    pdf.save('Pharmacy_Daily_Report_' + date + '.pdf');
+  } catch(err) {
+    alert('PDF generation failed: ' + err.message);
+  } finally {
+    spin(false);
+  }
+}
+</script>
+</body>
+</html>
