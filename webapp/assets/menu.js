@@ -258,6 +258,12 @@
       roles: ["admin", "accountant", "pharmacy", "manager", "viewer"]
     },
     {
+      label: "Pharmacy Day Reports",
+      icon: "📊",
+      page: "pages/report_pharmacy.html",
+      roles: ["admin", "accountant", "pharmacy", "manager", "viewer"]
+    },
+    {
       label: "Pharmacy Extra Pay",
       icon: "💰",
       page: "pages/pharmacy-extra-pay.html",
