@@ -38,12 +38,18 @@
     // ==========================================
     // HR & ACCOUNTS
     // ==========================================
-    {
+   {
+      label: "Payment",
+      icon: "💵",
+      page: "pages/payment.html",
+      roles: ["admin", "accountant"]
+   }
+ /*   {
       label: "Pay Salary",
       icon: "💵",
       page: "pages/pay_salary.html",
       roles: ["admin", "accountant"]
-    },
+    },*/
     {
       label: "Employees",
       icon: "👥",
