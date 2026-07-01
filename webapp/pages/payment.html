@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Payment</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .tab-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+    .tab-btn { padding:.5rem 1.1rem; border:2px solid #6366f1; border-radius:8px; background:#fff;
+               color:#6366f1; font-weight:600; cursor:pointer; transition:all .2s; }
+    .tab-btn.active { background:#6366f1; color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    /* type selector cards */
+    .type-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:.85rem; margin-bottom:1.5rem; }
+    .type-card { background:#fff; border:2px solid #e2e8f0; border-radius:12px; padding:1.1rem .9rem;
+                 text-align:center; cursor:pointer; transition:all .15s; }
+    .type-card:hover { border-color:#a5b4fc; transform:translateY(-2px); }
+    .type-card.active { border-color:#6366f1; background:#eef2ff; }
+    .type-card .ti { font-size:1.7rem; display:block; margin-bottom:.4rem; }
+    .type-card .tl { font-size:.85rem; font-weight:700; color:#1e293b; }
+
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; }
+    .form-row > * { flex:1; min-width:180px; }
+    .form-row label { display:block; font-size:.8rem; font-weight:600; color:#475569; margin-bottom:.3rem; }
+    .form-row input, .form-row select {
+      width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:6px;
+      padding:.5rem .65rem; font-size:.88rem;
+    }
+    .form-row input:focus, .form-row select:focus { outline:none; border-color:#6366f1; }
+    .req { color:#dc2626; }
+
+    .mode-chips { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.3rem; }
+    .mode-chip { border:2px solid #c7d2fe; border-radius:8px; padding:.35rem .9rem; cursor:pointer;
+                 font-size:.85rem; font-weight:600; color:#4338ca; background:#fff; transition:all .18s; }
+    .mode-chip.active { background:#6366f1; color:#fff; border-color:#6366f1; }
+
+    .voucher-badge { font-size:.8rem; margin-top:.35rem; min-height:1.1em; }
+    .due-box { background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:.6rem .9rem;
+               margin:.6rem 0; font-size:.86rem; }
+    .due-box .dv { font-weight:800; font-size:1.1rem; color:#c2410c; }
+
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; font-size:.82rem; }
+    th { background:#f0f0f0; padding:7px 8px; text-align:left; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; vertical-align:middle; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+    tr.row-blank td { background:#fef2f2; }
+    tr.row-filled td { background:#f0fdf4; }
+
+    .section-title { font-size:.9rem; font-weight:700; color:#312e81; margin:1.2rem 0 .5rem;
+                      padding-bottom:.3rem; border-bottom:1px solid #e0e7ff; }
+    .form-card { background:#f8f9ff; border:1px solid #c7d2fe; border-radius:10px; padding:1rem 1.1rem; margin-top:.75rem; }
+    .info { color:#15803d; font-size:.85rem; margin-top:.5rem; }
+    .err  { color:#dc2626; font-size:.85rem; margin-top:.5rem; white-space:pre-wrap; }
+    .hidden { display:none!important; }
+    .pill { display:inline-block; padding:2px 9px; border-radius:12px; font-size:.75rem; font-weight:700; }
+    .pill-blank  { background:#fee2e2; color:#991b1b; }
+    .pill-filled { background:#d1fae5; color:#065f46; }
+    .chk-row td { cursor:pointer; }
+    .upload-status-ok  { color:#059669; font-weight:600; }
+    .upload-status-bad { color:#dc2626; font-weight:600; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>💳 Payment</h1>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchMainTab('mtNew',this)">➕ New Payment</button>
+    <button class="tab-btn" onclick="switchMainTab('mtRange',this)">🎫 Voucher Range</button>
+    <button class="tab-btn" onclick="switchMainTab('mtTrack',this)">📋 Voucher Tracker</button>
+    <button class="tab-btn" onclick="switchMainTab('mtUpload',this)">📤 Excel Upload</button>
+  </div>
+
+  <!-- ══════════════════ TAB: NEW PAYMENT ══════════════════ -->
+  <div id="mtNew" class="tab-panel active">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">Select Payment Type</h2>
+      <div class="type-grid" id="typeGrid"></div>
+      <div id="formContainer"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ TAB: VOUCHER RANGE ══════════════════ -->
+  <div id="mtRange" class="tab-panel">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">🎫 Generate Voucher Range</h2>
+      <p style="font-size:.85rem;color:#666;margin-bottom:.75rem">
+        Creates one blank row per voucher number. Every payment entry (from any type, or Excel upload)
+        must use a voucher number that already exists here — this is what lets you spot a missed voucher
+        (a blank row) and stops the same voucher number being reused for two different parties.
+      </p>
+      <div class="form-row" style="max-width:520px">
+        <div><label>Start No. <span class="req">*</span></label><input id="rangeStart" type="number"/></div>
+        <div><label>End No. <span class="req">*</span></label><input id="rangeEnd" type="number"/></div>
+        <div style="flex:0"><button class="btn-primary" style="width:auto;white-space:nowrap" onclick="generateRange()">Generate</button></div>
+      </div>
+      <p class="err" id="rangeErr"></p>
+      <p class="info" id="rangeOk"></p>
+
+      <div class="section-title">Recent Ranges</div>
+      <div id="rangeHist">Loading…</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ TAB: VOUCHER TRACKER ══════════════════ -->
+  <div id="mtTrack" class="tab-panel">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">📋 Voucher Tracker</h2>
+      <div class="form-row" style="margin-bottom:.75rem">
+        <div><label>From No.</label><input id="trackFrom" type="number"/></div>
+        <div><label>To No.</label><input id="trackTo" type="number"/></div>
+        <div>
+          <label>Status</label>
+          <select id="trackStatus">
+            <option value="">All</option>
+            <option value="blank">Blank (missed) only</option>
+            <option value="filled">Filled only</option>
+          </select>
+        </div>
+        <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="loadTracker()">Show</button></div>
+      </div>
+      <div id="trackOut">Enter a range and click Show.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ TAB: EXCEL UPLOAD ══════════════════ -->
+  <div id="mtUpload" class="tab-panel">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">📤 Excel Upload</h2>
+      <div class="type-grid" id="uploadTypeGrid"></div>
+
+      <div id="uploadArea" class="hidden">
+        <div class="form-card">
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
+            <button class="btn-primary" style="width:auto;background:#059669" onclick="downloadSample()">⬇ Download Sample Excel</button>
+            <input type="file" id="uploadFile" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)"/>
+          </div>
+          <p style="font-size:.8rem;color:#666;margin-top:.5rem" id="uploadColsHint"></p>
+        </div>
+        <div id="uploadPreview" style="margin-top:1rem"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+BNH_PAGE.requireRole(["admin","accountant","manager"]);
+const sb = BNH_PAGE.sb;
+const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const todayISO = () => new Date().toISOString().slice(0,10);
+function spin(on){ document.getElementById('spinner').classList.toggle('hidden', !on); }
+
+// ════════════════════════════════════════════════════════════
+// PAYMENT TYPE CONFIG (shared by New Payment + Excel Upload)
+// ════════════════════════════════════════════════════════════
+const TYPES = {
+  ipd_refer:  { label:'IPD Refer Payment',  icon:'🏥' , multi:true  },
+  opd_refer:  { label:'OPD Refer Payment',  icon:'🚑' , multi:true  },
+  doctor:     { label:'Doctor Payment',     icon:'👨‍⚕️', multi:false },
+  lab_agent:  { label:'Lab Agent Payment',  icon:'🧪' , multi:false },
+  salary:     { label:'Salary Payment',     icon:'💵' , multi:false },
+  creditor:   { label:'Creditor Payment',   icon:'🏦' , multi:false },
+  cash:       { label:'Cash Voucher',       icon:'💰' , multi:false }
+};
+
+document.getElementById('typeGrid').innerHTML = Object.entries(TYPES).map(([k,t])=>
+  `<div class="type-card" id="tcard-${k}" onclick="selectType('${k}')">
+     <span class="ti">${t.icon}</span><span class="tl">${esc(t.label)}</span>
+   </div>`).join('');
+document.getElementById('uploadTypeGrid').innerHTML = Object.entries(TYPES).map(([k,t])=>
+  `<div class="type-card" id="ucard-${k}" onclick="selectUploadType('${k}')">
+     <span class="ti">${t.icon}</span><span class="tl">${esc(t.label)}</span>
+   </div>`).join('');
+
+function switchMainTab(id, btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-bar .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id==='mtRange') loadRangeHistory();
+}
+
+// ── shared mode-chip helper ──────────────────────────────────
+function modeChipsHtml(prefix){
+  return `<div class="mode-chips">
+      <div class="mode-chip" onclick="selectMode(this,'${prefix}','Cash')">💵 Cash</div>
+      <div class="mode-chip" onclick="selectMode(this,'${prefix}','Bank')">🏦 Bank</div>
+      <div class="mode-chip" onclick="selectMode(this,'${prefix}','PhonePe')">📱 PhonePe</div>
+    </div><input type="hidden" id="${prefix}Mode"/>`;
+}
+function selectMode(el, prefix, val){
+  el.parentElement.querySelectorAll('.mode-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(prefix+'Mode').value = val;
+}
+
+// ── voucher-number live check ────────────────────────────────
+async function checkVoucher(prefix){
+  const badge = document.getElementById(prefix+'VStatus');
+  const vNoEl = document.getElementById(prefix+'Voucher');
+  if (!badge || !vNoEl) return null;
+  const vNo = vNoEl.value.trim();
+  if (!vNo) { badge.innerHTML=''; return null; }
+  const { data } = await sb.from('payment_vouchers').select('*').eq('voucher_no', vNo).maybeSingle();
+  if (!data) {
+    badge.innerHTML = '<span style="color:#dc2626">❌ Not generated yet — create this voucher range first (Voucher Range tab).</span>';
+    return { ok:false };
+  }
+  if (data.status === 'blank') {
+    badge.innerHTML = '<span style="color:#059669">✅ Available.</span>';
+    return { ok:true, existing:null };
+  }
+  badge.innerHTML = `<span style="color:#d97706">⚠️ Already used — ${esc(data.party_name)} (${esc(data.type)}), ₹${fmt(data.amount)} recorded so far.
+    Additional entries on this voucher number are only allowed for the <b>same party</b> in the <b>same type</b>.</span>`;
+  return { ok:true, existing:data };
+}
+
+// ════════════════════════════════════════════════════════════
+// TYPE SELECTION → FORM RENDERING
+// ════════════════════════════════════════════════════════════
+let currentType = null;
+function selectType(key){
+  currentType = key;
+  document.querySelectorAll('.type-card').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tcard-'+key).classList.add('active');
+  const c = document.getElementById('formContainer');
+  const renderers = {
+    ipd_refer: formIpdRefer, opd_refer: formOpdRefer, doctor: formDoctor,
+    lab_agent: formLabAgent, salary: formSalary, creditor: formCreditor, cash: formCash
+  };
+  c.innerHTML = renderers[key]();
+  const initters = {
+    ipd_refer: initIpdRefer, opd_refer: initOpdRefer, doctor: initDoctorForm,
+    lab_agent: initLabAgentForm, salary: initSalaryForm, creditor: initCreditorForm, cash: initCashForm
+  };
+  initters[key]();
+}
+
+// ────────────────────────────────────────────────────────────
+// 1. IPD REFER PAYMENT  (multi-case, same refer name → one voucher)
+// ────────────────────────────────────────────────────────────
+function formIpdRefer(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">🏥 IPD Refer Payment</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        <input id="irVoucher" onblur="checkVoucher('ir')"/>
+        <div class="voucher-badge" id="irVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="irDate" type="date" value="${todayISO()}"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('ir')}</div>
+    </div>
+
+    <div class="section-title">Find Pending Cases</div>
+    <div class="form-row">
+      <div><label>Admission From</label><input id="irFrom" type="date"/></div>
+      <div><label>Admission To</label><input id="irTo" type="date"/></div>
+      <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="loadIpdReferCases()">Load</button></div>
+    </div>
+    <div class="form-row" style="margin-top:.5rem">
+      <div><label>Refer Name</label><select id="irReferSel" onchange="renderIpdReferCaseList()"><option value="">— pick refer name —</option></select></div>
+    </div>
+    <div id="irCaseList" style="margin-top:.5rem"></div>
+
+    <div class="form-row" style="margin-top:.75rem">
+      <div><label>Remark (optional)</label><input id="irRemark"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveIpdRefer()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="irErr"></p>
+    <p class="info" id="irOk" style="display:none"></p>
+  </div>`;
+}
+let irCases = [];
+function initIpdRefer(){
+  const t = todayISO();
+  document.getElementById('irFrom').value = t.slice(0,7)+'-01';
+  document.getElementById('irTo').value = t;
+}
+async function loadIpdReferCases(){
+  const from = document.getElementById('irFrom').value, to = document.getElementById('irTo').value;
+  if (!from || !to) return;
+  spin(true);
+  try{
+    const { data: adms } = await sb.from('ipd_admissions')
+      .select('id,admission_date,admission_no,patient_name,refer_name,refer_id')
+      .gte('admission_date',from).lte('admission_date',to)
+      .not('refer_name','is',null).order('admission_date',{ascending:false});
+    const filtered = (adms||[]).filter(r=>r.refer_name && r.refer_name.trim()!=='');
+    const admIds = filtered.map(r=>r.id);
+    const { data: amtEntries } = admIds.length ? await sb.from('ipd_amount_entries').select('admission_id,refer_amount').in('admission_id',admIds) : {data:[]};
+    const amtMap = {}; (amtEntries||[]).forEach(a=>amtMap[a.admission_id]=a);
+    const referIds = filtered.filter(r=>r.refer_id).map(r=>r.refer_id);
+    let paidMap = {};
+    if (referIds.length){
+      const { data: pays } = await sb.from('ipd_refer_payments').select('refer_id,admission_id,amount').in('refer_id',referIds);
+      (pays||[]).forEach(p=>{ paidMap[p.admission_id]=(paidMap[p.admission_id]||0)+parseFloat(p.amount||0); });
+    }
+    // NOTE: we deliberately do NOT filter out zero/negative-due cases here.
+    // Every case with a refer name in the period stays in irCases so its
+    // refer name still shows up in the dropdown below — even if that
+    // particular case has nothing pending (e.g. refer_amount not entered
+    // yet, or already fully paid). Those rows are shown but disabled
+    // instead of silently disappearing.
+    irCases = filtered.map(r=>{
+      const refA = parseFloat(amtMap[r.id]?.refer_amount||0);
+      const paid = paidMap[r.id]||0;
+      return { ...r, refer_amount: refA, paid, due: refA-paid };
+    });
+
+    const sel = document.getElementById('irReferSel');
+    const names = [...new Set(irCases.map(c=>c.refer_name))].sort();
+    sel.innerHTML = '<option value="">— pick refer name —</option>' + names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    document.getElementById('irCaseList').innerHTML = irCases.length ? '' : '<p style="color:#888">No cases with a refer name in this date range.</p>';
+  } finally { spin(false); }
+}
+function renderIpdReferCaseList(){
+  const name = document.getElementById('irReferSel').value;
+  const box = document.getElementById('irCaseList');
+  if (!name) { box.innerHTML=''; return; }
+  const list = irCases.filter(c=>c.refer_name===name);
+  const payable = c => c.due > 0.001;
+  box.innerHTML = `<table id="irTable">
+    <thead><tr><th></th><th>Adm Date</th><th>Adm No.</th><th>Patient</th><th class="r">Due</th><th class="r">Pay Amount</th></tr></thead>
+    <tbody>${list.map(c=>`<tr class="chk-row">
+      <td><input type="checkbox" class="ir-chk" data-id="${c.id}" onchange="irUpdateTotal()" ${payable(c)?'':'disabled'}/></td>
+      <td>${c.admission_date}</td><td>${c.admission_no}</td><td>${esc(c.patient_name)}</td>
+      <td class="r">${c.refer_amount>0 ? fmt(c.due) : '<span style="color:#999">amount not set</span>'}</td>
+      <td class="r"><input type="number" class="ir-amt" data-id="${c.id}" value="${Math.max(0,c.due).toFixed(2)}" min="0" step="0.01"
+          style="width:100px;text-align:right" oninput="irUpdateTotal()" ${payable(c)?'':'disabled'}/></td>
+    </tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="5">Total to Pay</td><td class="r" id="irTotal">₹0.00</td></tr></tfoot>
+  </table>`;
+}
+function irUpdateTotal(){
+  let total = 0;
+  document.querySelectorAll('.ir-chk:checked').forEach(chk=>{
+    const amtEl = document.querySelector(`.ir-amt[data-id="${chk.dataset.id}"]`);
+    total += parseFloat(amtEl.value||0);
+  });
+  document.getElementById('irTotal').textContent = fmt(total);
+}
+async function saveIpdRefer(){
+  const err = document.getElementById('irErr'), ok = document.getElementById('irOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = document.getElementById('irVoucher').value.trim();
+  const date = document.getElementById('irDate').value;
+  const mode = document.getElementById('irMode').value;
+  const remark = document.getElementById('irRemark').value.trim() || null;
+  const checked = [...document.querySelectorAll('.ir-chk:checked')];
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+  if (!checked.length) { err.textContent='Select at least one case to pay.'; return; }
+
+  const vcheck = await checkVoucher('ir');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  const rows = checked.map(chk=>{
+    const c = irCases.find(x=>x.id===chk.dataset.id);
+    const amt = parseFloat(document.querySelector(`.ir-amt[data-id="${chk.dataset.id}"]`).value||0);
+    return BNH_PAGE.stamp({
+      admission_id: c.id, admission_no: c.admission_no, patient_name: c.patient_name,
+      refer_id: c.refer_id || null, refer_name: c.refer_name,
+      payment_date: date, voucher_no: voucher, mode, amount: amt, remark
+    });
+  });
+  if (vcheck.existing && rows.some(r=>r.refer_name !== vcheck.existing.party_name)) {
+    err.textContent = `Voucher ${voucher} is already used for "${vcheck.existing.party_name}". All cases in this voucher must be for the same refer name.`;
+    return;
+  }
+
+  spin(true);
+  try{
+    const { error } = await sb.from('ipd_refer_payments').insert(rows);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = `✅ Saved ${rows.length} case(s) under Voucher ${voucher}.`;
+    document.getElementById('irRemark').value='';
+    await loadIpdReferCases();
+    await checkVoucher('ir');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 2. OPD REFER PAYMENT  (multi-case, same refer name → one voucher)
+// ────────────────────────────────────────────────────────────
+function formOpdRefer(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">🚑 OPD Refer Payment</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        <input id="orVoucher" onblur="checkVoucher('or')"/>
+        <div class="voucher-badge" id="orVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="orDate" type="date" value="${todayISO()}"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('or')}</div>
+    </div>
+
+    <div class="section-title">Find Pending Cases</div>
+    <div class="form-row">
+      <div><label>Case Date From</label><input id="orFrom" type="date"/></div>
+      <div><label>Case Date To</label><input id="orTo" type="date"/></div>
+      <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="loadOpdReferCases()">Load</button></div>
+    </div>
+    <div class="form-row" style="margin-top:.5rem">
+      <div><label>Refer Name</label><select id="orReferSel" onchange="renderOpdReferCaseList()"><option value="">— pick refer name —</option></select></div>
+    </div>
+    <div id="orCaseList" style="margin-top:.5rem"></div>
+
+    <div class="form-row" style="margin-top:.75rem">
+      <div><label>Remark (optional)</label><input id="orRemark"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveOpdRefer()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="orErr"></p>
+    <p class="info" id="orOk" style="display:none"></p>
+  </div>`;
+}
+let orCases = [];
+function initOpdRefer(){
+  const t = todayISO();
+  document.getElementById('orFrom').value = t.slice(0,7)+'-01';
+  document.getElementById('orTo').value = t;
+}
+async function loadOpdReferCases(){
+  const from = document.getElementById('orFrom').value, to = document.getElementById('orTo').value;
+  if (!from || !to) return;
+  spin(true);
+  try{
+    // NOTE: earlier this used .neq('refer_payment_status','paid') to skip
+    // already-paid cases. In Postgres/PostgREST, neq() silently EXCLUDES
+    // rows where the column is NULL (NULL never matches neq either), so
+    // any case whose status flag was never set dropped out of the list
+    // entirely — and its refer name vanished from the dropdown too. We
+    // now pull every case with a refer name in the period, and compute
+    // "due" from actual payments recorded (not from the status flag),
+    // which also correctly supports partial / multi-payment cases.
+    const { data: cases } = await sb.from('opd_case')
+      .select('case_no,case_date,patient_name,refer_name,refer_amount,refer_payment_status')
+      .gte('case_date',from).lte('case_date',to)
+      .not('refer_name','is',null)
+      .order('case_date',{ascending:false});
+    const filtered = (cases||[]).filter(r=>r.refer_name && r.refer_name.trim()!=='');
+    const caseNos = filtered.map(c=>c.case_no);
+    const { data: pays } = caseNos.length ? await sb.from('opd_refer_payment').select('case_no,amount').in('case_no',caseNos) : {data:[]};
+    const paidMap = {};
+    (pays||[]).forEach(p=>{ paidMap[p.case_no] = (paidMap[p.case_no]||0) + parseFloat(p.amount||0); });
+    orCases = filtered.map(c=>{
+      const refA = parseFloat(c.refer_amount||0);
+      const paid = paidMap[c.case_no] || 0;
+      return { ...c, refer_amount: refA, paid, due: refA - paid };
+    });
+
+    const sel = document.getElementById('orReferSel');
+    const names = [...new Set(orCases.map(c=>c.refer_name))].sort();
+    sel.innerHTML = '<option value="">— pick refer name —</option>' + names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    document.getElementById('orCaseList').innerHTML = orCases.length ? '' : '<p style="color:#888">No cases with a refer name in this date range.</p>';
+  } finally { spin(false); }
+}
+function renderOpdReferCaseList(){
+  const name = document.getElementById('orReferSel').value;
+  const box = document.getElementById('orCaseList');
+  if (!name) { box.innerHTML=''; return; }
+  const list = orCases.filter(c=>c.refer_name===name);
+  const payable = c => c.due > 0.001;
+  box.innerHTML = `<table id="orTable">
+    <thead><tr><th></th><th>Case Date</th><th>Case No.</th><th>Patient</th><th class="r">Due</th><th class="r">Pay Amount</th></tr></thead>
+    <tbody>${list.map(c=>`<tr class="chk-row">
+      <td><input type="checkbox" class="or-chk" data-no="${esc(c.case_no)}" onchange="orUpdateTotal()" ${payable(c)?'':'disabled'}/></td>
+      <td>${c.case_date}</td><td>${esc(c.case_no)}</td><td>${esc(c.patient_name)}</td>
+      <td class="r">${c.refer_amount>0 ? fmt(c.due) : '<span style="color:#999">amount not set</span>'}</td>
+      <td class="r"><input type="number" class="or-amt" data-no="${esc(c.case_no)}" value="${Math.max(0,c.due).toFixed(2)}" min="0" step="0.01"
+          style="width:100px;text-align:right" oninput="orUpdateTotal()" ${payable(c)?'':'disabled'}/></td>
+    </tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="5">Total to Pay</td><td class="r" id="orTotal">₹0.00</td></tr></tfoot>
+  </table>`;
+}
+function orUpdateTotal(){
+  let total = 0;
+  document.querySelectorAll('.or-chk:checked').forEach(chk=>{
+    const amtEl = document.querySelector(`.or-amt[data-no="${CSS.escape(chk.dataset.no)}"]`);
+    total += parseFloat(amtEl.value||0);
+  });
+  document.getElementById('orTotal').textContent = fmt(total);
+}
+async function saveOpdRefer(){
+  const err = document.getElementById('orErr'), ok = document.getElementById('orOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = document.getElementById('orVoucher').value.trim();
+  const date = document.getElementById('orDate').value;
+  const mode = document.getElementById('orMode').value;
+  const remark = document.getElementById('orRemark').value.trim() || null;
+  const checked = [...document.querySelectorAll('.or-chk:checked')];
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+  if (!checked.length) { err.textContent='Select at least one case to pay.'; return; }
+
+  const vcheck = await checkVoucher('or');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  const rows = checked.map(chk=>{
+    const c = orCases.find(x=>x.case_no===chk.dataset.no);
+    const amt = parseFloat(document.querySelector(`.or-amt[data-no="${CSS.escape(chk.dataset.no)}"]`).value||0);
+    return BNH_PAGE.stamp({
+      case_no: c.case_no, payment_date: date, voucher_no: voucher,
+      remarks: remark, payment_to: c.refer_name, mode, amount: amt, discount: 0,
+      description: `Case ${c.case_no}`
+    });
+  });
+  if (vcheck.existing && rows.some(r=>r.payment_to !== vcheck.existing.party_name)) {
+    err.textContent = `Voucher ${voucher} is already used for "${vcheck.existing.party_name}". All cases in this voucher must be for the same refer name.`;
+    return;
+  }
+
+  spin(true);
+  try{
+    const { error } = await sb.from('opd_refer_payment').insert(rows);
+    if (error) throw error;
+    // Only flip a case to 'paid' once its due is fully cleared — a partial
+    // payment should leave it visible (with the reduced due) next time.
+    for (const r of rows){
+      const c = orCases.find(x=>x.case_no===r.case_no);
+      const nowPaid = (c?.paid||0) + r.amount;
+      if (nowPaid >= (c?.refer_amount||0) - 0.01){
+        await sb.from('opd_case').update({ refer_payment_status:'paid' }).eq('case_no', r.case_no);
+      }
+    }
+    ok.style.display='block'; ok.textContent = `✅ Saved ${rows.length} case(s) under Voucher ${voucher}.`;
+    document.getElementById('orRemark').value='';
+    await loadOpdReferCases();
+    await checkVoucher('or');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 3. DOCTOR PAYMENT  (new)
+// ────────────────────────────────────────────────────────────
+function formDoctor(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">👨‍⚕️ Doctor Payment</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        <input id="dcVoucher" onblur="checkVoucher('dc')"/>
+        <div class="voucher-badge" id="dcVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="dcDate" type="date" value="${todayISO()}"/></div>
+      <div><label>Doctor <span class="req">*</span></label><select id="dcDoctor" onchange="onDoctorSelect()"><option value="">— select —</option></select></div>
+    </div>
+    <div class="due-box hidden" id="dcDueBox">Current Due: <span class="dv" id="dcDueVal">—</span></div>
+    <div class="form-row">
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="dcAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('dc')}</div>
+      <div><label>Remark (optional)</label><input id="dcRemark"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveDoctorPayment()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="dcErr"></p>
+    <p class="info" id="dcOk" style="display:none"></p>
+  </div>`;
+}
+let dcDoctors = [];
+async function initDoctorForm(){
+  const { data } = await sb.from('ipd_doctors').select('id,doctor_name,doctor_type,opening_balance').order('doctor_name');
+  dcDoctors = data||[];
+  document.getElementById('dcDoctor').innerHTML = '<option value="">— select —</option>' +
+    dcDoctors.map(d=>`<option value="${d.id}">${esc(d.doctor_name)} (${esc(d.doctor_type)})</option>`).join('');
+}
+async function onDoctorSelect(){
+  const id = document.getElementById('dcDoctor').value;
+  const box = document.getElementById('dcDueBox');
+  if (!id) { box.classList.add('hidden'); return; }
+  spin(true);
+  try{
+    const { due } = await getDoctorDue(id);
+    box.classList.remove('hidden');
+    document.getElementById('dcDueVal').textContent = fmt(due);
+  } finally { spin(false); }
+}
+async function getDoctorDue(doctorId){
+  const { data: doc } = await sb.from('ipd_doctors').select('*').eq('id',doctorId).single();
+  const { data: otEntries } = await sb.from('ipd_ot_entries').select('surgent_id,anaesthesia_id,admission_id')
+    .or(`surgent_id.eq.${doctorId},anaesthesia_id.eq.${doctorId}`);
+  const admIds = (otEntries||[]).map(o=>o.admission_id);
+  let amtMap = {};
+  if (admIds.length){
+    const { data: amts } = await sb.from('ipd_amount_entries').select('*').in('admission_id',admIds);
+    (amts||[]).forEach(a=>amtMap[a.admission_id]=a);
+  }
+  let otFees=0, nhAdj=0;
+  (otEntries||[]).forEach(ot=>{
+    const amt = amtMap[ot.admission_id]; if (!amt) return;
+    if (doc.doctor_type==='Surgent' && ot.surgent_id===doctorId){ otFees+=parseFloat(amt.surgent_fees||0); nhAdj+=parseFloat(amt.nh_fees||0); }
+    else if (doc.doctor_type==='Anaesthesia' && ot.anaesthesia_id===doctorId){ otFees+=parseFloat(amt.anaesthesia_fees||0); }
+  });
+  const { data: pays } = await sb.from('ipd_doctor_payments').select('amount').eq('doctor_id',doctorId);
+  const paid = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount||0),0);
+  const opBal = parseFloat(doc.opening_balance||0);
+  const due = doc.doctor_type==='Surgent' ? opBal+otFees-nhAdj-paid : opBal+otFees-paid;
+  return { doc, due };
+}
+async function saveDoctorPayment(){
+  const err = document.getElementById('dcErr'), ok = document.getElementById('dcOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = document.getElementById('dcVoucher').value.trim();
+  const date = document.getElementById('dcDate').value;
+  const docId = document.getElementById('dcDoctor').value;
+  const amount = parseFloat(document.getElementById('dcAmount').value||0);
+  const mode = document.getElementById('dcMode').value;
+  const remark = document.getElementById('dcRemark').value.trim() || null;
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!docId) { err.textContent='Select a doctor.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+
+  const vcheck = await checkVoucher('dc');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  const doc = dcDoctors.find(d=>d.id===docId);
+  spin(true);
+  try{
+    const payload = BNH_PAGE.stamp({
+      doctor_id: docId, doctor_name: doc.doctor_name, doctor_type: doc.doctor_type,
+      payment_date: date, voucher_no: voucher, amount, mode, remark,
+      description: `Doctor Payment - ${doc.doctor_name} (${doc.doctor_type})`
+    });
+    const { error } = await sb.from('ipd_doctor_payments').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = '✅ Doctor payment saved.';
+    document.getElementById('dcAmount').value=''; document.getElementById('dcRemark').value='';
+    await onDoctorSelect();
+    await checkVoucher('dc');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 4. LAB AGENT PAYMENT
+// ────────────────────────────────────────────────────────────
+function formLabAgent(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">🧪 Lab Agent Payment</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        <input id="laVoucher" onblur="checkVoucher('la')"/>
+        <div class="voucher-badge" id="laVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="laDate" type="date" value="${todayISO()}"/></div>
+      <div><label>Agent <span class="req">*</span></label><select id="laAgent" onchange="onAgentSelect()"><option value="">— select —</option></select></div>
+    </div>
+    <div class="due-box hidden" id="laDueBox">Current Due: <span class="dv" id="laDueVal">—</span></div>
+    <div class="form-row">
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="laAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('la')}</div>
+      <div><label>Remark (optional)</label><input id="laRemark"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveLabAgentPayment()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="laErr"></p>
+    <p class="info" id="laOk" style="display:none"></p>
+  </div>`;
+}
+let laAgents = [];
+async function initLabAgentForm(){
+  const { data } = await sb.from('lab_sample_agent').select('id,agent_name,mobile_no,opening_balance').order('agent_name');
+  laAgents = data||[];
+  document.getElementById('laAgent').innerHTML = '<option value="">— select —</option>' +
+    laAgents.map(a=>`<option value="${a.id}">${esc(a.agent_name)}</option>`).join('');
+}
+async function onAgentSelect(){
+  const id = document.getElementById('laAgent').value;
+  const box = document.getElementById('laDueBox');
+  if (!id) { box.classList.add('hidden'); return; }
+  spin(true);
+  try{
+    const { due } = await getAgentDue(id);
+    box.classList.remove('hidden');
+    document.getElementById('laDueVal').textContent = fmt(due);
+  } finally { spin(false); }
+}
+async function getAgentDue(agentId){
+  const { data: agent } = await sb.from('lab_sample_agent').select('*').eq('id',agentId).single();
+  const { data: work } = await sb.from('lab_work_entry').select('agent_amount').eq('agent_id',agentId).eq('is_cancelled',false);
+  const { data: pays } = await sb.from('lab_agent_payment').select('amount_paid').eq('agent_id',agentId);
+  const earned = (work||[]).reduce((a,w)=>a+parseFloat(w.agent_amount||0),0);
+  const paid = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount_paid||0),0);
+  const due = parseFloat(agent.opening_balance||0) + earned - paid;
+  return { agent, due };
+}
+async function saveLabAgentPayment(){
+  const err = document.getElementById('laErr'), ok = document.getElementById('laOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = document.getElementById('laVoucher').value.trim();
+  const date = document.getElementById('laDate').value;
+  const agentId = document.getElementById('laAgent').value;
+  const amount = parseFloat(document.getElementById('laAmount').value||0);
+  const mode = document.getElementById('laMode').value;
+  const remark = document.getElementById('laRemark').value.trim() || null;
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!agentId) { err.textContent='Select an agent.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+
+  const vcheck = await checkVoucher('la');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  const agent = laAgents.find(a=>a.id===agentId);
+  spin(true);
+  try{
+    const payload = BNH_PAGE.stamp({
+      agent_id: agentId, agent_name_snapshot: agent.agent_name,
+      payment_date: date, voucher_no: voucher, amount_paid: amount, payment_mode: mode, remarks: remark,
+      description: `Lab Agent Payment - ${agent.agent_name}`
+    });
+    const { error } = await sb.from('lab_agent_payment').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = '✅ Lab agent payment saved.';
+    document.getElementById('laAmount').value=''; document.getElementById('laRemark').value='';
+    await onAgentSelect();
+    await checkVoucher('la');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 5. SALARY PAYMENT
+// ────────────────────────────────────────────────────────────
+const MONTHS = ['', 'January','February','March','April','May','June','July','August','September','October','November','December'];
+function formSalary(){
+  const now = new Date();
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">💵 Salary Payment</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        <input id="syVoucher" onblur="checkVoucher('sy')"/>
+        <div class="voucher-badge" id="syVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="syDate" type="date" value="${todayISO()}"/></div>
+      <div><label>Employee <span class="req">*</span></label><select id="syEmp" onchange="onEmpSelect()"><option value="">— select —</option></select></div>
+    </div>
+    <div class="form-row">
+      <div><label>Month <span class="req">*</span></label>
+        <select id="syMonth" onchange="onEmpSelect()">${MONTHS.slice(1).map((m,i)=>`<option value="${i+1}" ${i+1===now.getMonth()+1?'selected':''}>${m}</option>`).join('')}</select>
+      </div>
+      <div><label>Year <span class="req">*</span></label><input id="syYear" type="number" value="${now.getFullYear()}" onchange="onEmpSelect()"/></div>
+    </div>
+    <div class="due-box hidden" id="syDueBox">Net Payable this month: <span class="dv" id="syDueVal">—</span> &nbsp;|&nbsp; Collected: <span id="syCollVal">—</span></div>
+    <div class="form-row">
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="syAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('sy')}</div>
+      <div><label>Remark (optional)</label><input id="syRemark"/></div>
+    </div>
+    <p style="font-size:.78rem;color:#666;margin-top:.4rem">Description auto-fills as "Salary for &lt;Month&gt; &lt;Year&gt;".</p>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveSalaryPayment()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="syErr"></p>
+    <p class="info" id="syOk" style="display:none"></p>
+  </div>`;
+}
+let syEmployees = [];
+async function initSalaryForm(){
+  const { data } = await sb.from('employees').select('id,name,salary').order('name');
+  syEmployees = data||[];
+  document.getElementById('syEmp').innerHTML = '<option value="">— select —</option>' +
+    syEmployees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+}
+async function getSalaryDue(empId, month, year){
+  const { data: emp } = await sb.from('employees').select('*').eq('id',empId).single();
+  const { data: bonus } = await sb.from('salary_bonuses').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
+  const { data: absent } = await sb.from('salary_absent').select('absent_days').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
+  const gross = parseFloat(emp.salary||0);
+  const absentDays = absent?.absent_days || 0;
+  const deductDays = Math.max(0, absentDays - 4);
+  const deduction = Math.round(((gross/26)*deductDays)/10)*10;
+  const net = gross - deduction + (bonus?.amount||0);
+  const { data: pays } = await sb.from('salary_payments').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year);
+  const collected = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount||0),0);
+  return { emp, net, collected, due: Math.max(0, net-collected) };
+}
+async function onEmpSelect(){
+  const id = document.getElementById('syEmp').value;
+  const box = document.getElementById('syDueBox');
+  const month = parseInt(document.getElementById('syMonth').value), year = parseInt(document.getElementById('syYear').value);
+  if (!id || !month || !year) { box.classList.add('hidden'); return; }
+  spin(true);
+  try{
+    const { due, collected } = await getSalaryDue(id, month, year);
+    box.classList.remove('hidden');
+    document.getElementById('syDueVal').textContent = fmt(due);
+    document.getElementById('syCollVal').textContent = fmt(collected);
+  } finally { spin(false); }
+}
+async function saveSalaryPayment(){
+  const err = document.getElementById('syErr'), ok = document.getElementById('syOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = document.getElementById('syVoucher').value.trim();
+  const date = document.getElementById('syDate').value;
+  const empId = document.getElementById('syEmp').value;
+  const month = parseInt(document.getElementById('syMonth').value);
+  const year = parseInt(document.getElementById('syYear').value);
+  const amount = parseFloat(document.getElementById('syAmount').value||0);
+  const mode = document.getElementById('syMode').value;
+  const remark = document.getElementById('syRemark').value.trim() || null;
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!empId) { err.textContent='Select an employee.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+
+  const vcheck = await checkVoucher('sy');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  const emp = syEmployees.find(e=>e.id===empId);
+  spin(true);
+  try{
+    const payload = BNH_PAGE.stamp({
+      employee_id: empId, employee_name: emp.name, month, year,
+      payment_date: date, voucher_no: voucher, amount, mode, remarks: remark,
+      description: `Salary for ${MONTHS[month]} ${year}`
+    });
+    const { error } = await sb.from('salary_payments').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = '✅ Salary payment saved.';
+    document.getElementById('syAmount').value=''; document.getElementById('syRemark').value='';
+    await onEmpSelect();
+    await checkVoucher('sy');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 6. CREDITOR PAYMENT
+// ────────────────────────────────────────────────────────────
+function formCreditor(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">🏦 Creditor Payment</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        <input id="crVoucher" onblur="checkVoucher('cr')"/>
+        <div class="voucher-badge" id="crVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="crDate" type="date" value="${todayISO()}"/></div>
+    </div>
+    <div class="form-row">
+      <div><label>Category <span class="req">*</span></label><select id="crCategory" onchange="onCreditorCatChange()"><option value="">— select —</option></select></div>
+      <div><label>Creditor <span class="req">*</span></label><select id="crCreditor" onchange="onCreditorSelect()"><option value="">— select category first —</option></select></div>
+    </div>
+    <div class="due-box hidden" id="crDueBox">Current Balance Due: <span class="dv" id="crDueVal">—</span></div>
+    <div class="form-row">
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="crAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('cr')}</div>
+    </div>
+    <div class="form-row">
+      <div><label>Description <span class="req">*</span> (manual, mandatory)</label><input id="crDesc" placeholder="Invoice no., what this payment covers…"/></div>
+      <div><label>Remark (optional)</label><input id="crRemark"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveCreditorPayment()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="crErr"></p>
+    <p class="info" id="crOk" style="display:none"></p>
+  </div>`;
+}
+let crCategories = [], crCreditors = [];
+async function initCreditorForm(){
+  const [{data:cats},{data:creds}] = await Promise.all([
+    sb.from('credit_categories').select('*').order('name'),
+    sb.from('creditors').select('*').order('name')
+  ]);
+  crCategories = cats||[]; crCreditors = creds||[];
+  document.getElementById('crCategory').innerHTML = '<option value="">— select —</option>' +
+    crCategories.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+}
+function onCreditorCatChange(){
+  const catId = document.getElementById('crCategory').value;
+  const sel = document.getElementById('crCreditor');
+  document.getElementById('crDueBox').classList.add('hidden');
+  if (!catId) { sel.innerHTML = '<option value="">— select category first —</option>'; return; }
+  const list = crCreditors.filter(c=>c.category_id===catId);
+  sel.innerHTML = '<option value="">— select —</option>' + list.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+}
+async function getCreditorDue(creditorId){
+  const { data: cred } = await sb.from('creditors').select('*').eq('id',creditorId).single();
+  const { data: entries } = await sb.from('credit_entries').select('amount,entry_type').eq('creditor_id',creditorId);
+  let credit=0, payment=0;
+  (entries||[]).forEach(e=>{
+    if (e.entry_type==='credit') credit += parseFloat(e.amount||0);
+    if (e.entry_type==='payment') payment += parseFloat(e.amount||0);
+  });
+  const bal = parseFloat(cred.opening_balance||0) + credit - payment;
+  return { cred, bal };
+}
+async function onCreditorSelect(){
+  const id = document.getElementById('crCreditor').value;
+  const box = document.getElementById('crDueBox');
+  if (!id) { box.classList.add('hidden'); return; }
+  spin(true);
+  try{
+    const { bal } = await getCreditorDue(id);
+    box.classList.remove('hidden');
+    document.getElementById('crDueVal').textContent = fmt(bal);
+  } finally { spin(false); }
+}
+async function saveCreditorPayment(){
+  const err = document.getElementById('crErr'), ok = document.getElementById('crOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = document.getElementById('crVoucher').value.trim();
+  const date = document.getElementById('crDate').value;
+  const catId = document.getElementById('crCategory').value;
+  const credId = document.getElementById('crCreditor').value;
+  const amount = parseFloat(document.getElementById('crAmount').value||0);
+  const mode = document.getElementById('crMode').value;
+  const desc = document.getElementById('crDesc').value.trim();
+  const remark = document.getElementById('crRemark').value.trim() || null;
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!catId) { err.textContent='Select a category.'; return; }
+  if (!credId) { err.textContent='Select a creditor.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+  if (!desc) { err.textContent='Description is mandatory for creditor payments.'; return; }
+
+  const vcheck = await checkVoucher('cr');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  const cat = crCategories.find(c=>c.id===catId);
+  const cred = crCreditors.find(c=>c.id===credId);
+  spin(true);
+  try{
+    const payload = BNH_PAGE.stamp({
+      creditor_id: credId, creditor_name: cred.name, category_id: catId, category_name: cat.name,
+      entry_date: date, amount, note: desc, description: desc, entry_type: 'payment',
+      voucher_no: voucher, mode
+    });
+    const { error } = await sb.from('credit_entries').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = '✅ Creditor payment saved.';
+    document.getElementById('crAmount').value=''; document.getElementById('crDesc').value=''; document.getElementById('crRemark').value='';
+    await onCreditorSelect();
+    await checkVoucher('cr');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 7. CASH VOUCHER  (no creditor involved)
+// ────────────────────────────────────────────────────────────
+function formCash(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">💰 Cash Voucher</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        <input id="cvVoucher" onblur="checkVoucher('cv')"/>
+        <div class="voucher-badge" id="cvVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="cvDate" type="date" value="${todayISO()}"/></div>
+      <div><label>Category</label><select id="cvCategory"><option value="">— none / general —</option></select></div>
+    </div>
+    <div class="form-row">
+      <div><label>To Whom Paying <span class="req">*</span></label><input id="cvParty" placeholder="Name of recipient"/></div>
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="cvAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('cv')}</div>
+    </div>
+    <div class="form-row">
+      <div><label>Description <span class="req">*</span> (manual, mandatory)</label><input id="cvDesc" placeholder="Purpose of this payment…"/></div>
+      <div><label>Remark (optional)</label><input id="cvRemark"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveCashVoucher()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="cvErr"></p>
+    <p class="info" id="cvOk" style="display:none"></p>
+  </div>`;
+}
+async function initCashForm(){
+  const { data } = await sb.from('credit_categories').select('*').order('name');
+  document.getElementById('cvCategory').innerHTML = '<option value="">— none / general —</option>' +
+    (data||[]).map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+}
+async function saveCashVoucher(){
+  const err = document.getElementById('cvErr'), ok = document.getElementById('cvOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = document.getElementById('cvVoucher').value.trim();
+  const date = document.getElementById('cvDate').value;
+  const category = document.getElementById('cvCategory').value || null;
+  const party = document.getElementById('cvParty').value.trim();
+  const amount = parseFloat(document.getElementById('cvAmount').value||0);
+  const mode = document.getElementById('cvMode').value;
+  const desc = document.getElementById('cvDesc').value.trim();
+  const remark = document.getElementById('cvRemark').value.trim() || null;
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!party) { err.textContent='"To Whom Paying" is required.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+  if (!desc) { err.textContent='Description is mandatory for cash vouchers.'; return; }
+
+  const vcheck = await checkVoucher('cv');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  spin(true);
+  try{
+    const payload = BNH_PAGE.stamp({ voucher_no: voucher, category, party_name: party, amount, mode, description: desc, remark, payment_date: date });
+    const { error } = await sb.from('cash_vouchers').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = '✅ Cash voucher saved.';
+    document.getElementById('cvParty').value=''; document.getElementById('cvAmount').value='';
+    document.getElementById('cvDesc').value=''; document.getElementById('cvRemark').value='';
+    await checkVoucher('cv');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ════════════════════════════════════════════════════════════
+// VOUCHER RANGE TAB
+// ════════════════════════════════════════════════════════════
+async function generateRange(){
+  const err = document.getElementById('rangeErr'), ok = document.getElementById('rangeOk');
+  err.textContent=''; ok.textContent='';
+  const start = parseInt(document.getElementById('rangeStart').value);
+  const end = parseInt(document.getElementById('rangeEnd').value);
+  if (!start || !end) { err.textContent='Enter both start and end numbers.'; return; }
+  if (end < start) { err.textContent='End must be greater than or equal to start.'; return; }
+  spin(true);
+  try{
+    const { data, error } = await sb.rpc('generate_voucher_range', {
+      p_start: start, p_end: end, p_by: BNH_PAGE.user.username, p_by_name: BNH_PAGE.user.name
+    });
+    if (error) throw error;
+    ok.textContent = `✅ Generated voucher numbers ${start} to ${end} (${data} new row(s) created).`;
+    document.getElementById('rangeStart').value=''; document.getElementById('rangeEnd').value='';
+    await loadRangeHistory();
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+async function loadRangeHistory(){
+  const box = document.getElementById('rangeHist');
+  const { data, error } = await sb.from('voucher_ranges').select('*').order('created_at',{ascending:false}).limit(20);
+  if (error || !data || !data.length) { box.textContent = 'No ranges generated yet.'; return; }
+  box.innerHTML = `<table><thead><tr><th>Start</th><th>End</th><th>New Rows</th><th>By</th><th>When</th></tr></thead>
+    <tbody>${data.map(r=>`<tr><td>${r.range_start}</td><td>${r.range_end}</td><td>${r.rows_created}</td>
+      <td>${esc(r.created_by_name||r.created_by||'')}</td><td>${new Date(r.created_at).toLocaleString('en-IN')}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// VOUCHER TRACKER TAB
+// ════════════════════════════════════════════════════════════
+async function loadTracker(){
+  const from = document.getElementById('trackFrom').value;
+  const to = document.getElementById('trackTo').value;
+  const status = document.getElementById('trackStatus').value;
+  const out = document.getElementById('trackOut');
+  out.textContent = 'Loading…';
+  let q = sb.from('payment_vouchers').select('*');
+  if (from) q = q.gte('voucher_no', from);
+  if (to)   q = q.lte('voucher_no', to);
+  if (status) q = q.eq('status', status);
+  const { data, error } = await q;
+  if (error) { out.innerHTML = `<p class="err">${esc(error.message)}</p>`; return; }
+  const rows = (data||[]).sort((a,b)=>parseInt(a.voucher_no)-parseInt(b.voucher_no));
+  if (!rows.length) { out.textContent = 'No vouchers found for this filter.'; return; }
+  const blankCount = rows.filter(r=>r.status==='blank').length;
+  out.innerHTML = `
+    <p style="font-size:.85rem;margin-bottom:.5rem">
+      ${rows.length} voucher(s) shown — <b style="color:${blankCount?'#dc2626':'#059669'}">${blankCount} blank (missed)</b>, ${rows.length-blankCount} filled.
+    </p>
+    <table>
+      <thead><tr><th>Voucher No</th><th>Status</th><th>Type</th><th>Party</th><th class="r">Amount</th><th>Mode</th><th>Date</th><th>Description</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr class="${r.status==='blank'?'row-blank':'row-filled'}">
+        <td><b>${r.voucher_no}</b></td>
+        <td><span class="pill ${r.status==='blank'?'pill-blank':'pill-filled'}">${r.status}</span></td>
+        <td>${esc(r.type||'-')}</td><td>${esc(r.party_name||'-')}</td>
+        <td class="r">${r.amount?fmt(r.amount):'-'}</td><td>${esc(r.mode||'-')}</td>
+        <td>${r.payment_date||'-'}</td><td style="max-width:280px">${esc(r.description||'-')}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// EXCEL UPLOAD TAB
+// ════════════════════════════════════════════════════════════
+const UPLOAD_CONFIG = {
+  ipd_refer: {
+    cols: ['voucher_no','payment_date','admission_no','amount','mode','remark'],
+    sampleRow: ['5201','2026-07-01','ADM1023','5000','Cash',''],
+    table: 'ipd_refer_payments',
+    async build(row, ctx){
+      const admNo = String(row.admission_no||'').trim();
+      if (!admNo) return { error:'admission_no is required' };
+      if (!ctx.admMap){
+        const { data } = await sb.from('ipd_admissions').select('id,admission_no,patient_name,refer_name,refer_id').not('refer_name','is',null);
+        ctx.admMap = {}; (data||[]).forEach(a=>ctx.admMap[String(a.admission_no).trim()]=a);
+      }
+      const adm = ctx.admMap[admNo];
+      if (!adm) return { error:`Admission "${admNo}" not found (or has no refer name)` };
+      return { payload: BNH_PAGE.stamp({
+        admission_id: adm.id, admission_no: adm.admission_no, patient_name: adm.patient_name,
+        refer_id: adm.refer_id||null, refer_name: adm.refer_name,
+        payment_date: row.payment_date, voucher_no: String(row.voucher_no).trim(),
+        mode: row.mode, amount: parseFloat(row.amount), remark: row.remark||null,
+        description: `${adm.patient_name} (${adm.admission_no})`
+      })};
+    }
+  },
+  opd_refer: {
+    cols: ['voucher_no','payment_date','case_no','amount','mode','remark'],
+    sampleRow: ['5202','2026-07-01','OPD-4567','1200','Bank',''],
+    table: 'opd_refer_payment',
+    async build(row, ctx){
+      const caseNo = String(row.case_no||'').trim();
+      if (!caseNo) return { error:'case_no is required' };
+      if (!ctx.caseMap){
+        const { data } = await sb.from('opd_case').select('case_no,patient_name,refer_name,refer_amount').not('refer_name','is',null);
+        ctx.caseMap = {}; (data||[]).forEach(c=>ctx.caseMap[String(c.case_no).trim()]=c);
+      }
+      const c = ctx.caseMap[caseNo];
+      if (!c) return { error:`Case "${caseNo}" not found (or has no refer name)` };
+      const payAmount = parseFloat(row.amount);
+      return {
+        payload: BNH_PAGE.stamp({
+          case_no: c.case_no, payment_date: row.payment_date, voucher_no: String(row.voucher_no).trim(),
+          remarks: row.remark||null, payment_to: c.refer_name, mode: row.mode, amount: payAmount,
+          discount: 0, description: `Case ${c.case_no}`
+        }),
+        // Only flip to 'paid' once cumulative payments (existing + this one) clear the refer_amount —
+        // avoids prematurely marking a partially-paid case as done.
+        postInsert: async () => {
+          const { data: pays } = await sb.from('opd_refer_payment').select('amount').eq('case_no', c.case_no);
+          const totalPaid = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount||0),0);
+          if (totalPaid >= parseFloat(c.refer_amount||0) - 0.01){
+            await sb.from('opd_case').update({ refer_payment_status:'paid' }).eq('case_no', c.case_no);
+          }
+        }
+      };
+    }
+  },
+  doctor: {
+    cols: ['voucher_no','payment_date','doctor_name','amount','mode','remark'],
+    sampleRow: ['5203','2026-07-01','Dr. A Sharma','8000','Cash',''],
+    table: 'ipd_doctor_payments',
+    async build(row, ctx){
+      const name = String(row.doctor_name||'').trim();
+      if (!name) return { error:'doctor_name is required' };
+      if (!ctx.docMap){
+        const { data } = await sb.from('ipd_doctors').select('id,doctor_name,doctor_type');
+        ctx.docMap = {}; (data||[]).forEach(d=>ctx.docMap[d.doctor_name.trim().toLowerCase()]=d);
+      }
+      const doc = ctx.docMap[name.toLowerCase()];
+      if (!doc) return { error:`Doctor "${name}" not found` };
+      return { payload: BNH_PAGE.stamp({
+        doctor_id: doc.id, doctor_name: doc.doctor_name, doctor_type: doc.doctor_type,
+        payment_date: row.payment_date, voucher_no: String(row.voucher_no).trim(),
+        amount: parseFloat(row.amount), mode: row.mode, remark: row.remark||null,
+        description: `Doctor Payment - ${doc.doctor_name} (${doc.doctor_type})`
+      })};
+    }
+  },
+  lab_agent: {
+    cols: ['voucher_no','payment_date','agent_name','amount','mode','remark'],
+    sampleRow: ['5204','2026-07-01','ABC Diagnostics','2500','PhonePe',''],
+    table: 'lab_agent_payment',
+    async build(row, ctx){
+      const name = String(row.agent_name||'').trim();
+      if (!name) return { error:'agent_name is required' };
+      if (!ctx.agMap){
+        const { data } = await sb.from('lab_sample_agent').select('id,agent_name');
+        ctx.agMap = {}; (data||[]).forEach(a=>ctx.agMap[a.agent_name.trim().toLowerCase()]=a);
+      }
+      const ag = ctx.agMap[name.toLowerCase()];
+      if (!ag) return { error:`Agent "${name}" not found` };
+      return { payload: BNH_PAGE.stamp({
+        agent_id: ag.id, agent_name_snapshot: ag.agent_name,
+        payment_date: row.payment_date, voucher_no: String(row.voucher_no).trim(),
+        amount_paid: parseFloat(row.amount), payment_mode: row.mode, remarks: row.remark||null,
+        description: `Lab Agent Payment - ${ag.agent_name}`
+      })};
+    }
+  },
+  salary: {
+    cols: ['voucher_no','payment_date','employee_name','month','year','amount','mode','remark'],
+    sampleRow: ['5205','2026-07-01','Ramesh Das','6','2026','15000','Bank',''],
+    table: 'salary_payments',
+    async build(row, ctx){
+      const name = String(row.employee_name||'').trim();
+      if (!name) return { error:'employee_name is required' };
+      if (!row.month || !row.year) return { error:'month and year are required' };
+      if (!ctx.empMap){
+        const { data } = await sb.from('employees').select('id,name');
+        ctx.empMap = {}; (data||[]).forEach(e=>ctx.empMap[e.name.trim().toLowerCase()]=e);
+      }
+      const emp = ctx.empMap[name.toLowerCase()];
+      if (!emp) return { error:`Employee "${name}" not found` };
+      const month = parseInt(row.month), year = parseInt(row.year);
+      return { payload: BNH_PAGE.stamp({
+        employee_id: emp.id, employee_name: emp.name, month, year,
+        payment_date: row.payment_date, voucher_no: String(row.voucher_no).trim(),
+        amount: parseFloat(row.amount), mode: row.mode, remarks: row.remark||null,
+        description: `Salary for ${MONTHS[month]} ${year}`
+      })};
+    }
+  },
+  creditor: {
+    cols: ['voucher_no','payment_date','category','creditor_name','amount','mode','description','remark'],
+    sampleRow: ['5206','2026-07-01','Supplier','ABC Traders','10000','Bank','Invoice #221 part payment',''],
+    table: 'credit_entries',
+    async build(row, ctx){
+      const catName = String(row.category||'').trim();
+      const credName = String(row.creditor_name||'').trim();
+      const desc = String(row.description||'').trim();
+      if (!catName) return { error:'category is required' };
+      if (!credName) return { error:'creditor_name is required' };
+      if (!desc) return { error:'description is mandatory for creditor payments' };
+      if (!ctx.credMap){
+        const { data } = await sb.from('creditors').select('id,name,category_id,credit_categories(name)');
+        ctx.credMap = {}; (data||[]).forEach(c=>ctx.credMap[`${(c.credit_categories?.name||'').trim().toLowerCase()}|${c.name.trim().toLowerCase()}`]=c);
+      }
+      const cred = ctx.credMap[`${catName.toLowerCase()}|${credName.toLowerCase()}`];
+      if (!cred) return { error:`Creditor "${credName}" not found in category "${catName}"` };
+      return { payload: BNH_PAGE.stamp({
+        creditor_id: cred.id, creditor_name: cred.name, category_id: cred.category_id, category_name: catName,
+        entry_date: row.payment_date, amount: parseFloat(row.amount), note: desc, description: desc,
+        entry_type: 'payment', voucher_no: String(row.voucher_no).trim(), mode: row.mode
+      })};
+    }
+  },
+  cash: {
+    cols: ['voucher_no','payment_date','category','party_name','amount','mode','description','remark'],
+    sampleRow: ['5207','2026-07-01','Misc','Local Vendor','700','Cash','Office supplies purchase',''],
+    table: 'cash_vouchers',
+    async build(row){
+      const desc = String(row.description||'').trim();
+      const party = String(row.party_name||'').trim();
+      if (!party) return { error:'party_name is required' };
+      if (!desc) return { error:'description is mandatory for cash vouchers' };
+      return { payload: BNH_PAGE.stamp({
+        voucher_no: String(row.voucher_no).trim(), category: row.category||null, party_name: party,
+        amount: parseFloat(row.amount), mode: row.mode, description: desc, remark: row.remark||null,
+        payment_date: row.payment_date
+      })};
+    }
+  }
+};
+
+let uploadType = null, uploadRows = [];
+function selectUploadType(key){
+  uploadType = key;
+  document.querySelectorAll('#uploadTypeGrid .type-card').forEach(c=>c.classList.remove('active'));
+  document.getElementById('ucard-'+key).classList.add('active');
+  document.getElementById('uploadArea').classList.remove('hidden');
+  document.getElementById('uploadPreview').innerHTML = '';
+  document.getElementById('uploadFile').value = '';
+  document.getElementById('uploadColsHint').textContent =
+    'Required columns: ' + UPLOAD_CONFIG[key].cols.join(', ');
+}
+function downloadSample(){
+  if (!uploadType) return;
+  const cfg = UPLOAD_CONFIG[uploadType];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([cfg.cols, cfg.sampleRow]);
+  XLSX.utils.book_append_sheet(wb, ws, 'Sample');
+  XLSX.writeFile(wb, `${uploadType}_sample.xlsx`);
+}
+function handleFileSelect(e){
+  const file = e.target.files[0];
+  if (!file || !uploadType) return;
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    const wb = XLSX.read(ev.target.result, { type:'binary' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
+    await validateAndPreview(rows);
+  };
+  reader.readAsBinaryString(file);
+}
+async function validateAndPreview(rawRows){
+  const cfg = UPLOAD_CONFIG[uploadType];
+  const box = document.getElementById('uploadPreview');
+  box.innerHTML = 'Validating…';
+  spin(true);
+  const ctx = {};
+  const results = [];
+  try{
+    for (const raw of rawRows){
+      // normalize date if it came through as an Excel serial number
+      if (raw.payment_date && typeof raw.payment_date === 'number'){
+        const d = XLSX.SSF.parse_date_code(raw.payment_date);
+        raw.payment_date = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+      }
+      let error = null;
+      if (!raw.voucher_no) error = 'voucher_no is required';
+      else if (!raw.payment_date) error = 'payment_date is required';
+      else if (!raw.amount || isNaN(parseFloat(raw.amount)) || parseFloat(raw.amount)<=0) error = 'amount must be a positive number';
+      else if (!raw.mode || !['Cash','Bank','PhonePe'].includes(raw.mode)) error = 'mode must be Cash, Bank or PhonePe';
+
+      let payload = null, postInsert = null;
+      if (!error){
+        const built = await cfg.build(raw, ctx);
+        if (built.error) error = built.error;
+        else { payload = built.payload; postInsert = built.postInsert; }
+      }
+      if (!error){
+        const { data: vcheck } = await sb.from('payment_vouchers').select('*').eq('voucher_no', String(raw.voucher_no).trim()).maybeSingle();
+        if (!vcheck) error = `Voucher ${raw.voucher_no} not generated`;
+      }
+      results.push({ raw, error, payload, postInsert });
+    }
+  } finally { spin(false); }
+  uploadRows = results;
+  renderUploadPreview();
+}
+function renderUploadPreview(){
+  const box = document.getElementById('uploadPreview');
+  const okCount = uploadRows.filter(r=>!r.error).length;
+  box.innerHTML = `
+    <div class="section-title">Preview — ${uploadRows.length} row(s), ${okCount} valid, ${uploadRows.length-okCount} with errors</div>
+    <table><thead><tr><th>#</th><th>Voucher</th><th>Date</th><th>Amount</th><th>Mode</th><th>Status</th></tr></thead>
+    <tbody>${uploadRows.map((r,i)=>`<tr>
+      <td>${i+1}</td><td>${esc(r.raw.voucher_no)}</td><td>${esc(r.raw.payment_date)}</td>
+      <td class="r">${r.raw.amount?fmt(r.raw.amount):'-'}</td><td>${esc(r.raw.mode||'-')}</td>
+      <td class="${r.error?'upload-status-bad':'upload-status-ok'}">${r.error ? '❌ '+esc(r.error) : '✅ OK'}</td>
+    </tr>`).join('')}</tbody></table>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" ${okCount===0?'disabled':''} onclick="doImport()">📥 Import ${okCount} Valid Row(s)</button>
+    </div>
+    <div id="uploadResult" style="margin-top:.75rem"></div>`;
+}
+async function doImport(){
+  const cfg = UPLOAD_CONFIG[uploadType];
+  const box = document.getElementById('uploadResult');
+  box.textContent = 'Importing…';
+  spin(true);
+  let ok=0, fail=0; const failMsgs=[];
+  try{
+    for (const r of uploadRows){
+      if (r.error) continue;
+      const { error } = await sb.from(cfg.table).insert(r.payload);
+      if (error){ fail++; failMsgs.push(`Voucher ${r.raw.voucher_no}: ${error.message}`); continue; }
+      if (r.postInsert) await r.postInsert();
+      ok++;
+    }
+  } finally { spin(false); }
+  box.innerHTML = `<p class="info">✅ Imported ${ok} row(s).</p>` +
+    (fail ? `<p class="err">${fail} row(s) failed:\n${failMsgs.map(esc).join('\n')}</p>` : '');
+}
+</script>
+</body>
+</html>
