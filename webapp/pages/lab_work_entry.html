@@ -218,6 +218,16 @@ function switchTab(e,name){
 // ══════════ HELPERS ══════════
 const fmt = n => '₹'+parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const normName = s => (s||'').toLowerCase().replace(/\s*-\s*/g,'-').replace(/\s+/g,' ').trim();
+
+// Biopsy tests don't need an exact name match against the catalogue —
+// any test whose name STARTS WITH "biopsy" matches the master "Biopsy" catalogue
+// entry (which carries the base cost + per-slide rate). All other tests still
+// require an exact (normalized) name match.
+function isBiopsy(name){ return (name||'').trim().toLowerCase().startsWith('biopsy'); }
+function findCatTest(name){
+  if(isBiopsy(name)) return allTests.find(x=>isBiopsy(x.test_name));
+  return allTests.find(x=>normName(x.test_name)===normName(name));
+}
 function spin(on){ document.getElementById('spinner').classList.toggle('hidden',!on); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d){ if(!d) return '—'; const dt=new Date(d); return isNaN(dt)?d:dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
@@ -264,17 +274,20 @@ async function loadPending(){
   // Group by case_no, keep only those with at least one lab test
   // test_name may be a comma-separated string like "IgE-Total, Serum, ABO & RH"
   // so split and check each individual test against the catalogue
+  const hasBiopsyMaster = allTests.some(x=>isBiopsy(x.test_name));
+  const hasCatMatch = n => isBiopsy(n) ? hasBiopsyMaster : catalogueNamesNorm.includes(normName(n));
+
   const caseMap = {};
   (testData||[]).forEach(row=>{
     const rawNames=(row.test_name||'').split(',').map(s=>s.trim()).filter(Boolean);
-    const matchedTests=rawNames.filter(n=>catalogueNamesNorm.includes(normName(n)));
+    const matchedTests=rawNames.filter(hasCatMatch);
     if(!matchedTests.length) return;
     if(!caseMap[row.case_number]) caseMap[row.case_number]={
       case_no:row.case_number, case_date:row.case_date,
       patient_name:row.patient_name, tests:[]
     };
     matchedTests.forEach(name=>{
-      const cat=allTests.find(x=>normName(x.test_name)===normName(name));
+      const cat=findCatTest(name);
       caseMap[row.case_number].tests.push({
         ...row,
         test_name:name,
@@ -301,7 +314,7 @@ function filterPending(){
   if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#888">No pending cases</td></tr>';return;}
   tb.innerHTML=list.map((c,i)=>{
     const totalAmt=c.tests.reduce((s,t)=>{
-      const cat=allTests.find(x=>normName(x.test_name)===normName(t.test_name));
+      const cat=findCatTest(t.test_name);
       return s+parseFloat(cat?cat.test_cost:t.test_amount||0);
     },0);
     return `<tr>
@@ -391,7 +404,7 @@ function openCaseModal(c){
 
 function openEditModal(r){
   currentCaseTests=(r.tests_snapshot||'').split(',').map(n=>n.trim()).map(name=>{
-    const cat=allTests.find(x=>x.test_name.toLowerCase()===name.toLowerCase());
+    const cat=findCatTest(name);
     return {test_name:name,test_amount:cat?cat.test_cost:0};
   });
 
@@ -428,7 +441,7 @@ function openEditModal(r){
 }
 
 // ── Helpers: per-test agent dropdown builder ─────────────────────────────────
-function isBiopsy(name){ return (name||'').trim().toLowerCase().startsWith('biopsy'); }
+// (isBiopsy / findCatTest are defined earlier, near normName)
 
 function agentSelectHtml(idx,selectedId){
   return `<select id="agentSel_${idx}" onchange="recalcAmount()">
@@ -439,7 +452,7 @@ function agentSelectHtml(idx,selectedId){
 
 function buildTestAllocUI(savedAgents,savedSlides){
   document.getElementById('testAllocDiv').innerHTML=currentCaseTests.map((t,i)=>{
-    const cat=allTests.find(x=>normName(x.test_name)===normName(t.test_name));
+    const cat=findCatTest(t.test_name);
     const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
     const biopsy=isBiopsy(t.test_name);
     const perSlide=biopsy&&cat?parseFloat(cat.biopsy_per_slide||0):0;
@@ -468,7 +481,7 @@ function recalcAmount(){
   currentCaseTests.forEach((t,i)=>{
     const agentId=(document.getElementById('agentSel_'+i)||{}).value||'';
     if(!agentId) return; // not allocable — skip agent amount
-    const cat=allTests.find(x=>normName(x.test_name)===normName(t.test_name));
+    const cat=findCatTest(t.test_name);
     const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
     total+=cost;
     if(isBiopsy(t.test_name)&&cat){
@@ -494,7 +507,7 @@ async function saveEntry(){
 
   // Build per-test alloc array
   const allocArr=currentCaseTests.map((t,i)=>{
-    const cat=allTests.find(x=>normName(x.test_name)===normName(t.test_name));
+    const cat=findCatTest(t.test_name);
     const agentId=(document.getElementById('agentSel_'+i)||{}).value||'';
     const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
     let slides=0,perSlide=0;
@@ -510,7 +523,7 @@ async function saveEntry(){
   // Lab amount = sum of ALL tests + biopsy slide cost (regardless of agent)
   let labAmount=0,agentAmount=0,totalBiopsySlides=0;
   allocArr.forEach(a=>{
-    const cat=allTests.find(x=>normName(x.test_name)===normName(a.test_name));
+    const cat=findCatTest(a.test_name);
     const base=parseFloat(cat?cat.test_cost:0);
     labAmount+=base;
     if(isBiopsy(a.test_name)&&cat){
