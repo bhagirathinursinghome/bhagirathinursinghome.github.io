@@ -485,7 +485,7 @@
         BNH_PAGE.sb.from('ipd_amount_entries').select('*'),
         BNH_PAGE.sb.from('ipd_cash_receipts').select('*'),
         BNH_PAGE.sb.from('ipd_medicine_indens').select('admission_id,amount'),
-        BNH_PAGE.sb.from('ipd_ot_entries').select('admission_id,surgent_name,anaesthesia_name'),
+        BNH_PAGE.sb.from('ipd_ot_entries').select('admission_id,case_detail,surgent_name,anaesthesia_name'),
         BNH_PAGE.sb.from('ipd_additional_income_expense').select('*'),
         BNH_PAGE.sb.from('opd_case').select('case_no,ipd_link,total_amount'),
         BNH_PAGE.sb.from('opd_cash_register').select('case_no,income,discount'),
@@ -552,6 +552,9 @@
         return {
           adm, pkg, addlChg, totalRecv, rcptAmt, disc, due,
           opdBill, opdRecv, opdDisc, opdDue,
+          caseDetail: ot.case_detail || '-',
+          surgName: ot.surgent_name || '-',
+          aneName: ot.anaesthesia_name || '-',
           surgF, aneF, inden, addlExp, refAmt, referPaid, referStatus, referPayDate,
           remain, status,
           otPkg: pkg > 0 ? fmt(pkg) : '-'
@@ -581,12 +584,12 @@
           <div class="summary-scroll">
           <table id="summaryTable">
             <thead><tr>
-              <th>#</th><th>Adm Date</th><th>Adm No.</th><th>Name</th>
+              <th>#</th><th>Adm Date</th><th>Adm No.</th><th>Name</th><th>Case Detail</th>
               <th>Mode</th><th>Type</th><th>OT Package</th>
               <th class="r">Add. Charge</th><th class="r">Total Recv.</th>
               <th class="r">Received</th><th class="r">Discount</th><th class="r">Due</th>
               <th class="r">OPD Bill</th><th class="r">OPD Recv.</th><th class="r">OPD Disc</th><th class="r">OPD Due</th>
-              <th class="r">Surgent</th><th class="r">Anaesthesia</th><th class="r">Inden</th>
+              <th>Surgent Name</th><th class="r">Surgent</th><th>Anaesthesia Name</th><th class="r">Anaesthesia</th><th class="r">Inden</th>
               <th class="r">Add. Exp.</th><th>Refer Name</th><th class="r">Refer Amt</th>
               <th>Paid Date</th><th>Refer Status</th><th class="r">Remain</th><th>Status</th>
             </tr></thead>
@@ -595,6 +598,7 @@
               <td>${r.adm.admission_date}</td>
               <td>${r.adm.admission_no}</td>
               <td>${r.adm.patient_name}${r.adm.is_cancelled?` <span style="font-size:.7rem;background:#fee2e2;border:1px solid #fca5a5;border-radius:4px;padding:.1rem .3rem;color:#dc2626;font-weight:700">CANC</span>`:''}</td>
+              <td>${r.caseDetail}</td>
               <td>${r.adm.case_mode}</td>
               <td>${r.adm.case_type}</td>
               <td class="r">${fmt(r.pkg)}</td>
@@ -607,7 +611,9 @@
               <td class="r">${fmt(r.opdRecv)}</td>
               <td class="r">${fmt(r.opdDisc)}</td>
               <td class="r" style="color:${r.opdDue>0?'#dc2626':'#059669'}">${fmt(r.opdDue)}</td>
+              <td>${r.surgName}</td>
               <td class="r">${fmt(r.surgF)}</td>
+              <td>${r.aneName}</td>
               <td class="r">${fmt(r.aneF)}</td>
               <td class="r">${fmt(r.inden)}</td>
               <td class="r">${fmt(r.addlExp)}</td>
@@ -621,7 +627,7 @@
               </td>
             </tr>`).join('')}</tbody>
             <tfoot><tr>
-              <td colspan="6">Total</td>
+              <td colspan="7">Total</td>
               <td class="r">${fmt(totPkg)}</td>
               <td class="r">${fmt(totAddlC)}</td>
               <td class="r"><strong>${fmt(totPkg+totAddlC)}</strong></td>
@@ -632,7 +638,7 @@
               <td class="r">${fmt(totOpdR)}</td>
               <td></td>
               <td class="r">${fmt(totOpdDu)}</td>
-              <td colspan="3"></td>
+              <td colspan="5"></td>
               <td class="r">${fmt(totInden)}</td>
               <td class="r">${fmt(totExp)}</td>
               <td></td>
@@ -650,18 +656,18 @@
   function downloadSummaryExcel() {
     if (!_summaryRows || _summaryRows.length === 0) { alert('Load summary first.'); return; }
     const headers = [
-      '#','Adm Date','Adm No','Name','Mode','Type','OT Package','Add. Charge','Total Receivable',
+      '#','Adm Date','Adm No','Name','Case Detail','Mode','Type','OT Package','Add. Charge','Total Receivable',
       'Total Received','Discount','Due','OPD Bill','OPD Received','OPD Discount','OPD Due',
-      'Surgent Charge','Anaesthesia Charge','Inden','Add. Expense','Refer Name','Refer Amount',
+      'Surgent Name','Surgent Charge','Anaesthesia Name','Anaesthesia Charge','Inden','Add. Expense','Refer Name','Refer Amount',
       'Paid Date','Refer Status','Remain','Status'
     ];
     const data = _summaryRows.map((r,i)=>[
-      i+1, r.adm.admission_date, r.adm.admission_no, r.adm.patient_name,
+      i+1, r.adm.admission_date, r.adm.admission_no, r.adm.patient_name, r.caseDetail,
       r.adm.case_mode, r.adm.case_type,
       parseFloat(r.pkg||0), parseFloat(r.addlChg||0), parseFloat(r.totalRecv||0),
       parseFloat(r.rcptAmt||0), parseFloat(r.disc||0), parseFloat(r.due||0),
       parseFloat(r.opdBill||0), parseFloat(r.opdRecv||0), parseFloat(r.opdDisc||0), parseFloat(r.opdDue||0),
-      parseFloat(r.surgF||0), parseFloat(r.aneF||0), parseFloat(r.inden||0), parseFloat(r.addlExp||0),
+      r.surgName, parseFloat(r.surgF||0), r.aneName, parseFloat(r.aneF||0), parseFloat(r.inden||0), parseFloat(r.addlExp||0),
       r.adm.refer_name||'', parseFloat(r.refAmt||0),
       r.referPayDate||'Pending', r.referStatus,
       parseFloat(r.remain||0),
