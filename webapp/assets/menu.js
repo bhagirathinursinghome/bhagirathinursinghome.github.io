@@ -43,7 +43,7 @@
       icon: "💵",
       page: "pages/payment.html",
       roles: ["admin", "accountant"]
-   }
+   },
  /*   {
       label: "Pay Salary",
       icon: "💵",
