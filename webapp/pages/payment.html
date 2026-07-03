@@ -62,10 +62,32 @@
     .chk-row td { cursor:pointer; }
     .upload-status-ok  { color:#059669; font-weight:600; }
     .upload-status-bad { color:#dc2626; font-weight:600; }
+
+    /* role-gated entry actions (Voucher Tracker) */
+    .btn-small { padding:.35rem .7rem; font-size:.8rem; border-radius:6px; border:none; cursor:pointer; font-weight:600; }
+    .btn-secondary { background:#e2e8f0; color:#334155; }
+    .btn-danger { background:#dc2626; color:#fff; }
+    .view-only-tag { color:#94a3b8; font-size:.78rem; }
+
+    /* pm- prefixed to avoid clashing with any shared modal CSS elsewhere */
+    .pm-modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,.55);
+      display:flex; align-items:center; justify-content:center; z-index:9999; }
+    .pm-modal-box { background:#fff; border-radius:12px; padding:1.25rem 1.4rem; max-width:640px;
+      width:92%; max-height:85vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); position:relative; }
+    .pm-modal-box h3 { margin:0 0 .85rem; font-size:1.05rem; color:#1e293b; padding-right:1.5rem; }
+    .pm-close-btn { position:absolute; top:1rem; right:1.1rem; cursor:pointer; font-size:1.1rem;
+      color:#64748b; background:none; border:none; line-height:1; }
+    .pm-row { border:1px solid #e2e8f0; border-radius:8px; padding:.75rem .85rem; margin-bottom:.65rem; background:#f8fafc; }
+    .pm-row-label { font-size:.82rem; font-weight:700; color:#334155; margin-bottom:.5rem; }
+    .pm-row .form-row { margin-bottom:0; }
+    .pm-row-actions { display:flex; justify-content:flex-end; gap:.5rem; margin-top:.65rem; }
   </style>
 </head>
 <body>
 <div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div id="pmModalOverlay" class="pm-modal-overlay hidden">
+  <div class="pm-modal-box" id="pmModalBox"></div>
+</div>
 <div class="page">
   <h1>💳 Payment</h1>
 
@@ -155,6 +177,22 @@
 <script>
 BNH_PAGE.requireRole(["admin","accountant","manager"]);
 const sb = BNH_PAGE.sb;
+
+// ════════════════════════════════════════════════════════════
+// ACCESS LEVEL — two tiers within the page
+//   full    → add, view, edit, delete
+//   limited → add, view only (no edit/delete of existing entries)
+// Adjust the role → level mapping below to match your actual role names.
+// ════════════════════════════════════════════════════════════
+const ROLE_ACCESS = {
+  admin:      'full',
+  accountant: 'limited',
+  manager:    'limited'
+};
+function hasFullAccess(){
+  const role = BNH_PAGE.user && BNH_PAGE.user.role;
+  return ROLE_ACCESS[role] === 'full';
+}
 const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const todayISO = () => new Date().toISOString().slice(0,10);
@@ -171,6 +209,25 @@ const TYPES = {
   salary:     { label:'Salary Payment',     icon:'💵' , multi:false },
   creditor:   { label:'Creditor Payment',   icon:'🏦' , multi:false },
   cash:       { label:'Cash Voucher',       icon:'💰' , multi:false }
+};
+
+// Per-type table + column mapping, used by the Voucher Tracker's Edit/Delete
+// (full access only). Keep this in sync with the insert payloads above.
+const TYPE_META = {
+  ipd_refer: { table:'ipd_refer_payments', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remark',
+    label:r=>`${r.patient_name||''} (${r.admission_no||''}) — Refer: ${r.refer_name||''}` },
+  opd_refer: { table:'opd_refer_payment', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remarks',
+    label:r=>`Case ${r.case_no||''} — ${r.payment_to||''}` },
+  doctor: { table:'ipd_doctor_payments', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remark',
+    label:r=>`${r.doctor_name||''} (${r.doctor_type||''})` },
+  lab_agent: { table:'lab_agent_payment', dateCol:'payment_date', amountCol:'amount_paid', modeCol:'payment_mode', remarkCol:'remarks',
+    label:r=>r.agent_name_snapshot||'' },
+  salary: { table:'salary_payments', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remarks',
+    label:r=>`${r.employee_name||''} — ${(typeof MONTHS!=='undefined'&&MONTHS[r.month])||r.month||''} ${r.year||''}` },
+  creditor: { table:'credit_entries', dateCol:'entry_date', amountCol:'amount', modeCol:'mode', remarkCol:'note',
+    label:r=>`${r.creditor_name||''} (${r.category_name||''})` },
+  cash: { table:'cash_vouchers', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remark',
+    label:r=>r.party_name||'' }
 };
 
 document.getElementById('typeGrid').innerHTML = Object.entries(TYPES).map(([k,t])=>
@@ -1086,20 +1143,154 @@ async function loadTracker(){
   const rows = (data||[]).sort((a,b)=>parseInt(a.voucher_no)-parseInt(b.voucher_no));
   if (!rows.length) { out.textContent = 'No vouchers found for this filter.'; return; }
   const blankCount = rows.filter(r=>r.status==='blank').length;
+  const fullAccess = hasFullAccess();
   out.innerHTML = `
     <p style="font-size:.85rem;margin-bottom:.5rem">
       ${rows.length} voucher(s) shown — <b style="color:${blankCount?'#dc2626':'#059669'}">${blankCount} blank (missed)</b>, ${rows.length-blankCount} filled.
     </p>
     <table>
-      <thead><tr><th>Voucher No</th><th>Status</th><th>Type</th><th>Party</th><th class="r">Amount</th><th>Mode</th><th>Date</th><th>Description</th></tr></thead>
+      <thead><tr><th>Voucher No</th><th>Status</th><th>Type</th><th>Party</th><th class="r">Amount</th><th>Mode</th><th>Date</th><th>Description</th><th>Actions</th></tr></thead>
       <tbody>${rows.map(r=>`<tr class="${r.status==='blank'?'row-blank':'row-filled'}">
         <td><b>${r.voucher_no}</b></td>
         <td><span class="pill ${r.status==='blank'?'pill-blank':'pill-filled'}">${r.status}</span></td>
         <td>${esc(r.type||'-')}</td><td>${esc(r.party_name||'-')}</td>
         <td class="r">${r.amount?fmt(r.amount):'-'}</td><td>${esc(r.mode||'-')}</td>
         <td>${r.payment_date||'-'}</td><td style="max-width:280px">${esc(r.description||'-')}</td>
+        <td>${trackerActionsCell(r, fullAccess)}</td>
       </tr>`).join('')}</tbody>
     </table>`;
+}
+function trackerActionsCell(r, fullAccess){
+  if (r.status !== 'filled') return '-';
+  if (!TYPE_META[r.type]) return '<span class="view-only-tag">-</span>';
+  if (!fullAccess) return '<span class="view-only-tag">view only</span>';
+  return `<button class="btn-small btn-secondary" onclick="openEditModal('${esc(r.voucher_no)}','${esc(r.type)}')">✏️ Edit</button>
+    <button class="btn-small btn-danger" onclick="deleteVoucherEntries('${esc(r.voucher_no)}','${esc(r.type)}')">🗑️ Delete</button>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// EDIT / DELETE (full access only) — driven from the Voucher Tracker
+// ════════════════════════════════════════════════════════════
+async function openEditModal(voucherNo, type){
+  if (!hasFullAccess()) return; // safety net, buttons are already hidden for limited access
+  const meta = TYPE_META[type];
+  if (!meta) { alert('Unknown entry type: ' + type); return; }
+  spin(true);
+  let rows;
+  try{
+    const { data, error } = await sb.from(meta.table).select('*').eq('voucher_no', voucherNo);
+    if (error) throw error;
+    rows = data || [];
+  } catch(ex){ spin(false); alert('Failed to load entries: ' + ex.message); return; }
+  spin(false);
+  if (!rows.length) { alert('No entries found for this voucher.'); return; }
+  renderEditModal(type, meta, rows);
+}
+function renderEditModal(type, meta, rows){
+  const box = document.getElementById('pmModalBox');
+  box.innerHTML = `
+    <button class="pm-close-btn" onclick="closeEditModal()">✕</button>
+    <h3>Edit / Delete — Voucher ${esc(rows[0].voucher_no)}</h3>
+    <div id="pmRows">${rows.map(r=>renderEditRow(type, meta, r)).join('')}</div>`;
+  document.getElementById('pmModalOverlay').classList.remove('hidden');
+}
+function renderEditRow(type, meta, r){
+  return `
+  <div class="pm-row" id="pmRow-${r.id}">
+    <div class="pm-row-label">${esc(meta.label(r))}</div>
+    <div class="form-row">
+      <div><label>Date</label><input type="date" id="pmDate-${r.id}" value="${r[meta.dateCol]||''}"/></div>
+      <div><label>Amount (₹)</label><input type="number" step="0.01" min="0.01" id="pmAmount-${r.id}" value="${r[meta.amountCol]||0}"/></div>
+      <div><label>Mode</label>
+        <select id="pmMode-${r.id}">${['Cash','Bank','PhonePe'].map(m=>`<option value="${m}" ${r[meta.modeCol]===m?'selected':''}>${m}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:.5rem">
+      <div style="flex:2"><label>Remark / Note</label><input id="pmRemark-${r.id}" value="${esc(r[meta.remarkCol]||'')}"/></div>
+    </div>
+    <div class="pm-row-actions">
+      <button class="btn-danger btn-small" onclick="deleteEntryRow('${type}','${r.id}')">🗑️ Delete this entry</button>
+      <button class="btn-primary btn-small" style="width:auto" onclick="saveEntryRow('${type}','${r.id}')">💾 Save</button>
+    </div>
+    <p class="err" id="pmErr-${r.id}" style="margin-top:.4rem"></p>
+  </div>`;
+}
+function closeEditModal(){ document.getElementById('pmModalOverlay').classList.add('hidden'); }
+async function saveEntryRow(type, id){
+  if (!hasFullAccess()) return;
+  const meta = TYPE_META[type];
+  const errEl = document.getElementById('pmErr-'+id);
+  errEl.style.color = '#dc2626'; errEl.textContent = '';
+  const date = document.getElementById('pmDate-'+id).value;
+  const amount = parseFloat(document.getElementById('pmAmount-'+id).value || 0);
+  const mode = document.getElementById('pmMode-'+id).value;
+  const remark = document.getElementById('pmRemark-'+id).value.trim() || null;
+  if (!date) { errEl.textContent = 'Date is required.'; return; }
+  if (!amount || amount <= 0) { errEl.textContent = 'Enter a valid amount.'; return; }
+  const patch = { [meta.dateCol]: date, [meta.amountCol]: amount, [meta.modeCol]: mode, [meta.remarkCol]: remark };
+  spin(true);
+  try{
+    const { error } = await sb.from(meta.table).update(patch).eq('id', id);
+    if (error) throw error;
+    if (type === 'opd_refer'){
+      const { data: row } = await sb.from(meta.table).select('case_no').eq('id', id).maybeSingle();
+      if (row) await recomputeOpdReferStatus(row.case_no);
+    }
+    errEl.style.color = '#059669'; errEl.textContent = '✅ Saved.';
+    await loadTracker();
+  } catch(ex){ errEl.textContent = ex.message; }
+  finally { spin(false); }
+}
+async function deleteEntryRow(type, id){
+  if (!hasFullAccess()) return;
+  if (!confirm('Delete this entry? This cannot be undone.')) return;
+  const meta = TYPE_META[type];
+  spin(true);
+  try{
+    let caseNo = null;
+    if (type === 'opd_refer'){
+      const { data: row } = await sb.from(meta.table).select('case_no').eq('id', id).maybeSingle();
+      caseNo = row?.case_no || null;
+    }
+    const { error } = await sb.from(meta.table).delete().eq('id', id);
+    if (error) throw error;
+    if (caseNo) await recomputeOpdReferStatus(caseNo);
+    document.getElementById('pmRow-'+id)?.remove();
+    if (!document.querySelectorAll('#pmRows .pm-row').length) closeEditModal();
+    await loadTracker();
+  } catch(ex){ alert('Delete failed: ' + ex.message); }
+  finally { spin(false); }
+}
+async function deleteVoucherEntries(voucherNo, type){
+  if (!hasFullAccess()) return;
+  const meta = TYPE_META[type];
+  if (!meta) return;
+  if (!confirm(`Delete ALL entries recorded under Voucher ${voucherNo}? This cannot be undone.`)) return;
+  spin(true);
+  try{
+    let caseNos = [];
+    if (type === 'opd_refer'){
+      const { data: rows } = await sb.from(meta.table).select('case_no').eq('voucher_no', voucherNo);
+      caseNos = [...new Set((rows||[]).map(r=>r.case_no))];
+    }
+    const { error } = await sb.from(meta.table).delete().eq('voucher_no', voucherNo);
+    if (error) throw error;
+    for (const c of caseNos) await recomputeOpdReferStatus(c);
+    await loadTracker();
+  } catch(ex){ alert('Delete failed: ' + ex.message); }
+  finally { spin(false); }
+}
+// Best-effort recompute of an OPD case's refer_payment_status after an
+// opd_refer_payment row is edited or deleted (mirrors the logic used when saving a payment).
+async function recomputeOpdReferStatus(caseNo){
+  try{
+    const { data: c } = await sb.from('opd_case').select('case_no,refer_amount').eq('case_no', caseNo).maybeSingle();
+    if (!c) return;
+    const { data: pays } = await sb.from('opd_refer_payment').select('amount').eq('case_no', caseNo);
+    const paid = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount||0),0);
+    const status = (paid > 0 && paid >= parseFloat(c.refer_amount||0) - 0.01) ? 'paid' : null;
+    await sb.from('opd_case').update({ refer_payment_status: status }).eq('case_no', caseNo);
+  } catch(ex){ /* non-critical; ignore */ }
 }
 
 // ════════════════════════════════════════════════════════════
