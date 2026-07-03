@@ -100,6 +100,13 @@
           <select id="pendReferFilter" onchange="filterPending()"><option value="">All Refers</option></select>
         </div>
       </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem">
+        <button class="btn-primary btn-sm" style="width:auto;background:#28a745" onclick="downloadReferTemplate()">📥 Download Excel Template</button>
+        <button class="btn-primary btn-sm" style="width:auto;background:#17a2b8" onclick="document.getElementById('excelUploadInput').click()">📤 Upload Filled Excel</button>
+        <input type="file" id="excelUploadInput" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(event)"/>
+        <span style="font-size:.8rem;color:#888">Download → fill "Refer Amount" column → upload back</span>
+      </div>
+      <div id="excelUploadSummary"></div>
       <div class="records-table-wrap"><div id="pendingTable"><div class="empty-state">Loading…</div></div></div>
       <div class="pagination" id="pendPager"></div>
     </div>
@@ -138,6 +145,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
 <script>
@@ -503,6 +511,100 @@
       filterCompleted();
     }catch(e){errEl.textContent='Error: '+e.message;}
     finally{showSpinner(false);}
+  }
+
+  // ── Bulk: download prefilled Excel template ──────────────────────────────
+  function downloadReferTemplate(){
+    const rows = filteredPend.length ? filteredPend
+      : allCases.filter(c=>!c.refer_amount||Number(c.refer_amount)<=0);
+    if(!rows.length){showErr('No pending cases to export.');return;}
+
+    const data = rows.map(c=>({
+      'Case No':      c.case_no,
+      'Patient Name': c.patient_name||'',
+      'Refer Name':   c.refer_name||'',
+      'Case Date':    fmtD(c.case_date),
+      'Bill Amount':  Number(c.total_amount||0),
+      'Refer Amount': ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [{wch:14},{wch:22},{wch:18},{wch:12},{wch:12},{wch:14}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Refer Amount');
+    XLSX.writeFile(wb,`refer_amount_template_${new Date().toISOString().slice(0,10)}.xlsx`);
+    showOk(`📥 Template downloaded with ${data.length} case(s). Fill "Refer Amount" and upload it back.`);
+  }
+
+  // ── Bulk: upload filled Excel and save amounts ───────────────────────────
+  async function handleExcelUpload(event){
+    const file=event.target.files[0];
+    event.target.value=''; // allow re-uploading same file later
+    if(!file)return;
+
+    const summaryEl=document.getElementById('excelUploadSummary');
+    summaryEl.innerHTML='';
+    showSpinner(true);
+    try{
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length){showErr('No rows found in the uploaded file.');return;}
+
+      let ok=0;
+      const notOk=[]; // {caseNo, reason}
+
+      for(const row of rows){
+        const caseNo=String(row['Case No']||'').trim();
+        const amtRaw=row['Refer Amount'];
+        const amt=parseFloat(amtRaw);
+
+        if(!caseNo)continue; // fully blank row, ignore silently
+        if(amtRaw===''||amtRaw==null||isNaN(amt)||amt<=0){
+          notOk.push({caseNo,reason:'Refer Amount left blank / invalid'});
+          continue;
+        }
+        const c=allCases.find(x=>x.case_no===caseNo);
+        if(!c){notOk.push({caseNo,reason:'Case No not found'});continue;}
+        if(c.refer_amount&&Number(c.refer_amount)>0&&!isFullAccess){
+          notOk.push({caseNo,reason:'Already set — requires Full Access to overwrite'});
+          continue;
+        }
+        try{
+          const payload={
+            refer_amount:            amt,
+            refer_amount_enter_by:   BNH_PAGE.user?.name || BNH_PAGE.user?.username || null,
+            refer_amount_enter_time: new Date().toISOString(),
+            updated_at:              new Date().toISOString()
+          };
+          const{error}=await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no',caseNo);
+          if(error)throw error;
+          Object.assign(c,payload);
+          ok++;
+        }catch(e){
+          notOk.push({caseNo,reason:e.message});
+        }
+      }
+
+      buildReferFilters();
+      filterPending();
+      filterCompleted();
+
+      let html=`<div class="info-note" style="margin-top:.2rem">
+        ✅ <strong>${ok}</strong> updated &nbsp;|&nbsp; ⚠️ <strong>${notOk.length}</strong> skipped/failed
+      </div>`;
+      if(notOk.length){
+        html+=`<div class="err" style="margin-top:.4rem;white-space:pre-line">${
+          esc(notOk.slice(0,12).map(n=>`${n.caseNo||'(blank case no)'}: ${n.reason}`).join('\n'))
+        }${notOk.length>12?`\n…and ${notOk.length-12} more`:''}</div>`;
+      }
+      summaryEl.innerHTML=html;
+      showOk(`✅ Excel upload complete: ${ok} case(s) updated.`);
+    }catch(e){
+      showErr('Upload error: '+e.message);
+    }finally{
+      showSpinner(false);
+    }
   }
 
   // ── Update refer amount (already set, full access only) ─────────────────
