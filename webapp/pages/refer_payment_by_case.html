@@ -190,6 +190,11 @@ const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractio
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const todayISO = () => new Date().toISOString().slice(0,10);
 function spin(on){ document.getElementById('spinner').classList.toggle('hidden', !on); }
+// Resolve the current user for created_by / created_by_name columns directly,
+// instead of relying on BNH_PAGE.stamp() (which adds its own fixed set of
+// audit-column names that don't match every table's actual schema).
+function currentUserId(){ return (BNH_PAGE.user && (BNH_PAGE.user.id || BNH_PAGE.user.email)) || null; }
+function currentUserName(){ return (BNH_PAGE.user && BNH_PAGE.user.name) || currentUserId() || 'unknown'; }
 
 // fill in the date defaults + mode chips that were templated above
 document.getElementById('opDate').value = todayISO();
@@ -382,11 +387,12 @@ async function saveOpdReferPay(){
     const c = opAllCases.find(x=>x.case_no===chk.dataset.no);
     const amtEl = opAmtEls.find(el=>el.dataset.no===chk.dataset.no);
     const amt = parseFloat(amtEl?.value||0);
-    return { row: BNH_PAGE.stamp({
+    return { row: {
       case_no: c.case_no, payment_date: date, voucher_no: voucher,
       remarks: remark, payment_to: c.refer_name, mode, amount: amt, discount: 0,
-      description: `Case ${c.case_no}`
-    }), c, amt };
+      description: `Case ${c.case_no}`,
+      created_by: currentUserId(), created_by_name: currentUserName()
+    }, c, amt };
   });
   if (rows.some(r=>!r.amt || r.amt<=0)) { err.textContent='Pay amount must be greater than 0 for every selected case.'; return; }
   if (vcheck.existing && rows.some(r=>r.row.payment_to !== vcheck.existing.party_name)) {
@@ -568,9 +574,11 @@ async function saveIpdReferPay(){
     const amtEl = ipAmtEls.find(el=>el.dataset.id===chk.dataset.id);
     const amt = parseFloat(amtEl?.value||0);
     return { row: {
-      admission_id: c.id, admission_no: c.admission_no,
+      admission_id: c.id, admission_no: c.admission_no, patient_name: c.patient_name,
       refer_id: c.refer_id || null, refer_name: c.refer_name,
-      payment_date: date, voucher_no: voucher, mode, amount: amt, remark
+      payment_date: date, voucher_no: voucher, mode, amount: amt, remark,
+      description: `Admission ${c.admission_no}`,
+      created_by: currentUserName()
     }, c, amt };
   });
   if (rows.some(r=>!r.amt || r.amt<=0)) { err.textContent='Pay amount must be greater than 0 for every selected case.'; return; }
