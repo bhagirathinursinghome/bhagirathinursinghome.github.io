@@ -568,7 +568,7 @@ async function saveIpdReferPay(){
     const amtEl = ipAmtEls.find(el=>el.dataset.id===chk.dataset.id);
     const amt = parseFloat(amtEl?.value||0);
     return { row: BNH_PAGE.stamp({
-      admission_id: c.id, admission_no: c.admission_no, patient_name: c.patient_name,
+      admission_id: c.id, admission_no: c.admission_no,
       refer_id: c.refer_id || null, refer_name: c.refer_name,
       payment_date: date, voucher_no: voucher, mode, amount: amt, remark
     }), c, amt };
