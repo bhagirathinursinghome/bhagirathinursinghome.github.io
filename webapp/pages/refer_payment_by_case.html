@@ -65,6 +65,7 @@
 </head>
 <body>
 <div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<datalist id="referNameOptions"></datalist>
 <div class="page">
   <h1>🔎 Refer Payment — Search by Case / Patient</h1>
   <p style="font-size:.85rem;color:#666;margin-bottom:1rem">
@@ -309,7 +310,7 @@ function renderOpdList(){
         <td>${cn}</td>
         <td>${esc(c.patient_name)}</td>
         <td>
-          <input class="row-inline-input mini-input name ${c.linked?'':'flagged'}" id="opName-${cn}" value="${esc(c.refer_name)}" placeholder="Refer name"/>
+          <input class="row-inline-input mini-input name ${c.linked?'':'flagged'}" id="opName-${cn}" list="referNameOptions" value="${esc(c.refer_name)}" placeholder="Refer name"/>
         </td>
         <td class="r">
           <input type="number" class="row-inline-input mini-input ${c.amountSet?'':'flagged'}" id="opAmt-${cn}" value="${c.refer_amount||''}" min="0" step="0.01" placeholder="0.00"/>
@@ -330,8 +331,8 @@ function renderOpdList(){
   opUpdateTotal();
 }
 async function updateOpdReferInfo(caseNo){
-  const nameEl = document.getElementById(`opName-${CSS.escape(caseNo)}`);
-  const amtEl = document.getElementById(`opAmt-${CSS.escape(caseNo)}`);
+  const nameEl = document.getElementById(`opName-${caseNo}`);
+  const amtEl = document.getElementById(`opAmt-${caseNo}`);
   const name = nameEl.value.trim();
   const amt = parseFloat(amtEl.value||0);
   const err = document.getElementById('opErr'), ok = document.getElementById('opOk');
@@ -346,14 +347,16 @@ async function updateOpdReferInfo(caseNo){
     if (c){ c.refer_name = name; c.refer_amount = amt; c.linked = true; c.amountSet = true; c.due = amt - c.paid; }
     ok.style.display='block'; ok.textContent = `✅ Case ${caseNo} refer link/amount updated. You can now select it for payment.`;
     renderOpdList();
+    loadReferNameOptions();
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
 }
 function opUpdateTotal(){
   let total = 0;
+  const amtEls = [...document.querySelectorAll('.op-amt')];
   document.querySelectorAll('.op-chk:checked').forEach(chk=>{
-    const amtEl = document.querySelector(`.op-amt[data-no="${CSS.escape(chk.dataset.no)}"]`);
-    total += parseFloat(amtEl.value||0);
+    const amtEl = amtEls.find(el=>el.dataset.no===chk.dataset.no);
+    if (amtEl) total += parseFloat(amtEl.value||0);
   });
   const el = document.getElementById('opTotal');
   if (el) el.textContent = fmt(total);
@@ -374,9 +377,11 @@ async function saveOpdReferPay(){
   const vcheck = await checkVoucher('op');
   if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
 
+  const opAmtEls = [...document.querySelectorAll('.op-amt')];
   const rows = checked.map(chk=>{
     const c = opAllCases.find(x=>x.case_no===chk.dataset.no);
-    const amt = parseFloat(document.querySelector(`.op-amt[data-no="${CSS.escape(chk.dataset.no)}"]`).value||0);
+    const amtEl = opAmtEls.find(el=>el.dataset.no===chk.dataset.no);
+    const amt = parseFloat(amtEl?.value||0);
     return { row: BNH_PAGE.stamp({
       case_no: c.case_no, payment_date: date, voucher_no: voucher,
       remarks: remark, payment_to: c.refer_name, mode, amount: amt, discount: 0,
@@ -481,7 +486,7 @@ function renderIpdList(){
         <td>${esc(c.admission_no)}</td>
         <td>${esc(c.patient_name)}</td>
         <td>
-          <input class="row-inline-input mini-input name ${c.linked?'':'flagged'}" id="ipName-${id}" value="${esc(c.refer_name)}" placeholder="Refer name"/>
+          <input class="row-inline-input mini-input name ${c.linked?'':'flagged'}" id="ipName-${id}" list="referNameOptions" value="${esc(c.refer_name)}" placeholder="Refer name"/>
         </td>
         <td class="r">
           <input type="number" class="row-inline-input mini-input ${c.amountSet?'':'flagged'}" id="ipAmt-${id}" value="${c.refer_amount||''}" min="0" step="0.01" placeholder="0.00"/>
@@ -504,8 +509,8 @@ function renderIpdList(){
 async function updateIpdReferInfo(id){
   const c = ipAllCases.find(x=>String(x.id)===String(id));
   if (!c) return;
-  const nameEl = document.getElementById(`ipName-${CSS.escape(id)}`);
-  const amtEl = document.getElementById(`ipAmt-${CSS.escape(id)}`);
+  const nameEl = document.getElementById(`ipName-${id}`);
+  const amtEl = document.getElementById(`ipAmt-${id}`);
   const name = nameEl.value.trim();
   const amt = parseFloat(amtEl.value||0);
   const err = document.getElementById('ipErr'), ok = document.getElementById('ipOk');
@@ -527,14 +532,16 @@ async function updateIpdReferInfo(id){
     c.refer_name = name; c.refer_amount = amt; c.linked = true; c.amountSet = true; c.due = amt - c.paid;
     ok.style.display='block'; ok.textContent = `✅ Admission ${c.admission_no} refer link/amount updated. You can now select it for payment.`;
     renderIpdList();
+    loadReferNameOptions();
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
 }
 function ipUpdateTotal(){
   let total = 0;
+  const amtEls = [...document.querySelectorAll('.ip-amt')];
   document.querySelectorAll('.ip-chk:checked').forEach(chk=>{
-    const amtEl = document.querySelector(`.ip-amt[data-id="${CSS.escape(chk.dataset.id)}"]`);
-    total += parseFloat(amtEl.value||0);
+    const amtEl = amtEls.find(el=>el.dataset.id===chk.dataset.id);
+    if (amtEl) total += parseFloat(amtEl.value||0);
   });
   const el = document.getElementById('ipTotal');
   if (el) el.textContent = fmt(total);
@@ -555,9 +562,11 @@ async function saveIpdReferPay(){
   const vcheck = await checkVoucher('ip');
   if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
 
+  const ipAmtEls = [...document.querySelectorAll('.ip-amt')];
   const rows = checked.map(chk=>{
     const c = ipAllCases.find(x=>String(x.id)===String(chk.dataset.id));
-    const amt = parseFloat(document.querySelector(`.ip-amt[data-id="${CSS.escape(chk.dataset.id)}"]`).value||0);
+    const amtEl = ipAmtEls.find(el=>el.dataset.id===chk.dataset.id);
+    const amt = parseFloat(amtEl?.value||0);
     return { row: BNH_PAGE.stamp({
       admission_id: c.id, admission_no: c.admission_no, patient_name: c.patient_name,
       refer_id: c.refer_id || null, refer_name: c.refer_name,
@@ -584,9 +593,28 @@ async function saveIpdReferPay(){
   finally { spin(false); }
 }
 
+// ── shared refer-name suggestions (datalist) ──────────────────
+// Pulls every distinct refer name already used anywhere in the system so
+// that updating a case's refer name shows existing names to pick from
+// instead of the user having to remember/retype them from scratch.
+async function loadReferNameOptions(){
+  const names = new Set();
+  try{
+    const [a, b] = await Promise.all([
+      sb.from('opd_case').select('refer_name').not('refer_name','is',null),
+      sb.from('ipd_admissions').select('refer_name').not('refer_name','is',null)
+    ]);
+    (a.data||[]).forEach(r=>{ const n=(r.refer_name||'').trim(); if (n) names.add(n); });
+    (b.data||[]).forEach(r=>{ const n=(r.refer_name||'').trim(); if (n) names.add(n); });
+  } catch(e){ console.warn('loadReferNameOptions:', e.message); }
+  const dl = document.getElementById('referNameOptions');
+  dl.innerHTML = [...names].sort().map(n=>`<option value="${esc(n)}"></option>`).join('');
+}
+
 // ── init ──
 initOpd();
 initIpd();
+loadReferNameOptions();
 </script>
 </body>
 </html>
