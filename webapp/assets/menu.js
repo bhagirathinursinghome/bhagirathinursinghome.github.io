@@ -44,6 +44,12 @@
       page: "pages/payment.html",
       roles: ["admin", "accountant"]
    },
+    {
+      label: "Refer Payment",
+      icon: "💵",
+      page: "pages/refer_payment_by_case.html",
+      roles: ["admin", "accountant"]
+   },
  /*   {
       label: "Pay Salary",
       icon: "💵",
