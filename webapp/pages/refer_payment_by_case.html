@@ -567,11 +567,11 @@ async function saveIpdReferPay(){
     const c = ipAllCases.find(x=>String(x.id)===String(chk.dataset.id));
     const amtEl = ipAmtEls.find(el=>el.dataset.id===chk.dataset.id);
     const amt = parseFloat(amtEl?.value||0);
-    return { row: BNH_PAGE.stamp({
+    return { row: {
       admission_id: c.id, admission_no: c.admission_no,
       refer_id: c.refer_id || null, refer_name: c.refer_name,
       payment_date: date, voucher_no: voucher, mode, amount: amt, remark
-    }), c, amt };
+    }, c, amt };
   });
   if (rows.some(r=>!r.amt || r.amt<=0)) { err.textContent='Pay amount must be greater than 0 for every selected case.'; return; }
   if (vcheck.existing && rows.some(r=>r.row.refer_name !== vcheck.existing.party_name)) {
