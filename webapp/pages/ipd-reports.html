@@ -59,6 +59,11 @@
           <button class="btn-primary" style="width:auto" onclick="loadPatientList()">Show</button>
         </div>
       </div>
+      <div class="form-row no-print" style="margin-bottom:.75rem">
+        <div style="flex:2"><label>Search (Patient Name / Admission No.)</label>
+          <input id="r1Search" placeholder="Type to filter…" oninput="renderPatientList()"/>
+        </div>
+      </div>
       <div id="patientList" style="font-size:.85rem;color:#555">Select date range and click Show.</div>
     </div>
 
@@ -87,6 +92,11 @@
         <button class="btn-primary" style="width:auto;background:#7c3aed" onclick="downloadSummaryPDF()">⬇ PDF</button>
       </div>
     </div>
+    <div class="form-row no-print" style="margin-top:.75rem">
+      <div style="flex:2"><label>Search (Patient Name / Admission No. / Refer Name)</label>
+        <input id="r2Search" placeholder="Type to filter…" oninput="renderSummaryTable()"/>
+      </div>
+    </div>
     <div id="summaryOut" style="margin-top:1rem">Select date range and click Show.</div>
   </div>
 
@@ -100,6 +110,11 @@
       <div><label>To Date</label><input id="r3To" type="date"/></div>
       <div style="display:flex;align-items:flex-end">
         <button class="btn-primary" style="width:auto" onclick="loadReferCases()">Show Cases</button>
+      </div>
+    </div>
+    <div class="form-row no-print" style="margin-bottom:.75rem">
+      <div style="flex:2"><label>Search (Patient Name / Admission No. / Refer Name)</label>
+        <input id="r3Search" placeholder="Type to filter…" oninput="renderReferCaseList()"/>
       </div>
     </div>
     <div id="referCaseList" style="font-size:.85rem;color:#555">Select date range and click Show Cases.</div>
@@ -144,6 +159,11 @@
           <button class="btn-primary" style="width:auto" onclick="loadReferPayHistory()">Show</button>
         </div>
       </div>
+      <div class="form-row no-print" style="margin-bottom:.75rem">
+        <div style="flex:2"><label>Search (Voucher / Admission No. / Refer Name)</label>
+          <input id="rpHistSearch" placeholder="Type to filter…" oninput="renderReferPayHistory()"/>
+        </div>
+      </div>
       <div id="referPayHistory" style="font-size:.85rem;color:#555">Select date range and click Show.</div>
     </div>
   </div>
@@ -179,6 +199,8 @@
   }
 
   // ─── REPORT 1: Patient List ───────────────────────────
+  let _patientListData = [];
+
   async function loadPatientList() {
     const from = document.getElementById('r1From').value;
     const to   = document.getElementById('r1To').value;
@@ -189,7 +211,19 @@
       .select('id,admission_date,admission_no,patient_name,case_mode,case_type,is_discharged,is_cancelled,cancel_reason,cancel_date')
       .gte('admission_date',from).lte('admission_date',to)
       .order('admission_date',{ascending:false});
-    if (error||!data||data.length===0){div.textContent='No patients in this range.';return;}
+    if (error||!data||data.length===0){ _patientListData=[]; div.textContent='No patients in this range.';return;}
+    _patientListData = data;
+    renderPatientList();
+  }
+
+  function renderPatientList() {
+    const div = document.getElementById('patientList');
+    if (!_patientListData.length) { div.textContent = 'No patients in this range.'; return; }
+    const q = (document.getElementById('r1Search')?.value||'').trim().toLowerCase();
+    const data = q ? _patientListData.filter(r =>
+      (r.patient_name||'').toLowerCase().includes(q) || (r.admission_no||'').toLowerCase().includes(q)
+    ) : _patientListData;
+    if (!data.length) { div.textContent = 'No patients match your search.'; return; }
     div.innerHTML = data.map(r=>`
       <div class="patient-card" onclick="loadPatientDetail('${r.id}')"
         style="${r.is_cancelled?'border:1.5px solid #fca5a5;background:#fff5f5;':''}">
@@ -225,9 +259,7 @@
         BNH_PAGE.sb.from('ipd_cash_receipts').select('*').eq('admission_id', admId).order('receipt_date'),
         BNH_PAGE.sb.from('ipd_medicine_indens').select('*').eq('admission_id', admId),
         BNH_PAGE.sb.from('opd_case').select('*').eq('ipd_link', adm.admission_no),
-        adm.refer_id
-          ? BNH_PAGE.sb.from('ipd_refer_payments').select('*').eq('refer_id', adm.refer_id)
-          : Promise.resolve({ data: [] })
+        BNH_PAGE.sb.from('ipd_refer_payments').select('*').eq('admission_id', admId)
       ]);
 
       const amtEntry = amtArr && amtArr.length > 0 ? amtArr[0] : null;
@@ -412,14 +444,18 @@
         </div>`;
       }
 
-      if (adm.refer_id) {
+      if (adm.refer_name) {
+        const referAmtVal = amtEntry?.refer_amount!=null ? parseFloat(amtEntry.refer_amount||0) : 0;
+        const referDone   = referAmtVal>0 && referPaid >= referAmtVal - 0.01;
+        const referVouchers = [...new Set((referPays||[]).map(p=>p.voucher_no).filter(Boolean))].join(', ') || '-';
         html += `<div class="detail-section">
           <h3>🤝 Refer Payment</h3>
           <p style="font-size:.85rem">
             Refer: <strong>${adm.refer_name}</strong> &nbsp;|&nbsp;
             Refer Amount: <strong>${amtEntry?.refer_amount!=null?fmt(amtEntry.refer_amount):'Not set'}</strong>
             &nbsp;|&nbsp; Paid: <strong>${fmt(referPaid)}</strong> &nbsp;|&nbsp;
-            Status: <strong style="color:${referPaid>0?'#059669':'#d97706'}">${referPaid>0?'Paid':'Pending'}</strong>
+            Voucher No: <strong>${referVouchers}</strong> &nbsp;|&nbsp;
+            Status: <strong style="color:${referDone?'#059669':'#d97706'}">${referAmtVal===0?'N/A':referDone?'✅ Done':'⏳ Pending'}</strong>
           </p>
           ${(referPays&&referPays.length>0)?`<table><thead><tr>
             <th>Date</th><th>Voucher</th><th>Mode</th><th class="r">Amount</th><th>Remark</th>
@@ -534,15 +570,14 @@
         const opdDisc   = opdRows.reduce((a,b)=>a+(summCashByCase[b.case_no]?.discount||0),0);
         const opdDue    = opdBill - opdRecv - opdDisc;
 
-        // Refer payment
-        const referPays = adm.refer_id
-          ? (allReferPays||[]).filter(r=>r.refer_id===adm.refer_id)
-          : [];
+        // Refer payment — matched by admission_id (reliable even when refer_id/master link is missing)
+        const referPays = (allReferPays||[]).filter(r=>r.admission_id===adm.id);
         const referPaid = referPays.reduce((a,r)=>a+parseFloat(r.amount||0),0);
         const referPayDate = referPays.length>0
-          ? referPays.sort((a,b)=>b.payment_date.localeCompare(a.payment_date))[0].payment_date
+          ? referPays.slice().sort((a,b)=>b.payment_date.localeCompare(a.payment_date))[0].payment_date
           : null;
-        const referStatus = refAmt>0 ? (referPaid>=refAmt?'Paid':'Pending') : 'N/A';
+        const referVoucher = [...new Set(referPays.map(r=>r.voucher_no).filter(Boolean))].join(', ') || '-';
+        const referStatus = refAmt>0 ? (referPaid>=refAmt-0.01?'Done':'Pending') : 'N/A';
 
         // Remain = totalRecv - surgF - aneF - inden - addlExp - refAmt
         const remain = totalRecv - surgF - aneF - inden - addlExp - refAmt;
@@ -555,113 +590,136 @@
           caseDetail: ot.case_detail || '-',
           surgName: ot.surgent_name || '-',
           aneName: ot.anaesthesia_name || '-',
-          surgF, aneF, inden, addlExp, refAmt, referPaid, referStatus, referPayDate,
+          surgF, aneF, inden, addlExp, refAmt, referPaid, referStatus, referPayDate, referVoucher,
           remain, status,
           otPkg: pkg > 0 ? fmt(pkg) : '-'
         };
       });
 
-      const totPkg   = _summaryRows.reduce((a,r)=>a+r.pkg,0);
-      const totAddlC = _summaryRows.reduce((a,r)=>a+r.addlChg,0);
-      const totRecv  = _summaryRows.reduce((a,r)=>a+r.rcptAmt,0);
-      const totDisc  = _summaryRows.reduce((a,r)=>a+r.disc,0);
-      const totDue   = _summaryRows.reduce((a,r)=>a+r.due,0);
-      const totOpdB  = _summaryRows.reduce((a,r)=>a+r.opdBill,0);
-      const totOpdR  = _summaryRows.reduce((a,r)=>a+r.opdRecv,0);
-      const totOpdDu = _summaryRows.reduce((a,r)=>a+r.opdDue,0);
-      const totInden = _summaryRows.reduce((a,r)=>a+r.inden,0);
-      const totExp   = _summaryRows.reduce((a,r)=>a+r.addlExp,0);
-      const totRef   = _summaryRows.reduce((a,r)=>a+r.refAmt,0);
-
-      out.innerHTML = `
-        <div id="summaryWrap">
-          <p style="font-size:.85rem;margin-bottom:.75rem">
-            Period: <strong>${from}</strong> to <strong>${to}</strong>
-            &nbsp;|&nbsp; Total: <strong>${_summaryRows.length}</strong>
-            &nbsp;|&nbsp; Discharged: <strong>${_summaryRows.filter(r=>r.adm.is_discharged).length}</strong>
-            &nbsp;|&nbsp; <span style="color:#dc2626">Cancelled: <strong>${_summaryRows.filter(r=>r.adm.is_cancelled).length}</strong></span>
-          </p>
-          <div class="summary-scroll">
-          <table id="summaryTable">
-            <thead><tr>
-              <th>#</th><th>Adm Date</th><th>Adm No.</th><th>Name</th><th>Case Detail</th>
-              <th>Mode</th><th>Type</th><th>OT Package</th>
-              <th class="r">Add. Charge</th><th class="r">Total Recv.</th>
-              <th class="r">Received</th><th class="r">Discount</th><th class="r">Due</th>
-              <th class="r">OPD Bill</th><th class="r">OPD Recv.</th><th class="r">OPD Disc</th><th class="r">OPD Due</th>
-              <th>Surgent Name</th><th class="r">Surgent</th><th>Anaesthesia Name</th><th class="r">Anaesthesia</th><th class="r">Inden</th>
-              <th class="r">Add. Exp.</th><th>Refer Name</th><th class="r">Refer Amt</th>
-              <th>Paid Date</th><th>Refer Status</th><th class="r">Remain</th><th>Status</th>
-            </tr></thead>
-            <tbody>${_summaryRows.map((r,i)=>`<tr style="${r.adm.is_cancelled?'background:#fff5f5;color:#dc2626;':''}">
-              <td>${i+1}</td>
-              <td>${r.adm.admission_date}</td>
-              <td>${r.adm.admission_no}</td>
-              <td>${r.adm.patient_name}${r.adm.is_cancelled?` <span style="font-size:.7rem;background:#fee2e2;border:1px solid #fca5a5;border-radius:4px;padding:.1rem .3rem;color:#dc2626;font-weight:700">CANC</span>`:''}</td>
-              <td>${r.caseDetail}</td>
-              <td>${r.adm.case_mode}</td>
-              <td>${r.adm.case_type}</td>
-              <td class="r">${fmt(r.pkg)}</td>
-              <td class="r">${fmt(r.addlChg)}</td>
-              <td class="r"><strong>${fmt(r.totalRecv)}</strong></td>
-              <td class="r">${fmt(r.rcptAmt)}</td>
-              <td class="r">${fmt(r.disc)}</td>
-              <td class="r" style="color:${r.adm.is_cancelled?'#dc2626':r.due>0?'#dc2626':'#059669'}">${fmt(r.due)}</td>
-              <td class="r">${fmt(r.opdBill)}</td>
-              <td class="r">${fmt(r.opdRecv)}</td>
-              <td class="r">${fmt(r.opdDisc)}</td>
-              <td class="r" style="color:${r.opdDue>0?'#dc2626':'#059669'}">${fmt(r.opdDue)}</td>
-              <td>${r.surgName}</td>
-              <td class="r">${fmt(r.surgF)}</td>
-              <td>${r.aneName}</td>
-              <td class="r">${fmt(r.aneF)}</td>
-              <td class="r">${fmt(r.inden)}</td>
-              <td class="r">${fmt(r.addlExp)}</td>
-              <td>${r.adm.refer_name||'-'}</td>
-              <td class="r">${r.refAmt>0?fmt(r.refAmt):'-'}</td>
-              <td>${r.referPayDate||'<span style="color:#d97706">Pending</span>'}</td>
-              <td><span style="color:${r.referStatus==='Paid'?'#059669':r.referStatus==='Pending'?'#d97706':'#6b7280'}">${r.referStatus}</span></td>
-              <td class="r" style="color:${r.remain<0?'#dc2626':'#059669'}">${fmt(r.remain)}</td>
-              <td style="${r.adm.is_cancelled?'color:#dc2626;font-weight:700':''}">
-                ${r.adm.is_cancelled?`❌ Cancelled${r.adm.cancel_date?' ('+r.adm.cancel_date+')':''}`:r.adm.is_discharged?'✅ Discharged':'🏥 Active'}
-              </td>
-            </tr>`).join('')}</tbody>
-            <tfoot><tr>
-              <td colspan="7">Total</td>
-              <td class="r">${fmt(totPkg)}</td>
-              <td class="r">${fmt(totAddlC)}</td>
-              <td class="r"><strong>${fmt(totPkg+totAddlC)}</strong></td>
-              <td class="r">${fmt(totRecv)}</td>
-              <td class="r">${fmt(totDisc)}</td>
-              <td class="r">${fmt(totDue)}</td>
-              <td class="r">${fmt(totOpdB)}</td>
-              <td class="r">${fmt(totOpdR)}</td>
-              <td></td>
-              <td class="r">${fmt(totOpdDu)}</td>
-              <td colspan="5"></td>
-              <td class="r">${fmt(totInden)}</td>
-              <td class="r">${fmt(totExp)}</td>
-              <td></td>
-              <td class="r">${fmt(totRef)}</td>
-              <td colspan="4"></td>
-            </tr></tfoot>
-          </table>
-          </div>
-        </div>`;
+      _summaryPeriod = { from, to };
+      renderSummaryTable();
     } finally {
       document.getElementById('spinner').classList.add('hidden');
     }
   }
 
+  let _summaryPeriod = { from:'', to:'' };
+
+  function renderSummaryTable() {
+    const out = document.getElementById('summaryOut');
+    const { from, to } = _summaryPeriod;
+    const q = (document.getElementById('r2Search')?.value||'').trim().toLowerCase();
+    const rows = q ? _summaryRows.filter(r =>
+      (r.adm.patient_name||'').toLowerCase().includes(q) ||
+      (r.adm.admission_no||'').toLowerCase().includes(q) ||
+      (r.adm.refer_name||'').toLowerCase().includes(q)
+    ) : _summaryRows;
+
+    const totPkg   = rows.reduce((a,r)=>a+r.pkg,0);
+    const totAddlC = rows.reduce((a,r)=>a+r.addlChg,0);
+    const totRecv  = rows.reduce((a,r)=>a+r.rcptAmt,0);
+    const totDisc  = rows.reduce((a,r)=>a+r.disc,0);
+    const totDue   = rows.reduce((a,r)=>a+r.due,0);
+    const totOpdB  = rows.reduce((a,r)=>a+r.opdBill,0);
+    const totOpdR  = rows.reduce((a,r)=>a+r.opdRecv,0);
+    const totOpdDu = rows.reduce((a,r)=>a+r.opdDue,0);
+    const totInden = rows.reduce((a,r)=>a+r.inden,0);
+    const totExp   = rows.reduce((a,r)=>a+r.addlExp,0);
+    const totRef   = rows.reduce((a,r)=>a+r.refAmt,0);
+
+    out.innerHTML = `
+      <div id="summaryWrap">
+        <p style="font-size:.85rem;margin-bottom:.75rem">
+          Period: <strong>${from}</strong> to <strong>${to}</strong>
+          &nbsp;|&nbsp; Showing: <strong>${rows.length}</strong> of ${_summaryRows.length}
+          &nbsp;|&nbsp; Discharged: <strong>${rows.filter(r=>r.adm.is_discharged).length}</strong>
+          &nbsp;|&nbsp; <span style="color:#dc2626">Cancelled: <strong>${rows.filter(r=>r.adm.is_cancelled).length}</strong></span>
+        </p>
+        <div class="summary-scroll">
+        <table id="summaryTable">
+          <thead><tr>
+            <th>#</th><th>Adm Date</th><th>Adm No.</th><th>Name</th><th>Case Detail</th>
+            <th>Mode</th><th>Type</th><th>OT Package</th>
+            <th class="r">Add. Charge</th><th class="r">Total Recv.</th>
+            <th class="r">Received</th><th class="r">Discount</th><th class="r">Due</th>
+            <th class="r">OPD Bill</th><th class="r">OPD Recv.</th><th class="r">OPD Disc</th><th class="r">OPD Due</th>
+            <th>Surgent Name</th><th class="r">Surgent</th><th>Anaesthesia Name</th><th class="r">Anaesthesia</th><th class="r">Inden</th>
+            <th class="r">Add. Exp.</th><th>Refer Name</th><th class="r">Refer Amt</th>
+            <th>Paid Date</th><th>Voucher No</th><th>Refer Status</th><th class="r">Remain</th><th>Status</th>
+          </tr></thead>
+          <tbody>${rows.map((r,i)=>`<tr style="${r.adm.is_cancelled?'background:#fff5f5;color:#dc2626;':''}">
+            <td>${i+1}</td>
+            <td>${r.adm.admission_date}</td>
+            <td>${r.adm.admission_no}</td>
+            <td>${r.adm.patient_name}${r.adm.is_cancelled?` <span style="font-size:.7rem;background:#fee2e2;border:1px solid #fca5a5;border-radius:4px;padding:.1rem .3rem;color:#dc2626;font-weight:700">CANC</span>`:''}</td>
+            <td>${r.caseDetail}</td>
+            <td>${r.adm.case_mode}</td>
+            <td>${r.adm.case_type}</td>
+            <td class="r">${fmt(r.pkg)}</td>
+            <td class="r">${fmt(r.addlChg)}</td>
+            <td class="r"><strong>${fmt(r.totalRecv)}</strong></td>
+            <td class="r">${fmt(r.rcptAmt)}</td>
+            <td class="r">${fmt(r.disc)}</td>
+            <td class="r" style="color:${r.adm.is_cancelled?'#dc2626':r.due>0?'#dc2626':'#059669'}">${fmt(r.due)}</td>
+            <td class="r">${fmt(r.opdBill)}</td>
+            <td class="r">${fmt(r.opdRecv)}</td>
+            <td class="r">${fmt(r.opdDisc)}</td>
+            <td class="r" style="color:${r.opdDue>0?'#dc2626':'#059669'}">${fmt(r.opdDue)}</td>
+            <td>${r.surgName}</td>
+            <td class="r">${fmt(r.surgF)}</td>
+            <td>${r.aneName}</td>
+            <td class="r">${fmt(r.aneF)}</td>
+            <td class="r">${fmt(r.inden)}</td>
+            <td class="r">${fmt(r.addlExp)}</td>
+            <td>${r.adm.refer_name||'-'}</td>
+            <td class="r">${r.refAmt>0?fmt(r.refAmt):'-'}</td>
+            <td>${r.referPayDate||(r.referStatus==='Pending'?'<span style="color:#d97706">Pending</span>':'-')}</td>
+            <td>${r.referVoucher}</td>
+            <td><span style="color:${r.referStatus==='Done'?'#059669':r.referStatus==='Pending'?'#d97706':'#6b7280'}">${r.referStatus==='Done'?'✅ Done':r.referStatus}</span></td>
+            <td class="r" style="color:${r.remain<0?'#dc2626':'#059669'}">${fmt(r.remain)}</td>
+            <td style="${r.adm.is_cancelled?'color:#dc2626;font-weight:700':''}">
+              ${r.adm.is_cancelled?`❌ Cancelled${r.adm.cancel_date?' ('+r.adm.cancel_date+')':''}`:r.adm.is_discharged?'✅ Discharged':'🏥 Active'}
+            </td>
+          </tr>`).join('')}</tbody>
+          <tfoot><tr>
+            <td colspan="7">Total</td>
+            <td class="r">${fmt(totPkg)}</td>
+            <td class="r">${fmt(totAddlC)}</td>
+            <td class="r"><strong>${fmt(totPkg+totAddlC)}</strong></td>
+            <td class="r">${fmt(totRecv)}</td>
+            <td class="r">${fmt(totDisc)}</td>
+            <td class="r">${fmt(totDue)}</td>
+            <td class="r">${fmt(totOpdB)}</td>
+            <td class="r">${fmt(totOpdR)}</td>
+            <td></td>
+            <td class="r">${fmt(totOpdDu)}</td>
+            <td colspan="4"></td>
+            <td class="r">${fmt(totInden)}</td>
+            <td class="r">${fmt(totExp)}</td>
+            <td></td>
+            <td class="r">${fmt(totRef)}</td>
+            <td colspan="5"></td>
+          </tr></tfoot>
+        </table>
+        </div>
+      </div>`;
+  }
+
   function downloadSummaryExcel() {
     if (!_summaryRows || _summaryRows.length === 0) { alert('Load summary first.'); return; }
+    const q = (document.getElementById('r2Search')?.value||'').trim().toLowerCase();
+    const rows = q ? _summaryRows.filter(r =>
+      (r.adm.patient_name||'').toLowerCase().includes(q) ||
+      (r.adm.admission_no||'').toLowerCase().includes(q) ||
+      (r.adm.refer_name||'').toLowerCase().includes(q)
+    ) : _summaryRows;
     const headers = [
       '#','Adm Date','Adm No','Name','Case Detail','Mode','Type','OT Package','Add. Charge','Total Receivable',
       'Total Received','Discount','Due','OPD Bill','OPD Received','OPD Discount','OPD Due',
       'Surgent Name','Surgent Charge','Anaesthesia Name','Anaesthesia Charge','Inden','Add. Expense','Refer Name','Refer Amount',
-      'Paid Date','Refer Status','Remain','Status'
+      'Paid Date','Voucher No','Refer Status','Remain','Status'
     ];
-    const data = _summaryRows.map((r,i)=>[
+    const data = rows.map((r,i)=>[
       i+1, r.adm.admission_date, r.adm.admission_no, r.adm.patient_name, r.caseDetail,
       r.adm.case_mode, r.adm.case_type,
       parseFloat(r.pkg||0), parseFloat(r.addlChg||0), parseFloat(r.totalRecv||0),
@@ -669,7 +727,7 @@
       parseFloat(r.opdBill||0), parseFloat(r.opdRecv||0), parseFloat(r.opdDisc||0), parseFloat(r.opdDue||0),
       r.surgName, parseFloat(r.surgF||0), r.aneName, parseFloat(r.aneF||0), parseFloat(r.inden||0), parseFloat(r.addlExp||0),
       r.adm.refer_name||'', parseFloat(r.refAmt||0),
-      r.referPayDate||'Pending', r.referStatus,
+      r.referPayDate||'Pending', r.referVoucher==='-'?'':r.referVoucher, r.referStatus==='Done'?'Done':r.referStatus,
       parseFloat(r.remain||0),
       r.adm.is_cancelled?'Cancelled':r.adm.is_discharged?'Discharged':'Active'
     ]);
@@ -694,6 +752,7 @@
 
   // ─── REPORT 3: REFER PAYMENT ─────────────────────────
   let _currentReferAdm = null;
+  let _referCaseRows = [];
 
   async function loadReferCases() {
     const from = document.getElementById('r3From').value;
@@ -710,7 +769,7 @@
         .order('admission_date',{ascending:false});
 
       const filtered = (adms||[]).filter(r=>r.refer_name&&r.refer_name.trim()!='');
-      if (filtered.length === 0) { div.textContent = 'No cases with refer in this range.'; return; }
+      if (filtered.length === 0) { _referCaseRows=[]; div.textContent = 'No cases with refer in this range.'; return; }
 
       // Get amount entries for refer amounts
       const admIds = filtered.map(r=>r.id);
@@ -719,48 +778,70 @@
       const amtMap = {};
       (amtEntries||[]).forEach(a=>{ amtMap[a.admission_id]=a; });
 
-      // Get refer payment totals
-      const referIds = filtered.filter(r=>r.refer_id).map(r=>r.refer_id);
-      let referPaidMap = {};
-      if (referIds.length > 0) {
-        const { data: pays } = await BNH_PAGE.sb.from('ipd_refer_payments')
-          .select('refer_id,amount').in('refer_id', referIds);
-        (pays||[]).forEach(p=>{
-          referPaidMap[p.refer_id] = (referPaidMap[p.refer_id]||0) + parseFloat(p.amount||0);
-        });
-      }
+      // Get refer payment totals & voucher numbers — matched by admission_id
+      // (refer_id is often blank when the refer name isn't linked to a formal
+      // refer-master record, so matching on admission_id is the reliable key).
+      const { data: pays } = await BNH_PAGE.sb.from('ipd_refer_payments')
+        .select('admission_id,amount,voucher_no').in('admission_id', admIds);
+      let referPaidMap = {}, referVoucherMap = {};
+      (pays||[]).forEach(p=>{
+        referPaidMap[p.admission_id] = (referPaidMap[p.admission_id]||0) + parseFloat(p.amount||0);
+        if (!referVoucherMap[p.admission_id]) referVoucherMap[p.admission_id] = new Set();
+        if (p.voucher_no) referVoucherMap[p.admission_id].add(p.voucher_no);
+      });
 
-      div.innerHTML = `<table>
-        <thead><tr>
-          <th>Adm Date</th><th>Adm No.</th><th>Patient</th>
-          <th>Refer Name</th><th class="r">Refer Amt</th><th class="r">Paid</th><th class="r">Due</th><th>Status</th><th class="no-print">Action</th>
-        </tr></thead>
-        <tbody>${filtered.map(r=>{
-          const amt   = amtMap[r.id];
-          const refA  = parseFloat(amt?.refer_amount||0);
-          const paid  = r.refer_id ? (referPaidMap[r.refer_id]||0) : 0;
-          const due   = refA - paid;
-          const status= refA===0?'N/A':paid>=refA?'✅ Paid':'⏳ Pending';
-          return `<tr>
-            <td>${r.admission_date}</td>
-            <td>${r.admission_no}</td>
-            <td>${r.patient_name}</td>
-            <td>${r.refer_name}</td>
-            <td class="r">${refA>0?fmt(refA):'-'}</td>
-            <td class="r">${fmt(paid)}</td>
-            <td class="r" style="color:${due>0?'#dc2626':'#059669'}">${refA>0?fmt(due):'-'}</td>
-            <td>${status}</td>
-            <td class="no-print"><button class="btn-primary" style="width:auto;padding:.3rem .7rem;font-size:.78rem"
-              onclick="openReferPayForm('${r.id}','${r.admission_no}','${r.patient_name.replace(/'/g,"\\'")}','${r.refer_name.replace(/'/g,"\\'")}','${r.refer_id||''}',${refA})">
-              ➕ Add Payment
-            </button></td>
-          </tr>`;
-        }).join('')}</tbody></table>`;
+      _referCaseRows = filtered.map(r=>{
+        const amt   = amtMap[r.id];
+        const refA  = parseFloat(amt?.refer_amount||0);
+        const paid  = referPaidMap[r.id] || 0;
+        const due   = refA - paid;
+        const vouchers = referVoucherMap[r.id] ? [...referVoucherMap[r.id]].join(', ') : '-';
+        const status= refA===0?'N/A':paid>=refA-0.01?'Done':'Pending';
+        return { ...r, refA, paid, due, vouchers, status };
+      });
+      renderReferCaseList();
     } catch(ex) {
       div.textContent = 'Error: ' + ex.message;
     } finally {
       document.getElementById('spinner').classList.add('hidden');
     }
+  }
+
+  function renderReferCaseList() {
+    const div = document.getElementById('referCaseList');
+    if (!_referCaseRows.length) { div.textContent = 'No cases with refer in this range.'; return; }
+    const q = (document.getElementById('r3Search')?.value||'').trim().toLowerCase();
+    const list = q ? _referCaseRows.filter(r =>
+      (r.patient_name||'').toLowerCase().includes(q) ||
+      (r.admission_no||'').toLowerCase().includes(q) ||
+      (r.refer_name||'').toLowerCase().includes(q) ||
+      (r.vouchers||'').toLowerCase().includes(q)
+    ) : _referCaseRows;
+    if (!list.length) { div.textContent = 'No cases match your search.'; return; }
+
+    div.innerHTML = `<table>
+      <thead><tr>
+        <th>Adm Date</th><th>Adm No.</th><th>Patient</th>
+        <th>Refer Name</th><th class="r">Refer Amt</th><th class="r">Paid</th><th class="r">Due</th>
+        <th>Voucher No</th><th>Status</th><th class="no-print">Action</th>
+      </tr></thead>
+      <tbody>${list.map(r=>{
+        return `<tr>
+          <td>${r.admission_date}</td>
+          <td>${r.admission_no}</td>
+          <td>${r.patient_name}</td>
+          <td>${r.refer_name}</td>
+          <td class="r">${r.refA>0?fmt(r.refA):'-'}</td>
+          <td class="r">${fmt(r.paid)}</td>
+          <td class="r" style="color:${r.due>0?'#dc2626':'#059669'}">${r.refA>0?fmt(r.due):'-'}</td>
+          <td>${r.vouchers}</td>
+          <td>${r.status==='Done'?'✅ Done':r.status==='Pending'?'⏳ Pending':'N/A'}</td>
+          <td class="no-print"><button class="btn-primary" style="width:auto;padding:.3rem .7rem;font-size:.78rem"
+            onclick="openReferPayForm('${r.id}','${r.admission_no}','${r.patient_name.replace(/'/g,"\\'")}','${r.refer_name.replace(/'/g,"\\'")}','${r.refer_id||''}',${r.refA})">
+            ➕ Add Payment
+          </button></td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
   }
 
   function openReferPayForm(admId, admNo, patName, referName, referId, referAmt) {
@@ -820,6 +901,8 @@
     }
   }
 
+  let _referPayHistoryData = [];
+
   async function loadReferPayHistory() {
     const from = document.getElementById('rpHistFrom').value;
     const to   = document.getElementById('rpHistTo').value;
@@ -829,7 +912,21 @@
     const { data, error } = await BNH_PAGE.sb.from('ipd_refer_payments')
       .select('*').gte('payment_date',from).lte('payment_date',to)
       .order('payment_date',{ascending:false});
-    if (error||!data||data.length===0){div.textContent='No refer payments in this range.';return;}
+    if (error||!data||data.length===0){ _referPayHistoryData=[]; div.textContent='No refer payments in this range.';return;}
+    _referPayHistoryData = data;
+    renderReferPayHistory();
+  }
+
+  function renderReferPayHistory() {
+    const div = document.getElementById('referPayHistory');
+    if (!_referPayHistoryData.length) { div.textContent = 'No refer payments in this range.'; return; }
+    const q = (document.getElementById('rpHistSearch')?.value||'').trim().toLowerCase();
+    const data = q ? _referPayHistoryData.filter(r =>
+      (r.voucher_no||'').toLowerCase().includes(q) ||
+      (r.admission_no||'').toLowerCase().includes(q) ||
+      (r.refer_name||'').toLowerCase().includes(q)
+    ) : _referPayHistoryData;
+    if (!data.length) { div.textContent = 'No records match your search.'; return; }
     const total = data.reduce((a,r)=>a+parseFloat(r.amount||0),0);
     div.innerHTML = `<table>
       <thead><tr>
