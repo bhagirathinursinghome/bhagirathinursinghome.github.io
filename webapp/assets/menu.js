@@ -50,6 +50,12 @@
       page: "pages/refer_payment_by_case.html",
       roles: ["admin", "accountant"]
    },
+    {
+      label: "Voucher",
+      icon: "📕",
+      page: "pages/Voucher_register.html",
+      roles: ["admin", "accountant"]
+   },
  /*   {
       label: "Pay Salary",
       icon: "💵",
