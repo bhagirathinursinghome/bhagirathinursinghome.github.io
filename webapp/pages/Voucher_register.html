@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Voucher Register-</title>
+  <title>Voucher Register</title>
   <link rel="stylesheet" href="../assets/style.css"/>
   <style>
     .form-row { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; }
@@ -118,6 +118,11 @@
     <div class="summary-bar" id="summaryBar"></div>
     <div class="export-bar" id="exportBar"></div>
     <p class="hint" id="diagBar" style="background:#fffbeb;border:1px solid #fde68a;padding:.5rem .75rem;border-radius:6px"></p>
+    <div id="debugPanel" style="background:#0f172a;color:#a3e635;font-family:monospace;font-size:.72rem;
+         padding:.6rem .75rem;border-radius:6px;margin-top:.5rem;max-height:220px;overflow:auto;white-space:pre-wrap;">
+      <b style="color:#fff">Debug log</b> (click Edit/Delete to trace) <button class="btn-small btn-outline" style="float:right;margin:-2px 0" onclick="debugLogLines=[];renderDebugLog()">clear</button>
+      <div id="debugPanelBody"></div>
+    </div>
     <p class="err" id="listErr"></p>
     <div id="listOut">Set your filters (or leave them blank) and click Search.</div>
   </div>
@@ -157,6 +162,19 @@ function hasFullAccess(){
     document.querySelector('.page').insertBefore(el, document.querySelector('.page-card'));
   } catch(e){ console.warn('role debug failed', e); }
 })();
+dlog('Page loaded. detectRole()=', detectRole(), 'hasFullAccess()=', hasFullAccess(), 'raw user=', (BNH_PAGE&&BNH_PAGE.user)||{});
+let debugLogLines = [];
+function dlog(...args){
+  const msg = args.map(a=>typeof a==='object' ? JSON.stringify(a) : String(a)).join(' ');
+  console.log('[VoucherRegister]', msg);
+  debugLogLines.push(`${new Date().toLocaleTimeString()} — ${msg}`);
+  if (debugLogLines.length > 200) debugLogLines.shift();
+  renderDebugLog();
+}
+function renderDebugLog(){
+  const el = document.getElementById('debugPanelBody');
+  if (el) el.innerHTML = debugLogLines.map(esc).join('<br>') || '(empty)';
+}
 const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 function spin(on){ document.getElementById('spinner').classList.toggle('hidden', !on); }
@@ -274,6 +292,8 @@ function renderList(){
     <button class="btn-small btn-outline" onclick="exportPDF()">⬇ Export PDF</button>`;
 
   const fullAccess = hasFullAccess();
+  dlog('renderList: fullAccess=', fullAccess, 'rows=', lastRows.length,
+       'row types=', [...new Set(lastRows.map(r=>`${r.type}(meta:${!!TYPE_META[r.type]})`))]);
   out.innerHTML = `
     <table>
       <thead><tr>
@@ -295,7 +315,7 @@ function renderList(){
 }
 function actionsCell(r, fullAccess){
   if (r.status !== 'filled') return '-';
-  if (!TYPE_META[r.type]) return '<span class="view-only-tag">-</span>';
+  if (!TYPE_META[r.type]) { dlog('actionsCell: voucher', r.voucher_no, 'type="'+r.type+'" has NO TYPE_META entry -> hidden'); return '<span class="view-only-tag">-</span>'; }
   if (!fullAccess) return '<span class="view-only-tag">view only</span>';
   return `<button class="btn-small btn-secondary" onclick="openEditModal('${esc(r.voucher_no)}','${esc(r.type)}')">✏️ Edit</button>
     <button class="btn-small btn-danger" onclick="deleteVoucherEntries('${esc(r.voucher_no)}','${esc(r.type)}')">🗑️ Delete</button>`;
@@ -307,18 +327,21 @@ function actionsCell(r, fullAccess){
 // register, dues/reports elsewhere) stays in sync automatically.
 // ════════════════════════════════════════════════════════════
 async function openEditModal(voucherNo, type){
-  if (!hasFullAccess()) return;
+  dlog('openEditModal called with voucherNo=', voucherNo, 'type=', type);
+  if (!hasFullAccess()) { dlog('openEditModal BLOCKED: hasFullAccess() is false. detectRole()=', detectRole()); return; }
   const meta = TYPE_META[type];
-  if (!meta) { alert('Unknown entry type: ' + type); return; }
+  if (!meta) { dlog('openEditModal BLOCKED: no TYPE_META entry for type="'+type+'"'); alert('Unknown entry type: ' + type); return; }
+  dlog('openEditModal: meta.table=', meta.table, '— querying voucher_no=', voucherNo);
   spin(true);
   let rows;
   try{
     const { data, error } = await sb.from(meta.table).select('*').eq('voucher_no', voucherNo);
     if (error) throw error;
     rows = data || [];
-  } catch(ex){ spin(false); alert('Failed to load entries: ' + ex.message); return; }
+    dlog('openEditModal: query returned', rows.length, 'row(s)');
+  } catch(ex){ spin(false); dlog('openEditModal ERROR:', ex.message); alert('Failed to load entries: ' + ex.message); return; }
   spin(false);
-  if (!rows.length) { alert('No entries found for this voucher.'); return; }
+  if (!rows.length) { dlog('openEditModal: no rows found for voucher_no=', voucherNo, 'in table', meta.table); alert('No entries found for this voucher.'); return; }
   renderEditModal(type, meta, rows);
 }
 function renderEditModal(type, meta, rows){
@@ -352,34 +375,40 @@ function renderEditRow(type, meta, r){
 }
 function closeEditModal(){ document.getElementById('pmModalOverlay').classList.add('hidden'); }
 async function saveEntryRow(type, id){
-  if (!hasFullAccess()) return;
+  dlog('saveEntryRow called with type=', type, 'id=', id);
+  if (!hasFullAccess()) { dlog('saveEntryRow BLOCKED: hasFullAccess() is false'); return; }
   const meta = TYPE_META[type];
+  if (!meta) { dlog('saveEntryRow BLOCKED: no TYPE_META entry for type="'+type+'"'); return; }
   const errEl = document.getElementById('pmErr-'+id);
   errEl.style.color = '#dc2626'; errEl.textContent = '';
   const date = document.getElementById('pmDate-'+id).value;
   const amount = parseFloat(document.getElementById('pmAmount-'+id).value || 0);
   const mode = document.getElementById('pmMode-'+id).value;
   const remark = document.getElementById('pmRemark-'+id).value.trim() || null;
-  if (!date) { errEl.textContent = 'Date is required.'; return; }
-  if (!amount || amount <= 0) { errEl.textContent = 'Enter a valid amount.'; return; }
+  if (!date) { errEl.textContent = 'Date is required.'; dlog('saveEntryRow: validation failed, missing date'); return; }
+  if (!amount || amount <= 0) { errEl.textContent = 'Enter a valid amount.'; dlog('saveEntryRow: validation failed, bad amount', amount); return; }
   const patch = { [meta.dateCol]: date, [meta.amountCol]: amount, [meta.modeCol]: mode, [meta.remarkCol]: remark };
+  dlog('saveEntryRow: updating table', meta.table, 'id=', id, 'patch=', patch);
   spin(true);
   try{
-    const { error } = await sb.from(meta.table).update(patch).eq('id', id);
+    const { error, data } = await sb.from(meta.table).update(patch).eq('id', id).select();
     if (error) throw error;
+    dlog('saveEntryRow: update result rows=', (data||[]).length, data);
     if (type === 'opd_refer'){
       const { data: row } = await sb.from(meta.table).select('case_no').eq('id', id).maybeSingle();
       if (row) await recomputeOpdReferStatus(row.case_no);
     }
     errEl.style.color = '#059669'; errEl.textContent = '✅ Saved.';
     await runSearch();
-  } catch(ex){ errEl.textContent = ex.message; }
+  } catch(ex){ dlog('saveEntryRow ERROR:', ex.message); errEl.textContent = ex.message; }
   finally { spin(false); }
 }
 async function deleteEntryRow(type, id){
-  if (!hasFullAccess()) return;
-  if (!confirm('Delete this entry? This cannot be undone.')) return;
+  dlog('deleteEntryRow called with type=', type, 'id=', id);
+  if (!hasFullAccess()) { dlog('deleteEntryRow BLOCKED: hasFullAccess() is false'); return; }
+  if (!confirm('Delete this entry? This cannot be undone.')) { dlog('deleteEntryRow: user cancelled confirm dialog'); return; }
   const meta = TYPE_META[type];
+  if (!meta) { dlog('deleteEntryRow BLOCKED: no TYPE_META entry for type="'+type+'"'); return; }
   spin(true);
   try{
     let caseNo = null;
@@ -387,20 +416,23 @@ async function deleteEntryRow(type, id){
       const { data: row } = await sb.from(meta.table).select('case_no').eq('id', id).maybeSingle();
       caseNo = row?.case_no || null;
     }
-    const { error } = await sb.from(meta.table).delete().eq('id', id);
+    const { error, count } = await sb.from(meta.table).delete({ count:'exact' }).eq('id', id);
     if (error) throw error;
+    dlog('deleteEntryRow: delete result, rows affected=', count);
     if (caseNo) await recomputeOpdReferStatus(caseNo);
     document.getElementById('pmRow-'+id)?.remove();
     if (!document.querySelectorAll('#pmRows .pm-row').length) closeEditModal();
     await runSearch();
-  } catch(ex){ alert('Delete failed: ' + ex.message); }
+  } catch(ex){ dlog('deleteEntryRow ERROR:', ex.message); alert('Delete failed: ' + ex.message); }
   finally { spin(false); }
 }
 async function deleteVoucherEntries(voucherNo, type){
-  if (!hasFullAccess()) return;
+  dlog('deleteVoucherEntries called with voucherNo=', voucherNo, 'type=', type);
+  if (!hasFullAccess()) { dlog('deleteVoucherEntries BLOCKED: hasFullAccess() is false. detectRole()=', detectRole()); return; }
   const meta = TYPE_META[type];
-  if (!meta) return;
-  if (!confirm(`Delete ALL entries recorded under Voucher ${voucherNo}? This cannot be undone.`)) return;
+  if (!meta) { dlog('deleteVoucherEntries BLOCKED: no TYPE_META entry for type="'+type+'"'); return; }
+  if (!confirm(`Delete ALL entries recorded under Voucher ${voucherNo}? This cannot be undone.`)) { dlog('deleteVoucherEntries: user cancelled confirm dialog'); return; }
+  dlog('deleteVoucherEntries: deleting from table', meta.table, 'where voucher_no=', voucherNo);
   spin(true);
   try{
     let caseNos = [];
@@ -408,11 +440,12 @@ async function deleteVoucherEntries(voucherNo, type){
       const { data: rows } = await sb.from(meta.table).select('case_no').eq('voucher_no', voucherNo);
       caseNos = [...new Set((rows||[]).map(r=>r.case_no))];
     }
-    const { error } = await sb.from(meta.table).delete().eq('voucher_no', voucherNo);
+    const { error, count } = await sb.from(meta.table).delete({ count:'exact' }).eq('voucher_no', voucherNo);
     if (error) throw error;
+    dlog('deleteVoucherEntries: delete succeeded, rows affected=', count);
     for (const c of caseNos) await recomputeOpdReferStatus(c);
     await runSearch();
-  } catch(ex){ alert('Delete failed: ' + ex.message); }
+  } catch(ex){ dlog('deleteVoucherEntries ERROR:', ex.message); alert('Delete failed: ' + ex.message); }
   finally { spin(false); }
 }
 // Best-effort recompute of an OPD case's refer_payment_status after an
