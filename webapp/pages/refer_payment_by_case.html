@@ -537,7 +537,7 @@ async function updateIpdReferInfo(id){
       const { error: e2 } = await sb.from('ipd_amount_entries').update({ refer_amount: amt }).eq('admission_id', c.id);
       if (e2) throw e2;
     } else {
-      const { error: e2 } = await sb.from('ipd_amount_entries').insert({ admission_id: c.id, refer_amount: amt });
+      const { error: e2 } = await sb.from('ipd_amount_entries').insert({ admission_id: c.id, admission_no: c.admission_no, refer_amount: amt });
       if (e2) throw e2;
       c.hasAmtRow = true;
     }
