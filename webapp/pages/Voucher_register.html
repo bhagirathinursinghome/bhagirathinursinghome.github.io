@@ -117,6 +117,7 @@
 
     <div class="summary-bar" id="summaryBar"></div>
     <div class="export-bar" id="exportBar"></div>
+    <p class="hint" id="diagBar" style="background:#fffbeb;border:1px solid #fde68a;padding:.5rem .75rem;border-radius:6px"></p>
     <p class="err" id="listErr"></p>
     <div id="listOut">Set your filters (or leave them blank) and click Search.</div>
   </div>
@@ -258,6 +259,15 @@ function renderList(){
     <div class="summary-chip"><b>${lastRows.length}</b> voucher(s) loaded</div>
     <div class="summary-chip"><b>${lastRows.length-blankCount}</b> filled, <b>${blankCount}</b> blank</div>
     <div class="summary-chip">Total amount: <b>${fmt(total)}</b></div>`;
+
+  // Temporary diagnostic: shows exactly what "type" and "status" strings are
+  // actually stored on these rows, so the actionsCell() matching logic can be
+  // corrected if the real values differ from what's expected. Safe to delete
+  // once Edit/Delete are confirmed working.
+  const pairs = [...new Set(lastRows.map(r=>`type="${r.type}" (known:${!!TYPE_META[r.type]}) / status="${r.status}"`))];
+  document.getElementById('diagBar').innerHTML =
+    `<b>Diagnostic — distinct type/status combos in this result:</b><br>${pairs.map(esc).join('<br>')}`;
+
   exportBar.innerHTML = `
     <button class="btn-small btn-outline" onclick="exportExcel()">⬇ Export Excel</button>
     <button class="btn-small btn-outline" onclick="exportPDF()">⬇ Export PDF</button>`;
