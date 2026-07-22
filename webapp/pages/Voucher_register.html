@@ -150,6 +150,19 @@ function detectRole(){
 function hasFullAccess(){
   return FULL_ACCESS_ROLES.includes(detectRole());
 }
+let debugLogLines = [];
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function dlog(...args){
+  const msg = args.map(a=>typeof a==='object' ? JSON.stringify(a) : String(a)).join(' ');
+  console.log('[VoucherRegister]', msg);
+  debugLogLines.push(`${new Date().toLocaleTimeString()} — ${msg}`);
+  if (debugLogLines.length > 200) debugLogLines.shift();
+  renderDebugLog();
+}
+function renderDebugLog(){
+  const el = document.getElementById('debugPanelBody');
+  if (el) el.innerHTML = debugLogLines.map(esc).join('<br>') || '(empty)';
+}
 // Temporary on-page debug line — shows what role/user object was actually
 // detected, so the role-name mapping above can be corrected if it's ever wrong.
 // Safe to delete once access is confirmed working.
@@ -163,20 +176,7 @@ function hasFullAccess(){
   } catch(e){ console.warn('role debug failed', e); }
 })();
 dlog('Page loaded. detectRole()=', detectRole(), 'hasFullAccess()=', hasFullAccess(), 'raw user=', (BNH_PAGE&&BNH_PAGE.user)||{});
-let debugLogLines = [];
-function dlog(...args){
-  const msg = args.map(a=>typeof a==='object' ? JSON.stringify(a) : String(a)).join(' ');
-  console.log('[VoucherRegister]', msg);
-  debugLogLines.push(`${new Date().toLocaleTimeString()} — ${msg}`);
-  if (debugLogLines.length > 200) debugLogLines.shift();
-  renderDebugLog();
-}
-function renderDebugLog(){
-  const el = document.getElementById('debugPanelBody');
-  if (el) el.innerHTML = debugLogLines.map(esc).join('<br>') || '(empty)';
-}
 const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
-const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 function spin(on){ document.getElementById('spinner').classList.toggle('hidden', !on); }
 
 // ════════════════════════════════════════════════════════════
