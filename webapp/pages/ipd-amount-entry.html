@@ -66,6 +66,22 @@
       cursor:pointer; padding:0 4px; line-height:1; flex-shrink:0;
     }
     .r { text-align:right; }
+
+    /* Bulk upload */
+    .bulk-panel { background:#faf5ff; border:1px solid #d8b4fe; border-radius:8px;
+                  padding:.75rem 1rem; margin-bottom:1rem; }
+    .bulk-panel-header { display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; flex-wrap:wrap; }
+    .bulk-panel-header strong { color:#6b21a8; font-size:.95rem; }
+    .bulk-btn { background:#7c3aed; color:#fff; border:none; border-radius:6px;
+                padding:.4rem .8rem; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .bulk-btn.secondary { background:#fff; color:#7c3aed; border:1px solid #7c3aed; }
+    .bulk-hint { font-size:.78rem; color:#6b21a8; margin-top:.4rem; line-height:1.4; }
+    .bulk-file-input { font-size:.82rem; }
+    .bulk-result { margin-top:.6rem; font-size:.83rem; white-space:pre-wrap; }
+    .edit-link-btn { background:none; border:1px solid #6366f1; color:#6366f1; border-radius:6px;
+                      padding:2px 10px; font-size:.78rem; font-weight:600; cursor:pointer; }
+    .edit-badge { background:#e0e7ff; color:#3730a3; border-radius:6px; padding:1px 8px;
+                  font-size:.72rem; font-weight:700; margin-left:.4rem; }
   </style>
 </head>
 <body>
@@ -80,6 +96,29 @@
         🏥 Admitted Patients – Pending Amount Entry
         <span class="pending-count-badge" id="pendingCountBadge">0</span>
       </h2>
+
+      <div class="bulk-panel">
+        <div class="bulk-panel-header">
+          <span>📊</span>
+          <strong>Bulk Upload (Excel)</strong>
+        </div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+          <button type="button" class="bulk-btn secondary" onclick="downloadBulkTemplate()">⬇ Download Pending List (Excel)</button>
+          <label class="bulk-btn" style="cursor:pointer;margin:0">
+            ⬆ Upload Filled Excel
+            <input type="file" id="bulkFileInput" accept=".xlsx,.xls" class="hidden" onchange="handleBulkUpload(event)"/>
+          </label>
+        </div>
+        <div class="bulk-hint">
+          Step 1: Download the pending list — it includes admission no, admission date, patient name,
+          case details, type, mode, surgent name, anaesthesia name and refer name, with blank columns for
+          Package, Surgent Fee, Anaesthesia Fee, Refer Amount and NH Fees.<br/>
+          Step 2: Fill only the blank amount columns in Excel, save, then upload it back here.<br/>
+          Step 3: Do not edit or delete the "Admission ID" column — it's used to match each row to the patient.
+        </div>
+        <div id="bulkResult" class="bulk-result"></div>
+      </div>
+
       <div class="search-bar-wrap">
         <input id="pendingSearch" type="text" placeholder="🔍 Search by patient name or admission no…" oninput="filterPending()"/>
       </div>
@@ -180,9 +219,10 @@
         <input type="hidden" id="caseModeH"/>
         <input type="hidden" id="hasRefer"/>
         <input type="hidden" id="hasAnaesthesia"/>
+        <input type="hidden" id="entryEditId"/>
 
         <div style="margin-top:1rem">
-          <button type="submit" class="btn-primary" style="width:auto">💾 Save Amount Entry</button>
+          <button type="submit" class="btn-primary" style="width:auto" id="saveBtn">💾 Save Amount Entry</button>
         </div>
         <p class="err" id="err"></p>
         <p class="info" id="ok" style="display:none"></p>
@@ -192,6 +232,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
 <script>
@@ -219,7 +260,7 @@
   ];
 
   // ── Multi-row helpers ──────────────────────────────────────────────
-  function buildRow(containerId, options, accentColor) {
+  function buildRow(containerId, options, accentColor, initial) {
     const container = document.getElementById(containerId);
     const idx = container.children.length;
     const div = document.createElement('div');
@@ -260,10 +301,22 @@
     div.appendChild(amtInput);
     div.appendChild(removeBtn);
     container.appendChild(div);
+
+    // Prefill for edit mode (existing income/expense row being reopened)
+    if (initial) {
+      if (options.includes(initial.label)) {
+        sel.value = initial.label;
+      } else {
+        sel.value = 'Other';
+        customInput.style.display = '';
+        customInput.value = initial.label;
+      }
+      amtInput.value = initial.amount;
+    }
   }
 
-  function addIncomeRow()  { buildRow('incomeRows',  INCOME_OPTIONS,  '#166534'); }
-  function addExpenseRow() { buildRow('expenseRows', EXPENSE_OPTIONS, '#92400e'); }
+  function addIncomeRow(initial)  { buildRow('incomeRows',  INCOME_OPTIONS,  '#166534', initial); }
+  function addExpenseRow(initial) { buildRow('expenseRows', EXPENSE_OPTIONS, '#92400e', initial); }
 
   function collectRows(containerId) {
     const rows = [];
@@ -289,7 +342,7 @@
     const doneIds = (done||[]).map(r=>r.admission_id);
 
     const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
-      .select('id,admission_date,admission_no,patient_name,case_type,refer_name')
+      .select('id,admission_date,admission_no,patient_name,case_type,case_mode,refer_name')
       .eq('is_discharged', false)
       .eq('is_cancelled', false)
       .order('admission_date', { ascending: false });
@@ -297,18 +350,26 @@
     if (error || !data || data.length === 0) { div.textContent = 'No active patients.'; return; }
     const pending = data.filter(r => !doneIds.includes(r.id));
 
-    const { data: otDone } = await BNH_PAGE.sb.from('ipd_ot_entries').select('admission_id');
-    const otIds = (otDone||[]).map(r=>r.admission_id);
+    const { data: otData } = await BNH_PAGE.sb.from('ipd_ot_entries').select('*');
+    const otByAdm = {};
+    (otData||[]).forEach(o => { otByAdm[o.admission_id] = o; });
 
-    _pendingCards = pending.map(r => ({
-      id: r.id,
-      name: r.patient_name,
-      admNo: r.admission_no,
-      date: r.admission_date,
-      type: r.case_type,
-      refer: r.refer_name||'N/A',
-      otPending: !otIds.includes(r.id)
-    }));
+    _pendingCards = pending.map(r => {
+      const ot = otByAdm[r.id] || null;
+      return {
+        id: r.id,
+        name: r.patient_name,
+        admNo: r.admission_no,
+        date: r.admission_date,
+        type: r.case_type,
+        mode: r.case_mode || '',
+        refer: r.refer_name||'N/A',
+        caseDetail: (ot && ot.case_detail) || '',
+        surgentName: (ot && ot.surgent_name) || '',
+        anaesthesiaName: (ot && ot.anaesthesia_name) || '',
+        otPending: !ot
+      };
+    });
 
     document.getElementById('pendingCountBadge').textContent = _pendingCards.length;
     renderPendingCards(_pendingCards);
@@ -336,8 +397,135 @@
 
   loadPending();
 
+  // ── Bulk Upload (Excel) ────────────────────────────────────────────
+  const BULK_HEADERS = [
+    'Admission ID', 'Admission No', 'Admission Date', 'Patient Name', 'Case Details',
+    'Type', 'Mode', 'Surgent Name', 'Anaesthesia Name', 'Refer Name',
+    'Package Amount', 'Surgent Fee', 'Anaesthesia Fee', 'Refer Amount', 'NH Fees',
+    'Entry Date', 'Remark'
+  ];
+
+  function downloadBulkTemplate() {
+    const resultDiv = document.getElementById('bulkResult');
+    if (!_pendingCards || _pendingCards.length === 0) {
+      resultDiv.textContent = 'No pending patients to export.';
+      return;
+    }
+    const rows = _pendingCards.map(r => ({
+      'Admission ID': r.id,
+      'Admission No': r.admNo,
+      'Admission Date': r.date,
+      'Patient Name': r.name,
+      'Case Details': r.caseDetail,
+      'Type': r.type,
+      'Mode': r.mode,
+      'Surgent Name': r.surgentName,
+      'Anaesthesia Name': r.anaesthesiaName,
+      'Refer Name': r.refer,
+      'Package Amount': '',
+      'Surgent Fee': '',
+      'Anaesthesia Fee': '',
+      'Refer Amount': '',
+      'NH Fees': '',
+      'Entry Date': '',
+      'Remark': ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows, { header: BULK_HEADERS });
+    ws['!cols'] = BULK_HEADERS.map(h => ({ wch: Math.max(14, h.length + 2) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Pending Amount Entry');
+    const stamp = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `IPD_Pending_Amount_Entry_${stamp}.xlsx`);
+    resultDiv.textContent = `Downloaded ${rows.length} pending patient(s). Fill the amount columns and upload it back.`;
+  }
+
+  async function handleBulkUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const spinner = document.getElementById('spinner');
+    const resultDiv = document.getElementById('bulkResult');
+    resultDiv.textContent = 'Reading file…';
+    spinner.classList.remove('hidden');
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      if (rows.length === 0) {
+        resultDiv.textContent = 'The uploaded file has no data rows.';
+        return;
+      }
+
+      // Admission map (by id and by admission no as fallback) + already-done set
+      const admIndex = {};
+      const admNoIndex = {};
+      _pendingCards.forEach(r => { admIndex[r.id] = r; admNoIndex[r.admNo] = r; });
+      const { data: done } = await BNH_PAGE.sb.from('ipd_amount_entries').select('admission_id');
+      const doneIds = new Set((done||[]).map(r => r.admission_id));
+
+      const toInsert = [];
+      const skipped = [];
+
+      rows.forEach((row, i) => {
+        const rowNum = i + 2; // account for header row
+        const admId = (row['Admission ID']||'').toString().trim();
+        const admNo = (row['Admission No']||'').toString().trim();
+        const card = admIndex[admId] || admNoIndex[admNo];
+        if (!card) { skipped.push(`Row ${rowNum}: no matching pending patient found.`); return; }
+        if (doneIds.has(card.id)) { skipped.push(`Row ${rowNum} (${card.name}): amount entry already exists, skipped.`); return; }
+
+        const num = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+        const pkg    = num(row['Package Amount']);
+        const surg   = num(row['Surgent Fee']);
+        const ane    = num(row['Anaesthesia Fee']);
+        const refer  = num(row['Refer Amount']);
+        const nh     = num(row['NH Fees']);
+
+        const isDoctorCase = (card.type||'').trim() === 'Doctor Case';
+        const hasRefer = card.refer && card.refer !== 'N/A';
+        const hasAne   = !!card.anaesthesiaName;
+
+        if (isDoctorCase && nh == null) { skipped.push(`Row ${rowNum} (${card.name}): NH Fees is required for Doctor Case, skipped.`); return; }
+        if (!isDoctorCase && (pkg == null || surg == null)) { skipped.push(`Row ${rowNum} (${card.name}): Package Amount and Surgent Fee are required, skipped.`); return; }
+        if (hasRefer && refer == null) { skipped.push(`Row ${rowNum} (${card.name}): Refer Amount is required (patient has a Refer), skipped.`); return; }
+
+        toInsert.push(BNH_PAGE.stamp({
+          admission_id:      card.id,
+          admission_no:      card.admNo,
+          patient_name:      card.name,
+          refer_amount:      hasRefer ? (refer||0) : null,
+          surgent_fees:      !isDoctorCase ? (surg||0) : null,
+          anaesthesia_fees:  !isDoctorCase && hasAne ? (ane||0) : null,
+          package_amount:    !isDoctorCase ? (pkg||0) : null,
+          nh_fees:           isDoctorCase ? (nh||0) : null,
+          amount_entry_date: (row['Entry Date']||'').toString().trim() || new Date().toISOString().slice(0,10),
+          remark:            (row['Remark']||'').toString().trim() || null
+        }));
+      });
+
+      let insertedCount = 0;
+      if (toInsert.length > 0) {
+        const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(toInsert);
+        if (error) throw error;
+        insertedCount = toInsert.length;
+      }
+
+      resultDiv.textContent =
+        `✅ ${insertedCount} amount entr${insertedCount===1?'y':'ies'} saved.` +
+        (skipped.length ? `\n⚠ ${skipped.length} row(s) skipped:\n` + skipped.join('\n') : '');
+
+      loadPending();
+    } catch (ex) {
+      resultDiv.textContent = 'Error: ' + ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+      event.target.value = '';
+    }
+  }
+
   // ── Open form ──────────────────────────────────────────────────────
-  async function openForm(admId) {
+  async function openForm(admId, existingEntry, existingAddl) {
     const spinner = document.getElementById('spinner');
     spinner.classList.remove('hidden');
     try {
@@ -348,6 +536,7 @@
       const { data: otArr } = await BNH_PAGE.sb.from('ipd_ot_entries')
         .select('*').eq('admission_id', admId);
       const ot = otArr && otArr.length > 0 ? otArr[0] : null;
+      const isEdit = !!existingEntry;
 
       document.getElementById('listView').classList.add('hidden');
       document.getElementById('formView').classList.remove('hidden');
@@ -360,20 +549,30 @@
         (adm.refer_name && adm.refer_name.trim() !== '') ? '1' : '0';
       document.getElementById('hasRefer').value = hasReferVal;
       document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
-      document.getElementById('entryDate').value = new Date().toISOString().slice(0,10);
-      document.getElementById('formTitle').textContent = `Amount Entry – ${adm.patient_name} (${adm.admission_no})`;
+      document.getElementById('entryEditId').value = isEdit ? existingEntry.id : '';
+      document.getElementById('saveBtn').textContent = isEdit ? '💾 Update Amount Entry' : '💾 Save Amount Entry';
+      document.getElementById('formTitle').innerHTML = isEdit
+        ? `Amount Entry – ${adm.patient_name} (${adm.admission_no}) <span class="edit-badge">EDITING</span>`
+        : `Amount Entry – ${adm.patient_name} (${adm.admission_no})`;
       document.getElementById('err').textContent = '';
       document.getElementById('ok').style.display = 'none';
 
       // Clear all amount fields and dynamic rows so previous values never bleed through
-      document.getElementById('referAmount').value = '';
-      document.getElementById('surgentFees').value = '';
-      document.getElementById('anaFees').value = '';
-      document.getElementById('packageAmt').value = '';
-      document.getElementById('nhFees').value = '';
-      document.getElementById('remark').value = '';
+      document.getElementById('referAmount').value = isEdit && existingEntry.refer_amount != null ? existingEntry.refer_amount : '';
+      document.getElementById('surgentFees').value = isEdit && existingEntry.surgent_fees != null ? existingEntry.surgent_fees : '';
+      document.getElementById('anaFees').value = isEdit && existingEntry.anaesthesia_fees != null ? existingEntry.anaesthesia_fees : '';
+      document.getElementById('packageAmt').value = isEdit && existingEntry.package_amount != null ? existingEntry.package_amount : '';
+      document.getElementById('nhFees').value = isEdit && existingEntry.nh_fees != null ? existingEntry.nh_fees : '';
+      document.getElementById('remark').value = isEdit ? (existingEntry.remark || '') : '';
+      document.getElementById('entryDate').value = isEdit
+        ? (existingEntry.amount_entry_date || new Date().toISOString().slice(0,10))
+        : new Date().toISOString().slice(0,10);
       document.getElementById('incomeRows').innerHTML = '';
       document.getElementById('expenseRows').innerHTML = '';
+      if (isEdit && existingAddl && existingAddl.length) {
+        existingAddl.filter(r => r.type === 'income').forEach(r => addIncomeRow({ label: r.label, amount: r.amount }));
+        existingAddl.filter(r => r.type === 'expense').forEach(r => addExpenseRow({ label: r.label, amount: r.amount }));
+      }
 
       document.getElementById('patientInfo').innerHTML =
         `<strong>${adm.patient_name}</strong> &nbsp;|&nbsp; Adm: ${adm.admission_no} &nbsp;|&nbsp; Date: ${adm.admission_date}<br>
@@ -455,7 +654,7 @@
       <thead><tr>
         <th>Date</th><th>Adm No.</th><th>Patient</th>
         <th class="r">Refer Amt</th><th class="r">Surgent</th><th class="r">Anaesthesia</th>
-        <th class="r">Package/NH</th><th>Add. Income</th><th>Extra Expense</th>
+        <th class="r">Package/NH</th><th>Add. Income</th><th>Extra Expense</th><th>Action</th>
       </tr></thead>
       <tbody>${data.map(r => {
         const inc = (incomeMap[r.id]||[]).map(x=>`${x.label}: ${fmt(x.amount)}`).join('<br>') || '-';
@@ -470,9 +669,27 @@
           <td class="r">${r.package_amount!=null?fmt(r.package_amount):r.nh_fees!=null?fmt(r.nh_fees):'-'}</td>
           <td style="font-size:.78rem;color:#166534">${inc}</td>
           <td style="font-size:.78rem;color:#92400e">${exp}</td>
+          <td><button type="button" class="edit-link-btn" onclick="editEntry('${r.id}','${r.admission_id}')">✎ Edit</button></td>
         </tr>`;
       }).join('')}</tbody>
     </table>`;
+  }
+
+  // ── Edit an existing amount entry (e.g. to add income/expense later) ─
+  async function editEntry(entryId, admissionId) {
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { data: entryArr, error } = await BNH_PAGE.sb.from('ipd_amount_entries')
+        .select('*').eq('id', entryId);
+      if (error || !entryArr || entryArr.length === 0) return;
+      const entry = entryArr[0];
+      const { data: addl } = await BNH_PAGE.sb.from('ipd_additional_income_expense')
+        .select('*').eq('amount_entry_id', entryId);
+      await openForm(admissionId, entry, addl || []);
+    } finally {
+      spinner.classList.add('hidden');
+    }
   }
 
   // ── Submit ─────────────────────────────────────────────────────────
@@ -497,6 +714,8 @@
     }
 
     const incomeRows = collectRows('incomeRows');
+    const editId = document.getElementById('entryEditId').value;
+    const isEdit = !!editId;
 
     spinner.classList.remove('hidden');
     try {
@@ -513,12 +732,24 @@
         remark:             document.getElementById('remark').value.trim() || null
       });
 
-      const { data: inserted, error } = await BNH_PAGE.sb
-        .from('ipd_amount_entries').insert(payload).select('id').single();
-      if (error) throw error;
+      let entryId;
+      if (isEdit) {
+        const { error } = await BNH_PAGE.sb
+          .from('ipd_amount_entries').update(payload).eq('id', editId);
+        if (error) throw error;
+        entryId = editId;
+        // Resync additional income/expense rows: clear existing, then re-insert current set
+        const { error: delErr } = await BNH_PAGE.sb
+          .from('ipd_additional_income_expense').delete().eq('amount_entry_id', entryId);
+        if (delErr) throw delErr;
+      } else {
+        const { data: inserted, error } = await BNH_PAGE.sb
+          .from('ipd_amount_entries').insert(payload).select('id').single();
+        if (error) throw error;
+        entryId = inserted.id;
+      }
 
       // Insert additional income + expense rows
-      const entryId = inserted.id;
       const admId = document.getElementById('admissionId').value;
       const allAddl = [
         ...incomeRows.map(r => ({
@@ -547,7 +778,8 @@
       }
 
       ok.style.display = 'block';
-      ok.textContent = '✅ Amount entry saved!';
+      ok.textContent = isEdit ? '✅ Amount entry updated!' : '✅ Amount entry saved!';
+      document.getElementById('entryEditId').value = '';
       setTimeout(() => { showList(); loadPending(); }, 1500);
     } catch(ex) {
       err.textContent = ex.message;
