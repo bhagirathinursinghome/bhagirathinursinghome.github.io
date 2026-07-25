@@ -178,19 +178,38 @@
   function showOk(msg){const o=document.getElementById('ok');o.style.display='block';o.textContent=msg;setTimeout(()=>o.style.display='none',3000);}
 
   // ── Load data ─────────────────────────────────────────────────────────────
+  // Supabase/PostgREST caps every query at 1000 rows by default. Once a table
+  // grows past that, a plain .select() silently drops everything beyond the
+  // cap (usually the newest rows) instead of erroring — so we always page
+  // through with .range() until a page comes back short.
+  async function fetchAllRows(table,selectStr,applyExtra){
+    const PAGE=1000;
+    let from=0,all=[];
+    while(true){
+      let q=BNH_PAGE.sb.from(table).select(selectStr).range(from,from+PAGE-1);
+      if(applyExtra)q=applyExtra(q);
+      const{data,error}=await q;
+      if(error)throw error;
+      all=all.concat(data||[]);
+      if(!data||data.length<PAGE)break;
+      from+=PAGE;
+    }
+    return all;
+  }
+
   async function loadCases(){
-    const{data,error}=await BNH_PAGE.sb.from('opd_case')
-      .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,type,ipd_link,refer_amount,refer_amount_enter_by,refer_amount_enter_time,refer_payment_status')
-      .not('refer_name','is',null)
-      .order('case_date',{ascending:false});
-    if(error)throw error;
-    allCases=data||[];
+    allCases=await fetchAllRows(
+      'opd_case',
+      'case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,type,ipd_link,refer_amount,refer_amount_enter_by,refer_amount_enter_time,refer_payment_status',
+      q=>q.not('refer_name','is',null).order('case_date',{ascending:false})
+    );
   }
 
   async function loadTests(){
-    const{data,error}=await BNH_PAGE.sb.from('opd_test')
-      .select('case_number,test_name,test_amount');
-    if(error){console.warn('opd_test:',error.message);return;}
+    let data;
+    try{
+      data=await fetchAllRows('opd_test','case_number,test_name,test_amount');
+    }catch(e){console.warn('opd_test:',e.message);return;}
     testsByCase={};
     (data||[]).forEach(r=>{
       if(!testsByCase[r.case_number])testsByCase[r.case_number]=[];
@@ -199,10 +218,14 @@
   }
 
   async function loadCash(){
-    const{data,error}=await BNH_PAGE.sb.from('opd_cash_register')
-      .select('case_no,transaction_no,transaction_date,income,discount,entry_by,created_by_name')
-      .order('transaction_date',{ascending:false});
-    if(error){console.warn('opd_cash_register:',error.message);return;}
+    let data;
+    try{
+      data=await fetchAllRows(
+        'opd_cash_register',
+        'case_no,transaction_no,transaction_date,income,discount,entry_by,created_by_name',
+        q=>q.order('transaction_date',{ascending:false})
+      );
+    }catch(e){console.warn('opd_cash_register:',e.message);return;}
     cashByCase={};
     (data||[]).forEach(r=>{
       const cn=(r.case_no||'').trim();
