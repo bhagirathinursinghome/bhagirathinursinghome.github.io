@@ -57,6 +57,25 @@
     .addl-charge-box { background:#f0fdf4; border:1px solid #86efac; border-radius:8px;
                        padding:.75rem 1rem; margin-top:.75rem; }
     .addl-charge-box h4 { font-size:.88rem; color:#14532d; margin:0 0 .5rem; font-weight:700; }
+    .search-wrap { position:relative; margin-bottom:.85rem; }
+    .search-wrap input { width:100%; box-sizing:border-box; padding:.55rem .75rem .55rem 2.1rem;
+                          border:1px solid #d1d5db; border-radius:8px; font-size:.9rem; }
+    .search-wrap .s-ic { position:absolute; left:.65rem; top:50%; transform:translateY(-50%);
+                          color:#9ca3af; font-size:.95rem; pointer-events:none; }
+    .btn-pkg { background:#4338ca; color:#fff; border:none; border-radius:8px;
+               padding:.6rem 1.4rem; font-weight:700; cursor:pointer; font-size:.9rem; margin-left:.75rem; }
+    .btn-pkg:hover { background:#3730a3; }
+    .pkg-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
+                         z-index:2000; align-items:center; justify-content:center; padding:1rem; }
+    .pkg-modal-overlay.open { display:flex; }
+    .pkg-modal { background:#fff; border-radius:12px; width:min(420px,96vw);
+                box-shadow:0 16px 60px rgba(0,0,0,.28); overflow:hidden; }
+    .pkg-modal-hdr { background:#4338ca; color:#fff; padding:1rem 1.3rem;
+                     display:flex; align-items:center; justify-content:space-between; }
+    .pkg-modal-hdr h3 { margin:0; font-size:1rem; }
+    .pkg-modal-body { padding:1.3rem 1.4rem; }
+    .pkg-modal-footer { display:flex; justify-content:flex-end; gap:.6rem;
+                       padding:.9rem 1.3rem; border-top:1px solid #eee; background:#fafafa; }
     @media print { .no-print { display:none!important; } }
   </style>
 </head>
@@ -69,6 +88,10 @@
   <div id="listView">
     <div class="page-card">
       <h2 style="font-size:1rem;margin-bottom:.75rem">🏥 Active Patients</h2>
+      <div class="search-wrap no-print">
+        <span class="s-ic">🔍</span>
+        <input id="activeSearch" type="text" placeholder="Search by patient name, admission no., mode, type or refer…" oninput="filterActiveList()"/>
+      </div>
       <div id="activeList">Loading…</div>
     </div>
     <div class="page-card" style="margin-top:1.5rem">
@@ -92,6 +115,9 @@
 
       <!-- Patient Info -->
       <div class="info-grid" id="patientInfoGrid"></div>
+      <div class="no-print" style="margin-bottom:1rem">
+        <button class="btn-pkg" style="margin-left:0" onclick="openPkgModal()">✏️ Update Package Amount</button>
+      </div>
 
       <!-- OPD Bills Summary -->
       <div class="section-title">📄 OPD Bills</div>
@@ -155,6 +181,7 @@
       <input type="hidden" id="currentAdmNo"/>
       <input type="hidden" id="currentCaseMode"/>
       <input type="hidden" id="currentCaseType"/>
+      <input type="hidden" id="currentAmtEntryId"/>
     </div>
   </div>
 </div>
@@ -192,6 +219,35 @@
   </div>
 </div>
 
+<!-- UPDATE PACKAGE AMOUNT MODAL -->
+<div class="pkg-modal-overlay" id="pkgModal">
+  <div class="pkg-modal">
+    <div class="pkg-modal-hdr">
+      <h3>✏️ Update Package Amount</h3>
+      <button onclick="closePkgModal()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div class="pkg-modal-body">
+      <label style="font-size:.85rem;font-weight:600;color:#374151">
+        Package Amount (₹) <span style="color:red">*</span>
+      </label>
+      <input id="pkgAmountInput" type="number" min="0" step="0.01" placeholder="0.00"
+        style="width:100%;box-sizing:border-box;margin-top:.4rem;padding:.5rem .75rem;
+               border:1px solid #ccc;border-radius:6px;font-size:.9rem"/>
+      <p class="err" id="pkgErr" style="margin-top:.5rem"></p>
+    </div>
+    <div class="pkg-modal-footer">
+      <button onclick="closePkgModal()"
+        style="padding:.42rem 1rem;border:1px solid #ccc;background:#fff;border-radius:5px;cursor:pointer;font-size:.85rem">
+        Cancel
+      </button>
+      <button onclick="savePkgAmount()"
+        style="padding:.42rem 1.2rem;background:#4338ca;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:.85rem;font-weight:700">
+        💾 Save
+      </button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
@@ -199,12 +255,23 @@
   BNH_PAGE.requireRole(["admin","accountant","manager","reception"]);
   const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
 
+  let activePatients = [];
+  let currentPkgAmt = 0;
+
   async function loadActive() {
     const div = document.getElementById('activeList');
     const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
       .select('*').eq('is_discharged', false).eq('is_cancelled', false).order('admission_date');
-    if (error || !data || data.length === 0) { div.textContent = 'No active patients.'; return; }
-    div.innerHTML = data.map(r => `
+    if (error || !data || data.length === 0) { activePatients = []; div.textContent = 'No active patients.'; return; }
+    activePatients = data;
+    renderActiveList(activePatients);
+  }
+  loadActive();
+
+  function renderActiveList(list) {
+    const div = document.getElementById('activeList');
+    if (!list || list.length === 0) { div.innerHTML = '<span style="color:#6b7280">No matching patients.</span>'; return; }
+    div.innerHTML = list.map(r => `
       <div class="patient-card" onclick="openDetail('${r.id}')">
         <div class="pname">${r.patient_name}</div>
         <div class="pmeta">📅 ${r.admission_date} &nbsp;|&nbsp; ${r.admission_no} &nbsp;|&nbsp;
@@ -212,7 +279,19 @@
           ${r.refer_name ? ' &nbsp;|&nbsp; Refer: '+r.refer_name : ''}</div>
       </div>`).join('');
   }
-  loadActive();
+
+  function filterActiveList() {
+    const q = document.getElementById('activeSearch').value.trim().toLowerCase();
+    if (!q) { renderActiveList(activePatients); return; }
+    const filtered = activePatients.filter(r =>
+      (r.patient_name||'').toLowerCase().includes(q) ||
+      (r.admission_no||'').toLowerCase().includes(q) ||
+      (r.case_mode||'').toLowerCase().includes(q) ||
+      (r.case_type||'').toLowerCase().includes(q) ||
+      (r.refer_name||'').toLowerCase().includes(q)
+    );
+    renderActiveList(filtered);
+  }
 
   async function openDetail(admId) {
     const spinner = document.getElementById('spinner');
@@ -267,6 +346,7 @@
       document.getElementById('currentAdmNo').value    = adm.admission_no;
       document.getElementById('currentCaseMode').value = adm.case_mode;
       document.getElementById('currentCaseType').value = adm.case_type;
+      document.getElementById('currentAmtEntryId').value = amtEntry ? amtEntry.id : '';
       document.getElementById('detailTitle').textContent = `${adm.patient_name} – ${adm.admission_no}`;
       document.getElementById('rcptDate').value  = new Date().toISOString().slice(0,10);
       document.getElementById('rcptErr').textContent = '';
@@ -274,6 +354,7 @@
 
       const pkgAmt    = parseFloat(amtEntry?.package_amount||amtEntry?.nh_fees||0);
       const totalAddlIncome = addlIncomeRows.reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      currentPkgAmt = pkgAmt;
 
       // Patient Info Grid
       document.getElementById('patientInfoGrid').innerHTML = [
@@ -501,6 +582,53 @@
       loadActive();
     } catch(ex) {
       document.getElementById('cancelErr').textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function openPkgModal() {
+    document.getElementById('pkgAmountInput').value = currentPkgAmt || '';
+    document.getElementById('pkgErr').textContent = '';
+    document.getElementById('pkgModal').classList.add('open');
+  }
+
+  function closePkgModal() {
+    document.getElementById('pkgModal').classList.remove('open');
+  }
+
+  async function savePkgAmount() {
+    const errEl = document.getElementById('pkgErr');
+    errEl.textContent = '';
+    const val = document.getElementById('pkgAmountInput').value;
+    if (val === '' || val === null || isNaN(parseFloat(val)) || parseFloat(val) < 0) {
+      errEl.textContent = 'Please enter a valid package amount.'; return;
+    }
+    const newAmt = parseFloat(val);
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const admId    = document.getElementById('currentAdmId').value;
+      const admNo    = document.getElementById('currentAdmNo').value;
+      const amtEntryId = document.getElementById('currentAmtEntryId').value;
+
+      if (amtEntryId) {
+        const { error } = await BNH_PAGE.sb.from('ipd_amount_entries')
+          .update({ package_amount: newAmt }).eq('id', amtEntryId);
+        if (error) throw error;
+      } else {
+        const payload = BNH_PAGE.stamp({
+          admission_id: admId,
+          admission_no: admNo,
+          package_amount: newAmt
+        });
+        const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(payload);
+        if (error) throw error;
+      }
+      closePkgModal();
+      openDetail(admId);
+    } catch(ex) {
+      errEl.textContent = ex.message;
     } finally {
       spinner.classList.add('hidden');
     }
