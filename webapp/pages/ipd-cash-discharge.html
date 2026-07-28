@@ -76,6 +76,18 @@
     .pkg-modal-body { padding:1.3rem 1.4rem; }
     .pkg-modal-footer { display:flex; justify-content:flex-end; gap:.6rem;
                        padding:.9rem 1.3rem; border-top:1px solid #eee; background:#fafafa; }
+    .bulk-actions { display:flex; gap:.75rem; flex-wrap:wrap; }
+    .btn-bulk { border:none; border-radius:8px; padding:.6rem 1.1rem; font-weight:700;
+                cursor:pointer; font-size:.87rem; }
+    .btn-bulk-dl { background:#0f766e; color:#fff; }
+    .btn-bulk-dl:hover { background:#0d5f59; }
+    .btn-bulk-ul { background:#7c3aed; color:#fff; }
+    .btn-bulk-ul:hover { background:#6d28d9; }
+    .btn-bulk:disabled { background:#9ca3af; cursor:not-allowed; }
+    .bulk-result-row { display:flex; justify-content:space-between; gap:.5rem;
+                       padding:.3rem 0; border-bottom:1px solid #eee; font-size:.82rem; }
+    .bulk-result-row.ok  .brr-msg { color:#059669; }
+    .bulk-result-row.err .brr-msg { color:#dc2626; }
     @media print { .no-print { display:none!important; } }
   </style>
 </head>
@@ -93,6 +105,20 @@
         <input id="activeSearch" type="text" placeholder="Search by patient name, admission no., mode, type or refer…" oninput="filterActiveList()"/>
       </div>
       <div id="activeList">Loading…</div>
+    </div>
+    <div class="page-card no-print" style="margin-top:1.5rem">
+      <h2 style="font-size:1rem;margin-bottom:.5rem">📊 Bulk Payment via Excel</h2>
+      <p style="font-size:.82rem;color:#6b7280;margin:0 0 .85rem">
+        Download an Excel of all active due cases, fill in the <strong>Receipt Date</strong> and
+        payment amount columns, then upload it back to record all receipts in one go.
+      </p>
+      <div class="bulk-actions">
+        <button class="btn-bulk btn-bulk-dl" id="bulkDlBtn" onclick="downloadDueCasesExcel()">⬇️ Download Due Cases (Excel)</button>
+        <button class="btn-bulk btn-bulk-ul" id="bulkUlBtn" onclick="document.getElementById('bulkUploadInput').click()">⬆️ Upload Filled Excel</button>
+        <input type="file" id="bulkUploadInput" class="hidden" accept=".xlsx,.xls" onchange="handleBulkUpload(event)"/>
+      </div>
+      <p class="err" id="bulkErr" style="margin-top:.6rem"></p>
+      <div id="bulkResultBox" style="margin-top:.75rem"></div>
     </div>
     <div class="page-card" style="margin-top:1.5rem">
       <h2 style="font-size:1rem;margin-bottom:.75rem">📋 Discharged Patients – Filter by Date</h2>
@@ -249,6 +275,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
 <script>
@@ -291,6 +318,245 @@
       (r.refer_name||'').toLowerCase().includes(q)
     );
     renderActiveList(filtered);
+  }
+
+  async function fetchActiveDuesData() {
+    const { data: admissions } = await BNH_PAGE.sb.from('ipd_admissions')
+      .select('*').eq('is_discharged', false).eq('is_cancelled', false).order('admission_date');
+    if (!admissions || admissions.length === 0) return [];
+    const admIds = admissions.map(a => a.id);
+    const admNos = admissions.map(a => a.admission_no);
+
+    const [
+      { data: amtEntries },
+      { data: receipts },
+      { data: allOpdCases }
+    ] = await Promise.all([
+      BNH_PAGE.sb.from('ipd_amount_entries').select('*').in('admission_id', admIds),
+      BNH_PAGE.sb.from('ipd_cash_receipts').select('*').in('admission_id', admIds),
+      BNH_PAGE.sb.from('opd_case').select('*')
+    ]);
+
+    const amtByAdm = {};
+    (amtEntries||[]).forEach(e => { amtByAdm[e.admission_id] = e; });
+
+    const amtEntryIds = (amtEntries||[]).map(e => e.id);
+    let addlIncomeRows = [];
+    if (amtEntryIds.length > 0) {
+      const { data: addlData } = await BNH_PAGE.sb.from('ipd_additional_income_expense')
+        .select('*').in('amount_entry_id', amtEntryIds).eq('type','income');
+      addlIncomeRows = addlData || [];
+    }
+    const addlByEntry = {};
+    addlIncomeRows.forEach(r => {
+      if (!addlByEntry[r.amount_entry_id]) addlByEntry[r.amount_entry_id] = [];
+      addlByEntry[r.amount_entry_id].push(r);
+    });
+
+    const rcptByAdm = {};
+    (receipts||[]).forEach(r => {
+      if (!rcptByAdm[r.admission_id]) rcptByAdm[r.admission_id] = [];
+      rcptByAdm[r.admission_id].push(r);
+    });
+
+    const opdByAdmNo = {};
+    (allOpdCases||[]).forEach(b => {
+      if (admNos.includes(b.ipd_link)) {
+        if (!opdByAdmNo[b.ipd_link]) opdByAdmNo[b.ipd_link] = [];
+        opdByAdmNo[b.ipd_link].push(b);
+      }
+    });
+    const allCaseNos = (allOpdCases||[]).filter(b => admNos.includes(b.ipd_link)).map(b => b.case_no).filter(Boolean);
+    let opdCashRows = [];
+    if (allCaseNos.length > 0) {
+      const { data: crData } = await BNH_PAGE.sb.from('opd_cash_register').select('case_no,income,discount').in('case_no', allCaseNos);
+      opdCashRows = crData || [];
+    }
+    const opdCashByCase = {};
+    opdCashRows.forEach(r => {
+      if (!opdCashByCase[r.case_no]) opdCashByCase[r.case_no] = { paid:0, discount:0 };
+      opdCashByCase[r.case_no].paid     += parseFloat(r.income   || 0);
+      opdCashByCase[r.case_no].discount += parseFloat(r.discount || 0);
+    });
+
+    return admissions.map(adm => {
+      const amtEntry = amtByAdm[adm.id] || null;
+      const pkgAmt = parseFloat(amtEntry?.package_amount||0);
+      const addlRows = amtEntry ? (addlByEntry[amtEntry.id]||[]) : [];
+      const totalAddlIncome = addlRows.reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const totalReceivable = pkgAmt + totalAddlIncome;
+      const admReceipts = rcptByAdm[adm.id] || [];
+      const totalRcpt = admReceipts.reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const totalDisc = admReceipts.reduce((a,r)=>a+parseFloat(r.discount||0),0);
+      const balance = totalReceivable - totalRcpt - totalDisc;
+      const opdBills = opdByAdmNo[adm.admission_no] || [];
+      const totalOpd = opdBills.reduce((a,b)=>a+parseFloat(b.total_amount||0),0);
+      const paidOpd  = opdBills.reduce((a,b)=>a+(opdCashByCase[b.case_no]?.paid||0),0);
+      const discOpd  = opdBills.reduce((a,b)=>a+(opdCashByCase[b.case_no]?.discount||0),0);
+      const opdDue   = totalOpd - paidOpd - discOpd;
+      const isCashless = ['Swastha Swasthy','Ayusman Bharat'].includes(adm.case_mode);
+      return { adm, amtEntry, pkgAmt, totalAddlIncome, totalReceivable, totalRcpt, totalDisc, balance, opdDue, isCashless };
+    });
+  }
+
+  async function downloadDueCasesExcel() {
+    const err = document.getElementById('bulkErr');
+    err.textContent = '';
+    document.getElementById('bulkResultBox').innerHTML = '';
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const rows = await fetchActiveDuesData();
+      const dueRows = rows.filter(r => !r.isCashless && r.balance > 0.01);
+      if (dueRows.length === 0) {
+        err.textContent = 'No active cases with pending dues found.';
+        return;
+      }
+      const sheetData = dueRows.map(r => ({
+        'Admission No': r.adm.admission_no,
+        'Patient Name': r.adm.patient_name,
+        'Admission Date': r.adm.admission_date,
+        'Case Mode': r.adm.case_mode,
+        'Case Type': r.adm.case_type,
+        'Package Amount': r.pkgAmt,
+        'Additional Charges': r.totalAddlIncome,
+        'Total Receivable': r.totalReceivable,
+        'Total Received': r.totalRcpt,
+        'Total Discount': r.totalDisc,
+        'Balance Due': Math.round(r.balance*100)/100,
+        'Receipt Date (YYYY-MM-DD)': '',
+        'Cash Amount': '',
+        'Bank Amount': '',
+        'PhonePe Amount': '',
+        'Discount': '',
+        'Remark': ''
+      }));
+      const ws = XLSX.utils.json_to_sheet(sheetData);
+      ws['!cols'] = [
+        {wch:14},{wch:22},{wch:13},{wch:14},{wch:12},
+        {wch:14},{wch:16},{wch:14},{wch:14},{wch:12},
+        {wch:12},{wch:22},{wch:12},{wch:12},{wch:14},{wch:12},{wch:20}
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Due Cases');
+      const today = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `IPD_Due_Cases_${today}.xlsx`);
+    } catch(ex) {
+      err.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function normalizeExcelDate(val) {
+    if (val instanceof Date && !isNaN(val)) return val.toISOString().slice(0,10);
+    if (typeof val === 'number') {
+      if (window.XLSX && XLSX.SSF) {
+        const d = XLSX.SSF.parse_date_code(val);
+        if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+      }
+      return null;
+    }
+    const s = String(val||'').trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    return null;
+  }
+
+  async function handleBulkUpload(event) {
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    const err = document.getElementById('bulkErr');
+    const resultBox = document.getElementById('bulkResultBox');
+    err.textContent = '';
+    resultBox.innerHTML = '';
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:'array', cellDates:false });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval:'' });
+      if (!rows || rows.length === 0) {
+        err.textContent = 'No rows found in the uploaded file.';
+        return;
+      }
+
+      const { data: admissions } = await BNH_PAGE.sb.from('ipd_admissions')
+        .select('id,admission_no,patient_name').eq('is_discharged',false).eq('is_cancelled',false);
+      const admByNo = {};
+      (admissions||[]).forEach(a => { admByNo[String(a.admission_no).trim()] = a; });
+
+      const results = [];
+      for (const row of rows) {
+        const admNo = String(row['Admission No']||'').trim();
+        if (!admNo) continue;
+
+        const cash     = parseFloat(row['Cash Amount']||0)     || 0;
+        const bank     = parseFloat(row['Bank Amount']||0)     || 0;
+        const phonepe  = parseFloat(row['PhonePe Amount']||0)  || 0;
+        const discount = parseFloat(row['Discount']||0)        || 0;
+        const rcptDateRaw = row['Receipt Date (YYYY-MM-DD)'];
+        const total = cash + bank + phonepe;
+
+        if (total <= 0 && discount <= 0) continue; // untouched row
+
+        const adm = admByNo[admNo];
+        if (!adm) {
+          results.push({ admNo, ok:false, msg:'Admission not found or no longer active — skipped.' });
+          continue;
+        }
+        const rcptDate = normalizeExcelDate(rcptDateRaw);
+        if (!rcptDate) {
+          results.push({ admNo, ok:false, msg:'Receipt Date is missing or invalid — skipped.' });
+          continue;
+        }
+
+        try {
+          const payload = BNH_PAGE.stamp({
+            admission_id:   adm.id,
+            admission_no:   adm.admission_no,
+            receipt_date:   rcptDate,
+            amount:         total,
+            discount,
+            cash_amount:    cash,
+            bank_amount:    bank,
+            phonepe_amount: phonepe,
+            remark: (row['Remark']||'').toString().trim() || null
+          });
+          const { error } = await BNH_PAGE.sb.from('ipd_cash_receipts').insert(payload);
+          if (error) throw error;
+          results.push({ admNo, ok:true, msg:`Receipt of ${fmt(total)}${discount>0?` (disc ${fmt(discount)})`:''} saved.` });
+        } catch(ex) {
+          results.push({ admNo, ok:false, msg: ex.message });
+        }
+      }
+
+      if (results.length === 0) {
+        err.textContent = 'No fillable rows found — fill Cash/Bank/PhonePe and Receipt Date for the rows you want to post.';
+        return;
+      }
+
+      const okCount = results.filter(r=>r.ok).length;
+      const errCount = results.length - okCount;
+      resultBox.innerHTML = `
+        <div class="${errCount===0?'summary-box':'warn-box'}">
+          ✅ ${okCount} receipt(s) saved${errCount>0?` &nbsp;|&nbsp; ⚠ ${errCount} row(s) skipped/failed`:''}.
+        </div>
+        ${results.map(r => `
+          <div class="bulk-result-row ${r.ok?'ok':'err'}">
+            <span>${r.admNo}</span><span class="brr-msg">${r.msg}</span>
+          </div>`).join('')}
+      `;
+      loadActive();
+    } catch(ex) {
+      err.textContent = 'Failed to read file: ' + ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
   }
 
   async function openDetail(admId) {
@@ -352,7 +618,7 @@
       document.getElementById('rcptErr').textContent = '';
       document.getElementById('dischargeErr').textContent = '';
 
-      const pkgAmt    = parseFloat(amtEntry?.package_amount||amtEntry?.nh_fees||0);
+      const pkgAmt    = parseFloat(amtEntry?.package_amount||0);
       const totalAddlIncome = addlIncomeRows.reduce((a,r)=>a+parseFloat(r.amount||0),0);
       currentPkgAmt = pkgAmt;
 
@@ -463,7 +729,7 @@
   function checkDischarge(adm, amtEntry, receipts, opdBills, addlIncomeRows, opdCashByCase) {
     opdCashByCase = opdCashByCase || {};
     const isCashless = ['Swastha Swasthy','Ayusman Bharat'].includes(adm.case_mode);
-    const pkgAmt      = parseFloat(amtEntry?.package_amount||amtEntry?.nh_fees||0);
+    const pkgAmt      = parseFloat(amtEntry?.package_amount||0);
     const totalAddlIncome = (addlIncomeRows||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
     const totalReceivable = pkgAmt + totalAddlIncome;
     const totalRcpt   = (receipts||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
