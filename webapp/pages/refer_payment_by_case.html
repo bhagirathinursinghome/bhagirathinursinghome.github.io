@@ -111,6 +111,10 @@
               <option value="payable">Only payable (due &gt; 0)</option>
             </select>
           </div>
+          <div style="flex:0 0 auto;min-width:auto;display:flex;align-items:center;gap:.4rem;padding-bottom:.5rem;">
+            <input type="checkbox" id="opShowDone" onchange="renderOpdList()" style="width:auto"/>
+            <label for="opShowDone" style="margin:0;font-weight:600;font-size:.8rem;white-space:nowrap">Show done/N-A cases</label>
+          </div>
         </div>
         <p class="search-count" id="opCount"></p>
         <div class="banner-warn hidden" id="opWarnBanner"></div>
@@ -160,6 +164,10 @@
               <option value="issues">Only refer not linked / amount missing</option>
               <option value="payable">Only payable (due &gt; 0)</option>
             </select>
+          </div>
+          <div style="flex:0 0 auto;min-width:auto;display:flex;align-items:center;gap:.4rem;padding-bottom:.5rem;">
+            <input type="checkbox" id="ipShowDone" onchange="renderIpdList()" style="width:auto"/>
+            <label for="ipShowDone" style="margin:0;font-weight:600;font-size:.8rem;white-space:nowrap">Show done/N-A cases</label>
           </div>
         </div>
         <p class="search-count" id="ipCount"></p>
@@ -257,7 +265,7 @@ async function loadOpdCases(){
     // or refer amount yet — that's the whole point of this page: to find
     // and fix cases whose refer link/amount was never entered.
     const { data: cases } = await sb.from('opd_case')
-      .select('case_no,case_date,patient_name,refer_name,refer_amount,refer_payment_status')
+      .select('case_no,case_date,patient_name,refer_name,refer_amount,refer_payment_status,refer_na')
       .gte('case_date',from).lte('case_date',to)
       .order('case_date',{ascending:false});
     const list = cases || [];
@@ -269,8 +277,10 @@ async function loadOpdCases(){
       const referName = (c.refer_name||'').trim();
       const refA = parseFloat(c.refer_amount||0);
       const paid = paidMap[c.case_no] || 0;
-      return { ...c, refer_name: referName, refer_amount: refA, paid, due: refA - paid,
-                linked: !!referName, amountSet: refA > 0 };
+      const na = !!c.refer_na;
+      return { ...c, refer_name: referName, refer_amount: refA, paid, refer_na: na,
+                due: na ? 0 : refA - paid,
+                linked: na || !!referName, amountSet: na || refA > 0 };
     });
     renderOpdList();
   } finally { spin(false); }
@@ -278,10 +288,12 @@ async function loadOpdCases(){
 function opdFilteredList(){
   const q = document.getElementById('opSearch').value.trim().toLowerCase();
   const show = document.getElementById('opShow').value;
+  const showDone = document.getElementById('opShowDone').checked;
   let list = opAllCases;
+  if (!showDone) list = list.filter(c => !(c.refer_na || (c.linked && c.amountSet && c.due <= 0.001)));
   if (q) list = list.filter(c => (c.case_no||'').toLowerCase().includes(q) || (c.patient_name||'').toLowerCase().includes(q));
   if (show === 'issues') list = list.filter(c => !c.linked || !c.amountSet);
-  if (show === 'payable') list = list.filter(c => c.linked && c.amountSet && c.due > 0.001);
+  if (show === 'payable') list = list.filter(c => !c.refer_na && c.linked && c.amountSet && c.due > 0.001);
   return list;
 }
 function renderOpdList(){
@@ -301,28 +313,31 @@ function renderOpdList(){
   box.innerHTML = `<table id="opTable">
     <thead><tr><th></th><th>Case Date</th><th>Case No.</th><th>Patient</th><th>Refer Name</th><th class="r">Refer Amt</th><th></th><th class="r">Due</th><th class="r">Pay Amount</th><th>Status</th></tr></thead>
     <tbody>${list.map(c=>{
-      const payable = c.linked && c.amountSet && c.due > 0.001;
-      const rowClass = (!c.linked || !c.amountSet) ? 'row-warn' : 'row-ok';
+      const payable = !c.refer_na && c.linked && c.amountSet && c.due > 0.001;
+      const rowClass = c.refer_na ? 'row-ok' : (!c.linked || !c.amountSet) ? 'row-warn' : 'row-ok';
       const cn = esc(c.case_no);
-      const donePaid = c.linked && c.amountSet && c.due <= 0.001;
+      const donePaid = !c.refer_na && c.linked && c.amountSet && c.due <= 0.001;
     return `<tr class="${rowClass}" data-no="${cn}">
         <td><input type="checkbox" class="op-chk" data-no="${cn}" onchange="opUpdateTotal()" ${payable?'':'disabled'}/></td>
         <td>${c.case_date}</td>
         <td>${cn}</td>
         <td>${esc(c.patient_name)}</td>
         <td>
-          <input class="row-inline-input mini-input name ${c.linked?'':'flagged'}" id="opName-${cn}" list="referNameOptions" value="${esc(c.refer_name)}" placeholder="Refer name"/>
+          <input class="row-inline-input mini-input name ${(c.linked||c.refer_na)?'':'flagged'}" id="opName-${cn}" list="referNameOptions" value="${esc(c.refer_name)}" placeholder="Refer name" ${c.refer_na?'disabled':''}/>
         </td>
         <td class="r">
-          <input type="number" class="row-inline-input mini-input ${c.amountSet?'':'flagged'}" id="opAmt-${cn}" value="${c.refer_amount||''}" min="0" step="0.01" placeholder="0.00"/>
+          <input type="number" class="row-inline-input mini-input ${(c.amountSet||c.refer_na)?'':'flagged'}" id="opAmt-${cn}" value="${c.refer_amount||''}" min="0" step="0.01" placeholder="0.00" ${c.refer_na?'disabled':''}/>
         </td>
-        <td><button class="btn-mini btn-mini-save" onclick="updateOpdReferInfo('${cn}')">💾 Update</button></td>
-        <td class="r">${c.amountSet ? fmt(c.due) : '<span style="color:#999">—</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-mini btn-mini-save" onclick="updateOpdReferInfo('${cn}')" ${c.refer_na?'disabled':''}>💾 Update</button>
+          <button class="btn-mini" style="background:#e2e8f0;color:#334155" onclick="markOpdReferNA('${cn}')">🚫 N/A</button>
+        </td>
+        <td class="r">${c.refer_na ? '<span style="color:#999">—</span>' : c.amountSet ? fmt(c.due) : '<span style="color:#999">—</span>'}</td>
         <td class="r"><input type="number" class="op-amt" data-no="${cn}" value="${Math.max(0,c.due).toFixed(2)}" min="0" step="0.01"
             style="width:100px;text-align:right" oninput="opUpdateTotal()" ${payable?'':'disabled'}/></td>
-        <td>${donePaid ? '<span class="pill pill-ok">✅ Done</span>' : payable ? '<span class="pill pill-ok">Payable</span>' : '<span class="pill pill-warn">Fix refer link</span>'}</td>
+        <td>${c.refer_na ? '<span class="pill pill-ok">✅ Done (N/A)</span>' : donePaid ? '<span class="pill pill-ok">✅ Done</span>' : payable ? '<span class="pill pill-ok">Payable</span>' : '<span class="pill pill-warn">Fix refer link</span>'}</td>
       </tr>
-      ${(!c.linked || !c.amountSet) ? `<tr class="${rowClass}"><td></td><td colspan="9" class="row-warn-msg">
+      ${(!c.refer_na && (!c.linked || !c.amountSet)) ? `<tr class="${rowClass}"><td></td><td colspan="9" class="row-warn-msg">
         ${!c.linked ? '⚠️ Refer not linked. ' : ''}${!c.amountSet ? '⚠️ Refer amount not entered.' : ''}
       </td></tr>` : ''}
       `;
@@ -349,6 +364,21 @@ async function updateOpdReferInfo(caseNo){
     ok.style.display='block'; ok.textContent = `✅ Case ${caseNo} refer link/amount updated. You can now select it for payment.`;
     renderOpdList();
     loadReferNameOptions();
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+async function markOpdReferNA(caseNo){
+  const err = document.getElementById('opErr'), ok = document.getElementById('opOk');
+  err.textContent=''; ok.style.display='none';
+  if (!confirm(`Mark case ${caseNo} as "Refer Not Applicable"? This clears any refer name/amount on this case.`)) return;
+  spin(true);
+  try{
+    const { error } = await sb.from('opd_case').update({ refer_na: true, refer_name: null, refer_amount: 0 }).eq('case_no', caseNo);
+    if (error) throw error;
+    const c = opAllCases.find(x=>x.case_no===caseNo);
+    if (c){ c.refer_na = true; c.refer_name=''; c.refer_amount=0; c.due=0; c.linked=true; c.amountSet=true; }
+    ok.style.display='block'; ok.textContent = `✅ Case ${caseNo} marked as Refer Not Applicable.`;
+    renderOpdList();
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
 }
@@ -442,7 +472,7 @@ async function loadIpdCases(){
     // Pull EVERY admission in the date range, whether or not it has a refer
     // name or refer amount set yet, so missing links surface here.
     const { data: adms } = await sb.from('ipd_admissions')
-      .select('id,admission_date,admission_no,patient_name,refer_name,refer_id')
+      .select('id,admission_date,admission_no,patient_name,refer_name,refer_id,refer_na')
       .gte('admission_date',from).lte('admission_date',to)
       .order('admission_date',{ascending:false});
     const list = adms || [];
@@ -456,8 +486,10 @@ async function loadIpdCases(){
       const referName = (r.refer_name||'').trim();
       const refA = parseFloat(amtMap[r.id]?.refer_amount||0);
       const paid = paidMap[r.id]||0;
-      return { ...r, refer_name: referName, refer_amount: refA, paid, due: refA-paid,
-                linked: !!referName, amountSet: refA > 0, hasAmtRow: !!amtMap[r.id] };
+      const na = !!r.refer_na;
+      return { ...r, refer_name: referName, refer_amount: refA, paid, refer_na: na,
+                due: na ? 0 : refA-paid,
+                linked: na || !!referName, amountSet: na || refA > 0, hasAmtRow: !!amtMap[r.id] };
     });
     renderIpdList();
   } finally { spin(false); }
@@ -465,10 +497,12 @@ async function loadIpdCases(){
 function ipdFilteredList(){
   const q = document.getElementById('ipSearch').value.trim().toLowerCase();
   const show = document.getElementById('ipShow').value;
+  const showDone = document.getElementById('ipShowDone').checked;
   let list = ipAllCases;
+  if (!showDone) list = list.filter(c => !(c.refer_na || (c.linked && c.amountSet && c.due <= 0.001)));
   if (q) list = list.filter(c => (c.admission_no||'').toLowerCase().includes(q) || (c.patient_name||'').toLowerCase().includes(q));
   if (show === 'issues') list = list.filter(c => !c.linked || !c.amountSet);
-  if (show === 'payable') list = list.filter(c => c.linked && c.amountSet && c.due > 0.001);
+  if (show === 'payable') list = list.filter(c => !c.refer_na && c.linked && c.amountSet && c.due > 0.001);
   return list;
 }
 function renderIpdList(){
@@ -488,28 +522,31 @@ function renderIpdList(){
   box.innerHTML = `<table id="ipTable">
     <thead><tr><th></th><th>Adm Date</th><th>Adm No.</th><th>Patient</th><th>Refer Name</th><th class="r">Refer Amt</th><th></th><th class="r">Due</th><th class="r">Pay Amount</th><th>Status</th></tr></thead>
     <tbody>${list.map(c=>{
-      const payable = c.linked && c.amountSet && c.due > 0.001;
-      const rowClass = (!c.linked || !c.amountSet) ? 'row-warn' : 'row-ok';
+      const payable = !c.refer_na && c.linked && c.amountSet && c.due > 0.001;
+      const rowClass = c.refer_na ? 'row-ok' : (!c.linked || !c.amountSet) ? 'row-warn' : 'row-ok';
       const id = esc(c.id);
-      const donePaid = c.linked && c.amountSet && c.due <= 0.001;
+      const donePaid = !c.refer_na && c.linked && c.amountSet && c.due <= 0.001;
       return `<tr class="${rowClass}" data-id="${id}">
         <td><input type="checkbox" class="ip-chk" data-id="${id}" onchange="ipUpdateTotal()" ${payable?'':'disabled'}/></td>
         <td>${c.admission_date}</td>
         <td>${esc(c.admission_no)}</td>
         <td>${esc(c.patient_name)}</td>
         <td>
-          <input class="row-inline-input mini-input name ${c.linked?'':'flagged'}" id="ipName-${id}" list="referNameOptions" value="${esc(c.refer_name)}" placeholder="Refer name"/>
+          <input class="row-inline-input mini-input name ${(c.linked||c.refer_na)?'':'flagged'}" id="ipName-${id}" list="referNameOptions" value="${esc(c.refer_name)}" placeholder="Refer name" ${c.refer_na?'disabled':''}/>
         </td>
         <td class="r">
-          <input type="number" class="row-inline-input mini-input ${c.amountSet?'':'flagged'}" id="ipAmt-${id}" value="${c.refer_amount||''}" min="0" step="0.01" placeholder="0.00"/>
+          <input type="number" class="row-inline-input mini-input ${(c.amountSet||c.refer_na)?'':'flagged'}" id="ipAmt-${id}" value="${c.refer_amount||''}" min="0" step="0.01" placeholder="0.00" ${c.refer_na?'disabled':''}/>
         </td>
-        <td><button class="btn-mini btn-mini-save" onclick="updateIpdReferInfo('${id}')">💾 Update</button></td>
-        <td class="r">${c.amountSet ? fmt(c.due) : '<span style="color:#999">—</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-mini btn-mini-save" onclick="updateIpdReferInfo('${id}')" ${c.refer_na?'disabled':''}>💾 Update</button>
+          <button class="btn-mini" style="background:#e2e8f0;color:#334155" onclick="markIpdReferNA('${id}')">🚫 N/A</button>
+        </td>
+        <td class="r">${c.refer_na ? '<span style="color:#999">—</span>' : c.amountSet ? fmt(c.due) : '<span style="color:#999">—</span>'}</td>
         <td class="r"><input type="number" class="ip-amt" data-id="${id}" value="${Math.max(0,c.due).toFixed(2)}" min="0" step="0.01"
             style="width:100px;text-align:right" oninput="ipUpdateTotal()" ${payable?'':'disabled'}/></td>
-        <td>${donePaid ? '<span class="pill pill-ok">✅ Done</span>' : payable ? '<span class="pill pill-ok">Payable</span>' : '<span class="pill pill-warn">Fix refer link</span>'}</td>
+        <td>${c.refer_na ? '<span class="pill pill-ok">✅ Done (N/A)</span>' : donePaid ? '<span class="pill pill-ok">✅ Done</span>' : payable ? '<span class="pill pill-ok">Payable</span>' : '<span class="pill pill-warn">Fix refer link</span>'}</td>
       </tr>
-      ${(!c.linked || !c.amountSet) ? `<tr class="${rowClass}"><td></td><td colspan="9" class="row-warn-msg">
+      ${(!c.refer_na && (!c.linked || !c.amountSet)) ? `<tr class="${rowClass}"><td></td><td colspan="9" class="row-warn-msg">
         ${!c.linked ? '⚠️ Refer not linked. ' : ''}${!c.amountSet ? '⚠️ Refer amount not entered.' : ''}
       </td></tr>` : ''}
       `;
@@ -545,6 +582,26 @@ async function updateIpdReferInfo(id){
     ok.style.display='block'; ok.textContent = `✅ Admission ${c.admission_no} refer link/amount updated. You can now select it for payment.`;
     renderIpdList();
     loadReferNameOptions();
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+async function markIpdReferNA(id){
+  const c = ipAllCases.find(x=>String(x.id)===String(id));
+  if (!c) return;
+  const err = document.getElementById('ipErr'), ok = document.getElementById('ipOk');
+  err.textContent=''; ok.style.display='none';
+  if (!confirm(`Mark admission ${c.admission_no} as "Refer Not Applicable"? This clears any refer name/amount on this admission.`)) return;
+  spin(true);
+  try{
+    const { error: e1 } = await sb.from('ipd_admissions').update({ refer_na: true, refer_name: null }).eq('id', c.id);
+    if (e1) throw e1;
+    if (c.hasAmtRow){
+      const { error: e2 } = await sb.from('ipd_amount_entries').update({ refer_amount: 0 }).eq('admission_id', c.id);
+      if (e2) throw e2;
+    }
+    c.refer_na = true; c.refer_name=''; c.refer_amount=0; c.due=0; c.linked=true; c.amountSet=true;
+    ok.style.display='block'; ok.textContent = `✅ Admission ${c.admission_no} marked as Refer Not Applicable.`;
+    renderIpdList();
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
 }
@@ -612,12 +669,16 @@ async function saveIpdReferPay(){
 async function loadReferNameOptions(){
   const names = new Set();
   try{
-    const [a, b] = await Promise.all([
+    const [a, b, c] = await Promise.all([
       sb.from('opd_case').select('refer_name').not('refer_name','is',null),
-      sb.from('ipd_admissions').select('refer_name').not('refer_name','is',null)
+      sb.from('ipd_admissions').select('refer_name').not('refer_name','is',null),
+      // Doctors logged by the marketing team's Gramin Visit tool are also
+      // valid refer names, even before they've ever been used on a case.
+      sb.from('gramin_doctor_visits').select('doctor_name').not('doctor_name','is',null)
     ]);
     (a.data||[]).forEach(r=>{ const n=(r.refer_name||'').trim(); if (n) names.add(n); });
     (b.data||[]).forEach(r=>{ const n=(r.refer_name||'').trim(); if (n) names.add(n); });
+    (c.data||[]).forEach(r=>{ const n=(r.doctor_name||'').trim(); if (n) names.add(n); });
   } catch(e){ console.warn('loadReferNameOptions:', e.message); }
   const dl = document.getElementById('referNameOptions');
   dl.innerHTML = [...names].sort().map(n=>`<option value="${esc(n)}"></option>`).join('');
