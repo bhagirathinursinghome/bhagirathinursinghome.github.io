@@ -78,7 +78,7 @@
       label: "Attendance", 
       icon: "🕐", 
       page: "pages/attendance.html", 
-      roles: ["admin","manager","viewer"] 
+      roles: ["admin","viewer"] 
     },
     {
       label: "Credit Management",
@@ -100,7 +100,7 @@
       label: "OPD Refer Linker",
       icon: "🔗",
       page: "pages/opd_refer_linker.html",
-      roles: ["admin", "manager", "accountant", "reception"]
+      roles: ["admin", "accountant", "reception"]
     },
     {
       label: "OPD Records",
@@ -126,17 +126,17 @@
     { label:"Lab Test Master",    
       icon:"🧪",
       page:"pages/lab_test_master.html",    
-      roles:["admin","manager"] 
+      roles:["admin"] 
     },
     { label:"Lab Work Entry",
       icon:"🔬", 
       page:"pages/lab_work_entry.html",      
-      roles:["admin","manager","lab"] 
+      roles:["admin","lab"] 
     },
     { label:"Lab Agent Payments", 
       icon:"💳", 
       page:"pages/lab_agent_payments.html",  
-      roles:["admin","manager","accountant"] 
+      roles:["admin","accountant"] 
     },
 
     // ==========================================
@@ -146,7 +146,7 @@
       label: "Gramin Doctor Visit",
       icon: "🏥",
       page: "pages/gramin-visit.html",
-      roles: ["marketing", "manager", "admin", "other", "reception"]
+      roles: ["marketing",  "admin", "other", "reception"]
     },
     {
       label: "QUACK DOCTOR",
@@ -167,7 +167,7 @@
       label: "IPD - Admission",
       icon: "🏥",
       page: "pages/ipd-admission.html",
-      roles: ["admin", "accountant", "reception", "manager"]
+      roles: ["admin", "accountant", "reception"]
     },
         {
       label: "IPD - Documents",
@@ -179,13 +179,13 @@
       label: "IPD - Doctor Entry",
       icon: "👨‍⚕️",
       page: "pages/ipd-doctor-entry.html",
-      roles: ["admin", "accountant", "manager"]
+      roles: ["admin", "accountant"]
     },
     {
       label: "IPD - OT Entry",
       icon: "🔬",
       page: "pages/ipd-ot-entry.html",
-      roles: ["admin", "accountant", "ot", "manager"]
+      roles: ["admin", "accountant", "ot"]
     },
     {
       label: "IPD - Amount Entry",
@@ -203,7 +203,7 @@
       label: "IPD - Cash & Discharge",
       icon: "💵",
       page: "pages/ipd-cash-discharge.html",
-      roles: ["admin", "accountant", "manager", "reception"]
+      roles: ["admin", "accountant", "reception"]
     },
        /* {
       label: "IPD - Refer Payment",
@@ -273,13 +273,15 @@
       label: "Pharmacy Reports",
       icon: "📊",
       page: "pages/pharmacy-reports.html",
-      roles: ["admin", "accountant", "pharmacy", "manager", "viewer"]
+      roles: ["admin", "accountant", "pharmacy", "viewer"]
     },
+    { label: "Daily Sheet", icon: "📊", page: "pages/pharmacy-daily-sheet.html",
+  roles: ["admin","accountant"] },
     {
       label: "Pharmacy Day Reports",
       icon: "📊",
       page: "pages/report_pharmacy.html",
-      roles: ["admin", "accountant", "pharmacy", "manager", "viewer"]
+      roles: ["admin", "accountant", "pharmacy", "viewer"]
     },
     {
       label: "Pharmacy Extra Pay",
