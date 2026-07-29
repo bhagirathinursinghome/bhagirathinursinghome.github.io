@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Daily Sheet – Pharmacy</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .filter-bar { display:flex; gap:.75rem; align-items:flex-end; flex-wrap:wrap; margin-bottom:1rem; }
+    .filter-bar > * { flex:1; min-width:160px; }
+    .filter-bar label { display:block; font-size:.8rem; font-weight:600; color:#374151; margin-bottom:.2rem; }
+
+    .balance-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.75rem; margin-bottom:1.2rem; }
+    .bal-card { border:1.5px solid #e0e7ff; border-radius:10px; padding:.7rem .9rem; background:#f8f9ff; }
+    .bal-card .lbl { font-size:.72rem; text-transform:uppercase; color:#6366f1; font-weight:700; letter-spacing:.03em; }
+    .bal-card .val { font-size:1.05rem; font-weight:700; color:#1e1b4b; margin-top:.2rem; }
+    .bal-card.closing { background:#ecfdf5; border-color:#a7f3d0; }
+    .bal-card.closing .lbl { color:#059669; }
+
+    .section-title { font-size:.95rem; font-weight:700; color:#312e81; background:#eef2ff;
+                      padding:.5rem .8rem; margin:1.3rem 0 .5rem; border-left:4px solid #6366f1; border-radius:4px; }
+
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f0f4ff; padding:8px 9px; text-align:left; font-size:.8rem; color:#4338ca; font-weight:700; border-bottom:2px solid #e0e7ff; }
+    td { padding:7px 9px; border-bottom:1px solid #f0f0f0; font-size:.82rem; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+    .empty-state { text-align:center; padding:1.2rem; color:#9ca3af; font-size:.85rem; }
+
+    .profit-strip { display:flex; justify-content:space-between; background:#1e1b4b; color:#fff;
+                    border-radius:10px; padding:.8rem 1.1rem; margin:1.1rem 0; font-size:.82rem; flex-wrap:wrap; gap:.5rem; }
+    .profit-strip div strong { display:block; font-size:1rem; }
+
+    .toolbar { display:flex; gap:.6rem; flex-wrap:wrap; margin:1rem 0; }
+    .btn-secondary { background:#6b7280; }
+    .variance-good { color:#059669; font-weight:700; }
+    .variance-bad  { color:#dc2626; font-weight:700; }
+    .note { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:.6rem .9rem; font-size:.82rem; margin-bottom:1rem; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>📊 Pharmacy Daily Sheet</h1>
+
+  <div class="page-card">
+    <div class="filter-bar">
+      <div>
+        <label>Report Date <span style="color:red">*</span></label>
+        <input id="reportDate" type="date" required/>
+      </div>
+      <div>
+        <label>Physical Cash Count (optional)</label>
+        <input id="physicalCash" type="number" step="0.01" placeholder="Count actual cash in drawer"/>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:.5rem">
+        <button class="btn-primary" style="width:auto" onclick="generateReport()">📊 Generate</button>
+        <button class="btn-primary btn-secondary" style="width:auto" onclick="downloadPDF()">⬇️ Download PDF</button>
+      </div>
+    </div>
+    <p class="err" id="err"></p>
+  </div>
+
+  <div id="reportOutput"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+BNH_PAGE.requireRole(["admin","manager","accountant"]);
+
+const fmt   = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+const num   = n => parseFloat(n||0);
+const spin  = show => document.getElementById('spinner').classList[show?'remove':'add']('hidden');
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+document.getElementById('reportDate').value = new Date().toISOString().slice(0,10);
+
+let lastReport = null; // cached computed report, used by downloadPDF()
+
+// ─────────────────────────────────────────────────────────────
+//  CORE CALCULATION
+// ─────────────────────────────────────────────────────────────
+async function buildDailySheet(dateStr) {
+  const [
+    { data: setupArr, error: eSetup },
+    { data: purchases, error: ePur },
+    { data: sales, error: eSale },
+    { data: payments, error: ePay },
+    { data: vouchers, error: eVou },
+    { data: transfers, error: eTra }
+  ] = await Promise.all([
+    BNH_PAGE.sb.from('pharmacy_setup').select('*').eq('id',1),
+    BNH_PAGE.sb.from('pharmacy_purchases').select('*').lte('purchase_date', dateStr),
+    BNH_PAGE.sb.from('pharmacy_sales').select('*').lte('sale_date', dateStr),
+    BNH_PAGE.sb.from('pharmacy_supplier_payments').select('*').lte('pay_date', dateStr),
+    BNH_PAGE.sb.from('pharmacy_vouchers').select('*').lte('voucher_date', dateStr),
+    BNH_PAGE.sb.from('pharmacy_fund_transfers').select('*').lte('transfer_date', dateStr)
+  ]);
+  const firstErr = eSetup||ePur||eSale||ePay||eVou||eTra;
+  if (firstErr) throw firstErr;
+
+  const setup = (setupArr && setupArr[0]) || {
+    opening_stock:0, opening_cash:0, opening_bank:0, opening_phonepe:0, opening_creditor:0
+  };
+
+  const before = arr => arr; // already <= dateStr; we'll split below
+  const isToday  = d => d === dateStr;
+  const isBefore = d => d < dateStr;
+
+  const purBefore = (purchases||[]).filter(r=>isBefore(r.purchase_date));
+  const purToday  = (purchases||[]).filter(r=>isToday(r.purchase_date));
+  const saleBefore = (sales||[]).filter(r=>isBefore(r.sale_date));
+  const saleToday   = (sales||[]).filter(r=>isToday(r.sale_date));
+  const payBefore = (payments||[]).filter(r=>isBefore(r.pay_date));
+  const payToday  = (payments||[]).filter(r=>isToday(r.pay_date));
+  const vouBefore = (vouchers||[]).filter(r=>isBefore(r.voucher_date));
+  const vouToday  = (vouchers||[]).filter(r=>isToday(r.voucher_date));
+  const traBefore = (transfers||[]).filter(r=>isBefore(r.transfer_date));
+  const traToday  = (transfers||[]).filter(r=>isToday(r.transfer_date));
+
+  const sum = (arr, field) => arr.reduce((a,r)=>a+num(r[field]),0);
+
+  // ── STOCK ──
+  const openingStock  = num(setup.opening_stock) + sum(purBefore,'amount') - sum(saleBefore,'cost_price');
+  const purchaseTotalToday = sum(purToday,'amount');
+  const saleCostToday       = sum(saleToday,'cost_price');
+  const closingStock  = openingStock + purchaseTotalToday - saleCostToday;
+
+  // ── FUND HELPERS (cash/bank/phonepe share the same shape) ──
+  function fundBalance(mode, modeField) {
+    const openIn  = num(setup['opening_'+mode]);
+    const salesIn = sum(saleBefore, modeField);
+    const transferIn  = traBefore.filter(t=>t.to_account===capitalize(mode)).reduce((a,t)=>a+num(t.amount),0);
+    const transferOut = traBefore.filter(t=>t.from_account===capitalize(mode)).reduce((a,t)=>a+num(t.amount),0);
+    const paymentOut = payBefore.filter(p=>p.mode===capitalize(mode)).reduce((a,p)=>a+num(p.amount),0);
+    const voucherOut = vouBefore.filter(v=>v.mode===capitalize(mode)).reduce((a,v)=>a+num(v.amount),0);
+    const opening = openIn + salesIn + transferIn - transferOut - paymentOut - voucherOut;
+
+    const todaySalesIn = sum(saleToday, modeField);
+    const todayTransferIn  = traToday.filter(t=>t.to_account===capitalize(mode)).reduce((a,t)=>a+num(t.amount),0);
+    const todayTransferOut = traToday.filter(t=>t.from_account===capitalize(mode)).reduce((a,t)=>a+num(t.amount),0);
+    const todayPaymentOut = payToday.filter(p=>p.mode===capitalize(mode)).reduce((a,p)=>a+num(p.amount),0);
+    const todayVoucherOut = vouToday.filter(v=>v.mode===capitalize(mode)).reduce((a,v)=>a+num(v.amount),0);
+    const todayIn  = todaySalesIn + todayTransferIn;
+    const todayOut = todayTransferOut + todayPaymentOut + todayVoucherOut;
+    const closing = opening + todayIn - todayOut;
+    return { opening, closing, todayIn, todayOut };
+  }
+  function capitalize(mode){ return mode==='phonepe' ? 'PhonePe' : (mode.charAt(0).toUpperCase()+mode.slice(1)); }
+
+  const cash    = fundBalance('cash','mode_cash');
+  const bank    = fundBalance('bank','mode_bank');
+  const phonepe = fundBalance('phonepe','mode_phonepe');
+
+  // ── CREDITOR ──
+  const openingCreditor = num(setup.opening_creditor) + sum(purBefore,'amount') - sum(payBefore,'amount');
+  const creditorPurchaseToday = purchaseTotalToday;
+  const creditorPaymentToday  = sum(payToday,'amount');
+  const closingCreditor = openingCreditor + creditorPurchaseToday - creditorPaymentToday;
+
+  // ── SALES SPLIT (Dispensary vs IPD) ──
+  const dispensaryToday = saleToday.filter(r=>r.sale_type==='Dispensary');
+  const ipdToday        = saleToday.filter(r=>r.sale_type==='IPD');
+  const dispensaryCost  = sum(dispensaryToday,'cost_price');
+  const dispensaryValue = sum(dispensaryToday,'sale_price');
+  const ipdTotal        = sum(ipdToday,'cost_price');
+  const grossProfit     = dispensaryValue - dispensaryCost;
+
+  return {
+    dateStr, setup,
+    openingStock, closingStock, purchaseTotalToday, saleCostToday,
+    cash, bank, phonepe,
+    openingCreditor, closingCreditor, creditorPurchaseToday, creditorPaymentToday,
+    dispensaryCost, dispensaryValue, ipdTotal, grossProfit,
+    purToday, saleToday, payToday, vouToday, traToday,
+    voucherTotalToday: sum(vouToday,'amount'),
+    transferTotalToday: sum(traToday,'amount')
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ON-SCREEN RENDER
+// ─────────────────────────────────────────────────────────────
+function renderReport(r) {
+  const physCash = document.getElementById('physicalCash').value;
+  let varianceHtml = '';
+  if (physCash !== '') {
+    const diff = num(physCash) - r.cash.closing;
+    varianceHtml = `<div class="note" style="${diff!==0?'background:#fef2f2;border-color:#fecaca':''}">
+      Physical Cash Count: <strong>${fmt(physCash)}</strong> &nbsp;|&nbsp;
+      System Closing Cash: <strong>${fmt(r.cash.closing)}</strong> &nbsp;|&nbsp;
+      Variance: <span class="${diff===0?'variance-good':'variance-bad'}">${fmt(diff)} ${diff===0?'✅ Matched':(diff>0?'(Excess)':'(Shortage)')}</span>
+    </div>`;
+  }
+
+  const rowsOrEmpty = (rows, cols) => rows.length ? rows : `<tr class="empty-state"><td colspan="${cols}" style="text-align:center;color:#9ca3af">No entries for this date.</td></tr>`;
+
+  const purRows = r.purToday.map(p=>`<tr>
+    <td>${esc(p.purchase_date)}</td><td>${esc(p.supplier_name)}</td><td>${esc(p.purchase_type)}</td>
+    <td class="r">${fmt(p.amount)}</td><td>${esc(p.remark||'—')}</td></tr>`);
+
+  const saleRows = r.saleToday.map(s=>`<tr>
+    <td>${esc(s.sale_date)}</td><td>${esc(s.sale_type)}</td><td>${esc(s.remark||s.admission_no||'—')}</td>
+    <td class="r">${fmt(s.cost_price)}</td><td class="r">${fmt(s.sale_price)}</td>
+    <td class="r">${fmt(s.mode_cash)}</td><td class="r">${fmt(s.mode_bank)}</td><td class="r">${fmt(s.mode_phonepe)}</td></tr>`);
+
+  const payRows = r.payToday.map(p=>`<tr>
+    <td>${esc(p.pay_date)}</td><td>${esc(p.supplier_name)}</td><td class="r">${fmt(p.amount)}</td>
+    <td>${esc(p.mode)}</td><td>${esc(p.remark||'—')}</td></tr>`);
+
+  const vouRows = r.vouToday.map(v=>`<tr>
+    <td>${esc(v.voucher_date)}</td><td>${esc(v.pay_to)}</td><td>${esc(v.pay_for)}</td>
+    <td class="r">${fmt(v.amount)}</td><td>${esc(v.mode)}</td></tr>`);
+
+  const traRows = r.traToday.map(t=>`<tr>
+    <td>${esc(t.transfer_date)}</td><td>${esc(t.from_account)}</td><td>${esc(t.to_account)}</td>
+    <td class="r">${fmt(t.amount)}</td><td>${esc(t.remark||'—')}</td></tr>`);
+
+  document.getElementById('reportOutput').innerHTML = `
+    <div class="page-card">
+      <div class="section-title">📦 Opening Balances (start of ${r.dateStr})</div>
+      <div class="balance-grid">
+        <div class="bal-card"><div class="lbl">Stock</div><div class="val">${fmt(r.openingStock)}</div></div>
+        <div class="bal-card"><div class="lbl">Cash</div><div class="val">${fmt(r.cash.opening)}</div></div>
+        <div class="bal-card"><div class="lbl">Bank</div><div class="val">${fmt(r.bank.opening)}</div></div>
+        <div class="bal-card"><div class="lbl">PhonePe</div><div class="val">${fmt(r.phonepe.opening)}</div></div>
+        <div class="bal-card"><div class="lbl">Creditor Due</div><div class="val">${fmt(r.openingCreditor)}</div></div>
+      </div>
+
+      <div class="section-title">🛒 Purchases — Total: ${fmt(r.purchaseTotalToday)}</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Date</th><th>Supplier</th><th>Type</th><th class="r">Amount</th><th>Remark</th></tr></thead>
+        <tbody>${rowsOrEmpty(purRows,5).join('')}</tbody>
+        <tfoot><tr><td colspan="3" style="text-align:right">Total</td><td class="r">${fmt(r.purchaseTotalToday)}</td><td></td></tr></tfoot>
+      </table></div>
+
+      <div class="section-title">💊 Sales — Dispensary Cost: ${fmt(r.dispensaryCost)} | Dispensary Value: ${fmt(r.dispensaryValue)} | IPD (at cost): ${fmt(r.ipdTotal)}</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Date</th><th>Type</th><th>Particulars</th><th class="r">Cost</th><th class="r">Sale</th><th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th></tr></thead>
+        <tbody>${rowsOrEmpty(saleRows,8).join('')}</tbody>
+      </table></div>
+
+      <div class="profit-strip">
+        <div>Dispensary Sale Value<strong>${fmt(r.dispensaryValue)}</strong></div>
+        <div>Dispensary Cost<strong>${fmt(r.dispensaryCost)}</strong></div>
+        <div>Gross Profit (Dispensary)<strong>${fmt(r.grossProfit)}</strong></div>
+        <div>IPD Sale (at cost, no margin)<strong>${fmt(r.ipdTotal)}</strong></div>
+      </div>
+
+      <div class="section-title">💳 Payments to Suppliers — Total: ${fmt(r.creditorPaymentToday)}</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Date</th><th>Supplier</th><th class="r">Amount</th><th>Mode</th><th>Remark</th></tr></thead>
+        <tbody>${rowsOrEmpty(payRows,5).join('')}</tbody>
+      </table></div>
+
+      <div class="section-title">🧾 Vouchers / Other Expenses — Total: ${fmt(r.voucherTotalToday)}</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Date</th><th>Pay To</th><th>Pay For</th><th class="r">Amount</th><th>Mode</th></tr></thead>
+        <tbody>${rowsOrEmpty(vouRows,5).join('')}</tbody>
+      </table></div>
+
+      <div class="section-title">🔄 Fund Transfers — Total: ${fmt(r.transferTotalToday)}</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Date</th><th>From</th><th>To</th><th class="r">Amount</th><th>Remark</th></tr></thead>
+        <tbody>${rowsOrEmpty(traRows,5).join('')}</tbody>
+      </table></div>
+
+      <div class="section-title">✅ Closing Balances (end of ${r.dateStr})</div>
+      <div class="balance-grid">
+        <div class="bal-card closing"><div class="lbl">Stock</div><div class="val">${fmt(r.closingStock)}</div></div>
+        <div class="bal-card closing"><div class="lbl">Cash</div><div class="val">${fmt(r.cash.closing)}</div></div>
+        <div class="bal-card closing"><div class="lbl">Bank</div><div class="val">${fmt(r.bank.closing)}</div></div>
+        <div class="bal-card closing"><div class="lbl">PhonePe</div><div class="val">${fmt(r.phonepe.closing)}</div></div>
+        <div class="bal-card closing"><div class="lbl">Creditor Due</div><div class="val">${fmt(r.closingCreditor)}</div></div>
+      </div>
+      ${varianceHtml}
+    </div>`;
+}
+
+async function generateReport() {
+  const dateStr = document.getElementById('reportDate').value;
+  const err = document.getElementById('err'); err.textContent='';
+  if (!dateStr) { err.textContent = 'Please select a date.'; return; }
+  spin(true);
+  try {
+    lastReport = await buildDailySheet(dateStr);
+    renderReport(lastReport);
+  } catch(ex) {
+    err.textContent = ex.message;
+  } finally {
+    spin(false);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PDF EXPORT — fetches the EXTERNAL template and fills tokens.
+//  To change the PDF layout, edit templates/daily-sheet-template.html
+//  — nothing here needs to change.
+// ─────────────────────────────────────────────────────────────
+function fillRepeatSection(html, sectionName, rows) {
+  const re = new RegExp(
+    '<!--\\s*REPEAT:' + sectionName + '\\s*-->([\\s\\S]*?)<!--\\s*ENDREPEAT:' + sectionName + '\\s*-->'
+  );
+  const match = html.match(re);
+  if (!match) return html;
+  const rowTemplate = match[1];
+  const filled = rows.length
+    ? rows.map(row => {
+        let rowHtml = rowTemplate;
+        Object.keys(row).forEach(key => {
+          rowHtml = rowHtml.split('{{'+key+'}}').join(esc(String(row[key])));
+        });
+        return rowHtml;
+      }).join('')
+    : `<tr class="empty-row"><td colspan="8">No entries for this date.</td></tr>`;
+  return html.replace(re, filled);
+}
+
+function fillScalars(html, scalars) {
+  Object.keys(scalars).forEach(key => {
+    html = html.split('{{'+key+'}}').join(String(scalars[key]));
+  });
+  return html;
+}
+
+async function downloadPDF() {
+  const err = document.getElementById('err'); err.textContent='';
+  if (!lastReport) { err.textContent = 'Please click "Generate" first.'; return; }
+  spin(true);
+  try {
+    const r = lastReport;
+    const templateUrl = '../templates/daily-sheet-template.html';
+    const res = await fetch(templateUrl);
+    if (!res.ok) throw new Error('Could not load PDF template at ' + templateUrl);
+    let html = await res.text();
+
+    const physCash = document.getElementById('physicalCash').value;
+    let varianceRow = '';
+    if (physCash !== '') {
+      const diff = num(physCash) - r.cash.closing;
+      varianceRow = `<div class="note" style="border:1px solid ${diff===0?'#a7f3d0':'#fecaca'};background:${diff===0?'#ecfdf5':'#fef2f2'};border-radius:6px;padding:6px 10px;font-size:10px;margin-top:8px">
+        Physical Cash Count: <strong>${fmt(physCash)}</strong> &nbsp;|&nbsp; System Closing Cash: <strong>${fmt(r.cash.closing)}</strong>
+        &nbsp;|&nbsp; Variance: <strong class="${diff===0?'':'variance-row'}">${fmt(diff)} ${diff===0?'(Matched)':(diff>0?'(Excess)':'(Shortage)')}</strong>
+      </div>`;
+    }
+
+    html = fillScalars(html, {
+      HOSPITAL_NAME: 'Bhagirathy Nursing Home',
+      REPORT_DATE: r.dateStr,
+      REPORT_DATE_LONG: new Date(r.dateStr+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'}),
+      GENERATED_AT: new Date().toLocaleString('en-IN'),
+      GENERATED_BY: (BNH_PAGE.user.name||BNH_PAGE.user.username||'—'),
+      OPENING_STOCK: fmt(r.openingStock), OPENING_CASH: fmt(r.cash.opening),
+      OPENING_BANK: fmt(r.bank.opening), OPENING_PHONEPE: fmt(r.phonepe.opening),
+      OPENING_CREDITOR: fmt(r.openingCreditor),
+      CLOSING_STOCK: fmt(r.closingStock), CLOSING_CASH: fmt(r.cash.closing),
+      CLOSING_BANK: fmt(r.bank.closing), CLOSING_PHONEPE: fmt(r.phonepe.closing),
+      CLOSING_CREDITOR: fmt(r.closingCreditor),
+      PURCHASE_TOTAL: fmt(r.purchaseTotalToday),
+      PURCHASE_IPD_TOTAL: fmt(r.purToday.filter(p=>p.purchase_type==='IPD').reduce((a,p)=>a+num(p.amount),0)),
+      PURCHASE_DISPENSARY_TOTAL: fmt(r.purToday.filter(p=>p.purchase_type==='Dispensary').reduce((a,p)=>a+num(p.amount),0)),
+      SALE_DISPENSARY_COST: fmt(r.dispensaryCost), SALE_DISPENSARY_VALUE: fmt(r.dispensaryValue),
+      SALE_IPD_TOTAL: fmt(r.ipdTotal), GROSS_PROFIT: fmt(r.grossProfit),
+      CASH_IN: fmt(r.cash.todayIn), CASH_OUT: fmt(r.cash.todayOut),
+      BANK_IN: fmt(r.bank.todayIn), BANK_OUT: fmt(r.bank.todayOut),
+      PHONEPE_IN: fmt(r.phonepe.todayIn), PHONEPE_OUT: fmt(r.phonepe.todayOut),
+      PAYMENT_TOTAL: fmt(r.creditorPaymentToday), VOUCHER_TOTAL: fmt(r.voucherTotalToday),
+      TRANSFER_TOTAL: fmt(r.transferTotalToday),
+      NET_CASH_VARIANCE_ROW: varianceRow
+    });
+
+    html = fillRepeatSection(html, 'purchases', r.purToday.map(p=>({
+      date:p.purchase_date, supplier:p.supplier_name, type:p.purchase_type, amount:fmt(p.amount), remark:p.remark||'—'
+    })));
+    html = fillRepeatSection(html, 'sales', r.saleToday.map(s=>({
+      date:s.sale_date, type:s.sale_type, particulars:s.remark||s.admission_no||'—',
+      cost:fmt(s.cost_price), sale:fmt(s.sale_price), cash:fmt(s.mode_cash), bank:fmt(s.mode_bank), phonepe:fmt(s.mode_phonepe)
+    })));
+    html = fillRepeatSection(html, 'payments', r.payToday.map(p=>({
+      date:p.pay_date, supplier:p.supplier_name, amount:fmt(p.amount), mode:p.mode, remark:p.remark||'—'
+    })));
+    html = fillRepeatSection(html, 'vouchers', r.vouToday.map(v=>({
+      date:v.voucher_date, pay_to:v.pay_to, pay_for:v.pay_for, amount:fmt(v.amount), mode:v.mode
+    })));
+    html = fillRepeatSection(html, 'transfers', r.traToday.map(t=>({
+      date:t.transfer_date, from:t.from_account, to:t.to_account, amount:fmt(t.amount), remark:t.remark||'—'
+    })));
+
+    // Render the filled template off-screen, then convert to PDF
+    const holder = document.createElement('div');
+    holder.style.position = 'fixed';
+    holder.style.left = '-99999px';
+    holder.style.top = '0';
+    document.body.appendChild(holder);
+    holder.innerHTML = html;
+
+    await html2pdf().set({
+      margin: 0,
+      filename: 'Pharmacy_Daily_Sheet_' + r.dateStr + '.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all','css','legacy'] }
+    }).from(holder).save();
+
+    document.body.removeChild(holder);
+  } catch(ex) {
+    err.textContent = ex.message;
+  } finally {
+    spin(false);
+  }
+}
+
+generateReport();
+</script>
+</body>
+</html>
