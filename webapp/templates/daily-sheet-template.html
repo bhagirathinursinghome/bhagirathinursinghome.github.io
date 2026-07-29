@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<!--
+  ═══════════════════════════════════════════════════════════════════════
+  PHARMACY DAILY SHEET — PDF TEMPLATE
+  ═══════════════════════════════════════════════════════════════════════
+  This file is fetched at runtime by pages/pharmacy-daily-sheet.html and
+  filled in with the day's numbers before being converted to a PDF.
+
+  HOW TO CUSTOMISE THE LAYOUT
+  ---------------------------
+  You do NOT need to touch any JavaScript to change how the report looks.
+  Just edit the HTML/CSS below:
+
+  1. SCALAR PLACEHOLDERS — tokens like {{OPENING_CASH}} are replaced with
+     a plain formatted string. Move them, restyle them, delete them,
+     duplicate them — the page-side JS does not care where they end up.
+
+  2. REPEATING TABLE ROWS — each transaction table has one row wrapped
+     between a pair of markers:
+         <!-- REPEAT:purchases -->  ... one <tr> using {{tokens}} ...  <!-- ENDREPEAT:purchases -->
+     The row between the markers is treated as the "row template" and is
+     duplicated once per record, then the markers + original row are
+     replaced by the generated rows. Do not remove the marker comments,
+     but you can restyle the <tr>/<td> freely and reorder columns.
+
+  3. Everything else (fonts, colors, header, footer, page size, signature
+     block, notes section) is just normal HTML/CSS — edit freely.
+
+  Available scalar tokens:
+    {{HOSPITAL_NAME}} {{REPORT_DATE}} {{REPORT_DATE_LONG}} {{GENERATED_AT}} {{GENERATED_BY}}
+
+    {{OPENING_STOCK}} {{OPENING_CASH}} {{OPENING_BANK}} {{OPENING_PHONEPE}} {{OPENING_CREDITOR}}
+    {{CLOSING_STOCK}} {{CLOSING_CASH}} {{CLOSING_BANK}} {{CLOSING_PHONEPE}} {{CLOSING_CREDITOR}}
+
+    {{PURCHASE_TOTAL}} {{PURCHASE_IPD_TOTAL}} {{PURCHASE_DISPENSARY_TOTAL}}
+    {{SALE_DISPENSARY_COST}} {{SALE_DISPENSARY_VALUE}} {{SALE_IPD_TOTAL}}
+    {{GROSS_PROFIT}}
+    {{CASH_IN}} {{CASH_OUT}} {{BANK_IN}} {{BANK_OUT}} {{PHONEPE_IN}} {{PHONEPE_OUT}}
+    {{PAYMENT_TOTAL}} {{VOUCHER_TOTAL}} {{TRANSFER_TOTAL}}
+
+    {{NET_CASH_VARIANCE_ROW}}  (blank unless a physical cash count was entered)
+
+  Available repeating sections (row tokens shown per section):
+    purchases : {{date}} {{supplier}} {{type}} {{amount}} {{remark}}
+    sales     : {{date}} {{type}} {{particulars}} {{cost}} {{sale}} {{cash}} {{bank}} {{phonepe}}
+    payments  : {{date}} {{supplier}} {{amount}} {{mode}} {{remark}}
+    vouchers  : {{date}} {{pay_to}} {{pay_for}} {{amount}} {{mode}}
+    transfers : {{date}} {{from}} {{to}} {{amount}} {{remark}}
+  ═══════════════════════════════════════════════════════════════════════
+-->
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+  @page { size: A4; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #1e1b4b;
+    margin: 0;
+    padding: 0;
+    font-size: 11px;
+    width: 186mm; /* A4 minus margins, used for html2canvas rendering width */
+  }
+  .sheet-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 3px solid #4338ca; padding-bottom: 8px; margin-bottom: 10px;
+  }
+  .sheet-header h1 { font-size: 17px; margin: 0 0 2px; color: #312e81; }
+  .sheet-header .sub { font-size: 12px; color: #4338ca; font-weight: 700; }
+  .sheet-header .meta { text-align: right; font-size: 10px; color: #666; }
+
+  .balance-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px;
+  }
+  .bal-card {
+    border: 1px solid #e0e7ff; border-radius: 6px; padding: 6px 8px; background: #f8f9ff;
+  }
+  .bal-card .lbl { font-size: 9px; text-transform: uppercase; color: #6366f1; font-weight: 700; letter-spacing: .03em; }
+  .bal-card .val { font-size: 12.5px; font-weight: 700; color: #1e1b4b; margin-top: 2px; }
+  .bal-card.closing { background: #ecfdf5; border-color: #a7f3d0; }
+  .bal-card.closing .lbl { color: #059669; }
+
+  .section-title {
+    font-size: 12px; font-weight: 700; color: #312e81; background: #eef2ff;
+    padding: 4px 8px; margin: 12px 0 4px; border-left: 4px solid #6366f1;
+  }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+  th { background: #f0f4ff; color: #4338ca; font-size: 9.5px; text-align: left; padding: 4px 6px; border-bottom: 1.5px solid #c7d2fe; }
+  td { font-size: 9.5px; padding: 3.5px 6px; border-bottom: 1px solid #f0f0f0; }
+  .r { text-align: right; }
+  tfoot td { font-weight: 700; background: #fafafa; }
+  .empty-row td { text-align: center; color: #aaa; font-style: italic; padding: 6px; }
+
+  .summary-strip {
+    display: flex; justify-content: space-between; background: #1e1b4b; color: #fff;
+    border-radius: 6px; padding: 8px 12px; margin: 14px 0; font-size: 10.5px;
+  }
+  .summary-strip div strong { display: block; font-size: 12px; }
+
+  .variance-row { color: #b91c1c; font-weight: 700; }
+
+  .sign-block { display: flex; justify-content: space-between; margin-top: 30px; }
+  .sign-box { width: 30%; text-align: center; font-size: 10px; color: #444; }
+  .sign-box .line { border-top: 1px solid #999; margin-bottom: 4px; padding-top: 22px; }
+
+  .footer-note { margin-top: 14px; font-size: 8.5px; color: #999; text-align: center; }
+</style>
+</head>
+<body>
+
+  <div class="sheet-header">
+    <div>
+      <h1>{{HOSPITAL_NAME}}</h1>
+      <div class="sub">Pharmacy — Daily Sheet</div>
+    </div>
+    <div class="meta">
+      Date: <strong>{{REPORT_DATE_LONG}}</strong><br/>
+      Generated: {{GENERATED_AT}} by {{GENERATED_BY}}
+    </div>
+  </div>
+
+  <!-- OPENING BALANCES -->
+  <div class="section-title">📦 Opening Balances (as of start of {{REPORT_DATE}})</div>
+  <div class="balance-grid">
+    <div class="bal-card"><div class="lbl">Stock</div><div class="val">{{OPENING_STOCK}}</div></div>
+    <div class="bal-card"><div class="lbl">Cash</div><div class="val">{{OPENING_CASH}}</div></div>
+    <div class="bal-card"><div class="lbl">Bank</div><div class="val">{{OPENING_BANK}}</div></div>
+    <div class="bal-card"><div class="lbl">PhonePe</div><div class="val">{{OPENING_PHONEPE}}</div></div>
+    <div class="bal-card"><div class="lbl">Creditor Due</div><div class="val">{{OPENING_CREDITOR}}</div></div>
+  </div>
+
+  <!-- PURCHASES -->
+  <div class="section-title">🛒 Purchases on {{REPORT_DATE}} — Total: {{PURCHASE_TOTAL}}</div>
+  <table>
+    <thead><tr><th>Date</th><th>Supplier</th><th>Type</th><th class="r">Amount</th><th>Remark</th></tr></thead>
+    <tbody>
+      <!-- REPEAT:purchases -->
+      <tr><td>{{date}}</td><td>{{supplier}}</td><td>{{type}}</td><td class="r">{{amount}}</td><td>{{remark}}</td></tr>
+      <!-- ENDREPEAT:purchases -->
+    </tbody>
+  </table>
+
+  <!-- SALES -->
+  <div class="section-title">💊 Sales on {{REPORT_DATE}} — Dispensary Cost: {{SALE_DISPENSARY_COST}} | Dispensary Value: {{SALE_DISPENSARY_VALUE}} | IPD (at cost): {{SALE_IPD_TOTAL}}</div>
+  <table>
+    <thead><tr><th>Date</th><th>Type</th><th>Particulars</th><th class="r">Cost</th><th class="r">Sale</th><th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th></tr></thead>
+    <tbody>
+      <!-- REPEAT:sales -->
+      <tr><td>{{date}}</td><td>{{type}}</td><td>{{particulars}}</td><td class="r">{{cost}}</td><td class="r">{{sale}}</td><td class="r">{{cash}}</td><td class="r">{{bank}}</td><td class="r">{{phonepe}}</td></tr>
+      <!-- ENDREPEAT:sales -->
+    </tbody>
+  </table>
+
+  <!-- SUPPLIER PAYMENTS -->
+  <div class="section-title">💳 Payments to Suppliers on {{REPORT_DATE}} — Total: {{PAYMENT_TOTAL}}</div>
+  <table>
+    <thead><tr><th>Date</th><th>Supplier</th><th class="r">Amount</th><th>Mode</th><th>Remark</th></tr></thead>
+    <tbody>
+      <!-- REPEAT:payments -->
+      <tr><td>{{date}}</td><td>{{supplier}}</td><td class="r">{{amount}}</td><td>{{mode}}</td><td>{{remark}}</td></tr>
+      <!-- ENDREPEAT:payments -->
+    </tbody>
+  </table>
+
+  <!-- VOUCHERS -->
+  <div class="section-title">🧾 Vouchers / Other Expenses on {{REPORT_DATE}} — Total: {{VOUCHER_TOTAL}}</div>
+  <table>
+    <thead><tr><th>Date</th><th>Pay To</th><th>Pay For</th><th class="r">Amount</th><th>Mode</th></tr></thead>
+    <tbody>
+      <!-- REPEAT:vouchers -->
+      <tr><td>{{date}}</td><td>{{pay_to}}</td><td>{{pay_for}}</td><td class="r">{{amount}}</td><td>{{mode}}</td></tr>
+      <!-- ENDREPEAT:vouchers -->
+    </tbody>
+  </table>
+
+  <!-- FUND TRANSFERS -->
+  <div class="section-title">🔄 Fund Transfers on {{REPORT_DATE}} — Total: {{TRANSFER_TOTAL}}</div>
+  <table>
+    <thead><tr><th>Date</th><th>From</th><th>To</th><th class="r">Amount</th><th>Remark</th></tr></thead>
+    <tbody>
+      <!-- REPEAT:transfers -->
+      <tr><td>{{date}}</td><td>{{from}}</td><td>{{to}}</td><td class="r">{{amount}}</td><td>{{remark}}</td></tr>
+      <!-- ENDREPEAT:transfers -->
+    </tbody>
+  </table>
+
+  <!-- GROSS PROFIT STRIP -->
+  <div class="summary-strip">
+    <div>Dispensary Sale Value<strong>{{SALE_DISPENSARY_VALUE}}</strong></div>
+    <div>Dispensary Cost<strong>{{SALE_DISPENSARY_COST}}</strong></div>
+    <div>Gross Profit (Dispensary)<strong>{{GROSS_PROFIT}}</strong></div>
+    <div>IPD Sale (at cost)<strong>{{SALE_IPD_TOTAL}}</strong></div>
+  </div>
+
+  <!-- CLOSING BALANCES -->
+  <div class="section-title">✅ Closing Balances (as of end of {{REPORT_DATE}})</div>
+  <div class="balance-grid">
+    <div class="bal-card closing"><div class="lbl">Stock</div><div class="val">{{CLOSING_STOCK}}</div></div>
+    <div class="bal-card closing"><div class="lbl">Cash</div><div class="val">{{CLOSING_CASH}}</div></div>
+    <div class="bal-card closing"><div class="lbl">Bank</div><div class="val">{{CLOSING_BANK}}</div></div>
+    <div class="bal-card closing"><div class="lbl">PhonePe</div><div class="val">{{CLOSING_PHONEPE}}</div></div>
+    <div class="bal-card closing"><div class="lbl">Creditor Due</div><div class="val">{{CLOSING_CREDITOR}}</div></div>
+  </div>
+
+  <!-- OPTIONAL: physical cash count variance (blank if not entered) -->
+  {{NET_CASH_VARIANCE_ROW}}
+
+  <div class="sign-block">
+    <div class="sign-box"><div class="line">Prepared By</div></div>
+    <div class="sign-box"><div class="line">Checked By (Accountant)</div></div>
+    <div class="sign-box"><div class="line">Approved By (Manager)</div></div>
+  </div>
+
+  <div class="footer-note">This is a system-generated daily sheet. Figures are cumulative from the Pharmacy Setup opening balances plus all recorded transactions up to and including the report date.</div>
+
+</body>
+</html>
