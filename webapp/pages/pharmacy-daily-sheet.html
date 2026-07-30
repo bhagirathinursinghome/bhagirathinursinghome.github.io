@@ -197,7 +197,7 @@ function renderReport(r) {
     </div>`;
   }
 
-  const rowsOrEmpty = (rows, cols) => rows.length ? rows : `<tr class="empty-state"><td colspan="${cols}" style="text-align:center;color:#9ca3af">No entries for this date.</td></tr>`;
+  const rowsOrEmpty = (rows, cols) => rows.length ? rows.join('') : `<tr class="empty-state"><td colspan="${cols}" style="text-align:center;color:#9ca3af">No entries for this date.</td></tr>`;
 
   const purRows = r.purToday.map(p=>`<tr>
     <td>${esc(p.purchase_date)}</td><td>${esc(p.supplier_name)}</td><td>${esc(p.purchase_type)}</td>
@@ -234,14 +234,14 @@ function renderReport(r) {
       <div class="section-title">🛒 Purchases — Total: ${fmt(r.purchaseTotalToday)}</div>
       <div style="overflow-x:auto"><table>
         <thead><tr><th>Date</th><th>Supplier</th><th>Type</th><th class="r">Amount</th><th>Remark</th></tr></thead>
-        <tbody>${rowsOrEmpty(purRows,5).join('')}</tbody>
+        <tbody>${rowsOrEmpty(purRows,5)}</tbody>
         <tfoot><tr><td colspan="3" style="text-align:right">Total</td><td class="r">${fmt(r.purchaseTotalToday)}</td><td></td></tr></tfoot>
       </table></div>
 
       <div class="section-title">💊 Sales — Dispensary Cost: ${fmt(r.dispensaryCost)} | Dispensary Value: ${fmt(r.dispensaryValue)} | IPD (at cost): ${fmt(r.ipdTotal)}</div>
       <div style="overflow-x:auto"><table>
         <thead><tr><th>Date</th><th>Type</th><th>Particulars</th><th class="r">Cost</th><th class="r">Sale</th><th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th></tr></thead>
-        <tbody>${rowsOrEmpty(saleRows,8).join('')}</tbody>
+        <tbody>${rowsOrEmpty(saleRows,8)}</tbody>
       </table></div>
 
       <div class="profit-strip">
@@ -254,19 +254,19 @@ function renderReport(r) {
       <div class="section-title">💳 Payments to Suppliers — Total: ${fmt(r.creditorPaymentToday)}</div>
       <div style="overflow-x:auto"><table>
         <thead><tr><th>Date</th><th>Supplier</th><th class="r">Amount</th><th>Mode</th><th>Remark</th></tr></thead>
-        <tbody>${rowsOrEmpty(payRows,5).join('')}</tbody>
+        <tbody>${rowsOrEmpty(payRows,5)}</tbody>
       </table></div>
 
       <div class="section-title">🧾 Vouchers / Other Expenses — Total: ${fmt(r.voucherTotalToday)}</div>
       <div style="overflow-x:auto"><table>
         <thead><tr><th>Date</th><th>Pay To</th><th>Pay For</th><th class="r">Amount</th><th>Mode</th></tr></thead>
-        <tbody>${rowsOrEmpty(vouRows,5).join('')}</tbody>
+        <tbody>${rowsOrEmpty(vouRows,5)}</tbody>
       </table></div>
 
       <div class="section-title">🔄 Fund Transfers — Total: ${fmt(r.transferTotalToday)}</div>
       <div style="overflow-x:auto"><table>
         <thead><tr><th>Date</th><th>From</th><th>To</th><th class="r">Amount</th><th>Remark</th></tr></thead>
-        <tbody>${rowsOrEmpty(traRows,5).join('')}</tbody>
+        <tbody>${rowsOrEmpty(traRows,5)}</tbody>
       </table></div>
 
       <div class="section-title">✅ Closing Balances (end of ${r.dateStr})</div>
