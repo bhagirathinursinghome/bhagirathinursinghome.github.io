@@ -87,6 +87,7 @@ let lastReport = null; // cached computed report, used by downloadPDF()
 async function buildDailySheet(dateStr) {
   const [
     { data: setupArr, error: eSetup },
+    { data: suppliers, error: eSup },
     { data: purchases, error: ePur },
     { data: sales, error: eSale },
     { data: payments, error: ePay },
@@ -94,14 +95,17 @@ async function buildDailySheet(dateStr) {
     { data: transfers, error: eTra }
   ] = await Promise.all([
     BNH_PAGE.sb.from('pharmacy_setup').select('*').eq('id',1),
+    BNH_PAGE.sb.from('pharmacy_suppliers').select('*'),
     BNH_PAGE.sb.from('pharmacy_purchases').select('*').lte('purchase_date', dateStr),
     BNH_PAGE.sb.from('pharmacy_sales').select('*').lte('sale_date', dateStr),
     BNH_PAGE.sb.from('pharmacy_supplier_payments').select('*').lte('pay_date', dateStr),
     BNH_PAGE.sb.from('pharmacy_vouchers').select('*').lte('voucher_date', dateStr),
     BNH_PAGE.sb.from('pharmacy_fund_transfers').select('*').lte('transfer_date', dateStr)
   ]);
-  const firstErr = eSetup||ePur||eSale||ePay||eVou||eTra;
+  const firstErr = eSetup||eSup||ePur||eSale||ePay||eVou||eTra;
   if (firstErr) throw firstErr;
+
+  const supplierOpeningTotal = (suppliers||[]).reduce((a,s)=>a+num(s.opening_balance),0);
 
   const setup = (setupArr && setupArr[0]) || {
     opening_stock:0, opening_cash:0, opening_bank:0, opening_phonepe:0, opening_creditor:0
@@ -157,7 +161,10 @@ async function buildDailySheet(dateStr) {
   const phonepe = fundBalance('phonepe','mode_phonepe');
 
   // ── CREDITOR ──
-  const openingCreditor = num(setup.opening_creditor) + sum(purBefore,'amount') - sum(payBefore,'amount');
+  // Base = pharmacy_setup.opening_creditor (any general/manual adjustment) PLUS
+  // the sum of each supplier's own opening_balance from pharmacy_suppliers,
+  // then cumulative purchases minus payments up to the day before the report date.
+  const openingCreditor = num(setup.opening_creditor) + supplierOpeningTotal + sum(purBefore,'amount') - sum(payBefore,'amount');
   const creditorPurchaseToday = purchaseTotalToday;
   const creditorPaymentToday  = sum(payToday,'amount');
   const closingCreditor = openingCreditor + creditorPurchaseToday - creditorPaymentToday;
