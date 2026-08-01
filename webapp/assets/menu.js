@@ -56,12 +56,6 @@
       page: "pages/Voucher_register.html",
       roles: ["admin", "accountant"]
    },
- /*   {
-      label: "Pay Salary",
-      icon: "💵",
-      page: "pages/pay_salary.html",
-      roles: ["admin", "accountant"]
-    },*/
     {
       label: "Employees",
       icon: "👥",
@@ -74,12 +68,12 @@
       page: "pages/salary_sheet.html",
       roles: ["admin", "accountant"]
     },
-    { 
+   /* { 
       label: "Attendance", 
       icon: "🕐", 
       page: "pages/attendance.html", 
       roles: ["admin","viewer"] 
-    },
+    },*/
     {
       label: "Credit Management",
       icon: "💳",
@@ -114,12 +108,6 @@
       page: "pages/opd_refer_amount.html",
       roles: ["admin", "manager", "accountant"]
     },
-   /* {
-      label: "Refer Paid",
-      icon: "✅",
-      page: "pages/opd_refer_paid.html",
-      roles: ["admin", "accountant"]
-    },*/
     // ==========================================
     // LAB
     // ==========================================
@@ -205,12 +193,6 @@
       page: "pages/ipd-cash-discharge.html",
       roles: ["admin", "accountant", "reception"]
     },
-       /* {
-      label: "IPD - Refer Payment",
-      icon: "💵",
-      page: "pages/ipd-refer-payment.html",
-      roles: ["admin", "accountant", "manager"]
-    },*/
     {
       label: "IPD - Reports",
       icon: "📊",
@@ -275,14 +257,10 @@
       page: "pages/pharmacy-reports.html",
       roles: ["admin", "accountant", "pharmacy", "viewer"]
     },
-    { label: "Daily Sheet", icon: "📊", page: "pages/pharmacy-daily-sheet.html",
-  roles: ["admin","accountant"] },
-    {
-      label: "Pharmacy Day Reports",
-      icon: "📊",
-      page: "pages/report_pharmacy.html",
-      roles: ["admin", "accountant", "pharmacy", "viewer"]
-    },
+    { label: "Daily Sheet", 
+      icon: "📊", 
+      page: "pages/pharmacy-daily-sheet.html",
+      roles: ["admin","accountant"] },
     {
       label: "Pharmacy Extra Pay",
       icon: "💰",
