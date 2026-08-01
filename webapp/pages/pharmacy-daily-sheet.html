@@ -481,18 +481,38 @@ async function downloadPDF() {
         iframe.srcdoc = html;
       });
 
-      // Let layout/fonts settle before rasterizing.
+      const doc = iframe.contentDocument;
+
+      // Resize the iframe to the full rendered content height (it starts at a
+      // fixed 297mm) so nothing below one A4-page's worth of height gets
+      // clipped before we capture it.
+      const contentHeightPx = Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight);
+      iframe.style.height = contentHeightPx + 'px';
+
+      // Let layout/fonts settle after the resize before rasterizing.
       await new Promise(res => setTimeout(res, 150));
 
-      const doc = iframe.contentDocument;
-      await html2pdf().set({
-        margin: 0,
-        filename: 'Pharmacy_Daily_Sheet_' + r.dateStr + '.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, windowWidth: doc.documentElement.scrollWidth || 793 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all','css','legacy'] }
-      }).from(doc.body).save();
+      const canvas = await html2canvas(doc.body, {
+        scale: 2,
+        useCORS: true,
+        windowWidth: doc.documentElement.scrollWidth,
+        windowHeight: contentHeightPx
+      });
+
+      // Build a PDF page sized to exactly fit the whole sheet at A4 width, so the
+      // report always renders as ONE single page instead of being split across
+      // two — the page height is derived from the canvas's own aspect ratio
+      // rather than a fixed 297mm A4 height.
+      const pdfWidthMM = 210;
+      const pdfHeightMM = (canvas.height * pdfWidthMM) / canvas.width;
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        unit: 'mm',
+        format: [pdfWidthMM, pdfHeightMM],
+        orientation: 'portrait'
+      });
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, pdfWidthMM, pdfHeightMM);
+      pdf.save('Pharmacy_Daily_Sheet_' + r.dateStr + '.pdf');
     } finally {
       document.body.removeChild(iframe);
     }
