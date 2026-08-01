@@ -209,6 +209,11 @@ const TYPE_META = {
   cash: { table:'cash_vouchers', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remark',
     label:r=>r.party_name||'' }
 };
+// Alias: DB writes payment_vouchers.type as "cash_voucher" (singular) for
+// cash entries, but the metadata above is keyed "cash". Point both keys at
+// the same config object so lookups succeed regardless of which spelling
+// shows up in the row data.
+TYPE_META.cash_voucher = TYPE_META.cash;
 
 // ────────────────────────────────────────────────────────────
 // BUG FIX #2: "type not match" — payment_vouchers.type is written by the
