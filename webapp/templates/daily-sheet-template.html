@@ -38,6 +38,9 @@
     {{CASH_IN}} {{CASH_OUT}} {{BANK_IN}} {{BANK_OUT}} {{PHONEPE_IN}} {{PHONEPE_OUT}}
     {{PAYMENT_TOTAL}} {{VOUCHER_TOTAL}} {{TRANSFER_TOTAL}}
 
+    {{BHAGIRATHI_DUE}}  (total amount receivable from Bhagirathi Nursing Home — cumulative,
+                         not limited to the report date, mirrors ipd-transactions.html)
+
     {{NET_CASH_VARIANCE_ROW}}  (blank unless a physical cash count was entered)
 
   Available repeating sections (row tokens shown per section):
@@ -46,6 +49,14 @@
     payments  : {{date}} {{supplier}} {{amount}} {{mode}} {{remark}}
     vouchers  : {{date}} {{pay_to}} {{pay_for}} {{amount}} {{mode}}
     transfers : {{date}} {{from}} {{to}} {{amount}} {{remark}}
+
+  4. AUTO-HIDING EMPTY SECTIONS — each of the five transaction sections above
+     (title + table together) is wrapped in a pair of markers:
+         <!-- SECTION:purchases --> ... <!-- ENDSECTION:purchases -->
+     If there are zero records for that section on the report date, the
+     page-side JS removes the ENTIRE block (title + table), so the PDF
+     never shows an empty "Purchases — Total: ₹0.00" table with no rows.
+     Keep the markers in place if you restyle; do not remove them.
   ═══════════════════════════════════════════════════════════════════════
 -->
 <html>
@@ -98,6 +109,14 @@
   }
   .summary-strip div strong { display: block; font-size: 12px; }
 
+  .due-strip {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #ecfdf5; border: 1.5px solid #a7f3d0; border-radius: 6px;
+    padding: 8px 12px; margin-bottom: 12px;
+  }
+  .due-strip .lbl { font-size: 10px; font-weight: 700; color: #065f46; text-transform: uppercase; letter-spacing: .03em; }
+  .due-strip .val { font-size: 15px; font-weight: 800; color: #065f46; }
+
   .variance-row { color: #b91c1c; font-weight: 700; }
 
   .sign-block { display: flex; justify-content: space-between; margin-top: 30px; }
@@ -120,6 +139,12 @@
     </div>
   </div>
 
+  <!-- AMOUNT RECEIVABLE FROM BHAGIRATHI NURSING HOME (cumulative, IPD medicine dues) -->
+  <div class="due-strip">
+    <div class="lbl">🏥 Receivable from Bhagirathi Nursing Home (Total Due)</div>
+    <div class="val">{{BHAGIRATHI_DUE}}</div>
+  </div>
+
   <!-- OPENING BALANCES -->
   <div class="section-title">📦 Opening Balances (as of start of {{REPORT_DATE}})</div>
   <div class="balance-grid">
@@ -131,6 +156,7 @@
   </div>
 
   <!-- PURCHASES -->
+  <!-- SECTION:purchases -->
   <div class="section-title">🛒 Purchases on {{REPORT_DATE}} — Total: {{PURCHASE_TOTAL}}</div>
   <table>
     <thead><tr><th>Date</th><th>Supplier</th><th>Type</th><th class="r">Amount</th><th>Remark</th></tr></thead>
@@ -140,8 +166,10 @@
       <!-- ENDREPEAT:purchases -->
     </tbody>
   </table>
+  <!-- ENDSECTION:purchases -->
 
   <!-- SALES -->
+  <!-- SECTION:sales -->
   <div class="section-title">💊 Sales on {{REPORT_DATE}} — Dispensary Cost: {{SALE_DISPENSARY_COST}} | Dispensary Value: {{SALE_DISPENSARY_VALUE}} | IPD (at cost): {{SALE_IPD_TOTAL}}</div>
   <table>
     <thead><tr><th>Date</th><th>Type</th><th>Particulars</th><th class="r">Cost</th><th class="r">Sale</th><th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th></tr></thead>
@@ -151,8 +179,10 @@
       <!-- ENDREPEAT:sales -->
     </tbody>
   </table>
+  <!-- ENDSECTION:sales -->
 
   <!-- SUPPLIER PAYMENTS -->
+  <!-- SECTION:payments -->
   <div class="section-title">💳 Payments to Suppliers on {{REPORT_DATE}} — Total: {{PAYMENT_TOTAL}}</div>
   <table>
     <thead><tr><th>Date</th><th>Supplier</th><th class="r">Amount</th><th>Mode</th><th>Remark</th></tr></thead>
@@ -162,8 +192,10 @@
       <!-- ENDREPEAT:payments -->
     </tbody>
   </table>
+  <!-- ENDSECTION:payments -->
 
   <!-- VOUCHERS -->
+  <!-- SECTION:vouchers -->
   <div class="section-title">🧾 Vouchers / Other Expenses on {{REPORT_DATE}} — Total: {{VOUCHER_TOTAL}}</div>
   <table>
     <thead><tr><th>Date</th><th>Pay To</th><th>Pay For</th><th class="r">Amount</th><th>Mode</th></tr></thead>
@@ -173,8 +205,10 @@
       <!-- ENDREPEAT:vouchers -->
     </tbody>
   </table>
+  <!-- ENDSECTION:vouchers -->
 
   <!-- FUND TRANSFERS -->
+  <!-- SECTION:transfers -->
   <div class="section-title">🔄 Fund Transfers on {{REPORT_DATE}} — Total: {{TRANSFER_TOTAL}}</div>
   <table>
     <thead><tr><th>Date</th><th>From</th><th>To</th><th class="r">Amount</th><th>Remark</th></tr></thead>
@@ -184,6 +218,7 @@
       <!-- ENDREPEAT:transfers -->
     </tbody>
   </table>
+  <!-- ENDSECTION:transfers -->
 
   <!-- GROSS PROFIT STRIP -->
   <div class="summary-strip">
