@@ -31,6 +31,12 @@
                     border-radius:10px; padding:.8rem 1.1rem; margin:1.1rem 0; font-size:.82rem; flex-wrap:wrap; gap:.5rem; }
     .profit-strip div strong { display:block; font-size:1rem; }
 
+    .due-strip { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.4rem;
+                 background:#ecfdf5; border:1.5px solid #a7f3d0; border-radius:10px;
+                 padding:.7rem 1rem; margin-bottom:1.2rem; }
+    .due-strip .lbl { font-size:.8rem; font-weight:700; color:#065f46; text-transform:uppercase; letter-spacing:.03em; }
+    .due-strip .val { font-size:1.25rem; font-weight:800; color:#065f46; }
+
     .toolbar { display:flex; gap:.6rem; flex-wrap:wrap; margin:1rem 0; }
     .btn-secondary { background:#6b7280; }
     .variance-good { color:#059669; font-weight:700; }
@@ -92,7 +98,9 @@ async function buildDailySheet(dateStr) {
     { data: sales, error: eSale },
     { data: payments, error: ePay },
     { data: vouchers, error: eVou },
-    { data: transfers, error: eTra }
+    { data: transfers, error: eTra },
+    { data: indens, error: eInden },
+    { data: ipdTxns, error: eIpdTxn }
   ] = await Promise.all([
     BNH_PAGE.sb.from('pharmacy_setup').select('*').eq('id',1),
     BNH_PAGE.sb.from('pharmacy_suppliers').select('*'),
@@ -100,10 +108,18 @@ async function buildDailySheet(dateStr) {
     BNH_PAGE.sb.from('pharmacy_sales').select('*').lte('sale_date', dateStr),
     BNH_PAGE.sb.from('pharmacy_supplier_payments').select('*').lte('pay_date', dateStr),
     BNH_PAGE.sb.from('pharmacy_vouchers').select('*').lte('voucher_date', dateStr),
-    BNH_PAGE.sb.from('pharmacy_fund_transfers').select('*').lte('transfer_date', dateStr)
+    BNH_PAGE.sb.from('pharmacy_fund_transfers').select('*').lte('transfer_date', dateStr),
+    // Same cumulative calc used on the IPD Transactions page: total medicine indents
+    // raised against IPD minus total received back from Bhagirathi Nursing Home.
+    BNH_PAGE.sb.from('ipd_medicine_indens').select('amount'),
+    BNH_PAGE.sb.from('ipd_transactions').select('amount,txn_type')
   ]);
-  const firstErr = eSetup||eSup||ePur||eSale||ePay||eVou||eTra;
+  const firstErr = eSetup||eSup||ePur||eSale||ePay||eVou||eTra||eInden||eIpdTxn;
   if (firstErr) throw firstErr;
+
+  const totalInden = (indens||[]).reduce((a,r)=>a+num(r.amount),0);
+  const totalReceivedFromBhagirathi = (ipdTxns||[]).filter(r=>r.txn_type==='Receive').reduce((a,r)=>a+num(r.amount),0);
+  const bhagirathiDue = totalInden - totalReceivedFromBhagirathi;
 
   const supplierOpeningTotal = (suppliers||[]).reduce((a,s)=>a+num(s.opening_balance),0);
 
@@ -185,7 +201,8 @@ async function buildDailySheet(dateStr) {
     dispensaryCost, dispensaryValue, ipdTotal, grossProfit,
     purToday, saleToday, payToday, vouToday, traToday,
     voucherTotalToday: sum(vouToday,'amount'),
-    transferTotalToday: sum(traToday,'amount')
+    transferTotalToday: sum(traToday,'amount'),
+    bhagirathiDue
   };
 }
 
@@ -203,8 +220,6 @@ function renderReport(r) {
       Variance: <span class="${diff===0?'variance-good':'variance-bad'}">${fmt(diff)} ${diff===0?'✅ Matched':(diff>0?'(Excess)':'(Shortage)')}</span>
     </div>`;
   }
-
-  const rowsOrEmpty = (rows, cols) => rows.length ? rows.join('') : `<tr class="empty-state"><td colspan="${cols}" style="text-align:center;color:#9ca3af">No entries for this date.</td></tr>`;
 
   const purRows = r.purToday.map(p=>`<tr>
     <td>${esc(p.purchase_date)}</td><td>${esc(p.supplier_name)}</td><td>${esc(p.purchase_type)}</td>
@@ -227,8 +242,51 @@ function renderReport(r) {
     <td>${esc(t.transfer_date)}</td><td>${esc(t.from_account)}</td><td>${esc(t.to_account)}</td>
     <td class="r">${fmt(t.amount)}</td><td>${esc(t.remark||'—')}</td></tr>`);
 
+  // Sections with zero transactions on this date are hidden entirely instead of
+  // showing an empty "No entries" table.
+  const purSection = purRows.length ? `
+      <div class="section-title">🛒 Purchases — Total: ${fmt(r.purchaseTotalToday)}</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Date</th><th>Supplier</th><th>Type</th><th class="r">Amount</th><th>Remark</th></tr></thead>
+        <tbody>${purRows.join('')}</tbody>
+        <tfoot><tr><td colspan="3" style="text-align:right">Total</td><td class="r">${fmt(r.purchaseTotalToday)}</td><td></td></tr></tfoot>
+      </table></div>` : '';
+
+  const saleSection = saleRows.length ? `
+      <div class="section-title">💊 Sales — Dispensary Cost: ${fmt(r.dispensaryCost)} | Dispensary Value: ${fmt(r.dispensaryValue)} | IPD (at cost): ${fmt(r.ipdTotal)}</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Date</th><th>Type</th><th>Particulars</th><th class="r">Cost</th><th class="r">Sale</th><th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th></tr></thead>
+        <tbody>${saleRows.join('')}</tbody>
+      </table></div>` : '';
+
+  const paySection = payRows.length ? `
+      <div class="section-title">💳 Payments to Suppliers — Total: ${fmt(r.creditorPaymentToday)}</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Date</th><th>Supplier</th><th class="r">Amount</th><th>Mode</th><th>Remark</th></tr></thead>
+        <tbody>${payRows.join('')}</tbody>
+      </table></div>` : '';
+
+  const vouSection = vouRows.length ? `
+      <div class="section-title">🧾 Vouchers / Other Expenses — Total: ${fmt(r.voucherTotalToday)}</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Date</th><th>Pay To</th><th>Pay For</th><th class="r">Amount</th><th>Mode</th></tr></thead>
+        <tbody>${vouRows.join('')}</tbody>
+      </table></div>` : '';
+
+  const traSection = traRows.length ? `
+      <div class="section-title">🔄 Fund Transfers — Total: ${fmt(r.transferTotalToday)}</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Date</th><th>From</th><th>To</th><th class="r">Amount</th><th>Remark</th></tr></thead>
+        <tbody>${traRows.join('')}</tbody>
+      </table></div>` : '';
+
   document.getElementById('reportOutput').innerHTML = `
     <div class="page-card">
+      <div class="due-strip">
+        <div class="lbl">🏥 Receivable from Bhagirathi Nursing Home (Total Due)</div>
+        <div class="val">${fmt(r.bhagirathiDue)}</div>
+      </div>
+
       <div class="section-title">📦 Opening Balances (start of ${r.dateStr})</div>
       <div class="balance-grid">
         <div class="bal-card"><div class="lbl">Stock</div><div class="val">${fmt(r.openingStock)}</div></div>
@@ -238,18 +296,9 @@ function renderReport(r) {
         <div class="bal-card"><div class="lbl">Creditor Due</div><div class="val">${fmt(r.openingCreditor)}</div></div>
       </div>
 
-      <div class="section-title">🛒 Purchases — Total: ${fmt(r.purchaseTotalToday)}</div>
-      <div style="overflow-x:auto"><table>
-        <thead><tr><th>Date</th><th>Supplier</th><th>Type</th><th class="r">Amount</th><th>Remark</th></tr></thead>
-        <tbody>${rowsOrEmpty(purRows,5)}</tbody>
-        <tfoot><tr><td colspan="3" style="text-align:right">Total</td><td class="r">${fmt(r.purchaseTotalToday)}</td><td></td></tr></tfoot>
-      </table></div>
+      ${purSection}
 
-      <div class="section-title">💊 Sales — Dispensary Cost: ${fmt(r.dispensaryCost)} | Dispensary Value: ${fmt(r.dispensaryValue)} | IPD (at cost): ${fmt(r.ipdTotal)}</div>
-      <div style="overflow-x:auto"><table>
-        <thead><tr><th>Date</th><th>Type</th><th>Particulars</th><th class="r">Cost</th><th class="r">Sale</th><th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th></tr></thead>
-        <tbody>${rowsOrEmpty(saleRows,8)}</tbody>
-      </table></div>
+      ${saleSection}
 
       <div class="profit-strip">
         <div>Dispensary Sale Value<strong>${fmt(r.dispensaryValue)}</strong></div>
@@ -258,23 +307,11 @@ function renderReport(r) {
         <div>IPD Sale (at cost, no margin)<strong>${fmt(r.ipdTotal)}</strong></div>
       </div>
 
-      <div class="section-title">💳 Payments to Suppliers — Total: ${fmt(r.creditorPaymentToday)}</div>
-      <div style="overflow-x:auto"><table>
-        <thead><tr><th>Date</th><th>Supplier</th><th class="r">Amount</th><th>Mode</th><th>Remark</th></tr></thead>
-        <tbody>${rowsOrEmpty(payRows,5)}</tbody>
-      </table></div>
+      ${paySection}
 
-      <div class="section-title">🧾 Vouchers / Other Expenses — Total: ${fmt(r.voucherTotalToday)}</div>
-      <div style="overflow-x:auto"><table>
-        <thead><tr><th>Date</th><th>Pay To</th><th>Pay For</th><th class="r">Amount</th><th>Mode</th></tr></thead>
-        <tbody>${rowsOrEmpty(vouRows,5)}</tbody>
-      </table></div>
+      ${vouSection}
 
-      <div class="section-title">🔄 Fund Transfers — Total: ${fmt(r.transferTotalToday)}</div>
-      <div style="overflow-x:auto"><table>
-        <thead><tr><th>Date</th><th>From</th><th>To</th><th class="r">Amount</th><th>Remark</th></tr></thead>
-        <tbody>${rowsOrEmpty(traRows,5)}</tbody>
-      </table></div>
+      ${traSection}
 
       <div class="section-title">✅ Closing Balances (end of ${r.dateStr})</div>
       <div class="balance-grid">
@@ -334,6 +371,15 @@ function fillScalars(html, scalars) {
   return html;
 }
 
+// Removes an entire <!-- SECTION:name --> ... <!-- ENDSECTION:name --> block (title + table)
+// when that section has no rows for the report date, instead of leaving a blank table behind.
+function hideSectionIfEmpty(html, sectionName, isEmpty) {
+  const re = new RegExp(
+    '<!--\\s*SECTION:' + sectionName + '\\s*-->([\\s\\S]*?)<!--\\s*ENDSECTION:' + sectionName + '\\s*-->'
+  );
+  return html.replace(re, isEmpty ? '' : '$1');
+}
+
 async function downloadPDF() {
   const err = document.getElementById('err'); err.textContent='';
   if (!lastReport) { err.textContent = 'Please click "Generate" first.'; return; }
@@ -377,6 +423,7 @@ async function downloadPDF() {
       PHONEPE_IN: fmt(r.phonepe.todayIn), PHONEPE_OUT: fmt(r.phonepe.todayOut),
       PAYMENT_TOTAL: fmt(r.creditorPaymentToday), VOUCHER_TOTAL: fmt(r.voucherTotalToday),
       TRANSFER_TOTAL: fmt(r.transferTotalToday),
+      BHAGIRATHI_DUE: fmt(r.bhagirathiDue),
       NET_CASH_VARIANCE_ROW: varianceRow
     });
 
@@ -397,24 +444,58 @@ async function downloadPDF() {
       date:t.transfer_date, from:t.from_account, to:t.to_account, amount:fmt(t.amount), remark:t.remark||'—'
     })));
 
-    // Render the filled template off-screen, then convert to PDF
-    const holder = document.createElement('div');
-    holder.style.position = 'fixed';
-    holder.style.left = '-99999px';
-    holder.style.top = '0';
-    document.body.appendChild(holder);
-    holder.innerHTML = html;
+    // Auto-hide sections with zero transactions on this date (title + table together),
+    // instead of shipping an empty "Total: ₹0.00" table with a lone "No entries" row.
+    html = hideSectionIfEmpty(html, 'purchases', r.purToday.length === 0);
+    html = hideSectionIfEmpty(html, 'sales',     r.saleToday.length === 0);
+    html = hideSectionIfEmpty(html, 'payments',  r.payToday.length === 0);
+    html = hideSectionIfEmpty(html, 'vouchers',  r.vouToday.length === 0);
+    html = hideSectionIfEmpty(html, 'transfers', r.traToday.length === 0);
 
-    await html2pdf().set({
-      margin: 0,
-      filename: 'Pharmacy_Daily_Sheet_' + r.dateStr + '.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all','css','legacy'] }
-    }).from(holder).save();
+    // Render the filled template inside an iframe rather than dumping the full
+    // <!DOCTYPE html> document string into a plain <div>'s innerHTML. Assigning a
+    // whole document (with its own <head>/<style>) into a div is what produced the
+    // blank PDFs: the browser's fragment parser drops/mangles the <head> content,
+    // so the template's CSS never applied and html2canvas rasterized an
+    // effectively empty, unstyled node. An iframe gets its own real document, so
+    // <head><style> is parsed and applied exactly as if the template were opened
+    // directly. It's kept on-screen (top:0,left:0) rather than pushed off-screen
+    // with a large negative offset — some browsers skip painting elements placed
+    // far outside the viewport, which was the other cause of the blank capture.
+    // The spinner overlay (already shown via spin(true)) covers it from view.
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.top = '0';
+    iframe.style.left = '0';
+    iframe.style.width = '210mm';
+    iframe.style.height = '297mm';
+    iframe.style.border = 'none';
+    iframe.style.background = '#fff';
+    iframe.style.zIndex = '1';
+    document.body.appendChild(iframe);
 
-    document.body.removeChild(holder);
+    try {
+      await new Promise((resolve, reject) => {
+        iframe.onload = resolve;
+        iframe.onerror = () => reject(new Error('Failed to render the PDF template.'));
+        iframe.srcdoc = html;
+      });
+
+      // Let layout/fonts settle before rasterizing.
+      await new Promise(res => setTimeout(res, 150));
+
+      const doc = iframe.contentDocument;
+      await html2pdf().set({
+        margin: 0,
+        filename: 'Pharmacy_Daily_Sheet_' + r.dateStr + '.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, windowWidth: doc.documentElement.scrollWidth || 793 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all','css','legacy'] }
+      }).from(doc.body).save();
+    } finally {
+      document.body.removeChild(iframe);
+    }
   } catch(ex) {
     err.textContent = ex.message;
   } finally {
