@@ -17,7 +17,7 @@
 
   2. REPEATING TABLE ROWS — each transaction table has one row wrapped
      between a pair of markers:
-         <!-- REPEAT:purchases -->  ... one <tr> using {{tokens}} ...  <!-- ENDREPEAT:purchases -->
+         <!-- REPEAT:sectionName -->  ... one <tr> using {{tokens}} ...  <!-- ENDREPEAT:sectionName -->
      The row between the markers is treated as the "row template" and is
      duplicated once per record, then the markers + original row are
      replaced by the generated rows. Do not remove the marker comments,
@@ -52,7 +52,7 @@
 
   4. AUTO-HIDING EMPTY SECTIONS — each of the five transaction sections above
      (title + table together) is wrapped in a pair of markers:
-         <!-- SECTION:purchases --> ... <!-- ENDSECTION:purchases -->
+         <!-- SECTION:sectionName --> ... <!-- ENDSECTION:sectionName -->
      If there are zero records for that section on the report date, the
      page-side JS removes the ENTIRE block (title + table), so the PDF
      never shows an empty "Purchases — Total: ₹0.00" table with no rows.
@@ -68,10 +68,10 @@
   body {
     font-family: 'Segoe UI', Arial, sans-serif;
     color: #1e1b4b;
-    margin: 0;
-    padding: 0;
+    margin: 0 auto;
+    padding: 12mm;
     font-size: 11px;
-    width: 186mm; /* A4 minus margins, used for html2canvas rendering width */
+    width: 210mm; /* full A4 width; padding above supplies the 12mm margin on all sides */
   }
   .sheet-header {
     display: flex; justify-content: space-between; align-items: flex-start;
