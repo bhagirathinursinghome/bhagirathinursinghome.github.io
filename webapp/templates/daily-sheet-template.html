@@ -16,8 +16,8 @@
      duplicate them — the page-side JS does not care where they end up.
 
   2. REPEATING TABLE ROWS — each transaction table has one row wrapped
-     between a pair of markers:
-         <!-- REPEAT:sectionName -->  ... one <tr> using {{tokens}} ...  <!-- ENDREPEAT:sectionName -->
+     between a pair of HTML-comment markers named REPEAT:sectionName and
+     ENDREPEAT:sectionName (one <tr> using {{tokens}} sits between them).
      The row between the markers is treated as the "row template" and is
      duplicated once per record, then the markers + original row are
      replaced by the generated rows. Do not remove the marker comments,
@@ -51,8 +51,8 @@
     transfers : {{date}} {{from}} {{to}} {{amount}} {{remark}}
 
   4. AUTO-HIDING EMPTY SECTIONS — each of the five transaction sections above
-     (title + table together) is wrapped in a pair of markers:
-         <!-- SECTION:sectionName --> ... <!-- ENDSECTION:sectionName -->
+     (title + table together) is wrapped in a pair of HTML-comment markers
+     named SECTION:sectionName and ENDSECTION:sectionName.
      If there are zero records for that section on the report date, the
      page-side JS removes the ENTIRE block (title + table), so the PDF
      never shows an empty "Purchases — Total: ₹0.00" table with no rows.
