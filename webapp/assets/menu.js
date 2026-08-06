@@ -45,21 +45,21 @@
       icon: "💵",
       page: "pages/payment.html",
       roles: ["admin", "accountant"],
-      group: "Employees"
+      group: "Voucher"
    },
     {
       label: "Refer Payment",
       icon: "💵",
       page: "pages/refer_payment_by_case.html",
       roles: ["admin", "accountant"],
-      group: "Employees"
+      group: "Voucher"
    },
     {
       label: "Voucher",
       icon: "📕",
       page: "pages/Voucher_register.html",
       roles: ["admin", "accountant"],
-      group: "Employees"
+      group: "Voucher"
    },
     {
       label: "Employees",
@@ -314,9 +314,10 @@
   ];
 
   // Order in which groups appear in the admin grouped sidebar.
-  const GROUP_ORDER = ["Administration", "Employees", "OPD", "Lab", "Marketing", "IPD", "Pharmacy", "Reports"];
+  const GROUP_ORDER = ["Administration", "Voucher","Employees", "OPD", "Lab", "Marketing", "IPD", "Pharmacy", "Reports"];
   const GROUP_ICONS = {
     "Administration": "🛡️",
+    "Voucher":"💵",
     "Employees": "👥",
     "OPD": "🏥",
     "Lab": "🧪",
