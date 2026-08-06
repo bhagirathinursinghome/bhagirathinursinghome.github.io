@@ -150,7 +150,7 @@
     { label: "Refer Search", 
      icon: "🔎", 
      page: "pages/refer_search.html",
-    roles: ["admin","accountant","manager", "viewer"] }
+    roles: ["admin","accountant","manager", "viewer"] },
 
     // ==========================================
     // IPD
