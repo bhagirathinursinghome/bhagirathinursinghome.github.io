@@ -147,6 +147,10 @@
       page: "pages/call-refer.html", 
       roles: ["admin","manager","accountant","viewer", "reception"] 
     },
+    { label: "Refer Search", 
+     icon: "🔎", 
+     page: "pages/refer_search.html",
+    roles: ["admin","accountant","manager", "viewer"] }
 
     // ==========================================
     // IPD
