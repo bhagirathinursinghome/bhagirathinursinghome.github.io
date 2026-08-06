@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Refer Search</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .tab-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+    .tab-btn { padding:.5rem 1.1rem; border:2px solid #6366f1; border-radius:8px; background:#fff;
+               color:#6366f1; font-weight:600; cursor:pointer; transition:all .2s; }
+    .tab-btn.active { background:#6366f1; color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; }
+    .form-row > * { flex:1; min-width:170px; }
+    .form-row label { display:block; font-size:.8rem; font-weight:600; color:#475569; margin-bottom:.3rem; }
+    .form-row input, .form-row select {
+      width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:6px;
+      padding:.5rem .65rem; font-size:.88rem;
+    }
+    .form-row input:focus, .form-row select:focus { outline:none; border-color:#6366f1; }
+
+    .form-card { background:#f8f9ff; border:1px solid #c7d2fe; border-radius:10px; padding:1rem 1.1rem; margin-top:.75rem; }
+    .section-title { font-size:.9rem; font-weight:700; color:#312e81; margin:1.2rem 0 .5rem;
+                      padding-bottom:.3rem; border-bottom:1px solid #e0e7ff; }
+
+    .summary-cards { display:flex; gap:.75rem; flex-wrap:wrap; margin:.9rem 0; }
+    .s-card { flex:1; min-width:140px; background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+               padding:.7rem .9rem; }
+    .s-card .lbl { font-size:.72rem; color:#64748b; font-weight:600; text-transform:uppercase; }
+    .s-card .val { font-size:1.15rem; font-weight:700; color:#1e293b; margin-top:.15rem; }
+    .s-card.due .val { color:#b45309; }
+    .s-card.paid .val { color:#059669; }
+
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; font-size:.82rem; }
+    th { background:#f0f0f0; padding:7px 8px; text-align:left; white-space:nowrap; cursor:pointer; user-select:none; }
+    th:hover { background:#e5e7eb; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; vertical-align:middle; }
+    .r { text-align:right; }
+    tr.case-row { cursor:pointer; }
+    tr.case-row:hover td { background:#f8fafc; }
+    tr.aging td { background:#fff7ed; }
+    tr.detail-row td { background:#fafaff; padding:0; }
+    .detail-wrap { padding:.5rem 1rem .8rem 2.2rem; }
+    .detail-wrap table { margin-top:.25rem; font-size:.78rem; }
+    .detail-wrap th { background:#eef2ff; }
+    .no-pay { color:#94a3b8; font-style:italic; font-size:.8rem; }
+
+    .pill { display:inline-block; padding:2px 9px; border-radius:12px; font-size:.72rem; font-weight:700; white-space:nowrap; }
+    .pill-type-opd { background:#dbeafe; color:#1e40af; }
+    .pill-type-ipd { background:#ede9fe; color:#5b21b6; }
+    .pill-paid    { background:#d1fae5; color:#065f46; }
+    .pill-partial { background:#fef3c7; color:#92400e; }
+    .pill-due     { background:#fee2e2; color:#991b1b; }
+    .pill-na      { background:#e2e8f0; color:#475569; }
+    .pill-unlinked{ background:#fef3c7; color:#92400e; }
+
+    .search-count { font-size:.78rem; color:#666; margin:.4rem 0 .2rem; }
+    .err  { color:#dc2626; font-size:.85rem; margin-top:.5rem; white-space:pre-wrap; }
+    .toolbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem; margin-top:.75rem; }
+    .btn-ghost { background:#fff; border:1px solid #cbd5e1; color:#334155; padding:.4rem .8rem; border-radius:6px;
+                 font-size:.8rem; font-weight:600; cursor:pointer; }
+    .btn-ghost:hover { background:#f1f5f9; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<datalist id="referNameOptions"></datalist>
+
+<div class="page">
+  <h1>🔎 Refer Search</h1>
+  <p style="font-size:.85rem;color:#666;margin-bottom:1rem">
+    Look up refer/commission details for any OPD or IPD case — by patient name, case/admission no,
+    or by a doctor's refer name — including refer amount, paid amount, due, and voucher history.
+  </p>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('patientTab',this)">🧍 Search by Patient / Case</button>
+    <button class="tab-btn" onclick="switchTab('referTab',this)">👨‍⚕️ Search by Refer Name</button>
+  </div>
+
+  <!-- ══════════════════ SEARCH BY PATIENT / CASE ══════════════════ -->
+  <div id="patientTab" class="tab-panel active">
+    <div class="page-card">
+      <div class="form-card">
+        <div class="form-row">
+          <div style="flex:2">
+            <label>Patient Name / Case No. / Admission No.</label>
+            <input id="pQuery" placeholder="e.g. Rahim Sk, OPD-0231, or IPD-1042" onkeydown="if(event.key==='Enter')searchPatient()"/>
+          </div>
+          <div><label>Case Type</label>
+            <select id="pType"><option value="all">OPD + IPD</option><option value="OPD">OPD only</option><option value="IPD">IPD only</option></select>
+          </div>
+          <div><label>Status</label>
+            <select id="pStatus">
+              <option value="all">All</option>
+              <option value="due">Due / Partial</option>
+              <option value="paid">Fully Paid</option>
+              <option value="unlinked">Refer not set</option>
+              <option value="na">Refer N/A</option>
+            </select>
+          </div>
+          <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="searchPatient()">🔍 Search</button></div>
+        </div>
+        <div class="form-row" style="margin-top:.4rem">
+          <div><label>Case Date From (optional)</label><input id="pFrom" type="date"/></div>
+          <div><label>Case Date To (optional)</label><input id="pTo" type="date"/></div>
+        </div>
+        <p class="search-count" id="pCount"></p>
+        <p class="err" id="pErr"></p>
+        <div id="pSummary"></div>
+        <div id="pResults"></div>
+        <div class="toolbar" id="pToolbar" style="display:none">
+          <span></span>
+          <button class="btn-ghost" onclick="exportRows(patientRows,'refer_search_patient')">⬇️ Export to Excel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ SEARCH BY REFER NAME ══════════════════ -->
+  <div id="referTab" class="tab-panel">
+    <div class="page-card">
+      <div class="form-card">
+        <div class="form-row">
+          <div style="flex:2">
+            <label>Refer / Doctor Name</label>
+            <input id="rQuery" list="referNameOptions" placeholder="e.g. Dr. S. Roy" onkeydown="if(event.key==='Enter')searchRefer()"/>
+          </div>
+          <div><label>Case Type</label>
+            <select id="rType"><option value="all">OPD + IPD</option><option value="OPD">OPD only</option><option value="IPD">IPD only</option></select>
+          </div>
+          <div><label>Status</label>
+            <select id="rStatus">
+              <option value="all">All</option>
+              <option value="due">Due / Partial</option>
+              <option value="paid">Fully Paid</option>
+            </select>
+          </div>
+          <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="searchRefer()">🔍 Search</button></div>
+        </div>
+        <div class="form-row" style="margin-top:.4rem">
+          <div><label>Case Date From (optional)</label><input id="rFrom" type="date"/></div>
+          <div><label>Case Date To (optional)</label><input id="rTo" type="date"/></div>
+        </div>
+        <p class="search-count" id="rCount"></p>
+        <p class="err" id="rErr"></p>
+        <div id="rSummary"></div>
+        <div id="rResults"></div>
+        <div class="toolbar" id="rToolbar" style="display:none">
+          <span></span>
+          <button class="btn-ghost" onclick="exportRows(referRows,'refer_search_by_doctor')">⬇️ Export to Excel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+BNH_PAGE.requireRole(["admin","accountant","manager", "viewer"]);
+const sb = BNH_PAGE.sb;
+
+const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const todayISO = () => new Date().toISOString().slice(0,10);
+function spin(on){ document.getElementById('spinner').classList.toggle('hidden', !on); }
+function switchTab(id, btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-bar .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+function daysAgo(dateStr){
+  if (!dateStr) return null;
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+// ── row status classification ──────────────────────────────
+function classify(row){
+  if (row.referNA) return 'na';
+  if (!row.referName) return 'unlinked';
+  if (row.referAmount <= 0) return 'unlinked';
+  if (row.paid >= row.referAmount - 0.01) return 'paid';
+  if (row.paid > 0) return 'partial';
+  return 'due';
+}
+function statusPill(status){
+  const map = {
+    paid:     ['pill-paid','✅ Paid'],
+    partial:  ['pill-partial','◐ Partial'],
+    due:      ['pill-due','⏳ Due'],
+    na:       ['pill-na','🚫 N/A'],
+    unlinked: ['pill-unlinked','⚠️ Not Set']
+  };
+  const [cls,label] = map[status] || ['pill-na', status];
+  return `<span class="pill ${cls}">${label}</span>`;
+}
+
+// ── shared refer-name suggestions ──────────────────────────
+async function loadReferNameOptions(){
+  const names = new Set();
+  try{
+    const [a, b, c] = await Promise.all([
+      sb.from('opd_case').select('refer_name').not('refer_name','is',null),
+      sb.from('ipd_admissions').select('refer_name').not('refer_name','is',null),
+      sb.from('gramin_doctor_visits').select('doctor_name').not('doctor_name','is',null)
+    ]);
+    (a.data||[]).forEach(r=>{ const n=(r.refer_name||'').trim(); if (n) names.add(n); });
+    (b.data||[]).forEach(r=>{ const n=(r.refer_name||'').trim(); if (n) names.add(n); });
+    (c.data||[]).forEach(r=>{ const n=(r.doctor_name||'').trim(); if (n) names.add(n); });
+  } catch(e){ console.warn('loadReferNameOptions:', e.message); }
+  document.getElementById('referNameOptions').innerHTML =
+    [...names].sort().map(n=>`<option value="${esc(n)}"></option>`).join('');
+}
+
+// ── core fetch: builds unified OPD+IPD rows for a given filter set ──
+// filters: { q, refer, type, from, to }
+async function fetchRows(filters){
+  const rows = [];
+  const wantOpd = filters.type !== 'IPD';
+  const wantIpd = filters.type !== 'OPD';
+
+  // ---- OPD ----
+  if (wantOpd){
+    let q1 = sb.from('opd_case').select('case_no,case_date,patient_name,refer_name,refer_amount,refer_na');
+    if (filters.from) q1 = q1.gte('case_date', filters.from);
+    if (filters.to)   q1 = q1.lte('case_date', filters.to);
+    if (filters.q)    q1 = q1.or(`case_no.ilike.%${filters.q}%,patient_name.ilike.%${filters.q}%`);
+    if (filters.refer) q1 = q1.ilike('refer_name', `%${filters.refer}%`);
+    const { data: cases, error } = await q1.order('case_date',{ascending:false}).limit(500);
+    if (error) throw error;
+    const list = cases || [];
+    const caseNos = list.map(c=>c.case_no);
+    const { data: pays } = caseNos.length
+      ? await sb.from('opd_refer_payment').select('case_no,payment_date,voucher_no,amount,mode,remarks').in('case_no',caseNos)
+      : { data: [] };
+    const payMap = {};
+    (pays||[]).forEach(p=>{ (payMap[p.case_no] = payMap[p.case_no]||[]).push(p); });
+    list.forEach(c=>{
+      const payments = (payMap[c.case_no]||[]).sort((a,b)=>(a.payment_date||'').localeCompare(b.payment_date||''));
+      const paid = payments.reduce((s,p)=>s+parseFloat(p.amount||0),0);
+      const referAmount = parseFloat(c.refer_amount||0);
+      rows.push({
+        type:'OPD', key:'opd-'+c.case_no, no:c.case_no, date:c.case_date, patient:c.patient_name,
+        referName:(c.refer_name||'').trim(), referAmount, paid, due: referAmount-paid,
+        referNA: !!c.refer_na, payments
+      });
+    });
+  }
+
+  // ---- IPD ----
+  if (wantIpd){
+    let q2 = sb.from('ipd_admissions').select('id,admission_date,admission_no,patient_name,refer_name,refer_na');
+    if (filters.from) q2 = q2.gte('admission_date', filters.from);
+    if (filters.to)   q2 = q2.lte('admission_date', filters.to);
+    if (filters.q)    q2 = q2.or(`admission_no.ilike.%${filters.q}%,patient_name.ilike.%${filters.q}%`);
+    if (filters.refer) q2 = q2.ilike('refer_name', `%${filters.refer}%`);
+    const { data: adms, error } = await q2.order('admission_date',{ascending:false}).limit(500);
+    if (error) throw error;
+    const list = adms || [];
+    const ids = list.map(r=>r.id);
+    const { data: amtEntries } = ids.length
+      ? await sb.from('ipd_amount_entries').select('admission_id,refer_amount').in('admission_id',ids) : {data:[]};
+    const amtMap = {}; (amtEntries||[]).forEach(a=>amtMap[a.admission_id]=parseFloat(a.refer_amount||0));
+    const { data: pays } = ids.length
+      ? await sb.from('ipd_refer_payments').select('admission_id,payment_date,voucher_no,amount,mode,remark').in('admission_id',ids) : {data:[]};
+    const payMap = {}; (pays||[]).forEach(p=>{ (payMap[p.admission_id]=payMap[p.admission_id]||[]).push(p); });
+    list.forEach(r=>{
+      const payments = (payMap[r.id]||[]).sort((a,b)=>(a.payment_date||'').localeCompare(b.payment_date||''));
+      const paid = payments.reduce((s,p)=>s+parseFloat(p.amount||0),0);
+      const referAmount = amtMap[r.id] || 0;
+      rows.push({
+        type:'IPD', key:'ipd-'+r.id, no:r.admission_no, date:r.admission_date, patient:r.patient_name,
+        referName:(r.refer_name||'').trim(), referAmount, paid, due: referAmount-paid,
+        referNA: !!r.refer_na, payments: payments.map(p=>({...p, remarks:p.remark}))
+      });
+    });
+  }
+
+  rows.forEach(r=>{ r.status = classify(r); r.dueDays = daysAgo(r.date); });
+  rows.sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  return rows;
+}
+
+function applyStatusFilter(rows, status){
+  if (status === 'all') return rows;
+  if (status === 'due') return rows.filter(r=>r.status==='due' || r.status==='partial');
+  return rows.filter(r=>r.status===status);
+}
+
+// ── rendering (shared table builder) ─────────────────────────
+function renderTable(containerId, rows, showReferCol){
+  const box = document.getElementById(containerId);
+  if (!rows.length){ box.innerHTML = '<p style="color:#888">No matching cases found.</p>'; return; }
+  const cols = ['Type','Patient','Case/Adm No.','Date'];
+  if (showReferCol) cols.push('Refer Name');
+  cols.push('Refer Amt','Paid','Due','Last Paid','Voucher No(s)','Status');
+
+  box.innerHTML = `<table>
+    <thead><tr>${cols.map((c,i)=>`<th onclick="sortRows('${containerId}',${i})">${c}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>{
+      const lastPaid = r.payments.length ? r.payments[r.payments.length-1].payment_date : '';
+      const vouchers = [...new Set(r.payments.map(p=>p.voucher_no).filter(Boolean))].join(', ');
+      const aging = (r.status==='due' || r.status==='partial') && r.dueDays!=null && r.dueDays>30;
+      return `
+      <tr class="case-row ${aging?'aging':''}" onclick="toggleDetail('${r.key}')">
+        <td><span class="pill pill-type-${r.type.toLowerCase()}">${r.type}</span></td>
+        <td>${esc(r.patient)}</td>
+        <td>${esc(r.no)}</td>
+        <td>${esc(r.date||'')}${aging?` <span title="Due ${r.dueDays} days" style="color:#b45309">⏰</span>`:''}</td>
+        ${showReferCol ? `<td>${esc(r.referName)||'<span class="no-pay">—</span>'}</td>` : ''}
+        <td class="r">${r.referAmount ? fmt(r.referAmount) : '<span class="no-pay">—</span>'}</td>
+        <td class="r">${fmt(r.paid)}</td>
+        <td class="r">${r.referNA ? '<span class="no-pay">—</span>' : fmt(Math.max(0,r.due))}</td>
+        <td>${esc(lastPaid||'')||'<span class="no-pay">—</span>'}</td>
+        <td>${esc(vouchers)||'<span class="no-pay">—</span>'}</td>
+        <td>${statusPill(r.status)}</td>
+      </tr>
+      <tr class="detail-row hidden" id="detail-${r.key}"><td colspan="${cols.length}">
+        <div class="detail-wrap">
+        ${r.payments.length ? `
+          <table><thead><tr><th>Payment Date</th><th>Voucher No</th><th>Mode</th><th class="r">Amount</th><th>Remark</th></tr></thead>
+          <tbody>${r.payments.map(p=>`<tr>
+            <td>${esc(p.payment_date||'')}</td><td>${esc(p.voucher_no||'')}</td><td>${esc(p.mode||'')}</td>
+            <td class="r">${fmt(p.amount)}</td><td>${esc(p.remarks||'')}</td>
+          </tr>`).join('')}</tbody></table>
+        ` : `<p class="no-pay">No payments recorded yet for this case.</p>`}
+        </div>
+      </td></tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+function toggleDetail(key){
+  const el = document.getElementById('detail-'+key);
+  if (el) el.classList.toggle('hidden');
+}
+function renderSummary(containerId, rows){
+  const totalRefer = rows.reduce((s,r)=>s+r.referAmount,0);
+  const totalPaid  = rows.reduce((s,r)=>s+r.paid,0);
+  const totalDue   = rows.reduce((s,r)=>s+Math.max(0,r.due),0);
+  document.getElementById(containerId).innerHTML = `<div class="summary-cards">
+    <div class="s-card"><div class="lbl">Cases Found</div><div class="val">${rows.length}</div></div>
+    <div class="s-card"><div class="lbl">Total Refer Amount</div><div class="val">${fmt(totalRefer)}</div></div>
+    <div class="s-card paid"><div class="lbl">Total Paid</div><div class="val">${fmt(totalPaid)}</div></div>
+    <div class="s-card due"><div class="lbl">Total Due</div><div class="val">${fmt(totalDue)}</div></div>
+  </div>`;
+}
+
+// simple client-side column sort toggle
+let sortState = {};
+function sortRows(containerId, colIdx){
+  const rows = containerId==='pResults' ? patientRows : referRows;
+  const key = containerId+colIdx;
+  sortState[key] = !sortState[key];
+  const dir = sortState[key] ? 1 : -1;
+  const getters = [
+    r=>r.type, r=>r.patient, r=>r.no, r=>r.date, r=>r.referName,
+    r=>r.referAmount, r=>r.paid, r=>r.due, r=>(r.payments.length?r.payments[r.payments.length-1].payment_date:''),
+    r=>'', r=>r.status
+  ];
+  // account for hidden refer-name column on referTab
+  const showReferCol = containerId==='pResults';
+  const g = showReferCol ? getters : getters.filter((_,i)=>i!==4);
+  rows.sort((a,b)=>{
+    const va = g[colIdx](a), vb = g[colIdx](b);
+    if (typeof va === 'number') return (va-vb)*dir;
+    return String(va).localeCompare(String(vb))*dir;
+  });
+  renderTable(containerId, rows, showReferCol);
+}
+
+// ── export ──
+function exportRows(rows, filenamePrefix){
+  if (!rows || !rows.length) return;
+  const data = rows.map(r=>({
+    Type: r.type, Patient: r.patient, 'Case/Adm No': r.no, Date: r.date,
+    'Refer Name': r.referName, 'Refer Amount': r.referAmount, 'Paid': r.paid,
+    'Due': Math.max(0,r.due),
+    'Last Paid Date': r.payments.length ? r.payments[r.payments.length-1].payment_date : '',
+    'Voucher No(s)': [...new Set(r.payments.map(p=>p.voucher_no).filter(Boolean))].join(', '),
+    Status: r.status
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Refer Search');
+  XLSX.writeFile(wb, `${filenamePrefix}_${todayISO()}.xlsx`);
+}
+
+// ── Search by Patient / Case ──
+let patientRows = [];
+async function searchPatient(){
+  const err = document.getElementById('pErr'); err.textContent = '';
+  const q = document.getElementById('pQuery').value.trim();
+  const type = document.getElementById('pType').value;
+  const status = document.getElementById('pStatus').value;
+  const from = document.getElementById('pFrom').value || null;
+  const to = document.getElementById('pTo').value || null;
+  if (!q && !from && !to){ err.textContent = 'Enter a patient name / case no. / admission no., or a date range, to search.'; return; }
+  spin(true);
+  try{
+    let rows = await fetchRows({ q, type: type==='all'?null:type, from, to });
+    rows = applyStatusFilter(rows, status);
+    patientRows = rows;
+    document.getElementById('pCount').textContent = `${rows.length} case(s) found.`;
+    renderSummary('pSummary', rows);
+    renderTable('pResults', rows, true);
+    document.getElementById('pToolbar').style.display = rows.length ? 'flex' : 'none';
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ── Search by Refer Name ──
+let referRows = [];
+async function searchRefer(){
+  const err = document.getElementById('rErr'); err.textContent = '';
+  const refer = document.getElementById('rQuery').value.trim();
+  const type = document.getElementById('rType').value;
+  const status = document.getElementById('rStatus').value;
+  const from = document.getElementById('rFrom').value || null;
+  const to = document.getElementById('rTo').value || null;
+  if (!refer){ err.textContent = 'Enter a refer / doctor name to search.'; return; }
+  spin(true);
+  try{
+    let rows = await fetchRows({ refer, type: type==='all'?null:type, from, to });
+    rows = applyStatusFilter(rows, status);
+    referRows = rows;
+    document.getElementById('rCount').textContent = `${rows.length} case(s) found for "${refer}".`;
+    renderSummary('rSummary', rows);
+    renderTable('rResults', rows, false);
+    document.getElementById('rToolbar').style.display = rows.length ? 'flex' : 'none';
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ── init ──
+loadReferNameOptions();
+</script>
+</body>
+</html>
