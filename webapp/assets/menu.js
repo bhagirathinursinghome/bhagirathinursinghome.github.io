@@ -87,7 +87,7 @@
       icon: "💳",
       page: "pages/add-credit.html",
       roles: ["admin", "accountant"],
-      group: "Employees"
+      group: "Voucher"
     },
 
     // ==========================================
@@ -121,6 +121,14 @@
       roles: ["admin", "manager", "accountant"],
       group: "OPD"
     },
+    { label: "Cash Receipts Import", 
+     icon: "📥", 
+     page: "pages/cash_receipts_import.html",
+     roles: ["admin","accountant"] ,
+     group: "OPD"
+    }
+
+    
     // ==========================================
     // LAB
     // ==========================================
