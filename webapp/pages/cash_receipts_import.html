@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Cash Receipts</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .map-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin:1rem 0}
+    .map-grid label{display:block;font-size:.85rem;margin-bottom:.25rem}
+    .map-grid select{width:100%}
+    table.prev{width:100%;border-collapse:collapse;font-size:.85rem}
+    table.prev th,table.prev td{border:1px solid #ddd;padding:4px 6px;text-align:left}
+    table.prev input,table.prev select{width:100%;border:1px solid #ccc;padding:2px 4px;font-size:.85rem}
+    table.prev tr.excluded{opacity:.35}
+    .scrollbox{max-height:420px;overflow:auto;margin-top:1rem}
+    .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.75rem;background:#eee;margin-left:.5rem}
+    .row-actions{margin:.75rem 0;display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}
+    .step{font-weight:600;margin-top:1.25rem}
+    .tabs{display:flex;gap:.5rem;margin-bottom:1rem;border-bottom:2px solid #eee}
+    .tab-btn{background:none;border:none;padding:.6rem 1rem;font-size:1rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px}
+    .tab-btn.active{border-bottom:2px solid #2563eb;font-weight:600;color:#2563eb}
+    .filters{display:flex;gap:.75rem;flex-wrap:wrap;align-items:end;margin-bottom:1rem}
+    .filters label{display:block;font-size:.8rem;margin-bottom:.2rem}
+    .agg-cards{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+    .agg-card{background:#f8f9fb;border:1px solid #eee;border-radius:8px;padding:.75rem 1rem;min-width:140px}
+    .agg-card .num{font-size:1.4rem;font-weight:700}
+    .agg-card .lbl{font-size:.75rem;color:#666}
+    table.byrec{width:100%;max-width:420px;border-collapse:collapse;font-size:.85rem;margin-bottom:1rem}
+    table.byrec th,table.byrec td{border:1px solid #ddd;padding:4px 8px;text-align:left}
+    .del-btn{background:#dc2626;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:.8rem}
+    .save-btn{background:#16a34a;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:.8rem}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>📥 Cash Receipts</h1>
+
+  <div class="page-card">
+    <div class="tabs">
+      <button class="tab-btn active" id="tabImportBtn">Import</button>
+      <button class="tab-btn" id="tabViewBtn">View &amp; Manage</button>
+    </div>
+
+    <!-- ===================== IMPORT TAB ===================== -->
+    <div id="tabImport">
+      <div class="step">1. Choose file</div>
+      <p style="font-size:.85rem;color:#666">Accepts .xls / .xlsx / .csv cash register exports.</p>
+      <input type="file" id="fileInput" accept=".xls,.xlsx,.csv" />
+
+      <div id="mapSection" style="display:none">
+        <div class="step">2. Map columns</div>
+        <p style="font-size:.85rem;color:#666">Pick which column holds each field. Sample values from the first detected data row are shown under each dropdown. "Recorded By" is the staff name in the file (e.g. ELAHI, AFSANA) — not the person uploading it.</p>
+        <div class="map-grid" id="mapGrid"></div>
+        <button class="btn-primary" style="width:auto" id="previewBtn">Build Preview</button>
+      </div>
+
+      <div id="previewSection" style="display:none">
+        <div class="step">3. Review &amp; edit rows <span class="pill" id="rowCount"></span></div>
+        <p style="font-size:.85rem;color:#666">Untick any row you don't want to import. Edit any cell directly if needed.</p>
+        <div class="scrollbox">
+          <table class="prev" id="prevTable"></table>
+        </div>
+        <div class="row-actions">
+          <button class="btn-primary" style="width:auto" id="uploadBtn">Upload checked rows</button>
+          <span id="uploadStatus"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== VIEW TAB ===================== -->
+    <div id="tabView" style="display:none">
+      <div class="filters">
+        <div>
+          <label>From date</label>
+          <input type="date" id="fFrom" />
+        </div>
+        <div>
+          <label>To date</label>
+          <input type="date" id="fTo" />
+        </div>
+        <div>
+          <label>Recorded By</label>
+          <select id="fRecordedBy"><option value="">All</option></select>
+        </div>
+        <div>
+          <label>Search name / trans no</label>
+          <input type="text" id="fSearch" placeholder="type to search" />
+        </div>
+        <div>
+          <button class="btn-primary" style="width:auto" id="loadBtn">Apply filters</button>
+        </div>
+      </div>
+
+      <div class="agg-cards" id="aggCards"></div>
+      <table class="byrec" id="byRecTable"></table>
+
+      <div class="scrollbox">
+        <table class="prev" id="viewTable"></table>
+      </div>
+      <span id="viewStatus"></span>
+    </div>
+
+    <p class="err" id="err"></p>
+    <p class="info" id="ok" style="display:none"></p>
+  </div>
+</div>
+
+<!-- REQUIRED scripts, in this order -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+  // 1. Role guard
+  BNH_PAGE.requireRole(["admin","accountant"]);
+
+  // ---------- Tab switching ----------
+  const tabImportBtn = document.getElementById('tabImportBtn');
+  const tabViewBtn = document.getElementById('tabViewBtn');
+  const tabImport = document.getElementById('tabImport');
+  const tabView = document.getElementById('tabView');
+
+  tabImportBtn.addEventListener('click', () => {
+    tabImportBtn.classList.add('active');
+    tabViewBtn.classList.remove('active');
+    tabImport.style.display = 'block';
+    tabView.style.display = 'none';
+  });
+  tabViewBtn.addEventListener('click', () => {
+    tabViewBtn.classList.add('active');
+    tabImportBtn.classList.remove('active');
+    tabView.style.display = 'block';
+    tabImport.style.display = 'none';
+    loadViewData();
+  });
+
+  // =====================================================================
+  // IMPORT TAB
+  // =====================================================================
+  const FIELDS = [
+    { key: 'date_col',   label: 'Date',            guesses: ['case dt', 'date'] },
+    { key: 'trans_col',  label: 'Transaction No',  guesses: ['trans no', 'transaction'] },
+    { key: 'name_col',   label: 'Name',            guesses: ['name / particular', 'name'] },
+    { key: 'recby_col',  label: 'Recorded By',     guesses: ['entry by', 'entered by', 'recorded by'] },
+    { key: 'amt_col',    label: 'Received Amount', guesses: ['expense', 'amount', 'bill amt'] },
+  ];
+
+  let rawRows = [];
+  let numCols = 0;
+  let parsedRows = [];
+
+  function colLetter(i){
+    let s = '';
+    i += 1;
+    while (i > 0) {
+      const m = (i - 1) % 26;
+      s = String.fromCharCode(65 + m) + s;
+      i = Math.floor((i - m) / 26);
+    }
+    return s;
+  }
+
+  document.getElementById('fileInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('err').textContent = '';
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+      numCols = rawRows.reduce((m, r) => Math.max(m, r.length), 0);
+      buildMapUI();
+      document.getElementById('mapSection').style.display = 'block';
+      document.getElementById('previewSection').style.display = 'none';
+    } catch (err) {
+      document.getElementById('err').textContent = 'Could not read file: ' + err.message;
+    }
+  });
+
+  function cellText(v){
+    if (v === null || v === undefined) return '';
+    if (v instanceof Date) return v.toISOString().slice(0,10);
+    return String(v).trim();
+  }
+
+  function guessColumn(guesses){
+    for (const row of rawRows) {
+      for (let c = 0; c < row.length; c++) {
+        const t = cellText(row[c]).toLowerCase();
+        if (guesses.some(g => t.includes(g))) return c;
+      }
+    }
+    return -1;
+  }
+
+  function sampleValuesForCol(c){
+    const samples = [];
+    for (const row of rawRows) {
+      const nonEmpty = row.filter(v => cellText(v) !== '').length;
+      if (nonEmpty >= 4 && cellText(row[c]) !== '') {
+        samples.push(cellText(row[c]));
+        if (samples.length >= 2) break;
+      }
+    }
+    return samples;
+  }
+
+  function buildMapUI(){
+    const grid = document.getElementById('mapGrid');
+    grid.innerHTML = '';
+    FIELDS.forEach(f => {
+      const guessed = guessColumn(f.guesses);
+      const wrap = document.createElement('div');
+      const label = document.createElement('label');
+      label.textContent = f.label;
+      const select = document.createElement('select');
+      select.id = 'sel_' + f.key;
+      for (let c = 0; c < numCols; c++) {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = 'Column ' + colLetter(c);
+        if (c === guessed) opt.selected = true;
+        select.appendChild(opt);
+      }
+      const sampleEl = document.createElement('div');
+      sampleEl.style.fontSize = '.75rem';
+      sampleEl.style.color = '#888';
+      const updateSample = () => {
+        const c = parseInt(select.value, 10);
+        sampleEl.textContent = 'e.g. ' + sampleValuesForCol(c).join(' / ');
+      };
+      select.addEventListener('change', updateSample);
+      updateSample();
+      wrap.appendChild(label);
+      wrap.appendChild(select);
+      wrap.appendChild(sampleEl);
+      grid.appendChild(wrap);
+    });
+  }
+
+  function parseAmount(v){
+    if (typeof v === 'number') return v;
+    const n = parseFloat(String(v).replace(/,/g, ''));
+    return isNaN(n) ? null : n;
+  }
+
+  function parseDateVal(v){
+    if (v instanceof Date) return v.toISOString().slice(0,10);
+    const s = cellText(v);
+    if (!s) return '';
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+    return s;
+  }
+
+  document.getElementById('previewBtn').addEventListener('click', async () => {
+    const dateCol = parseInt(document.getElementById('sel_date_col').value, 10);
+    const transCol = parseInt(document.getElementById('sel_trans_col').value, 10);
+    const nameCol = parseInt(document.getElementById('sel_name_col').value, 10);
+    const recByCol = parseInt(document.getElementById('sel_recby_col').value, 10);
+    const amtCol = parseInt(document.getElementById('sel_amt_col').value, 10);
+
+    parsedRows = [];
+    const seenInFile = new Set();
+    let dupInFileCount = 0;
+
+    for (const row of rawRows) {
+      const transRaw = cellText(row[transCol]);
+      const amtRaw = parseAmount(row[amtCol]);
+      if (!transRaw || amtRaw === null || amtRaw <= 0) continue;
+      if (!/\d/.test(transRaw)) continue;
+
+      const key = transRaw.toLowerCase();
+      if (seenInFile.has(key)) {
+        // Same Trans No appears more than once in this file — keep only the first occurrence.
+        dupInFileCount++;
+        continue;
+      }
+      seenInFile.add(key);
+
+      parsedRows.push({
+        receipt_date: parseDateVal(row[dateCol]),
+        trans_no: transRaw,
+        patient_name: cellText(row[nameCol]),
+        recorded_by: cellText(row[recByCol]),
+        received_amount: amtRaw,
+        included: true
+      });
+    }
+
+    if (dupInFileCount > 0) {
+      document.getElementById('err').textContent =
+        'Note: ' + dupInFileCount + ' row(s) had a Transaction No already seen earlier in this file and were skipped (only the first occurrence is kept).';
+    } else {
+      document.getElementById('err').textContent = '';
+    }
+
+    await flagAlreadyImported();
+    renderPreview();
+  });
+
+  // Cross-check against rows already saved in Supabase, so re-importing the
+  // same report clearly shows which rows will UPDATE existing data rather
+  // than silently create anything new (trans_no is unique in the database).
+  async function flagAlreadyImported(){
+    if (parsedRows.length === 0) return;
+    try {
+      const transNos = parsedRows.map(r => r.trans_no);
+      const { data, error } = await BNH_PAGE.sb
+        .from('cash_receipts')
+        .select('trans_no')
+        .in('trans_no', transNos);
+      if (error) throw error;
+      const existing = new Set((data || []).map(r => r.trans_no));
+      parsedRows.forEach(r => { r.alreadyExists = existing.has(r.trans_no); });
+    } catch (err) {
+      // Non-fatal — if this check fails, upload still relies on the DB's
+      // unique constraint to prevent duplicates.
+      parsedRows.forEach(r => { r.alreadyExists = false; });
+    }
+  }
+
+  function renderPreview(){
+    const table = document.getElementById('prevTable');
+    table.innerHTML = '';
+    const thead = document.createElement('tr');
+    ['', 'Date', 'Trans No', 'Name', 'Recorded By', 'Received Amount', 'Status'].forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      thead.appendChild(th);
+    });
+    table.appendChild(thead);
+
+    parsedRows.forEach((r, idx) => {
+      const tr = document.createElement('tr');
+      tr.id = 'row_' + idx;
+
+      const tdChk = document.createElement('td');
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.checked = r.included;
+      chk.addEventListener('change', () => {
+        r.included = chk.checked;
+        tr.classList.toggle('excluded', !chk.checked);
+      });
+      tdChk.appendChild(chk);
+      tr.appendChild(tdChk);
+
+      const fieldsInRow = [
+        ['receipt_date', 'text'],
+        ['trans_no', 'text'],
+        ['patient_name', 'text'],
+        ['recorded_by', 'text'],
+        ['received_amount', 'number']
+      ];
+      fieldsInRow.forEach(([key, type]) => {
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = type;
+        input.value = r[key];
+        input.addEventListener('input', () => {
+          r[key] = type === 'number' ? parseFloat(input.value) : input.value;
+        });
+        td.appendChild(input);
+        tr.appendChild(td);
+      });
+
+      const tdStatus = document.createElement('td');
+      tdStatus.style.fontSize = '.75rem';
+      if (r.alreadyExists) {
+        tdStatus.textContent = 'Already saved — will update';
+        tdStatus.style.color = '#b45309';
+      } else {
+        tdStatus.textContent = 'New';
+        tdStatus.style.color = '#16a34a';
+      }
+      tr.appendChild(tdStatus);
+
+      table.appendChild(tr);
+    });
+
+    document.getElementById('rowCount').textContent = parsedRows.length + ' rows found';
+    document.getElementById('previewSection').style.display = 'block';
+  }
+
+  document.getElementById('uploadBtn').addEventListener('click', async () => {
+    const spinner = document.getElementById('spinner');
+    const status = document.getElementById('uploadStatus');
+    document.getElementById('err').textContent = '';
+    document.getElementById('ok').style.display = 'none';
+
+    const toUpload = parsedRows
+      .filter(r => r.included)
+      .map(r => ({
+        receipt_date: r.receipt_date,
+        trans_no: r.trans_no,
+        patient_name: r.patient_name,
+        recorded_by: r.recorded_by,
+        received_amount: r.received_amount,
+        imported_by: BNH_PAGE.user.username,
+        imported_by_name: BNH_PAGE.user.name,
+        imported_at: new Date().toISOString()
+      }));
+
+    if (toUpload.length === 0) {
+      document.getElementById('err').textContent = 'No rows checked to upload.';
+      return;
+    }
+
+    // Guard against duplicate trans_no within the batch (e.g. from manual edits),
+    // since a single upsert call cannot touch the same key twice.
+    const seen = new Set();
+    for (const row of toUpload) {
+      const key = String(row.trans_no).trim().toLowerCase();
+      if (seen.has(key)) {
+        document.getElementById('err').textContent =
+          'Duplicate Transaction No "' + row.trans_no + '" found among checked rows. Fix or untick one before uploading.';
+        return;
+      }
+      seen.add(key);
+    }
+
+    spinner.classList.remove('hidden');
+    status.textContent = 'Uploading ' + toUpload.length + ' rows...';
+    try {
+      const { error } = await BNH_PAGE.sb
+        .from('cash_receipts')
+        .upsert(toUpload, { onConflict: 'trans_no' });
+      if (error) throw error;
+
+      document.getElementById('ok').style.display = 'block';
+      document.getElementById('ok').textContent =
+        'Saved ' + toUpload.length + ' rows successfully (existing trans_no rows were updated, not duplicated).';
+      status.textContent = '';
+    } catch (err) {
+      document.getElementById('err').textContent = err.message;
+      status.textContent = '';
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  });
+
+  // =====================================================================
+  // VIEW & MANAGE TAB
+  // =====================================================================
+  let viewRows = [];
+  let recordedByOptionsLoaded = false;
+
+  async function populateRecordedByFilter(){
+    if (recordedByOptionsLoaded) return;
+    try {
+      const { data, error } = await BNH_PAGE.sb
+        .from('cash_receipts')
+        .select('recorded_by');
+      if (error) throw error;
+      const uniq = [...new Set((data || []).map(r => r.recorded_by).filter(Boolean))].sort();
+      const sel = document.getElementById('fRecordedBy');
+      uniq.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
+      });
+      recordedByOptionsLoaded = true;
+    } catch (err) {
+      // non-fatal, filter dropdown just stays with "All"
+    }
+  }
+
+  async function loadViewData(){
+    await populateRecordedByFilter();
+
+    const from = document.getElementById('fFrom').value;
+    const to = document.getElementById('fTo').value;
+    const recBy = document.getElementById('fRecordedBy').value;
+    const search = document.getElementById('fSearch').value.trim();
+
+    const status = document.getElementById('viewStatus');
+    status.textContent = 'Loading...';
+    document.getElementById('err').textContent = '';
+
+    try {
+      let q = BNH_PAGE.sb.from('cash_receipts').select('*').order('receipt_date', { ascending: false });
+      if (from) q = q.gte('receipt_date', from);
+      if (to) q = q.lte('receipt_date', to);
+      if (recBy) q = q.eq('recorded_by', recBy);
+      if (search) q = q.or('patient_name.ilike.%' + search + '%,trans_no.ilike.%' + search + '%');
+
+      const { data, error } = await q;
+      if (error) throw error;
+      viewRows = data || [];
+      renderViewTable();
+      renderAggregates();
+      status.textContent = viewRows.length + ' rows';
+    } catch (err) {
+      document.getElementById('err').textContent = err.message;
+      status.textContent = '';
+    }
+  }
+  document.getElementById('loadBtn').addEventListener('click', loadViewData);
+
+  function renderAggregates(){
+    const total = viewRows.reduce((s, r) => s + (parseFloat(r.received_amount) || 0), 0);
+    const count = viewRows.length;
+    const avg = count ? total / count : 0;
+
+    const cards = document.getElementById('aggCards');
+    cards.innerHTML = '';
+    [
+      ['Total Amount', '₹' + total.toLocaleString('en-IN', { maximumFractionDigits: 2 })],
+      ['Transactions', count],
+      ['Average', '₹' + avg.toLocaleString('en-IN', { maximumFractionDigits: 2 })]
+    ].forEach(([lbl, num]) => {
+      const div = document.createElement('div');
+      div.className = 'agg-card';
+      div.innerHTML = '<div class="num">' + num + '</div><div class="lbl">' + lbl + '</div>';
+      cards.appendChild(div);
+    });
+
+    const byRec = {};
+    viewRows.forEach(r => {
+      const key = r.recorded_by || '(blank)';
+      if (!byRec[key]) byRec[key] = { count: 0, sum: 0 };
+      byRec[key].count += 1;
+      byRec[key].sum += parseFloat(r.received_amount) || 0;
+    });
+    const rows = Object.entries(byRec).sort((a, b) => b[1].sum - a[1].sum);
+
+    const table = document.getElementById('byRecTable');
+    table.innerHTML = '';
+    const thead = document.createElement('tr');
+    ['Recorded By', 'Count', 'Sum'].forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      thead.appendChild(th);
+    });
+    table.appendChild(thead);
+    rows.forEach(([name, agg]) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + name + '</td><td>' + agg.count + '</td><td>₹' +
+        agg.sum.toLocaleString('en-IN', { maximumFractionDigits: 2 }) + '</td>';
+      table.appendChild(tr);
+    });
+  }
+
+  function renderViewTable(){
+    const table = document.getElementById('viewTable');
+    table.innerHTML = '';
+    const thead = document.createElement('tr');
+    ['Date', 'Trans No', 'Name', 'Recorded By', 'Received Amount', 'Imported By', ''].forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      thead.appendChild(th);
+    });
+    table.appendChild(thead);
+
+    viewRows.forEach((r) => {
+      const tr = document.createElement('tr');
+
+      const editable = [
+        ['receipt_date', 'date'],
+        ['trans_no', 'text'],
+        ['patient_name', 'text'],
+        ['recorded_by', 'text'],
+        ['received_amount', 'number']
+      ];
+      editable.forEach(([key, type]) => {
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = type;
+        input.value = r[key] || '';
+        input.addEventListener('input', () => {
+          r[key] = type === 'number' ? parseFloat(input.value) : input.value;
+        });
+        td.appendChild(input);
+        tr.appendChild(td);
+      });
+
+      const tdImp = document.createElement('td');
+      tdImp.style.fontSize = '.75rem';
+      tdImp.style.color = '#888';
+      tdImp.textContent = r.imported_by_name || r.imported_by || '';
+      tr.appendChild(tdImp);
+
+      const tdActions = document.createElement('td');
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = 'Save';
+      saveBtn.className = 'save-btn';
+      saveBtn.style.marginRight = '4px';
+      saveBtn.addEventListener('click', () => saveRow(r));
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete';
+      delBtn.className = 'del-btn';
+      delBtn.addEventListener('click', () => deleteRow(r));
+      tdActions.appendChild(saveBtn);
+      tdActions.appendChild(delBtn);
+      tr.appendChild(tdActions);
+
+      table.appendChild(tr);
+    });
+  }
+
+  async function saveRow(r){
+    document.getElementById('err').textContent = '';
+    try {
+      const { error } = await BNH_PAGE.sb
+        .from('cash_receipts')
+        .update({
+          receipt_date: r.receipt_date,
+          trans_no: r.trans_no,
+          patient_name: r.patient_name,
+          recorded_by: r.recorded_by,
+          received_amount: r.received_amount
+        })
+        .eq('id', r.id);
+      if (error) throw error;
+      document.getElementById('viewStatus').textContent = 'Saved row (' + r.trans_no + ')';
+      renderAggregates();
+    } catch (err) {
+      document.getElementById('err').textContent = err.message;
+    }
+  }
+
+  async function deleteRow(r){
+    if (!confirm('Delete transaction ' + r.trans_no + ' for ' + r.patient_name + '?')) return;
+    document.getElementById('err').textContent = '';
+    try {
+      const { error } = await BNH_PAGE.sb.from('cash_receipts').delete().eq('id', r.id);
+      if (error) throw error;
+      viewRows = viewRows.filter(x => x.id !== r.id);
+      renderViewTable();
+      renderAggregates();
+    } catch (err) {
+      document.getElementById('err').textContent = err.message;
+    }
+  }
+</script>
+</body>
+</html>
