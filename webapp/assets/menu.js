@@ -126,7 +126,7 @@
      page: "pages/cash_receipts_import.html",
      roles: ["admin","accountant"] ,
      group: "OPD"
-    }
+    },
 
     
     // ==========================================
