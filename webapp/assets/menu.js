@@ -309,7 +309,7 @@
     { label: "Daily Sheet", 
       icon: "📊", 
       page: "pages/pharmacy-daily-sheet.html",
-      roles: ["admin","accountant"],
+      roles: ["admin","accountant","pharmacy"],
       group: "Reports" },
     {
       label: "Pharmacy Extra Pay",
