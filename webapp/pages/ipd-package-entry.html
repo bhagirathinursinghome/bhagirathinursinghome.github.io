@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Package Amount Entry – IPD</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .form-row > * { flex:1; min-width:200px; }
+    .hidden { display:none!important; }
+    .patient-card { background:#f8f9ff; border:1px solid #c7d2fe; border-radius:8px;
+                    padding:.75rem 1rem; margin-bottom:.6rem; cursor:pointer; transition:all .2s; }
+    .patient-card:hover { background:#e0e7ff; border-color:#818cf8; }
+    .patient-card .pname { font-weight:600; color:#1e1b4b; }
+    .patient-card .pmeta { font-size:.82rem; color:#6b7280; margin-top:2px; }
+    .info-box { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;
+                padding:.75rem; margin-bottom:1rem; font-size:.85rem; }
+    .back-btn { background:none; border:none; color:#6366f1; font-weight:600;
+                cursor:pointer; font-size:.9rem; margin-bottom:1rem; padding:0; }
+    .search-bar-wrap { margin-bottom:.75rem; }
+    .search-bar-wrap input {
+      width:100%; padding:.45rem .75rem; border:1px solid #c7d2fe; border-radius:8px;
+      font-size:.9rem; background:#f8f9ff; box-sizing:border-box;
+    }
+    .badge-done { background:#dcfce7; color:#166534; border:1px solid #86efac;
+                  padding:1px 8px; border-radius:10px; font-size:.72rem; font-weight:700;
+                  margin-left:.5rem; display:inline-block; }
+    .pkg-amt { color:#166534; font-weight:700; }
+    .tab-bar { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.75rem; border-bottom:2px solid #e5e7eb; }
+    .tab-btn { background:none; border:none; border-bottom:3px solid transparent; cursor:pointer;
+               padding:.5rem .9rem; font-size:.86rem; font-weight:600; color:#6b7280; margin-bottom:-2px; }
+    .tab-btn .tab-count { display:inline-flex; align-items:center; justify-content:center;
+      background:#e5e7eb; color:#374151; border-radius:20px; padding:1px 9px; font-size:.75rem;
+      font-weight:700; margin-left:.4rem; }
+    .tab-btn.active { color:#4338ca; border-bottom-color:#6366f1; }
+    .tab-btn.active .tab-count { background:#6366f1; color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+    .edit-badge { background:#e0e7ff; color:#3730a3; border-radius:6px; padding:1px 8px;
+                  font-size:.72rem; font-weight:700; margin-left:.4rem; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>📦 Package Amount Entry – IPD</h1>
+  <p style="font-size:.85rem;color:#6b7280;margin-top:-.5rem">
+    Enter or update the Package Amount for IPD admissions (excluding Doctor Case).
+    This is picked up automatically by the main Amount Entry page.
+  </p>
+
+  <!-- LIST VIEW -->
+  <div id="listView">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">🏥 Admitted Patients (Non-Doctor-Case)</h2>
+
+      <div class="tab-bar">
+        <button type="button" class="tab-btn active" data-tab="pending" onclick="switchTab('pending')">
+          🔴 Package Pending <span class="tab-count" id="pendingCount">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="entered" onclick="switchTab('entered')">
+          🟢 Package Entered <span class="tab-count" id="enteredCount">0</span>
+        </button>
+      </div>
+
+      <div class="tab-panel active" id="tabPanel-pending">
+        <div class="search-bar-wrap">
+          <input id="pendingSearch" type="text" placeholder="🔍 Search by patient name or admission no…" oninput="filterTab('pending')"/>
+        </div>
+        <div id="pendingListDiv">Loading…</div>
+      </div>
+
+      <div class="tab-panel" id="tabPanel-entered">
+        <div class="search-bar-wrap">
+          <input id="enteredSearch" type="text" placeholder="🔍 Search by patient name or admission no…" oninput="filterTab('entered')"/>
+        </div>
+        <div id="enteredListDiv">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORM VIEW -->
+  <div id="formView" class="hidden">
+    <div class="page-card">
+      <button class="back-btn" onclick="showList()">← Back to Patient List</button>
+      <h2 style="font-size:1rem;margin-bottom:.75rem" id="formTitle">Package Amount Entry</h2>
+
+      <div class="info-box" id="patientInfo"></div>
+
+      <form id="pkgForm" autocomplete="off">
+        <label>Recorded By</label>
+        <input id="recBy" readonly/>
+
+        <label style="margin-top:.75rem">Package Amount (₹) <span style="color:red">*</span></label>
+        <input id="packageAmt" type="number" min="0" step="0.01" placeholder="0.00" autocomplete="off" required/>
+
+        <label style="margin-top:.75rem">Remark</label>
+        <textarea id="remark" rows="2" placeholder="Optional…"></textarea>
+
+        <input type="hidden" id="admissionId"/>
+        <input type="hidden" id="admissionNo"/>
+        <input type="hidden" id="patientNameH"/>
+        <input type="hidden" id="entryId"/>
+
+        <div style="margin-top:1rem">
+          <button type="submit" class="btn-primary" style="width:auto" id="saveBtn">💾 Save Package Amount</button>
+        </div>
+        <p class="err" id="err"></p>
+        <p class="info" id="ok" style="display:none"></p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant","manager"]);
+
+  const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+
+  let _pendingCards = [], _enteredCards = [];
+  let _entryByAdmission = {}; // admission_id -> ipd_amount_entries row (may be partial)
+
+  async function loadList() {
+    ['pendingListDiv','enteredListDiv'].forEach(id => {
+      document.getElementById(id).textContent = 'Loading…';
+    });
+
+    const { data: entries } = await BNH_PAGE.sb.from('ipd_amount_entries').select('*');
+    _entryByAdmission = {};
+    (entries||[]).forEach(e => { _entryByAdmission[e.admission_id] = e; });
+
+    const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
+      .select('id,admission_date,admission_no,patient_name,case_type,case_mode,refer_name')
+      .eq('is_discharged', false)
+      .eq('is_cancelled', false)
+      .neq('case_type', 'Doctor Case')
+      .order('admission_date', { ascending: false });
+
+    if (error || !data) {
+      ['pendingListDiv','enteredListDiv'].forEach(id => {
+        document.getElementById(id).textContent = 'No active patients.';
+      });
+      return;
+    }
+
+    _pendingCards = []; _enteredCards = [];
+    data.forEach(r => {
+      const entry = _entryByAdmission[r.id] || null;
+      const card = {
+        id: r.id, name: r.patient_name, admNo: r.admission_no, date: r.admission_date,
+        type: r.case_type, mode: r.case_mode || '', refer: r.refer_name || 'N/A',
+        packageAmt: entry && entry.package_amount != null ? entry.package_amount : null
+      };
+      if (card.packageAmt != null) _enteredCards.push(card);
+      else _pendingCards.push(card);
+    });
+
+    document.getElementById('pendingCount').textContent = _pendingCards.length;
+    document.getElementById('enteredCount').textContent = _enteredCards.length;
+    renderTab('pending');
+    renderTab('entered');
+  }
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tabPanel-' + name));
+  }
+
+  function renderTab(tab) {
+    const q = (document.getElementById(tab + 'Search').value || '').toLowerCase().trim();
+    let list = tab === 'pending' ? _pendingCards : _enteredCards;
+    if (q) list = list.filter(r => r.name.toLowerCase().includes(q) || r.admNo.toLowerCase().includes(q));
+    const div = document.getElementById(tab + 'ListDiv');
+    if (list.length === 0) { div.textContent = 'No matching patients.'; return; }
+    div.innerHTML = list.map(r => `
+      <div class="patient-card" onclick="openForm('${r.id}')">
+        <div class="pname">${r.name}
+          ${r.packageAmt != null ? `<span class="badge-done">✓ ${fmt(r.packageAmt)}</span>` : ''}
+        </div>
+        <div class="pmeta">📅 ${r.date} &nbsp;|&nbsp; Adm: ${r.admNo} &nbsp;|&nbsp; Type: ${r.type} &nbsp;|&nbsp; Refer: ${r.refer}</div>
+      </div>`).join('');
+  }
+
+  function filterTab(tab) { renderTab(tab); }
+
+  function showList() {
+    document.getElementById('formView').classList.add('hidden');
+    document.getElementById('listView').classList.remove('hidden');
+  }
+
+  async function openForm(admId) {
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { data: admArr } = await BNH_PAGE.sb.from('ipd_admissions').select('*').eq('id', admId);
+      const adm = admArr && admArr.length > 0 ? admArr[0] : null;
+      if (!adm) return;
+      const entry = _entryByAdmission[admId] || null;
+      const isEdit = !!(entry && entry.package_amount != null);
+
+      document.getElementById('listView').classList.add('hidden');
+      document.getElementById('formView').classList.remove('hidden');
+      document.getElementById('admissionId').value = admId;
+      document.getElementById('admissionNo').value = adm.admission_no;
+      document.getElementById('patientNameH').value = adm.patient_name;
+      document.getElementById('entryId').value = entry ? entry.id : '';
+      document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+      document.getElementById('packageAmt').value = isEdit ? entry.package_amount : '';
+      document.getElementById('remark').value = '';
+      document.getElementById('err').textContent = '';
+      document.getElementById('ok').style.display = 'none';
+      document.getElementById('saveBtn').textContent = isEdit ? '💾 Update Package Amount' : '💾 Save Package Amount';
+      document.getElementById('formTitle').innerHTML = isEdit
+        ? `Package Amount – ${adm.patient_name} (${adm.admission_no}) <span class="edit-badge">EDITING</span>`
+        : `Package Amount – ${adm.patient_name} (${adm.admission_no})`;
+
+      document.getElementById('patientInfo').innerHTML =
+        `<strong>${adm.patient_name}</strong> &nbsp;|&nbsp; Adm: ${adm.admission_no} &nbsp;|&nbsp; Date: ${adm.admission_date}<br>
+         Case Mode: <strong>${adm.case_mode||'-'}</strong> &nbsp;|&nbsp; Case Type: <strong>${adm.case_type}</strong>
+         ${adm.refer_name ? ' &nbsp;|&nbsp; Refer: <strong>'+adm.refer_name+'</strong>' : ''}`;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  document.getElementById('pkgForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const spinner = document.getElementById('spinner');
+    const err = document.getElementById('err');
+    const ok = document.getElementById('ok');
+    err.textContent = ''; ok.style.display = 'none';
+
+    const amtVal = document.getElementById('packageAmt').value;
+    if (amtVal === '' || amtVal === null) {
+      err.textContent = 'Package Amount is required on this page.';
+      return;
+    }
+    const amt = parseFloat(amtVal);
+    const admId = document.getElementById('admissionId').value;
+    const entryId = document.getElementById('entryId').value;
+    const remark = document.getElementById('remark').value.trim();
+
+    spinner.classList.remove('hidden');
+    try {
+      if (entryId) {
+        // Existing ipd_amount_entries row (full or partial) — only touch package_amount.
+        const { error } = await BNH_PAGE.sb.from('ipd_amount_entries')
+          .update(BNH_PAGE.stamp({ package_amount: amt }))
+          .eq('id', entryId);
+        if (error) throw error;
+      } else {
+        // No row for this admission yet — create a partial row with just the package amount.
+        // The main Amount Entry page will pick this up and let staff fill the remaining fields.
+        const { error } = await BNH_PAGE.sb.from('ipd_amount_entries')
+          .insert(BNH_PAGE.stamp({
+            admission_id:  admId,
+            admission_no:  document.getElementById('admissionNo').value,
+            patient_name:  document.getElementById('patientNameH').value,
+            package_amount: amt,
+            remark: remark || null
+          }));
+        if (error) throw error;
+      }
+
+      ok.style.display = 'block';
+      ok.textContent = '✅ Package amount saved!';
+      setTimeout(() => { showList(); loadList(); }, 1200);
+    } catch (ex) {
+      err.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  };
+
+  loadList();
+</script>
+</body>
+</html>
