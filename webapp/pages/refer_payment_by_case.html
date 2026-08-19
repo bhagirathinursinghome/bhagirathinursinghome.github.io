@@ -6,13 +6,6 @@
   <title>Refer Payment (Search by Case/Patient)</title>
   <link rel="stylesheet" href="../assets/style.css"/>
   <style>
-    .tab-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
-    .tab-btn { padding:.5rem 1.1rem; border:2px solid #6366f1; border-radius:8px; background:#fff;
-               color:#6366f1; font-weight:600; cursor:pointer; transition:all .2s; }
-    .tab-btn.active { background:#6366f1; color:#fff; }
-    .tab-panel { display:none; }
-    .tab-panel.active { display:block; }
-
     .form-row { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; }
     .form-row > * { flex:1; min-width:180px; }
     .form-row label { display:block; font-size:.8rem; font-weight:600; color:#475569; margin-bottom:.3rem; }
@@ -37,6 +30,7 @@
     tfoot td { font-weight:700; background:#f9f9f9; }
     tr.row-warn td { background:#fff7ed; }
     tr.row-ok td { background:#fff; }
+    tr.row-added td { background:#ecfdf5; }
 
     .section-title { font-size:.9rem; font-weight:700; color:#312e81; margin:1.2rem 0 .5rem;
                       padding-bottom:.3rem; border-bottom:1px solid #e0e7ff; }
@@ -48,6 +42,8 @@
     .pill { display:inline-block; padding:2px 9px; border-radius:12px; font-size:.72rem; font-weight:700; white-space:nowrap; }
     .pill-warn { background:#fef3c7; color:#92400e; }
     .pill-ok   { background:#d1fae5; color:#065f46; }
+    .pill-type-op { background:#e0e7ff; color:#3730a3; }
+    .pill-type-ip { background:#fce7f3; color:#9d174d; }
 
     .mini-input { width:120px!important; min-width:100px!important; }
     .mini-input.name { width:150px!important; }
@@ -55,47 +51,77 @@
     .row-inline-input.flagged { border-color:#f59e0b; background:#fffbeb; }
     .btn-mini { padding:.28rem .55rem; font-size:.72rem; border-radius:5px; border:none; cursor:pointer; font-weight:700; }
     .btn-mini-save { background:#059669; color:#fff; }
+    .btn-mini-add { background:#4f46e5; color:#fff; }
+    .btn-mini-added { background:#d1fae5; color:#065f46; cursor:default; }
+    .btn-mini-remove { background:#fee2e2; color:#b91c1c; }
     .row-warn-msg { font-size:.72rem; color:#b45309; margin-top:2px; }
     .search-wrap { position:relative; }
     .search-count { font-size:.78rem; color:#666; margin:.4rem 0 .2rem; }
 
     .banner-warn { background:#fffbeb; border:1px solid #fcd34d; color:#92400e; border-radius:8px;
                    padding:.6rem .9rem; font-size:.83rem; margin:.6rem 0; }
+
+    .split { display:grid; grid-template-columns:1fr 1fr; gap:1rem; align-items:start; }
+    @media (max-width: 900px){ .split { grid-template-columns:1fr; } }
+
+    .cart-card { background:#fff; border:2px solid #6366f1; border-radius:10px; padding:1rem 1.1rem;
+                 margin-top:1rem; position:sticky; top:.5rem; z-index:5; }
+    .cart-empty { color:#888; font-size:.85rem; padding:.5rem 0; }
+    .amt-input { width:110px; text-align:right; }
   </style>
 </head>
 <body>
 <div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
 <datalist id="referNameOptions"></datalist>
 <div class="page">
-  <h1>🔎 Refer Payment — Search by Case / Patient</h1>
+  <h1>🔎 Refer Payment — One Voucher, OPD + IPD Together</h1>
   <p style="font-size:.85rem;color:#666;margin-bottom:1rem">
-    Find OPD or IPD cases by <b>case/admission number or patient name</b>, add several cases to one
-    voucher, and fix a missing refer link or refer amount inline before including a case in the payment.
+    Enter one voucher number, search OPD and IPD cases below, add as many as you like from either side
+    into the selection list, fix a missing refer link or amount inline, then submit everything together
+    under that single voucher.
   </p>
 
-  <div class="tab-bar">
-    <button class="tab-btn active" onclick="switchTab('opdTab',this)">🚑 OPD Refer Payment</button>
-    <button class="tab-btn" onclick="switchTab('ipdTab',this)">🏥 IPD Refer Payment</button>
+  <!-- ══════════════════ VOUCHER / PAYMENT DETAILS (shared) ══════════════════ -->
+  <div class="page-card">
+    <div class="form-card">
+      <div class="section-title" style="margin-top:0">🧾 Payment Details</div>
+      <div class="form-row">
+        <div><label>Voucher No <span class="req">*</span></label>
+          <input id="voucherNo" onblur="checkVoucher()"/>
+          <div class="voucher-badge" id="vStatus"></div>
+        </div>
+        <div><label>Payment Date <span class="req">*</span></label><input id="payDate" type="date"/></div>
+        <div><label>Mode <span class="req">*</span></label><div id="modeHost"></div></div>
+        <div><label>Remark (optional)</label><input id="payRemark"/></div>
+      </div>
+    </div>
   </div>
 
-  <!-- ══════════════════ OPD TAB ══════════════════ -->
-  <div id="opdTab" class="tab-panel active">
+  <!-- ══════════════════ SELECTED CASES CART ══════════════════ -->
+  <div class="page-card">
+    <div class="cart-card">
+      <div class="section-title" style="margin-top:0">🧺 Selected Cases for this Voucher</div>
+      <div id="cartBox"><p class="cart-empty">No cases selected yet. Search OPD or IPD below and click ➕ Add.</p></div>
+      <p class="err" id="mainErr"></p>
+      <p class="info" id="mainOk" style="display:none"></p>
+      <div style="margin-top:.85rem">
+        <button class="btn-primary" style="width:auto" onclick="submitAll()">💾 Submit All Selected Cases</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ TWO SEARCH PANELS SIDE BY SIDE ══════════════════ -->
+  <div class="split">
+
+    <!-- OPD PANEL -->
     <div class="page-card">
       <div class="form-card">
-        <div class="section-title" style="margin-top:0">🚑 OPD Refer Payment</div>
-        <div class="form-row">
-          <div><label>Voucher No <span class="req">*</span></label>
-            <input id="opVoucher" onblur="checkVoucher('op')"/>
-            <div class="voucher-badge" id="opVStatus"></div>
-          </div>
-          <div><label>Payment Date <span class="req">*</span></label><input id="opDate" type="date"/></div>
-          <div><label>Mode <span class="req">*</span></label><div id="opModeHost"></div></div>
-        </div>
-
-        <div class="section-title">Find Cases</div>
+        <div class="section-title" style="margin-top:0">🚑 Find OPD Cases</div>
         <div class="form-row">
           <div><label>Case Date From</label><input id="opFrom" type="date"/></div>
           <div><label>Case Date To</label><input id="opTo" type="date"/></div>
+        </div>
+        <div class="form-row" style="margin-top:.3rem">
           <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="loadOpdCases()">Load</button></div>
         </div>
         <div class="form-row" style="margin-top:.5rem">
@@ -103,6 +129,12 @@
             <label>Search by Case No. or Patient Name</label>
             <input id="opSearch" placeholder="e.g. OPD-0231 or Rahim Sk" oninput="renderOpdList()"/>
           </div>
+          <div style="flex:0 0 auto;min-width:auto;">
+            <label>&nbsp;</label>
+            <button class="btn-mini" style="background:#e0e7ff;color:#3730a3;padding:.5rem .8rem" id="opToggleBtn" onclick="toggleOpdList()">👁 Show Full List</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:.3rem">
           <div>
             <label>Show</label>
             <select id="opShow" onchange="renderOpdList()">
@@ -118,38 +150,21 @@
         </div>
         <p class="search-count" id="opCount"></p>
         <div class="banner-warn hidden" id="opWarnBanner"></div>
-        <div id="opCaseList"></div>
-
-        <div class="form-row" style="margin-top:.75rem">
-          <div><label>Remark (optional)</label><input id="opRemark"/></div>
-        </div>
-        <div style="margin-top:.85rem">
-          <button class="btn-primary" style="width:auto" onclick="saveOpdReferPay()">💾 Save Payment</button>
-        </div>
+        <div id="opCaseList" style="overflow-x:auto"></div>
         <p class="err" id="opErr"></p>
         <p class="info" id="opOk" style="display:none"></p>
       </div>
     </div>
-  </div>
 
-  <!-- ══════════════════ IPD TAB ══════════════════ -->
-  <div id="ipdTab" class="tab-panel">
+    <!-- IPD PANEL -->
     <div class="page-card">
       <div class="form-card">
-        <div class="section-title" style="margin-top:0">🏥 IPD Refer Payment</div>
-        <div class="form-row">
-          <div><label>Voucher No <span class="req">*</span></label>
-            <input id="ipVoucher" onblur="checkVoucher('ip')"/>
-            <div class="voucher-badge" id="ipVStatus"></div>
-          </div>
-          <div><label>Payment Date <span class="req">*</span></label><input id="ipDate" type="date"/></div>
-          <div><label>Mode <span class="req">*</span></label><div id="ipModeHost"></div></div>
-        </div>
-
-        <div class="section-title">Find Cases</div>
+        <div class="section-title" style="margin-top:0">🏥 Find IPD Cases</div>
         <div class="form-row">
           <div><label>Admission Date From</label><input id="ipFrom" type="date"/></div>
           <div><label>Admission Date To</label><input id="ipTo" type="date"/></div>
+        </div>
+        <div class="form-row" style="margin-top:.3rem">
           <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="loadIpdCases()">Load</button></div>
         </div>
         <div class="form-row" style="margin-top:.5rem">
@@ -157,6 +172,12 @@
             <label>Search by Admission No. or Patient Name</label>
             <input id="ipSearch" placeholder="e.g. IPD-1042 or Sultana Begum" oninput="renderIpdList()"/>
           </div>
+          <div style="flex:0 0 auto;min-width:auto;">
+            <label>&nbsp;</label>
+            <button class="btn-mini" style="background:#fce7f3;color:#9d174d;padding:.5rem .8rem" id="ipToggleBtn" onclick="toggleIpdList()">👁 Show Full List</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:.3rem">
           <div>
             <label>Show</label>
             <select id="ipShow" onchange="renderIpdList()">
@@ -172,18 +193,12 @@
         </div>
         <p class="search-count" id="ipCount"></p>
         <div class="banner-warn hidden" id="ipWarnBanner"></div>
-        <div id="ipCaseList"></div>
-
-        <div class="form-row" style="margin-top:.75rem">
-          <div><label>Remark (optional)</label><input id="ipRemark"/></div>
-        </div>
-        <div style="margin-top:.85rem">
-          <button class="btn-primary" style="width:auto" onclick="saveIpdReferPay()">💾 Save Payment</button>
-        </div>
+        <div id="ipCaseList" style="overflow-x:auto"></div>
         <p class="err" id="ipErr"></p>
         <p class="info" id="ipOk" style="display:none"></p>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -199,58 +214,148 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 const todayISO = () => new Date().toISOString().slice(0,10);
 function spin(on){ document.getElementById('spinner').classList.toggle('hidden', !on); }
 
-// fill in the date defaults + mode chips that were templated above
-document.getElementById('opDate').value = todayISO();
-document.getElementById('ipDate').value = todayISO();
+document.getElementById('payDate').value = todayISO();
 
-function modeChipsHtml(prefix){
+function modeChipsHtml(){
   return `<div class="mode-chips">
-      <div class="mode-chip" onclick="selectMode(this,'${prefix}','Cash')">💵 Cash</div>
-      <div class="mode-chip" onclick="selectMode(this,'${prefix}','Bank')">🏦 Bank</div>
-      <div class="mode-chip" onclick="selectMode(this,'${prefix}','PhonePe')">📱 PhonePe</div>
-    </div><input type="hidden" id="${prefix}Mode"/>`;
+      <div class="mode-chip" onclick="selectMode(this,'Cash')">💵 Cash</div>
+      <div class="mode-chip" onclick="selectMode(this,'Bank')">🏦 Bank</div>
+      <div class="mode-chip" onclick="selectMode(this,'PhonePe')">📱 PhonePe</div>
+    </div><input type="hidden" id="payMode"/>`;
 }
-function selectMode(el, prefix, val){
+function selectMode(el, val){
   el.parentElement.querySelectorAll('.mode-chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
-  document.getElementById(prefix+'Mode').value = val;
+  document.getElementById('payMode').value = val;
 }
-// inject the mode-chip controls into their host divs
-document.getElementById('opModeHost').innerHTML = modeChipsHtml('op');
-document.getElementById('ipModeHost').innerHTML = modeChipsHtml('ip');
-
-function switchTab(id, btn){
-  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.tab-bar .tab-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  btn.classList.add('active');
-}
+document.getElementById('modeHost').innerHTML = modeChipsHtml();
 
 // ── shared voucher-number live check ─────────────────────────
-async function checkVoucher(prefix){
-  const badge = document.getElementById(prefix+'VStatus');
-  const vNoEl = document.getElementById(prefix+'Voucher');
-  if (!badge || !vNoEl) return null;
+let voucherCheckResult = null;
+async function checkVoucher(){
+  const badge = document.getElementById('vStatus');
+  const vNoEl = document.getElementById('voucherNo');
   const vNo = vNoEl.value.trim();
-  if (!vNo) { badge.innerHTML=''; return null; }
+  if (!vNo) { badge.innerHTML=''; voucherCheckResult = null; return null; }
   const { data } = await sb.from('payment_vouchers').select('*').eq('voucher_no', vNo).maybeSingle();
   if (!data) {
     badge.innerHTML = '<span style="color:#dc2626">❌ Not generated yet — create this voucher range first (Voucher Range tab in Payment page).</span>';
-    return { ok:false };
+    voucherCheckResult = { ok:false };
+    return voucherCheckResult;
   }
   if (data.status === 'blank') {
     badge.innerHTML = '<span style="color:#059669">✅ Available.</span>';
-    return { ok:true, existing:null };
+    voucherCheckResult = { ok:true, existing:null };
+    return voucherCheckResult;
   }
   badge.innerHTML = `<span style="color:#d97706">⚠️ Already used — ${esc(data.party_name)} (${esc(data.type)}), ₹${fmt(data.amount)} recorded so far.
     Additional entries on this voucher number are only allowed for the <b>same party</b>.</span>`;
-  return { ok:true, existing:data };
+  voucherCheckResult = { ok:true, existing:data };
+  return voucherCheckResult;
 }
 
 // ════════════════════════════════════════════════════════════
-// OPD REFER PAYMENT — search by case no / patient name
+// SELECTION CART — shared between OPD and IPD
+// ════════════════════════════════════════════════════════════
+// Each entry: { domain:'op'|'ip', key, no, patient_name, refer_name, due, amount }
+let cart = [];
+function cartKey(domain, key){ return domain+':'+key; }
+function isInCart(domain, key){ return cart.some(x=>cartKey(x.domain,x.key)===cartKey(domain,key)); }
+
+function currentReferName(){
+  if (cart.length) return cart[0].refer_name;
+  return null;
+}
+// Voucher party_name may be stored as a composite string like
+// "Injamul SK (7679633142, Team: Jnana ranjan das)". Do a loose
+// contains-match (case-insensitive) instead of requiring an exact
+// match, so the same person isn't blocked over formatting differences.
+function namesMatch(caseName, partyName){
+  const a = (caseName||'').trim().toLowerCase();
+  const b = (partyName||'').trim().toLowerCase();
+  if (!a || !b) return false;
+  return a === b || b.includes(a) || a.includes(b);
+}
+
+function addToCart(domain, key){
+  const err = document.getElementById('mainErr'), ok = document.getElementById('mainOk');
+  err.textContent=''; ok.style.display='none';
+  const src = domain==='op' ? opAllCases.find(x=>x.case_no===key) : ipAllCases.find(x=>String(x.id)===String(key));
+  if (!src) return;
+  if (isInCart(domain,key)) return;
+  if (!src.refer_na && (!src.linked || !src.amountSet || src.due <= 0.001)) {
+    err.textContent = 'This case is not payable yet — fix the refer name/amount first.';
+    return;
+  }
+  // enforce single refer-name per voucher
+  const wantName = (src.refer_name||'').trim();
+  const existingName = currentReferName();
+  if (existingName && !namesMatch(wantName, existingName)) {
+    err.textContent = `All cases on one voucher must share the same refer name. This voucher already has cases for "${existingName}", but this case is for "${wantName}".`;
+    return;
+  }
+  if (voucherCheckResult && voucherCheckResult.existing && !namesMatch(wantName, voucherCheckResult.existing.party_name)) {
+    err.textContent = `Voucher ${document.getElementById('voucherNo').value.trim()} is already used for "${voucherCheckResult.existing.party_name}". Select cases for that same refer name.`;
+    return;
+  }
+  cart.push({
+    domain, key,
+    no: domain==='op' ? src.case_no : src.admission_no,
+    patient_name: src.patient_name,
+    refer_name: wantName,
+    due: src.due,
+    amount: Math.max(0, src.due).toFixed(2)
+  });
+  renderCart();
+  if (domain==='op') renderOpdList(); else renderIpdList();
+}
+function removeFromCart(domain, key){
+  cart = cart.filter(x=>!(x.domain===domain && String(x.key)===String(key)));
+  renderCart();
+  if (domain==='op') renderOpdList(); else renderIpdList();
+}
+function cartUpdateTotal(){
+  let total = 0;
+  cart.forEach(x=>{ total += parseFloat(document.getElementById(`cartAmt-${x.domain}-${x.key}`)?.value || 0); });
+  const el = document.getElementById('cartTotal');
+  if (el) el.textContent = fmt(total);
+}
+function cartAmtChanged(domain, key, val){
+  const it = cart.find(x=>x.domain===domain && String(x.key)===String(key));
+  if (it) it.amount = val;
+  cartUpdateTotal();
+}
+function renderCart(){
+  const box = document.getElementById('cartBox');
+  if (!cart.length){ box.innerHTML = '<p class="cart-empty">No cases selected yet. Search OPD or IPD below and click ➕ Add.</p>'; return; }
+  box.innerHTML = `<table>
+    <thead><tr><th>Type</th><th>No.</th><th>Patient</th><th>Refer Name</th><th class="r">Due</th><th class="r">Pay Amount</th><th></th></tr></thead>
+    <tbody>${cart.map(x=>`
+      <tr>
+        <td><span class="pill ${x.domain==='op'?'pill-type-op':'pill-type-ip'}">${x.domain==='op'?'OPD':'IPD'}</span></td>
+        <td>${esc(x.no)}</td>
+        <td>${esc(x.patient_name)}</td>
+        <td>${esc(x.refer_name)}</td>
+        <td class="r">${fmt(x.due)}</td>
+        <td class="r"><input type="number" class="row-inline-input amt-input" id="cartAmt-${x.domain}-${x.key}"
+              value="${x.amount}" min="0.01" step="0.01" oninput="cartAmtChanged('${x.domain}','${x.key}',this.value); cartUpdateTotal()"/></td>
+        <td><button class="btn-mini btn-mini-remove" onclick="removeFromCart('${x.domain}','${x.key}')">✕ Remove</button></td>
+      </tr>`).join('')}
+    </tbody>
+    <tfoot><tr><td colspan="5">Total to Pay</td><td class="r" id="cartTotal">₹0.00</td><td></td></tr></tfoot>
+  </table>`;
+  cartUpdateTotal();
+}
+
+// ════════════════════════════════════════════════════════════
+// OPD — search by case no / patient name
 // ════════════════════════════════════════════════════════════
 let opAllCases = [];
+let opListVisible = false;
+function toggleOpdList(){
+  opListVisible = !opListVisible;
+  renderOpdList();
+}
 function initOpd(){
   const t = todayISO();
   document.getElementById('opFrom').value = t.slice(0,7)+'-01';
@@ -261,9 +366,6 @@ async function loadOpdCases(){
   if (!from || !to) return;
   spin(true);
   try{
-    // Pull EVERY case in the date range, whether or not it has a refer name
-    // or refer amount yet — that's the whole point of this page: to find
-    // and fix cases whose refer link/amount was never entered.
     const { data: cases } = await sb.from('opd_case')
       .select('case_no,case_date,patient_name,refer_name,refer_amount,refer_payment_status,refer_na')
       .gte('case_date',from).lte('case_date',to)
@@ -297,6 +399,20 @@ function opdFilteredList(){
   return list;
 }
 function renderOpdList(){
+  const q = document.getElementById('opSearch').value.trim();
+  const toggleBtn = document.getElementById('opToggleBtn');
+  if (toggleBtn) toggleBtn.textContent = opListVisible ? '🙈 Hide List' : '👁 Show Full List';
+
+  if (!q && !opListVisible){
+    document.getElementById('opCount').textContent = opAllCases.length ? `${opAllCases.length} case(s) loaded.` : '';
+    document.getElementById('opWarnBanner').classList.add('hidden');
+    const box = document.getElementById('opCaseList');
+    box.innerHTML = opAllCases.length
+      ? '<p style="color:#888">Type in the search box above, or click 👁 Show Full List to browse all loaded cases.</p>'
+      : '<p style="color:#888">Load a date range to search cases.</p>';
+    return;
+  }
+
   const list = opdFilteredList();
   document.getElementById('opCount').textContent = `${list.length} case(s) match.`;
   const issues = list.filter(c=>!c.linked || !c.amountSet).length;
@@ -304,21 +420,21 @@ function renderOpdList(){
   if (issues > 0){
     banner.classList.remove('hidden');
     banner.innerHTML = `⚠️ ${issues} case(s) below have <b>no refer name</b> and/or <b>no refer amount</b> set.
-      Fill in the fields on that row and click 💾 to update before you can select it for payment.`;
+      Fill in the fields on that row and click 💾 to update before adding it.`;
   } else banner.classList.add('hidden');
 
   const box = document.getElementById('opCaseList');
   if (!list.length){ box.innerHTML = opAllCases.length ? '<p style="color:#888">No cases match your search.</p>' : '<p style="color:#888">Load a date range to search cases.</p>'; return; }
 
   box.innerHTML = `<table id="opTable">
-    <thead><tr><th></th><th>Case Date</th><th>Case No.</th><th>Patient</th><th>Refer Name</th><th class="r">Refer Amt</th><th></th><th class="r">Due</th><th class="r">Pay Amount</th><th>Status</th></tr></thead>
+    <thead><tr><th>Case Date</th><th>Case No.</th><th>Patient</th><th>Refer Name</th><th class="r">Refer Amt</th><th></th><th class="r">Due</th><th>Status</th><th></th></tr></thead>
     <tbody>${list.map(c=>{
       const payable = !c.refer_na && c.linked && c.amountSet && c.due > 0.001;
-      const rowClass = c.refer_na ? 'row-ok' : (!c.linked || !c.amountSet) ? 'row-warn' : 'row-ok';
+      const added = isInCart('op', c.case_no);
+      const rowClass = added ? 'row-added' : c.refer_na ? 'row-ok' : (!c.linked || !c.amountSet) ? 'row-warn' : 'row-ok';
       const cn = esc(c.case_no);
       const donePaid = !c.refer_na && c.linked && c.amountSet && c.due <= 0.001;
     return `<tr class="${rowClass}" data-no="${cn}">
-        <td><input type="checkbox" class="op-chk" data-no="${cn}" onchange="opUpdateTotal()" ${payable?'':'disabled'}/></td>
         <td>${c.case_date}</td>
         <td>${cn}</td>
         <td>${esc(c.patient_name)}</td>
@@ -333,18 +449,17 @@ function renderOpdList(){
           <button class="btn-mini" style="background:#e2e8f0;color:#334155" onclick="markOpdReferNA('${cn}')">🚫 N/A</button>
         </td>
         <td class="r">${c.refer_na ? '<span style="color:#999">—</span>' : c.amountSet ? fmt(c.due) : '<span style="color:#999">—</span>'}</td>
-        <td class="r"><input type="number" class="op-amt" data-no="${cn}" value="${Math.max(0,c.due).toFixed(2)}" min="0" step="0.01"
-            style="width:100px;text-align:right" oninput="opUpdateTotal()" ${payable?'':'disabled'}/></td>
         <td>${c.refer_na ? '<span class="pill pill-ok">✅ Done (N/A)</span>' : donePaid ? '<span class="pill pill-ok">✅ Done</span>' : payable ? '<span class="pill pill-ok">Payable</span>' : '<span class="pill pill-warn">Fix refer link</span>'}</td>
+        <td>${added
+            ? `<button class="btn-mini btn-mini-remove" onclick="removeFromCart('op','${cn}')">✕ Remove</button>`
+            : `<button class="btn-mini btn-mini-add" onclick="addToCart('op','${cn}')" ${payable?'':'disabled'}>➕ Add</button>`}</td>
       </tr>
-      ${(!c.refer_na && (!c.linked || !c.amountSet)) ? `<tr class="${rowClass}"><td></td><td colspan="9" class="row-warn-msg">
+      ${(!c.refer_na && (!c.linked || !c.amountSet)) ? `<tr class="${rowClass}"><td></td><td colspan="8" class="row-warn-msg">
         ${!c.linked ? '⚠️ Refer not linked. ' : ''}${!c.amountSet ? '⚠️ Refer amount not entered.' : ''}
       </td></tr>` : ''}
       `;
     }).join('')}</tbody>
-    <tfoot><tr><td colspan="8">Total to Pay</td><td class="r" id="opTotal">₹0.00</td><td></td></tr></tfoot>
   </table>`;
-  opUpdateTotal();
 }
 async function updateOpdReferInfo(caseNo){
   const nameEl = document.getElementById(`opName-${caseNo}`);
@@ -361,8 +476,12 @@ async function updateOpdReferInfo(caseNo){
     if (error) throw error;
     const c = opAllCases.find(x=>x.case_no===caseNo);
     if (c){ c.refer_name = name; c.refer_amount = amt; c.linked = true; c.amountSet = true; c.due = amt - c.paid; }
-    ok.style.display='block'; ok.textContent = `✅ Case ${caseNo} refer link/amount updated. You can now select it for payment.`;
+    // keep an already-selected cart entry in sync
+    const inCart = cart.find(x=>x.domain==='op' && x.key===caseNo);
+    if (inCart){ inCart.refer_name = name; inCart.due = c.due; }
+    ok.style.display='block'; ok.textContent = `✅ Case ${caseNo} refer link/amount updated. You can now add it.`;
     renderOpdList();
+    renderCart();
     loadReferNameOptions();
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
@@ -377,88 +496,22 @@ async function markOpdReferNA(caseNo){
     if (error) throw error;
     const c = opAllCases.find(x=>x.case_no===caseNo);
     if (c){ c.refer_na = true; c.refer_name=''; c.refer_amount=0; c.due=0; c.linked=true; c.amountSet=true; }
+    removeFromCart('op', caseNo); // no longer payable — drop from selection if it was there
     ok.style.display='block'; ok.textContent = `✅ Case ${caseNo} marked as Refer Not Applicable.`;
     renderOpdList();
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
 }
-function opUpdateTotal(){
-  let total = 0;
-  const amtEls = [...document.querySelectorAll('.op-amt')];
-  document.querySelectorAll('.op-chk:checked').forEach(chk=>{
-    const amtEl = amtEls.find(el=>el.dataset.no===chk.dataset.no);
-    if (amtEl) total += parseFloat(amtEl.value||0);
-  });
-  const el = document.getElementById('opTotal');
-  if (el) el.textContent = fmt(total);
-}
-async function saveOpdReferPay(){
-  const err = document.getElementById('opErr'), ok = document.getElementById('opOk');
-  err.textContent=''; ok.style.display='none';
-  const voucher = document.getElementById('opVoucher').value.trim();
-  const date = document.getElementById('opDate').value;
-  const mode = document.getElementById('opMode').value;
-  const remark = document.getElementById('opRemark').value.trim() || null;
-  const checked = [...document.querySelectorAll('.op-chk:checked')];
-  if (!voucher) { err.textContent='Voucher No is required.'; return; }
-  if (!date) { err.textContent='Payment date is required.'; return; }
-  if (!mode) { err.textContent='Select a payment mode.'; return; }
-  if (!checked.length) { err.textContent='Select at least one case to pay.'; return; }
-
-  const vcheck = await checkVoucher('op');
-  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
-
-  const opAmtEls = [...document.querySelectorAll('.op-amt')];
-  // opd_refer_payment's columns are: case_no, payment_date, voucher_no, remarks,
-  // payment_to, mode, amount, discount, created_by, created_by_name, description
-  // (+ id/created_at, which default automatically). It does NOT have a
-  // 'recorded_at' column, so we only keep the stamped fields that are valid
-  // for this table — anything else BNH_PAGE.stamp() adds gets dropped here.
-  const OPD_REFER_PAYMENT_COLS = ['case_no','payment_date','voucher_no','remarks',
-    'payment_to','mode','amount','discount','created_by','created_by_name','description'];
-  const rows = checked.map(chk=>{
-    const c = opAllCases.find(x=>x.case_no===chk.dataset.no);
-    const amtEl = opAmtEls.find(el=>el.dataset.no===chk.dataset.no);
-    const amt = parseFloat(amtEl?.value||0);
-    const stamped = BNH_PAGE.stamp({
-      case_no: c.case_no, payment_date: date, voucher_no: voucher,
-      remarks: remark, payment_to: c.refer_name, mode, amount: amt, discount: 0,
-      description: `Case ${c.case_no}`
-    });
-    const row = {};
-    OPD_REFER_PAYMENT_COLS.forEach(k => { if (k in stamped) row[k] = stamped[k]; });
-    return { row, c, amt };
-  });
-  if (rows.some(r=>!r.amt || r.amt<=0)) { err.textContent='Pay amount must be greater than 0 for every selected case.'; return; }
-  if (vcheck.existing && rows.some(r=>r.row.payment_to !== vcheck.existing.party_name)) {
-    err.textContent = `Voucher ${voucher} is already used for "${vcheck.existing.party_name}". All cases in this voucher must be for the same refer name.`;
-    return;
-  }
-  const names = new Set(rows.map(r=>r.row.payment_to));
-  if (names.size > 1) { err.textContent = 'All cases selected for one voucher must share the same refer name.'; return; }
-
-  spin(true);
-  try{
-    const { error } = await sb.from('opd_refer_payment').insert(rows.map(r=>r.row));
-    if (error) throw error;
-    for (const r of rows){
-      const nowPaid = (r.c.paid||0) + r.amt;
-      if (nowPaid >= (r.c.refer_amount||0) - 0.01){
-        await sb.from('opd_case').update({ refer_payment_status:'paid' }).eq('case_no', r.c.case_no);
-      }
-    }
-    ok.style.display='block'; ok.textContent = `✅ Saved ${rows.length} case(s) under Voucher ${voucher}.`;
-    document.getElementById('opRemark').value='';
-    await loadOpdCases();
-    await checkVoucher('op');
-  } catch(ex){ err.textContent = ex.message; }
-  finally { spin(false); }
-}
 
 // ════════════════════════════════════════════════════════════
-// IPD REFER PAYMENT — search by admission no / patient name
+// IPD — search by admission no / patient name
 // ════════════════════════════════════════════════════════════
 let ipAllCases = [];
+let ipListVisible = false;
+function toggleIpdList(){
+  ipListVisible = !ipListVisible;
+  renderIpdList();
+}
 function initIpd(){
   const t = todayISO();
   document.getElementById('ipFrom').value = t.slice(0,7)+'-01';
@@ -469,8 +522,6 @@ async function loadIpdCases(){
   if (!from || !to) return;
   spin(true);
   try{
-    // Pull EVERY admission in the date range, whether or not it has a refer
-    // name or refer amount set yet, so missing links surface here.
     const { data: adms } = await sb.from('ipd_admissions')
       .select('id,admission_date,admission_no,patient_name,refer_name,refer_id,refer_na')
       .gte('admission_date',from).lte('admission_date',to)
@@ -506,6 +557,20 @@ function ipdFilteredList(){
   return list;
 }
 function renderIpdList(){
+  const q = document.getElementById('ipSearch').value.trim();
+  const toggleBtn = document.getElementById('ipToggleBtn');
+  if (toggleBtn) toggleBtn.textContent = ipListVisible ? '🙈 Hide List' : '👁 Show Full List';
+
+  if (!q && !ipListVisible){
+    document.getElementById('ipCount').textContent = ipAllCases.length ? `${ipAllCases.length} case(s) loaded.` : '';
+    document.getElementById('ipWarnBanner').classList.add('hidden');
+    const box = document.getElementById('ipCaseList');
+    box.innerHTML = ipAllCases.length
+      ? '<p style="color:#888">Type in the search box above, or click 👁 Show Full List to browse all loaded cases.</p>'
+      : '<p style="color:#888">Load a date range to search cases.</p>';
+    return;
+  }
+
   const list = ipdFilteredList();
   document.getElementById('ipCount').textContent = `${list.length} case(s) match.`;
   const issues = list.filter(c=>!c.linked || !c.amountSet).length;
@@ -513,21 +578,21 @@ function renderIpdList(){
   if (issues > 0){
     banner.classList.remove('hidden');
     banner.innerHTML = `⚠️ ${issues} admission(s) below have <b>no refer name</b> and/or <b>no refer amount</b> set.
-      Fill in the fields on that row and click 💾 to update before you can select it for payment.`;
+      Fill in the fields on that row and click 💾 to update before adding it.`;
   } else banner.classList.add('hidden');
 
   const box = document.getElementById('ipCaseList');
   if (!list.length){ box.innerHTML = ipAllCases.length ? '<p style="color:#888">No cases match your search.</p>' : '<p style="color:#888">Load a date range to search cases.</p>'; return; }
 
   box.innerHTML = `<table id="ipTable">
-    <thead><tr><th></th><th>Adm Date</th><th>Adm No.</th><th>Patient</th><th>Refer Name</th><th class="r">Refer Amt</th><th></th><th class="r">Due</th><th class="r">Pay Amount</th><th>Status</th></tr></thead>
+    <thead><tr><th>Adm Date</th><th>Adm No.</th><th>Patient</th><th>Refer Name</th><th class="r">Refer Amt</th><th></th><th class="r">Due</th><th>Status</th><th></th></tr></thead>
     <tbody>${list.map(c=>{
       const payable = !c.refer_na && c.linked && c.amountSet && c.due > 0.001;
-      const rowClass = c.refer_na ? 'row-ok' : (!c.linked || !c.amountSet) ? 'row-warn' : 'row-ok';
+      const added = isInCart('ip', c.id);
+      const rowClass = added ? 'row-added' : c.refer_na ? 'row-ok' : (!c.linked || !c.amountSet) ? 'row-warn' : 'row-ok';
       const id = esc(c.id);
       const donePaid = !c.refer_na && c.linked && c.amountSet && c.due <= 0.001;
       return `<tr class="${rowClass}" data-id="${id}">
-        <td><input type="checkbox" class="ip-chk" data-id="${id}" onchange="ipUpdateTotal()" ${payable?'':'disabled'}/></td>
         <td>${c.admission_date}</td>
         <td>${esc(c.admission_no)}</td>
         <td>${esc(c.patient_name)}</td>
@@ -542,18 +607,17 @@ function renderIpdList(){
           <button class="btn-mini" style="background:#e2e8f0;color:#334155" onclick="markIpdReferNA('${id}')">🚫 N/A</button>
         </td>
         <td class="r">${c.refer_na ? '<span style="color:#999">—</span>' : c.amountSet ? fmt(c.due) : '<span style="color:#999">—</span>'}</td>
-        <td class="r"><input type="number" class="ip-amt" data-id="${id}" value="${Math.max(0,c.due).toFixed(2)}" min="0" step="0.01"
-            style="width:100px;text-align:right" oninput="ipUpdateTotal()" ${payable?'':'disabled'}/></td>
         <td>${c.refer_na ? '<span class="pill pill-ok">✅ Done (N/A)</span>' : donePaid ? '<span class="pill pill-ok">✅ Done</span>' : payable ? '<span class="pill pill-ok">Payable</span>' : '<span class="pill pill-warn">Fix refer link</span>'}</td>
+        <td>${added
+            ? `<button class="btn-mini btn-mini-remove" onclick="removeFromCart('ip','${id}')">✕ Remove</button>`
+            : `<button class="btn-mini btn-mini-add" onclick="addToCart('ip','${id}')" ${payable?'':'disabled'}>➕ Add</button>`}</td>
       </tr>
-      ${(!c.refer_na && (!c.linked || !c.amountSet)) ? `<tr class="${rowClass}"><td></td><td colspan="9" class="row-warn-msg">
+      ${(!c.refer_na && (!c.linked || !c.amountSet)) ? `<tr class="${rowClass}"><td></td><td colspan="8" class="row-warn-msg">
         ${!c.linked ? '⚠️ Refer not linked. ' : ''}${!c.amountSet ? '⚠️ Refer amount not entered.' : ''}
       </td></tr>` : ''}
       `;
     }).join('')}</tbody>
-    <tfoot><tr><td colspan="8">Total to Pay</td><td class="r" id="ipTotal">₹0.00</td><td></td></tr></tfoot>
   </table>`;
-  ipUpdateTotal();
 }
 async function updateIpdReferInfo(id){
   const c = ipAllCases.find(x=>String(x.id)===String(id));
@@ -579,8 +643,11 @@ async function updateIpdReferInfo(id){
       c.hasAmtRow = true;
     }
     c.refer_name = name; c.refer_amount = amt; c.linked = true; c.amountSet = true; c.due = amt - c.paid;
-    ok.style.display='block'; ok.textContent = `✅ Admission ${c.admission_no} refer link/amount updated. You can now select it for payment.`;
+    const inCart = cart.find(x=>x.domain==='ip' && String(x.key)===String(id));
+    if (inCart){ inCart.refer_name = name; inCart.due = c.due; }
+    ok.style.display='block'; ok.textContent = `✅ Admission ${c.admission_no} refer link/amount updated. You can now add it.`;
     renderIpdList();
+    renderCart();
     loadReferNameOptions();
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
@@ -600,80 +667,108 @@ async function markIpdReferNA(id){
       if (e2) throw e2;
     }
     c.refer_na = true; c.refer_name=''; c.refer_amount=0; c.due=0; c.linked=true; c.amountSet=true;
+    removeFromCart('ip', id); // no longer payable — drop from selection if it was there
     ok.style.display='block'; ok.textContent = `✅ Admission ${c.admission_no} marked as Refer Not Applicable.`;
     renderIpdList();
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
 }
-function ipUpdateTotal(){
-  let total = 0;
-  const amtEls = [...document.querySelectorAll('.ip-amt')];
-  document.querySelectorAll('.ip-chk:checked').forEach(chk=>{
-    const amtEl = amtEls.find(el=>el.dataset.id===chk.dataset.id);
-    if (amtEl) total += parseFloat(amtEl.value||0);
-  });
-  const el = document.getElementById('ipTotal');
-  if (el) el.textContent = fmt(total);
-}
-async function saveIpdReferPay(){
-  const err = document.getElementById('ipErr'), ok = document.getElementById('ipOk');
+
+// ════════════════════════════════════════════════════════════
+// SUBMIT — writes OPD rows to opd_refer_payment and IPD rows to
+// ipd_refer_payments, all sharing the same voucher/date/mode/remark.
+// ════════════════════════════════════════════════════════════
+async function submitAll(){
+  const err = document.getElementById('mainErr'), ok = document.getElementById('mainOk');
   err.textContent=''; ok.style.display='none';
-  const voucher = document.getElementById('ipVoucher').value.trim();
-  const date = document.getElementById('ipDate').value;
-  const mode = document.getElementById('ipMode').value;
-  const remark = document.getElementById('ipRemark').value.trim() || null;
-  const checked = [...document.querySelectorAll('.ip-chk:checked')];
+  const voucher = document.getElementById('voucherNo').value.trim();
+  const date = document.getElementById('payDate').value;
+  const mode = document.getElementById('payMode').value;
+  const remark = document.getElementById('payRemark').value.trim() || null;
+
   if (!voucher) { err.textContent='Voucher No is required.'; return; }
   if (!date) { err.textContent='Payment date is required.'; return; }
   if (!mode) { err.textContent='Select a payment mode.'; return; }
-  if (!checked.length) { err.textContent='Select at least one case to pay.'; return; }
+  if (!cart.length) { err.textContent='Add at least one case to the selection list before submitting.'; return; }
 
-  const vcheck = await checkVoucher('ip');
+  const vcheck = await checkVoucher();
   if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
 
-  const ipAmtEls = [...document.querySelectorAll('.ip-amt')];
-  const rows = checked.map(chk=>{
-    const c = ipAllCases.find(x=>String(x.id)===String(chk.dataset.id));
-    const amtEl = ipAmtEls.find(el=>el.dataset.id===chk.dataset.id);
-    const amt = parseFloat(amtEl?.value||0);
-    return { row: {
-      admission_id: c.id, admission_no: c.admission_no,
-      refer_id: c.refer_id || null, refer_name: c.refer_name,
-      payment_date: date, voucher_no: voucher, mode, amount: amt, remark
-    }, c, amt };
-  });
-  if (rows.some(r=>!r.amt || r.amt<=0)) { err.textContent='Pay amount must be greater than 0 for every selected case.'; return; }
-  if (vcheck.existing && rows.some(r=>r.row.refer_name !== vcheck.existing.party_name)) {
+  // pull live pay-amounts from the cart inputs
+  cart.forEach(x=>{ x.amount = parseFloat(document.getElementById(`cartAmt-${x.domain}-${x.key}`)?.value || 0); });
+
+  if (cart.some(x=>!x.amount || x.amount<=0)) { err.textContent='Pay amount must be greater than 0 for every selected case.'; return; }
+
+  const firstName = cart[0] ? cart[0].refer_name : '';
+  if (cart.some(x=>!namesMatch(x.refer_name, firstName))) {
+    err.textContent = 'All cases selected for one voucher must share the same refer name.'; return;
+  }
+  if (vcheck.existing && cart.some(x=>!namesMatch(x.refer_name, vcheck.existing.party_name))) {
     err.textContent = `Voucher ${voucher} is already used for "${vcheck.existing.party_name}". All cases in this voucher must be for the same refer name.`;
     return;
   }
-  const names = new Set(rows.map(r=>r.row.refer_name));
-  if (names.size > 1) { err.textContent = 'All cases selected for one voucher must share the same refer name.'; return; }
+
+  const opItems = cart.filter(x=>x.domain==='op');
+  const ipItems = cart.filter(x=>x.domain==='ip');
+
+  const OPD_REFER_PAYMENT_COLS = ['case_no','payment_date','voucher_no','remarks',
+    'payment_to','mode','amount','discount','created_by','created_by_name','description'];
+
+  const opRows = opItems.map(x=>{
+    const c = opAllCases.find(o=>o.case_no===x.key);
+    const stamped = BNH_PAGE.stamp({
+      case_no: c.case_no, payment_date: date, voucher_no: voucher,
+      remarks: remark, payment_to: c.refer_name, mode, amount: x.amount, discount: 0,
+      description: `Case ${c.case_no}`
+    });
+    const row = {};
+    OPD_REFER_PAYMENT_COLS.forEach(k => { if (k in stamped) row[k] = stamped[k]; });
+    return { row, c, amt: x.amount };
+  });
+  const ipRows = ipItems.map(x=>{
+    const c = ipAllCases.find(i=>String(i.id)===String(x.key));
+    return { row: {
+      admission_id: c.id, admission_no: c.admission_no,
+      refer_id: c.refer_id || null, refer_name: c.refer_name,
+      payment_date: date, voucher_no: voucher, mode, amount: x.amount, remark
+    }, c, amt: x.amount };
+  });
 
   spin(true);
   try{
-    const { error } = await sb.from('ipd_refer_payments').insert(rows.map(r=>r.row));
-    if (error) throw error;
-    ok.style.display='block'; ok.textContent = `✅ Saved ${rows.length} case(s) under Voucher ${voucher}.`;
-    document.getElementById('ipRemark').value='';
+    if (opRows.length){
+      const { error } = await sb.from('opd_refer_payment').insert(opRows.map(r=>r.row));
+      if (error) throw error;
+      for (const r of opRows){
+        const nowPaid = (r.c.paid||0) + r.amt;
+        if (nowPaid >= (r.c.refer_amount||0) - 0.01){
+          await sb.from('opd_case').update({ refer_payment_status:'paid' }).eq('case_no', r.c.case_no);
+        }
+      }
+    }
+    if (ipRows.length){
+      const { error } = await sb.from('ipd_refer_payments').insert(ipRows.map(r=>r.row));
+      if (error) throw error;
+    }
+    ok.style.display='block';
+    ok.textContent = `✅ Saved ${cart.length} case(s) (${opRows.length} OPD, ${ipRows.length} IPD) under Voucher ${voucher}.`;
+    document.getElementById('payRemark').value='';
+    cart = [];
+    renderCart();
+    await loadOpdCases();
     await loadIpdCases();
-    await checkVoucher('ip');
+    await checkVoucher();
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
 }
 
 // ── shared refer-name suggestions (datalist) ──────────────────
-// Pulls every distinct refer name already used anywhere in the system so
-// that updating a case's refer name shows existing names to pick from
-// instead of the user having to remember/retype them from scratch.
 async function loadReferNameOptions(){
   const names = new Set();
   try{
     const [a, b, c] = await Promise.all([
       sb.from('opd_case').select('refer_name').not('refer_name','is',null),
       sb.from('ipd_admissions').select('refer_name').not('refer_name','is',null),
-      // Doctors logged by the marketing team's Gramin Visit tool are also
-      // valid refer names, even before they've ever been used on a case.
       sb.from('gramin_doctor_visits').select('doctor_name').not('doctor_name','is',null)
     ]);
     (a.data||[]).forEach(r=>{ const n=(r.refer_name||'').trim(); if (n) names.add(n); });
