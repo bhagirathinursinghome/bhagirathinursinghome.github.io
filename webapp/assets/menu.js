@@ -218,6 +218,13 @@
       roles: ["admin", "accountant", "manager"],
       group: "IPD"
     },
+        {
+      label: "Package Entry",
+      icon: "💰",
+      page: "pages/ipd-package-entry.html",
+      roles: ["admin", "accountant", "manager", "reception"],
+      group: "IPD"
+    },
     {
       label: "IPD - Doctor Details",
       icon: "📋",
