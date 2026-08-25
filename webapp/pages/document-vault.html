@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Document Vault</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    /* Scoped with dv- prefix so it never clashes with the shared stylesheet */
+    .dv-tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+    .dv-tab{padding:.5rem 1rem;border-radius:8px;border:1px solid #ccc;background:#f4f4f4;cursor:pointer;font-weight:600}
+    .dv-tab.active{background:#2563eb;color:#fff;border-color:#2563eb}
+    .dv-hidden{display:none !important}
+    .dv-banner{border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;font-weight:600;position:sticky;top:0;z-index:5}
+    .dv-banner-red{background:#fee2e2;color:#7f1d1d;border:1px solid #f87171}
+    .dv-banner-orange{background:#ffedd5;color:#7c2d12;border:1px solid #fb923c}
+    .dv-banner ul{margin:.4rem 0 0 1.2rem;font-weight:500}
+    .dv-filters{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:end}
+    .dv-filters > div{display:flex;flex-direction:column;font-size:.8rem}
+    .dv-filters input,.dv-filters select{padding:.4rem;border-radius:6px;border:1px solid #ccc}
+    .dv-row{display:flex;gap:.75rem;flex-wrap:wrap}
+    .dv-row .dv-field{flex:1;min-width:200px;display:flex;flex-direction:column;margin-bottom:.75rem}
+    .dv-card{border:1px solid #e5e7eb;border-radius:10px;padding:.9rem 1rem;margin-bottom:.6rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+    .dv-card.dv-expired{border-color:#f87171;background:#fef2f2}
+    .dv-card.dv-expiring{border-color:#fb923c;background:#fff7ed}
+    .dv-card .dv-name{font-weight:700}
+    .dv-meta{font-size:.82rem;color:#555}
+    .dv-badge{display:inline-block;padding:.15rem .5rem;border-radius:999px;font-size:.72rem;font-weight:700;margin-left:.4rem}
+    .dv-badge-red{background:#dc2626;color:#fff}
+    .dv-badge-orange{background:#ea580c;color:#fff}
+    .dv-actions button{margin-left:.35rem;padding:.35rem .7rem;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:.82rem}
+    .dv-actions button:hover{background:#f0f0f0}
+    .dv-history{margin-top:.5rem;padding:.5rem .75rem;background:#f9fafb;border-radius:8px;font-size:.82rem}
+    .dv-history table{width:100%;border-collapse:collapse}
+    .dv-history td,.dv-history th{padding:.25rem .4rem;text-align:left;border-bottom:1px solid #eee}
+    .dv-empty{color:#888;padding:1rem;text-align:center}
+    .dv-cat-add{display:flex;gap:.4rem}
+    .dv-cat-add select{flex:1}
+    .dv-cat-add button{white-space:nowrap}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>🗄️ Document Vault</h1>
+
+  <!-- Persistent alert banner: stays visible until the expiring/expired doc is renewed -->
+  <div id="dvBanner" class="dv-banner dv-hidden"></div>
+
+  <div class="dv-tabs">
+    <div class="dv-tab active" data-tab="view">📁 View Documents</div>
+    <div class="dv-tab" data-tab="new">➕ Add New</div>
+    <div class="dv-tab" data-tab="renew">🔄 Renew</div>
+  </div>
+
+  <!-- ============ VIEW TAB ============ -->
+  <div id="tab-view" class="page-card">
+    <div class="dv-filters">
+      <div style="min-width:220px">
+        <label>Search</label>
+        <input id="dvSearch" placeholder="Name, category, doc no..." />
+      </div>
+      <div>
+        <label>Category</label>
+        <select id="dvFilterCategory"><option value="">All</option></select>
+      </div>
+      <div>
+        <label>Expiry From</label>
+        <input id="dvFilterFrom" type="date" />
+      </div>
+      <div>
+        <label>Expiry To</label>
+        <input id="dvFilterTo" type="date" />
+      </div>
+      <div>
+        <button class="btn-primary" style="width:auto" onclick="DV.clearFilters()">Clear</button>
+      </div>
+    </div>
+    <div id="dvList"></div>
+  </div>
+
+  <!-- ============ ADD NEW TAB ============ -->
+  <div id="tab-new" class="page-card dv-hidden">
+    <form id="dvNewForm">
+      <div class="dv-row">
+        <div class="dv-field">
+          <label>Recorded By</label>
+          <input id="dvNewRecBy" readonly />
+        </div>
+      </div>
+      <div class="dv-row">
+        <div class="dv-field">
+          <label>Category *</label>
+          <div class="dv-cat-add">
+            <select id="dvNewCategory" required></select>
+            <button type="button" class="btn-primary" style="width:auto" onclick="DV.addCategory('dvNewCategory')">+ New</button>
+          </div>
+        </div>
+        <div class="dv-field">
+          <label>Document Name *</label>
+          <input id="dvNewName" required />
+        </div>
+      </div>
+      <div class="dv-row">
+        <div class="dv-field">
+          <label>Document No</label>
+          <input id="dvNewDocNo" />
+        </div>
+        <div class="dv-field">
+          <label>Expiry Date</label>
+          <input id="dvNewExpiry" type="date" />
+        </div>
+      </div>
+      <div class="dv-row">
+        <div class="dv-field" style="min-width:100%">
+          <label>Description</label>
+          <textarea id="dvNewDesc" rows="2" style="padding:.5rem;border-radius:6px;border:1px solid #ccc"></textarea>
+        </div>
+      </div>
+      <div class="dv-row">
+        <div class="dv-field">
+          <label>PDF File *</label>
+          <input id="dvNewFile" type="file" accept="application/pdf" required />
+        </div>
+      </div>
+      <button class="btn-primary" style="width:auto">Save Document</button>
+      <p class="err" id="dvNewErr"></p>
+      <p class="info" id="dvNewOk" style="display:none">Saved successfully.</p>
+    </form>
+  </div>
+
+  <!-- ============ RENEW TAB ============ -->
+  <div id="tab-renew" class="page-card dv-hidden">
+    <div class="dv-row">
+      <div class="dv-field" style="min-width:100%">
+        <label>Select Document to Renew *</label>
+        <select id="dvRenewSelect">
+          <option value="">-- choose a document --</option>
+        </select>
+      </div>
+    </div>
+
+    <form id="dvRenewForm" class="dv-hidden">
+      <div class="dv-row">
+        <div class="dv-field">
+          <label>Document Name (locked)</label>
+          <input id="dvRenewName" readonly />
+        </div>
+        <div class="dv-field">
+          <label>Recorded By</label>
+          <input id="dvRenewRecBy" readonly />
+        </div>
+      </div>
+      <div class="dv-row">
+        <div class="dv-field">
+          <label>Category *</label>
+          <div class="dv-cat-add">
+            <select id="dvRenewCategory" required></select>
+            <button type="button" class="btn-primary" style="width:auto" onclick="DV.addCategory('dvRenewCategory')">+ New</button>
+          </div>
+        </div>
+        <div class="dv-field">
+          <label>Document No</label>
+          <input id="dvRenewDocNo" />
+        </div>
+      </div>
+      <div class="dv-row">
+        <div class="dv-field">
+          <label>Expiry Date</label>
+          <input id="dvRenewExpiry" type="date" />
+        </div>
+        <div class="dv-field">
+          <label>New PDF File *</label>
+          <input id="dvRenewFile" type="file" accept="application/pdf" required />
+        </div>
+      </div>
+      <div class="dv-row">
+        <div class="dv-field" style="min-width:100%">
+          <label>Description</label>
+          <textarea id="dvRenewDesc" rows="2" style="padding:.5rem;border-radius:6px;border:1px solid #ccc"></textarea>
+        </div>
+      </div>
+      <button class="btn-primary" style="width:auto">Save Renewal</button>
+      <p class="err" id="dvRenewErr"></p>
+      <p class="info" id="dvRenewOk" style="display:none">Renewed successfully.</p>
+    </form>
+  </div>
+</div>
+
+<!-- REQUIRED scripts, in this order -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+// 1. Role guard — adjust to restrict who can open this page at all
+BNH_PAGE.requireRole(["*"]);
+
+const spinner = document.getElementById('spinner');
+const showSpin = () => spinner.classList.remove('hidden');
+const hideSpin = () => spinner.classList.add('hidden');
+
+const BUCKET = 'documents'; // create this as a PRIVATE bucket in Supabase Storage
+
+const DV = {
+  categories: [],
+  documents: [],
+  activeTab: 'view',
+
+  async init() {
+    document.getElementById('dvNewRecBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+    document.getElementById('dvRenewRecBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+
+    document.querySelectorAll('.dv-tab').forEach(t => {
+      t.onclick = () => DV.switchTab(t.dataset.tab);
+    });
+
+    document.getElementById('dvSearch').oninput = debounce(() => DV.renderList(), 250);
+    document.getElementById('dvFilterCategory').onchange = () => DV.renderList();
+    document.getElementById('dvFilterFrom').onchange = () => DV.renderList();
+    document.getElementById('dvFilterTo').onchange = () => DV.renderList();
+
+    document.getElementById('dvNewForm').onsubmit = (e) => DV.submitNew(e);
+    document.getElementById('dvRenewForm').onsubmit = (e) => DV.submitRenew(e);
+    document.getElementById('dvRenewSelect').onchange = (e) => DV.loadRenewTarget(e.target.value);
+
+    showSpin();
+    await Promise.all([DV.loadCategories(), DV.loadDocuments()]);
+    hideSpin();
+    DV.renderList();
+  },
+
+  switchTab(name) {
+    DV.activeTab = name;
+    document.querySelectorAll('.dv-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    ['view', 'new', 'renew'].forEach(n => {
+      document.getElementById('tab-' + n).classList.toggle('dv-hidden', n !== name);
+    });
+  },
+
+  async loadCategories() {
+    const { data, error } = await BNH_PAGE.sb.from('document_vault_categories').select('*').order('name');
+    if (error) { console.error(error); return; }
+    DV.categories = data || [];
+    DV.fillCategorySelects();
+  },
+
+  fillCategorySelects() {
+    const opts = DV.categories.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+    document.getElementById('dvNewCategory').innerHTML = opts;
+    document.getElementById('dvRenewCategory').innerHTML = opts;
+    document.getElementById('dvFilterCategory').innerHTML = '<option value="">All</option>' + opts;
+  },
+
+  async addCategory(targetSelectId) {
+    const name = prompt('New category name:');
+    if (!name || !name.trim()) return;
+    const clean = name.trim();
+    if (DV.categories.some(c => c.name.toLowerCase() === clean.toLowerCase())) {
+      alert('That category already exists.');
+      return;
+    }
+    showSpin();
+    const { error } = await BNH_PAGE.sb.from('document_vault_categories').insert({ name: clean });
+    hideSpin();
+    if (error) { alert(error.message); return; }
+    await DV.loadCategories();
+    document.getElementById(targetSelectId).value = clean;
+  },
+
+  async loadDocuments() {
+    const { data, error } = await BNH_PAGE.sb.from('document_vault').select('*').order('document_name');
+    if (error) { console.error(error); return; }
+    DV.documents = data || [];
+    DV.fillRenewSelect();
+    DV.renderBanner();
+  },
+
+  fillRenewSelect() {
+    const sel = document.getElementById('dvRenewSelect');
+    const opts = DV.documents
+      .map(d => `<option value="${d.id}">${escapeHtml(d.document_name)} (${escapeHtml(d.category)})</option>`)
+      .join('');
+    sel.innerHTML = '<option value="">-- choose a document --</option>' + opts;
+  },
+
+  status(expiry) {
+    if (!expiry) return 'none';
+    const today = new Date(); today.setHours(0,0,0,0);
+    const exp = new Date(expiry + 'T00:00:00');
+    const diffDays = Math.round((exp - today) / 86400000);
+    if (diffDays < 0) return 'expired';
+    if (diffDays <= 30) return 'expiring';
+    return 'normal';
+  },
+
+  renderBanner() {
+    const banner = document.getElementById('dvBanner');
+    const expired = DV.documents.filter(d => DV.status(d.expiry_date) === 'expired');
+    const expiring = DV.documents.filter(d => DV.status(d.expiry_date) === 'expiring');
+    if (expired.length === 0 && expiring.length === 0) {
+      banner.classList.add('dv-hidden');
+      banner.innerHTML = '';
+      return;
+    }
+    banner.classList.remove('dv-hidden');
+    banner.classList.toggle('dv-banner-red', expired.length > 0);
+    banner.classList.toggle('dv-banner-orange', expired.length === 0 && expiring.length > 0);
+    let html = '';
+    if (expired.length) html += `⚠️ ${expired.length} document(s) EXPIRED — renew immediately.`;
+    if (expiring.length) html += (html ? '<br/>' : '') + `⏳ ${expiring.length} document(s) expiring within 30 days.`;
+    html += '<ul>';
+    [...expired, ...expiring].forEach(d => {
+      html += `<li>${escapeHtml(d.document_name)} — expiry ${d.expiry_date} (${DV.status(d.expiry_date) === 'expired' ? 'EXPIRED' : 'expiring soon'})</li>`;
+    });
+    html += '</ul>';
+    banner.innerHTML = html;
+  },
+
+  clearFilters() {
+    document.getElementById('dvSearch').value = '';
+    document.getElementById('dvFilterCategory').value = '';
+    document.getElementById('dvFilterFrom').value = '';
+    document.getElementById('dvFilterTo').value = '';
+    DV.renderList();
+  },
+
+  renderList() {
+    const q = document.getElementById('dvSearch').value.trim().toLowerCase();
+    const cat = document.getElementById('dvFilterCategory').value;
+    const from = document.getElementById('dvFilterFrom').value;
+    const to = document.getElementById('dvFilterTo').value;
+
+    let rows = DV.documents.filter(d => {
+      if (q) {
+        const hay = `${d.document_name} ${d.category} ${d.document_no || ''} ${d.description || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (cat && d.category !== cat) return false;
+      if (from && (!d.expiry_date || d.expiry_date < from)) return false;
+      if (to && (!d.expiry_date || d.expiry_date > to)) return false;
+      return true;
+    });
+
+    const rank = { expired: 0, expiring: 1, normal: 2, none: 3 };
+    rows.sort((a, b) => {
+      const ra = rank[DV.status(a.expiry_date)], rb = rank[DV.status(b.expiry_date)];
+      if (ra !== rb) return ra - rb;
+      if (!a.expiry_date) return 1;
+      if (!b.expiry_date) return -1;
+      return a.expiry_date < b.expiry_date ? -1 : 1;
+    });
+
+    const list = document.getElementById('dvList');
+    if (rows.length === 0) {
+      list.innerHTML = '<div class="dv-empty">No documents found.</div>';
+      return;
+    }
+
+    list.innerHTML = rows.map(d => {
+      const st = DV.status(d.expiry_date);
+      const cardClass = st === 'expired' ? 'dv-expired' : (st === 'expiring' ? 'dv-expiring' : '');
+      const badge = st === 'expired'
+        ? '<span class="dv-badge dv-badge-red">EXPIRED</span>'
+        : (st === 'expiring' ? '<span class="dv-badge dv-badge-orange">EXPIRING SOON</span>' : '');
+      return `
+        <div class="dv-card ${cardClass}">
+          <div>
+            <div class="dv-name">${escapeHtml(d.document_name)} ${badge}</div>
+            <div class="dv-meta">
+              Category: ${escapeHtml(d.category)}${d.document_no ? ' • No: ' + escapeHtml(d.document_no) : ''}
+              ${d.expiry_date ? ' • Expiry: ' + d.expiry_date : ' • No expiry set'}
+              • v${d.version || 1}
+            </div>
+            ${d.description ? `<div class="dv-meta">${escapeHtml(d.description)}</div>` : ''}
+            <div id="hist-${d.id}"></div>
+          </div>
+          <div class="dv-actions">
+            <button onclick="DV.view('${d.id}')">View</button>
+            <button onclick="DV.download('${d.id}')">Download</button>
+            <button onclick="DV.toggleHistory('${d.id}')">History</button>
+            <button onclick="DV.jumpToRenew('${d.id}')">Renew</button>
+          </div>
+        </div>`;
+    }).join('');
+  },
+
+  jumpToRenew(id) {
+    DV.switchTab('renew');
+    const sel = document.getElementById('dvRenewSelect');
+    sel.value = id;
+    DV.loadRenewTarget(id);
+  },
+
+  async signedUrl(path, forceDownload, fileName) {
+    const opts = forceDownload ? { download: fileName || true } : {};
+    const { data, error } = await BNH_PAGE.sb.storage.from(BUCKET).createSignedUrl(path, 300, opts);
+    if (error) { alert(error.message); return null; }
+    return data.signedUrl;
+  },
+
+  async view(id) {
+    const d = DV.documents.find(x => x.id === id);
+    if (!d) return;
+    showSpin();
+    const url = await DV.signedUrl(d.file_path, false);
+    hideSpin();
+    if (url) window.open(url, '_blank');
+  },
+
+  async download(id) {
+    const d = DV.documents.find(x => x.id === id);
+    if (!d) return;
+    showSpin();
+    const url = await DV.signedUrl(d.file_path, true, d.file_name);
+    hideSpin();
+    if (url) window.open(url, '_blank');
+  },
+
+  async toggleHistory(id) {
+    const box = document.getElementById('hist-' + id);
+    if (box.dataset.open === '1') { box.innerHTML = ''; box.dataset.open = '0'; return; }
+    showSpin();
+    const { data, error } = await BNH_PAGE.sb.from('document_vault_history')
+      .select('*').eq('document_id', id).order('archived_at', { ascending: false });
+    hideSpin();
+    if (error) { alert(error.message); return; }
+    if (!data || data.length === 0) {
+      box.innerHTML = '<div class="dv-history">No previous versions.</div>';
+      box.dataset.open = '1';
+      return;
+    }
+    let html = '<div class="dv-history"><table><tr><th>Version</th><th>Expiry</th><th>Archived</th><th>By</th><th></th></tr>';
+    data.forEach(h => {
+      html += `<tr><td>v${h.version}</td><td>${h.expiry_date || '-'}</td><td>${new Date(h.archived_at).toLocaleDateString()}</td>
+        <td>${escapeHtml(h.archived_by_name || '')}</td>
+        <td><button onclick="DV.viewHistoryFile('${h.file_path}')">View</button></td></tr>`;
+    });
+    html += '</table></div>';
+    box.innerHTML = html;
+    box.dataset.open = '1';
+  },
+
+  async viewHistoryFile(path) {
+    showSpin();
+    const url = await DV.signedUrl(path, false);
+    hideSpin();
+    if (url) window.open(url, '_blank');
+  },
+
+  async loadRenewTarget(id) {
+    const form = document.getElementById('dvRenewForm');
+    if (!id) { form.classList.add('dv-hidden'); return; }
+    const d = DV.documents.find(x => x.id === id);
+    if (!d) return;
+    document.getElementById('dvRenewName').value = d.document_name;
+    document.getElementById('dvRenewCategory').value = d.category;
+    document.getElementById('dvRenewDocNo').value = d.document_no || '';
+    document.getElementById('dvRenewExpiry').value = d.expiry_date || '';
+    document.getElementById('dvRenewDesc').value = d.description || '';
+    document.getElementById('dvRenewErr').textContent = '';
+    document.getElementById('dvRenewOk').style.display = 'none';
+    form.dataset.id = id;
+    form.classList.remove('dv-hidden');
+  },
+
+  async submitNew(e) {
+    e.preventDefault();
+    const errEl = document.getElementById('dvNewErr');
+    const okEl = document.getElementById('dvNewOk');
+    errEl.textContent = ''; okEl.style.display = 'none';
+
+    const category = document.getElementById('dvNewCategory').value;
+    const name = document.getElementById('dvNewName').value.trim();
+    const docNo = document.getElementById('dvNewDocNo').value.trim();
+    const expiry = document.getElementById('dvNewExpiry').value || null;
+    const desc = document.getElementById('dvNewDesc').value.trim();
+    const file = document.getElementById('dvNewFile').files[0];
+
+    if (!category || !name) { errEl.textContent = 'Category and Document Name are required.'; return; }
+    if (!file) { errEl.textContent = 'Please choose a PDF file.'; return; }
+    if (file.type !== 'application/pdf') { errEl.textContent = 'Only PDF files are allowed.'; return; }
+    if (DV.documents.some(d => d.document_name.toLowerCase() === name.toLowerCase())) {
+      errEl.textContent = 'A document with this name already exists. Use Renew instead.';
+      return;
+    }
+
+    showSpin();
+    try {
+      const path = `${category}/${crypto.randomUUID()}.pdf`;
+      const { error: upErr } = await BNH_PAGE.sb.storage.from(BUCKET).upload(path, file, { contentType: 'application/pdf' });
+      if (upErr) throw upErr;
+
+      const payload = BNH_PAGE.stamp({
+        category, document_name: name, description: desc || null,
+        document_no: docNo || null, expiry_date: expiry,
+        file_path: path, file_name: file.name, version: 1
+      });
+      const { error } = await BNH_PAGE.sb.from('document_vault').insert(payload);
+      if (error) throw error;
+
+      okEl.style.display = 'block';
+      e.target.reset();
+      document.getElementById('dvNewRecBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+      await DV.loadDocuments();
+      DV.renderList();
+    } catch (err) {
+      errEl.textContent = err.message;
+    } finally {
+      hideSpin();
+    }
+  },
+
+  async submitRenew(e) {
+    e.preventDefault();
+    const errEl = document.getElementById('dvRenewErr');
+    const okEl = document.getElementById('dvRenewOk');
+    errEl.textContent = ''; okEl.style.display = 'none';
+
+    const form = document.getElementById('dvRenewForm');
+    const id = form.dataset.id;
+    const d = DV.documents.find(x => x.id === id);
+    if (!d) { errEl.textContent = 'Select a document first.'; return; }
+
+    const category = document.getElementById('dvRenewCategory').value;
+    const docNo = document.getElementById('dvRenewDocNo').value.trim();
+    const expiry = document.getElementById('dvRenewExpiry').value || null;
+    const desc = document.getElementById('dvRenewDesc').value.trim();
+    const file = document.getElementById('dvRenewFile').files[0];
+
+    if (!category) { errEl.textContent = 'Category is required.'; return; }
+    if (!file) { errEl.textContent = 'Please choose the renewed PDF file.'; return; }
+    if (file.type !== 'application/pdf') { errEl.textContent = 'Only PDF files are allowed.'; return; }
+
+    showSpin();
+    try {
+      // 1. Archive the current version into history (explicit object — schema uses archived_* not recorded_*)
+      const histPayload = {
+        document_id: d.id, document_name: d.document_name, category: d.category,
+        description: d.description, document_no: d.document_no, expiry_date: d.expiry_date,
+        file_path: d.file_path, file_name: d.file_name, version: d.version || 1,
+        archived_by: BNH_PAGE.user.username, archived_by_name: BNH_PAGE.user.name
+      };
+      const { error: histErr } = await BNH_PAGE.sb.from('document_vault_history').insert(histPayload);
+      if (histErr) throw histErr;
+
+      // 2. Upload the new file under a fresh path (old file stays in history/storage)
+      const newPath = `${category}/${crypto.randomUUID()}.pdf`;
+      const { error: upErr } = await BNH_PAGE.sb.storage.from(BUCKET).upload(newPath, file, { contentType: 'application/pdf' });
+      if (upErr) throw upErr;
+
+      // 3. Update the live record — explicit object (schema uses updated_* not recorded_*)
+      const updatePayload = {
+        category, document_no: docNo || null, expiry_date: expiry, description: desc || null,
+        file_path: newPath, file_name: file.name, version: (d.version || 1) + 1,
+        updated_by: BNH_PAGE.user.username, updated_by_name: BNH_PAGE.user.name,
+        updated_at: new Date().toISOString()
+      };
+      const { error } = await BNH_PAGE.sb.from('document_vault').update(updatePayload).eq('id', d.id);
+      if (error) throw error;
+
+      okEl.style.display = 'block';
+      form.classList.add('dv-hidden');
+      document.getElementById('dvRenewSelect').value = '';
+      document.getElementById('dvRenewFile').value = '';
+      await DV.loadDocuments();
+      DV.renderList();
+    } catch (err) {
+      errEl.textContent = err.message;
+    } finally {
+      hideSpin();
+    }
+  }
+};
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+DV.init();
+</script>
+</body>
+</html>
