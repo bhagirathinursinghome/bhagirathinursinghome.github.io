@@ -36,6 +36,13 @@
       roles: ["admin"],
       group: "Administration"
     },
+        {
+      label: "DOCUMENTS",
+      icon: "🗄️", 
+      page: "pages/document-vault.html",
+      roles: ["admin"],
+      group: "Administration"
+    },
 
     // ==========================================
     // HR & ACCOUNTS
