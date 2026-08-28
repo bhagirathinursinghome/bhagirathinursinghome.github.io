@@ -129,18 +129,24 @@
           <strong>Bulk Upload (Excel)</strong>
         </div>
         <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
-          <button type="button" class="bulk-btn secondary" onclick="downloadBulkTemplate()">⬇ Download Full Pending List (Excel)</button>
+          <button type="button" class="bulk-btn secondary" onclick="downloadBulkTemplate('full')">⬇ Full Pending (Excel)</button>
+          <button type="button" class="bulk-btn secondary" onclick="downloadBulkTemplate('partial')">⬇ Partial Pending (Excel)</button>
+          <button type="button" class="bulk-btn secondary" onclick="downloadBulkTemplate('all')">⬇ All Pending (Excel)</button>
           <label class="bulk-btn" style="cursor:pointer;margin:0">
             ⬆ Upload Filled Excel
             <input type="file" id="bulkFileInput" accept=".xlsx,.xls" class="hidden" onchange="handleBulkUpload(event)"/>
           </label>
         </div>
         <div class="bulk-hint">
-          Step 1: Download the Full Pending list — it includes admission no, admission date, patient name,
-          case details, type, mode, surgent name, anaesthesia name and refer name, with blank columns for
-          Package, Surgent Fee, Anaesthesia Fee, Refer Amount and NH Fees. Package Amount and Refer Amount
-          columns can be left blank — they can be filled later.<br/>
-          Step 2: Fill the amount columns in Excel, save, then upload it back here.<br/>
+          Step 1: Choose a list to download — <strong>Full Pending</strong> (no amount entry started yet),
+          <strong>Partial Pending</strong> (entry started but some amounts still missing — existing values are
+          pre-filled so you can see what's already saved), or <strong>All Pending</strong> (Full + Partial
+          combined). Each includes admission no, admission date, patient name, case details, type, mode,
+          surgent name, anaesthesia name and refer name, plus columns for Package, Surgent Fee, Anaesthesia
+          Fee, Refer Amount and NH Fees. Package Amount and Refer Amount columns can be left blank — they
+          can be filled later.<br/>
+          Step 2: Fill/edit the amount columns in Excel, save, then upload it back here. For Partial rows,
+          re-uploading updates the existing entry with your new values.<br/>
           Step 3: Do not edit or delete the "Admission ID" column — it's used to match each row to the patient.
         </div>
         <div id="bulkResult" class="bulk-result"></div>
@@ -532,38 +538,49 @@
     'Entry Date', 'Remark'
   ];
 
-  function downloadBulkTemplate() {
+  function downloadBulkTemplate(type) {
     const resultDiv = document.getElementById('bulkResult');
-    if (!_pendingCards || _pendingCards.length === 0) {
-      resultDiv.textContent = 'No pending patients to export.';
+    let list, label, filenamePart;
+    if (type === 'partial') {
+      list = _partialCards; label = 'Partial Pending'; filenamePart = 'PartialPending';
+    } else if (type === 'all') {
+      list = _fullCards.concat(_partialCards); label = 'All Pending'; filenamePart = 'AllPending';
+    } else {
+      list = _fullCards; label = 'Full Pending'; filenamePart = 'FullPending';
+    }
+    if (!list || list.length === 0) {
+      resultDiv.textContent = `No ${label.toLowerCase()} patients to export.`;
       return;
     }
-    const rows = _pendingCards.map(r => ({
-      'Admission ID': r.id,
-      'Admission No': r.admNo,
-      'Admission Date': r.date,
-      'Patient Name': r.name,
-      'Case Details': r.caseDetail,
-      'Type': r.type,
-      'Mode': r.mode,
-      'Surgent Name': r.surgentName,
-      'Anaesthesia Name': r.anaesthesiaName,
-      'Refer Name': r.refer,
-      'Package Amount': '',
-      'Surgent Fee': '',
-      'Anaesthesia Fee': '',
-      'Refer Amount': '',
-      'NH Fees': '',
-      'Entry Date': '',
-      'Remark': ''
-    }));
+    const rows = list.map(r => {
+      const entry = _entryByAdmission[r.id] || null;
+      return {
+        'Admission ID': r.id,
+        'Admission No': r.admNo,
+        'Admission Date': r.date,
+        'Patient Name': r.name,
+        'Case Details': r.caseDetail,
+        'Type': r.type,
+        'Mode': r.mode,
+        'Surgent Name': r.surgentName,
+        'Anaesthesia Name': r.anaesthesiaName,
+        'Refer Name': r.refer,
+        'Package Amount': entry && entry.package_amount != null ? entry.package_amount : '',
+        'Surgent Fee': entry && entry.surgent_fees != null ? entry.surgent_fees : '',
+        'Anaesthesia Fee': entry && entry.anaesthesia_fees != null ? entry.anaesthesia_fees : '',
+        'Refer Amount': entry && entry.refer_amount != null ? entry.refer_amount : '',
+        'NH Fees': entry && entry.nh_fees != null ? entry.nh_fees : '',
+        'Entry Date': entry && entry.amount_entry_date ? entry.amount_entry_date : '',
+        'Remark': entry && entry.remark ? entry.remark : ''
+      };
+    });
     const ws = XLSX.utils.json_to_sheet(rows, { header: BULK_HEADERS });
     ws['!cols'] = BULK_HEADERS.map(h => ({ wch: Math.max(14, h.length + 2) }));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Pending Amount Entry');
+    XLSX.utils.book_append_sheet(wb, ws, label.slice(0, 31));
     const stamp = new Date().toISOString().slice(0,10);
-    XLSX.writeFile(wb, `IPD_Pending_Amount_Entry_${stamp}.xlsx`);
-    resultDiv.textContent = `Downloaded ${rows.length} pending patient(s). Fill the amount columns and upload it back.`;
+    XLSX.writeFile(wb, `IPD_${filenamePart}_Amount_Entry_${stamp}.xlsx`);
+    resultDiv.textContent = `Downloaded ${rows.length} ${label.toLowerCase()} patient(s). Fill/edit the amount columns and upload it back.`;
   }
 
   async function handleBulkUpload(event) {
@@ -584,14 +601,16 @@
         return;
       }
 
-      // Admission map (by id and by admission no as fallback) + already-done set
+      // Admission map (by id and by admission no as fallback) — covers BOTH Full and
+      // Partial pending patients, so a re-uploaded Partial (or All) list can update
+      // an existing entry instead of being skipped.
+      const allPending = _fullCards.concat(_partialCards);
       const admIndex = {};
       const admNoIndex = {};
-      _pendingCards.forEach(r => { admIndex[r.id] = r; admNoIndex[r.admNo] = r; });
-      const { data: done } = await BNH_PAGE.sb.from('ipd_amount_entries').select('admission_id');
-      const doneIds = new Set((done||[]).map(r => r.admission_id));
+      allPending.forEach(r => { admIndex[r.id] = r; admNoIndex[r.admNo] = r; });
 
       const toInsert = [];
+      const toUpdate = [];
       const skipped = [];
 
       rows.forEach((row, i) => {
@@ -600,9 +619,8 @@
         const admNo = (row['Admission No']||'').toString().trim();
         const card = admIndex[admId] || admNoIndex[admNo];
         if (!card) { skipped.push(`Row ${rowNum}: no matching pending patient found.`); return; }
-        if (doneIds.has(card.id)) { skipped.push(`Row ${rowNum} (${card.name}): amount entry already exists, skipped.`); return; }
 
-        const num = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+        const num = v => { const s = (v==null?'':v.toString().trim()); if (s === '') return null; const n = parseFloat(s); return isNaN(n) ? null : n; };
         const pkg    = num(row['Package Amount']);
         const surg   = num(row['Surgent Fee']);
         const ane    = num(row['Anaesthesia Fee']);
@@ -612,35 +630,52 @@
         const isDoctorCase = (card.type||'').trim() === 'Doctor Case';
         const hasRefer = card.refer && card.refer !== 'N/A';
         const hasAne   = !!card.anaesthesiaName;
+        const existingEntry = _entryByAdmission[card.id] || null;
 
-        if (isDoctorCase && nh == null) { skipped.push(`Row ${rowNum} (${card.name}): NH Fees is required for Doctor Case, skipped.`); return; }
-        if (!isDoctorCase && surg == null) { skipped.push(`Row ${rowNum} (${card.name}): Surgent Fee is required, skipped.`); return; }
+        // Required fields: blank is only OK if a value was already saved earlier (Partial re-upload).
+        if (isDoctorCase && nh == null && !(existingEntry && existingEntry.nh_fees != null)) {
+          skipped.push(`Row ${rowNum} (${card.name}): NH Fees is required for Doctor Case, skipped.`); return;
+        }
+        if (!isDoctorCase && surg == null && !(existingEntry && existingEntry.surgent_fees != null)) {
+          skipped.push(`Row ${rowNum} (${card.name}): Surgent Fee is required, skipped.`); return;
+        }
         // Package Amount and Refer Amount are optional — can be left blank and filled in later
         // (via the Amount Entry edit flow or the dedicated Package Entry page).
 
-        toInsert.push(BNH_PAGE.stamp({
+        const payload = BNH_PAGE.stamp({
           admission_id:      card.id,
           admission_no:      card.admNo,
           patient_name:      card.name,
-          refer_amount:      hasRefer ? (refer||0) : null,
-          surgent_fees:      !isDoctorCase ? (surg||0) : null,
-          anaesthesia_fees:  !isDoctorCase && hasAne ? (ane||0) : null,
-          package_amount:    !isDoctorCase ? (pkg||0) : null,
-          nh_fees:           isDoctorCase ? (nh||0) : null,
-          amount_entry_date: (row['Entry Date']||'').toString().trim() || new Date().toISOString().slice(0,10),
-          remark:            (row['Remark']||'').toString().trim() || null
-        }));
+          refer_amount:      hasRefer ? (refer != null ? refer : (existingEntry ? existingEntry.refer_amount : null)) : null,
+          surgent_fees:      !isDoctorCase ? (surg != null ? surg : (existingEntry ? existingEntry.surgent_fees : null)) : null,
+          anaesthesia_fees:  !isDoctorCase && hasAne ? (ane != null ? ane : (existingEntry ? existingEntry.anaesthesia_fees : null)) : null,
+          package_amount:    !isDoctorCase ? (pkg != null ? pkg : (existingEntry ? existingEntry.package_amount : null)) : null,
+          nh_fees:           isDoctorCase ? (nh != null ? nh : (existingEntry ? existingEntry.nh_fees : null)) : null,
+          amount_entry_date: (row['Entry Date']||'').toString().trim() || (existingEntry && existingEntry.amount_entry_date) || new Date().toISOString().slice(0,10),
+          remark:            (row['Remark']||'').toString().trim() || (existingEntry ? existingEntry.remark : null) || null
+        });
+
+        if (existingEntry) {
+          toUpdate.push({ id: existingEntry.id, payload });
+        } else {
+          toInsert.push(payload);
+        }
       });
 
-      let insertedCount = 0;
+      let insertedCount = 0, updatedCount = 0;
       if (toInsert.length > 0) {
         const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(toInsert);
         if (error) throw error;
         insertedCount = toInsert.length;
       }
+      for (const u of toUpdate) {
+        const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').update(u.payload).eq('id', u.id);
+        if (error) throw error;
+        updatedCount++;
+      }
 
       resultDiv.textContent =
-        `✅ ${insertedCount} amount entr${insertedCount===1?'y':'ies'} saved.` +
+        `✅ ${insertedCount} new amount entr${insertedCount===1?'y':'ies'} saved, ${updatedCount} existing entr${updatedCount===1?'y':'ies'} updated.` +
         (skipped.length ? `\n⚠ ${skipped.length} row(s) skipped:\n` + skipped.join('\n') : '');
 
       loadPending();
