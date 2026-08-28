@@ -21,6 +21,10 @@
     tfoot td { font-weight:700; background:#f9f9f9; }
     .due-pos { color:#dc2626; font-weight:700; }
     .due-neg { color:#059669; font-weight:700; }
+    tr.doctor-case-row td { background:#fff7ed; color:#c2410c; }
+    .case-tag { display:inline-block; font-size:.72rem; font-weight:700; color:#c2410c;
+                background:#ffedd5; border:1px solid #fdba74; border-radius:4px; padding:1px 6px; margin-left:6px; }
+    tr.opbal-row td { background:#f0f4ff; font-weight:700; }
     @media print { .tab-bar,.no-print { display:none!important; } }
   </style>
 </head>
@@ -182,6 +186,20 @@
       </p>`;
   }
 
+  // Helper: compute net Dr (fees minus NH adjustment where applicable) for one OT entry
+  function computeFees(ot, amt, docType, docId) {
+    let fees = 0, nhAdj = 0, isDoctorCase = false;
+    if (docType === 'Surgent' && ot.surgent_id === docId) {
+      fees  = parseFloat(amt?.surgent_fees||0);
+      nhAdj = parseFloat(amt?.nh_fees||0);
+      isDoctorCase = nhAdj > 0;
+    } else if (docType === 'Anaesthesia' && ot.anaesthesia_id === docId) {
+      fees = parseFloat(amt?.anaesthesia_fees||0);
+      isDoctorCase = parseFloat(amt?.nh_fees||0) > 0;
+    }
+    return { fees, nhAdj, isDoctorCase };
+  }
+
   // ── REPORT 2: DOCTOR LEDGER ──────────────────────────
   async function loadLedger() {
     const docId = document.getElementById('ledgerDoc').value;
@@ -196,19 +214,28 @@
 
     document.getElementById('spinner').classList.remove('hidden');
 
-    const [{ data: docInfoArr }, { data: otEntries }, { data: payments }] = await Promise.all([
+    // Fetch doctor info, in-period transactions, AND all transactions dated before
+    // "from" (needed to roll the static opening_balance forward to the period start).
+    const [{ data: docInfoArr }, { data: otEntries }, { data: payments },
+           { data: priorOT }, { data: priorPayments }] = await Promise.all([
       BNH_PAGE.sb.from('ipd_doctors').select('*').eq('id',docId),
       BNH_PAGE.sb.from('ipd_ot_entries').select('*')
         .or(`surgent_id.eq.${docId},anaesthesia_id.eq.${docId}`)
         .gte('ot_date', from).lte('ot_date', to).order('ot_date'),
       BNH_PAGE.sb.from('ipd_doctor_payments').select('*')
-        .eq('doctor_id', docId).gte('payment_date', from).lte('payment_date', to).order('payment_date')
+        .eq('doctor_id', docId).gte('payment_date', from).lte('payment_date', to).order('payment_date'),
+      BNH_PAGE.sb.from('ipd_ot_entries').select('*')
+        .or(`surgent_id.eq.${docId},anaesthesia_id.eq.${docId}`)
+        .lt('ot_date', from),
+      BNH_PAGE.sb.from('ipd_doctor_payments').select('*')
+        .eq('doctor_id', docId).lt('payment_date', from)
     ]);
 
     const docInfo = docInfoArr && docInfoArr.length > 0 ? docInfoArr[0] : null;
 
-    // Get amount entries for these OT cases
-    const admIds = (otEntries||[]).map(r=>r.admission_id);
+    // Get amount entries for BOTH in-period and prior OT cases (need fees for both)
+    const allOT = [...(priorOT||[]), ...(otEntries||[])];
+    const admIds = [...new Set(allOT.map(r=>r.admission_id))];
     let amtMap = {};
     if (admIds.length > 0) {
       const { data: amts } = await BNH_PAGE.sb.from('ipd_amount_entries')
@@ -217,34 +244,56 @@
     }
     document.getElementById('spinner').classList.add('hidden');
 
-    const opBal = parseFloat(docInfo?.opening_balance||0);
+    const staticOpBal = parseFloat(docInfo?.opening_balance||0);
+
+    // 1) Roll the doctor's static opening balance forward to the start of the
+    //    selected period by applying every OT case fee and every payment dated
+    //    strictly before "from".
+    let periodOpBal = staticOpBal;
+    (priorOT||[]).forEach(ot => {
+      const amt = amtMap[ot.admission_id];
+      const { fees, nhAdj } = computeFees(ot, amt, docType, docId);
+      periodOpBal += (fees - nhAdj);
+    });
+    (priorPayments||[]).forEach(p => { periodOpBal -= parseFloat(p.amount||0); });
+
+    // 2) Build the in-period transaction rows
     let rows = [];
-
     (otEntries||[]).forEach(ot => {
-      const amt = amtMap[ot.admission_id] || {};
-      let fees = 0, nhAdj = 0;
-      if (docType === 'Surgent' && ot.surgent_id === docId) {
-        fees  = parseFloat(amt.surgent_fees||0);
-        nhAdj = parseFloat(amt.nh_fees||0);
-      } else if (docType === 'Anaesthesia' && ot.anaesthesia_id === docId) {
-        fees = parseFloat(amt.anaesthesia_fees||0);
-      }
-      rows.push({ date: ot.ot_date, desc: `OT – ${ot.patient_name} (${ot.admission_no})`, dr: fees, nhAdj, cr: 0 });
+      const amt = amtMap[ot.admission_id];
+      const { fees, nhAdj, isDoctorCase } = computeFees(ot, amt, docType, docId);
+      rows.push({
+        date: ot.ot_date, type: 'OT Case',
+        patient: ot.patient_name, admissionNo: ot.admission_no,
+        dr: fees, nhAdj, cr: 0, isDoctorCase
+      });
     });
-
     (payments||[]).forEach(p => {
-      rows.push({ date: p.payment_date, desc: `Payment (${p.mode})`, dr: 0, nhAdj: 0, cr: parseFloat(p.amount||0) });
+      rows.push({
+        date: p.payment_date, type: 'Payment',
+        patient: `Mode: ${p.mode||'-'}`, admissionNo: '',
+        dr: 0, nhAdj: 0, cr: parseFloat(p.amount||0), isDoctorCase: false
+      });
     });
-
     rows.sort((a,b) => a.date.localeCompare(b.date));
 
-    let bal = opBal;
-    let tableRows = '';
+    // 3) Walk forward from the calculated period opening balance
+    let bal = periodOpBal;
+    let tableRows = `<tr class="opbal-row">
+        <td>-</td><td>${from}</td><td>Opening Balance</td>
+        <td>Balance carried forward (as of ${from})</td>
+        <td class="r">-</td><td class="r">-</td><td class="r">-</td>
+        <td class="r">${fmt(periodOpBal)}</td>
+      </tr>`;
     rows.forEach((r,i) => {
-      const netDr = r.dr - r.nhAdj; // Surgent: fees minus NH adj
+      const netDr = r.dr - r.nhAdj;
       bal += netDr - r.cr;
-      tableRows += `<tr>
-        <td>${i+1}</td><td>${r.date}</td><td>${r.desc}</td>
+      const caseDetails = r.type === 'OT Case'
+        ? `${r.patient}${r.admissionNo ? ' (' + r.admissionNo + ')' : ''}${r.isDoctorCase ? '<span class="case-tag">Doctor Case</span>' : ''}`
+        : r.patient;
+      tableRows += `<tr${r.isDoctorCase ? ' class="doctor-case-row"' : ''}>
+        <td>${i+1}</td><td>${r.date}</td><td>${r.type}</td>
+        <td>${caseDetails}</td>
         <td class="r">${r.dr ? fmt(r.dr) : '-'}</td>
         <td class="r">${docType==='Surgent' && r.nhAdj ? fmt(r.nhAdj) : '-'}</td>
         <td class="r">${r.cr ? fmt(r.cr) : '-'}</td>
@@ -256,18 +305,20 @@
       <div style="font-size:.85rem;margin-bottom:.75rem">
         <strong>${docInfo?.doctor_name}</strong> &nbsp;|&nbsp; ${docType} &nbsp;|&nbsp;
         ${docInfo?.specialisation||''} &nbsp;|&nbsp; Mobile: ${docInfo?.mobile||'-'}<br>
-        Opening Balance: <strong>${fmt(opBal)}</strong> &nbsp;|&nbsp; Period: ${from} to ${to}
+        Opening Balance (static, all-time): <strong>${fmt(staticOpBal)}</strong> &nbsp;|&nbsp;
+        Opening Balance as of ${from}: <strong>${fmt(periodOpBal)}</strong> &nbsp;|&nbsp; Period: ${from} to ${to}
+        ${docType==='Anaesthesia' ? '<br><span class="case-tag">Doctor Case</span> = case marked with an NH fee adjustment' : ''}
       </div>
       <table id="ledgerTable">
         <thead><tr>
-          <th>#</th><th>Date</th><th>Description</th>
+          <th>#</th><th>Date</th><th>Type</th><th>Case Details</th>
           <th class="r">Fees (Dr)</th>
           <th class="r">NH Adj (Cr)</th>
           <th class="r">Payment (Cr)</th>
           <th class="r">Balance</th>
         </tr></thead>
-        <tbody>${tableRows||'<tr><td colspan="7" style="text-align:center">No transactions in this period.</td></tr>'}</tbody>
-        <tfoot><tr><td colspan="6" style="text-align:right">Closing Balance (Due)</td>
+        <tbody>${tableRows}</tbody>
+        <tfoot><tr><td colspan="7" style="text-align:right">Closing Balance (Due)</td>
           <td class="r ${bal>0?'due-pos':'due-neg'}">${fmt(bal)}</td>
         </tr></tfoot>
       </table>
