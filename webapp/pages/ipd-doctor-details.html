@@ -265,13 +265,14 @@
       rows.push({
         date: ot.ot_date, type: 'OT Case',
         patient: ot.patient_name, admissionNo: ot.admission_no,
+        caseDetail: ot.case_detail || '',
         dr: fees, nhAdj, cr: 0, isDoctorCase
       });
     });
     (payments||[]).forEach(p => {
       rows.push({
         date: p.payment_date, type: 'Payment',
-        patient: `Mode: ${p.mode||'-'}`, admissionNo: '',
+        patient: `Mode: ${p.mode||'-'}`, admissionNo: '', caseDetail: '',
         dr: 0, nhAdj: 0, cr: parseFloat(p.amount||0), isDoctorCase: false
       });
     });
@@ -288,8 +289,12 @@
     rows.forEach((r,i) => {
       const netDr = r.dr - r.nhAdj;
       bal += netDr - r.cr;
+      // Case Details column: for OT rows, show the actual case detail text
+      // entered on the OT Entry form (falling back to patient/adm no if blank).
       const caseDetails = r.type === 'OT Case'
-        ? `${r.patient}${r.admissionNo ? ' (' + r.admissionNo + ')' : ''}${r.isDoctorCase ? '<span class="case-tag">Doctor Case</span>' : ''}`
+        ? `${r.caseDetail ? r.caseDetail : (r.patient + (r.admissionNo ? ' (' + r.admissionNo + ')' : ''))}
+           <div style="font-size:.72rem;color:#6b7280;margin-top:2px">${r.patient}${r.admissionNo ? ' &middot; ' + r.admissionNo : ''}</div>
+           ${r.isDoctorCase ? '<span class="case-tag">Doctor Case</span>' : ''}`
         : r.patient;
       tableRows += `<tr${r.isDoctorCase ? ' class="doctor-case-row"' : ''}>
         <td>${i+1}</td><td>${r.date}</td><td>${r.type}</td>
