@@ -88,6 +88,16 @@
                        padding:.3rem 0; border-bottom:1px solid #eee; font-size:.82rem; }
     .bulk-result-row.ok  .brr-msg { color:#059669; }
     .bulk-result-row.err .brr-msg { color:#dc2626; }
+    .btn-delete-rcpt { background:#dc2626; color:#fff; border:none; border-radius:5px;
+                       padding:.22rem .5rem; font-size:.72rem; font-weight:600; cursor:pointer; }
+    .btn-delete-rcpt:hover { background:#b91c1c; }
+    .btn-reverse { background:#d97706; color:#fff; border:none; border-radius:5px;
+                   padding:.3rem .65rem; font-size:.75rem; font-weight:700; cursor:pointer; }
+    .btn-reverse:hover { background:#b45309; }
+    .btn-bulk-pkg-dl { background:#0e7490; color:#fff; }
+    .btn-bulk-pkg-dl:hover { background:#155e75; }
+    .btn-bulk-pkg-ul { background:#a21caf; color:#fff; }
+    .btn-bulk-pkg-ul:hover { background:#86198f; }
     @media print { .no-print { display:none!important; } }
   </style>
 </head>
@@ -119,6 +129,21 @@
       </div>
       <p class="err" id="bulkErr" style="margin-top:.6rem"></p>
       <div id="bulkResultBox" style="margin-top:.75rem"></div>
+    </div>
+    <div class="page-card no-print hidden" id="bulkPkgSection" style="margin-top:1.5rem">
+      <h2 style="font-size:1rem;margin-bottom:.5rem">📦 Bulk Package Update & Discharge (Excel) <span style="font-size:.72rem;font-weight:400;color:#a21caf">— Full Access</span></h2>
+      <p style="font-size:.82rem;color:#6b7280;margin:0 0 .85rem">
+        Download an Excel of all active cases with package amount, total received, and dues.
+        Optionally fill in a <strong>New Package Amount</strong> and/or set <strong>Discharge</strong> to
+        <code>TRUE</code>, then upload it back. Rows marked TRUE are only discharged if all dues are cleared.
+      </p>
+      <div class="bulk-actions">
+        <button class="btn-bulk btn-bulk-pkg-dl" id="bulkPkgDlBtn" onclick="downloadPkgDischargeExcel()">⬇️ Download Active Cases (Excel)</button>
+        <button class="btn-bulk btn-bulk-pkg-ul" id="bulkPkgUlBtn" onclick="document.getElementById('bulkPkgUploadInput').click()">⬆️ Upload Filled Excel</button>
+        <input type="file" id="bulkPkgUploadInput" class="hidden" accept=".xlsx,.xls" onchange="handlePkgDischargeUpload(event)"/>
+      </div>
+      <p class="err" id="bulkPkgErr" style="margin-top:.6rem"></p>
+      <div id="bulkPkgResultBox" style="margin-top:.75rem"></div>
     </div>
     <div class="page-card" style="margin-top:1.5rem">
       <h2 style="font-size:1rem;margin-bottom:.75rem">📋 Discharged Patients – Filter by Date</h2>
@@ -281,6 +306,8 @@
 <script>
   BNH_PAGE.requireRole(["admin","accountant","manager","reception"]);
   const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+  const fullAccess = typeof BNH_PAGE.hasFullAccess === 'function' ? BNH_PAGE.hasFullAccess() : false;
+  if (fullAccess) document.getElementById('bulkPkgSection').classList.remove('hidden');
 
   let activePatients = [];
   let currentPkgAmt = 0;
@@ -559,6 +586,190 @@
     }
   }
 
+  function parseBoolFlag(val) {
+    const s = String(val==null?'':val).trim().toLowerCase();
+    return s === 'true' || s === 'yes' || s === 'y' || s === '1';
+  }
+
+  async function downloadPkgDischargeExcel() {
+    if (!fullAccess) return;
+    const err = document.getElementById('bulkPkgErr');
+    err.textContent = '';
+    document.getElementById('bulkPkgResultBox').innerHTML = '';
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const rows = await fetchActiveDuesData();
+      if (rows.length === 0) {
+        err.textContent = 'No active cases found.';
+        return;
+      }
+      const sheetData = rows.map(r => ({
+        'Admission No': r.adm.admission_no,
+        'Patient Name': r.adm.patient_name,
+        'Admission Date': r.adm.admission_date,
+        'Case Mode': r.adm.case_mode,
+        'Case Type': r.adm.case_type,
+        'Current Package Amount': r.pkgAmt,
+        'Additional Charges': r.totalAddlIncome,
+        'Total Received': r.totalRcpt,
+        'Total Discount': r.totalDisc,
+        'OPD Due': Math.round(r.opdDue*100)/100,
+        'Balance Due': Math.round(r.balance*100)/100,
+        'New Package Amount (leave blank to keep same)': '',
+        'Discharge (TRUE/FALSE)': 'FALSE'
+      }));
+      const ws = XLSX.utils.json_to_sheet(sheetData);
+      ws['!cols'] = [
+        {wch:14},{wch:22},{wch:13},{wch:14},{wch:12},
+        {wch:16},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12},
+        {wch:30},{wch:16}
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Active Cases');
+      const today = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `IPD_Package_Discharge_${today}.xlsx`);
+    } catch(ex) {
+      err.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  async function handlePkgDischargeUpload(event) {
+    if (!fullAccess) { event.target.value = ''; return; }
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    const err = document.getElementById('bulkPkgErr');
+    const resultBox = document.getElementById('bulkPkgResultBox');
+    err.textContent = '';
+    resultBox.innerHTML = '';
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:'array', cellDates:false });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const excelRows = XLSX.utils.sheet_to_json(sheet, { defval:'' });
+      if (!excelRows || excelRows.length === 0) {
+        err.textContent = 'No rows found in the uploaded file.';
+        return;
+      }
+
+      const duesRows = await fetchActiveDuesData();
+      const duesByAdmNo = {};
+      duesRows.forEach(r => { duesByAdmNo[String(r.adm.admission_no).trim()] = r; });
+
+      const today = new Date().toISOString().slice(0,10);
+      const results = [];
+
+      for (const row of excelRows) {
+        const admNo = String(row['Admission No']||'').trim();
+        if (!admNo) continue;
+
+        const dr = duesByAdmNo[admNo];
+        if (!dr) {
+          results.push({ admNo, ok:false, msg:'Admission not found or no longer active — skipped.' });
+          continue;
+        }
+
+        const newPkgRaw = row['New Package Amount (leave blank to keep same)'];
+        const wantDischarge = parseBoolFlag(row['Discharge (TRUE/FALSE)']);
+        let newPkgVal = null;
+        if (newPkgRaw !== '' && newPkgRaw !== null && newPkgRaw !== undefined) {
+          const parsed = parseFloat(newPkgRaw);
+          if (isNaN(parsed) || parsed < 0) {
+            results.push({ admNo, ok:false, msg:'Invalid New Package Amount — skipped.' });
+            continue;
+          }
+          newPkgVal = parsed;
+        }
+
+        if (newPkgVal === null && !wantDischarge) continue; // untouched row
+
+        const messages = [];
+        let effectivePkg = dr.pkgAmt;
+        let hadError = false;
+
+        if (newPkgVal !== null) {
+          try {
+            if (dr.amtEntry) {
+              const { error } = await BNH_PAGE.sb.from('ipd_amount_entries')
+                .update({ package_amount: newPkgVal }).eq('id', dr.amtEntry.id);
+              if (error) throw error;
+            } else {
+              const payload = BNH_PAGE.stamp({
+                admission_id: dr.adm.id,
+                admission_no: dr.adm.admission_no,
+                package_amount: newPkgVal
+              });
+              const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(payload);
+              if (error) throw error;
+            }
+            effectivePkg = newPkgVal;
+            messages.push(`Package updated to ${fmt(newPkgVal)}`);
+          } catch(ex) {
+            results.push({ admNo, ok:false, msg:'Package update failed: ' + ex.message });
+            hadError = true;
+          }
+        }
+
+        if (hadError) continue;
+
+        if (wantDischarge) {
+          const hasAmtEntry = !!dr.amtEntry || newPkgVal !== null;
+          const totalReceivable = effectivePkg + dr.totalAddlIncome;
+          const balance = totalReceivable - dr.totalRcpt - dr.totalDisc;
+          const reasons = [];
+          if (!dr.isCashless && balance > 0.01) reasons.push(`payment due ${fmt(balance)}`);
+          if (dr.opdDue > 0.01) reasons.push(`OPD due ${fmt(dr.opdDue)}`);
+          if (!hasAmtEntry) reasons.push('amount entry not done');
+
+          if (reasons.length > 0) {
+            results.push({ admNo, ok:false, msg: (messages.length?messages.join('; ')+'; ':'') + 'Cannot discharge — ' + reasons.join(', ') + '.' });
+            continue;
+          }
+          try {
+            const { error } = await BNH_PAGE.sb.from('ipd_admissions').update({
+              is_discharged: true,
+              discharge_date: today
+            }).eq('id', dr.adm.id);
+            if (error) throw error;
+            messages.push('Discharged');
+          } catch(ex) {
+            results.push({ admNo, ok:false, msg: (messages.length?messages.join('; ')+'; ':'') + 'Discharge failed: ' + ex.message });
+            continue;
+          }
+        }
+
+        results.push({ admNo, ok:true, msg: messages.join('; ') || 'No changes.' });
+      }
+
+      if (results.length === 0) {
+        err.textContent = 'No fillable rows found — set New Package Amount and/or Discharge=TRUE for the rows you want to update.';
+        return;
+      }
+
+      const okCount = results.filter(r=>r.ok).length;
+      const errCount = results.length - okCount;
+      resultBox.innerHTML = `
+        <div class="${errCount===0?'summary-box':'warn-box'}">
+          ✅ ${okCount} row(s) processed${errCount>0?` &nbsp;|&nbsp; ⚠ ${errCount} row(s) skipped/failed`:''}.
+        </div>
+        ${results.map(r => `
+          <div class="bulk-result-row ${r.ok?'ok':'err'}">
+            <span>${r.admNo}</span><span class="brr-msg">${r.msg}</span>
+          </div>`).join('')}
+      `;
+      loadActive();
+    } catch(ex) {
+      err.textContent = 'Failed to read file: ' + ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
   async function openDetail(admId) {
     const spinner = document.getElementById('spinner');
     spinner.classList.remove('hidden');
@@ -617,6 +828,7 @@
       document.getElementById('rcptDate').value  = new Date().toISOString().slice(0,10);
       document.getElementById('rcptErr').textContent = '';
       document.getElementById('dischargeErr').textContent = '';
+      document.getElementById('cancelCaseBtn').classList.toggle('hidden', !fullAccess);
 
       const pkgAmt    = parseFloat(amtEntry?.package_amount||0);
       const totalAddlIncome = addlIncomeRows.reduce((a,r)=>a+parseFloat(r.amount||0),0);
@@ -687,15 +899,16 @@
 
       document.getElementById('receiptHistory').innerHTML = (receipts && receipts.length > 0)
         ? `<table><thead><tr><th>Date</th><th class="r">Amt</th><th class="r">Disc</th>
-            <th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th><th>Remark</th></tr></thead>
+            <th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th><th>Remark</th>${fullAccess ? '<th class="no-print"></th>' : ''}</tr></thead>
            <tbody>${receipts.map(r=>`<tr>
             <td>${r.receipt_date}</td>
             <td class="r">${fmt(r.amount)}</td><td class="r">${fmt(r.discount)}</td>
             <td class="r">${fmt(r.cash_amount)}</td><td class="r">${fmt(r.bank_amount)}</td>
             <td class="r">${fmt(r.phonepe_amount)}</td><td>${r.remark||'-'}</td>
+            ${fullAccess ? `<td class="no-print"><button class="btn-delete-rcpt" onclick="deleteReceipt('${r.id}','${admId}')">🗑️ Delete</button></td>` : ''}
            </tr>`).join('')}</tbody>
            <tfoot><tr><td>Total</td><td class="r">${fmt(totalRcpt)}</td><td class="r">${fmt(totalDisc)}</td>
-             <td colspan="4"></td></tr></tfoot></table>`
+             <td colspan="${fullAccess ? 5 : 4}"></td></tr></tfoot></table>`
         : '<span style="color:#6b7280">No receipts yet.</span>';
 
       // Payment Summary — package + additional charges = total receivable
@@ -805,16 +1018,54 @@
     if (error||!data||data.length===0){div.textContent='No discharges in this range.';return;}
     div.innerHTML=`<table><thead><tr>
       <th>Adm Date</th><th>Discharge</th><th>Adm No.</th><th>Patient</th><th>Mode</th><th>Type</th>
+      ${fullAccess ? '<th>Action</th>' : ''}
     </tr></thead><tbody>${data.map(r=>`<tr>
       <td>${r.admission_date}</td><td>${r.discharge_date}</td>
       <td>${r.admission_no}</td><td>${r.patient_name}</td>
       <td>${r.case_mode}</td><td>${r.case_type}</td>
+      ${fullAccess ? `<td><button class="btn-reverse" onclick="reverseDischarge('${r.id}','${(r.patient_name||'').replace(/'/g,"\\'")}')">↩️ Reverse Discharge</button></td>` : ''}
     </tr>`).join('')}</tbody></table>`;
+  }
+
+  async function reverseDischarge(admId, patientName) {
+    if (!fullAccess) return;
+    if (!confirm(`Reverse discharge for ${patientName}? This will move the case back to Active Patients.`)) return;
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { error } = await BNH_PAGE.sb.from('ipd_admissions').update({
+        is_discharged: false,
+        discharge_date: null
+      }).eq('id', admId);
+      if (error) throw error;
+      loadDischargedHistory();
+      loadActive();
+    } catch(ex) {
+      alert('Failed to reverse discharge: ' + ex.message);
+    } finally {
+      spinner.classList.add('hidden');
+    }
   }
 
   function showList() {
     document.getElementById('detailView').classList.add('hidden');
     document.getElementById('listView').classList.remove('hidden');
+  }
+
+  async function deleteReceipt(receiptId, admId) {
+    if (!fullAccess) return;
+    if (!confirm('Delete this cash receipt? This cannot be undone.')) return;
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { error } = await BNH_PAGE.sb.from('ipd_cash_receipts').delete().eq('id', receiptId);
+      if (error) throw error;
+      openDetail(admId);
+    } catch(ex) {
+      alert('Failed to delete receipt: ' + ex.message);
+    } finally {
+      spinner.classList.add('hidden');
+    }
   }
 
   function openCancelModal() {
