@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Day Work</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .hidden{display:none!important}
+    .form-row{display:flex;gap:1rem;flex-wrap:wrap}
+    .form-row>*{flex:1;min-width:150px}
+    table{width:100%;border-collapse:collapse;margin-top:.75rem;font-size:.78rem}
+    th{background:#f0f0f0;padding:6px 7px;text-align:left;white-space:nowrap}
+    td{padding:6px 7px;border-bottom:1px solid #eee;white-space:nowrap}
+    .r{text-align:right}
+    tfoot td{font-weight:700;background:#f9f9f9}
+    .date-filter{display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem}
+    .date-filter>*{flex:1;min-width:140px}
+    .section-title{font-size:.9rem;font-weight:700;color:#1e3a8a;margin:1.2rem 0 .5rem;
+                    padding-bottom:.3rem;border-bottom:1px solid #dbeafe}
+    .readonly-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:.5rem .75rem;
+                  font-size:.85rem;font-weight:700;color:#1e3a8a}
+    .computed-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:.5rem .75rem;
+                  font-size:.85rem;font-weight:700;color:#166534}
+    .computed-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.6rem;margin:.6rem 0}
+    .variance-warn{color:#b45309;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;
+                    padding:.5rem .75rem;font-size:.82rem;margin-top:.5rem}
+    .variance-ok{color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
+                  padding:.5rem .75rem;font-size:.82rem;margin-top:.5rem}
+    .table-scroll{overflow-x:auto}
+    .note{font-size:.78rem;color:#6b7280;margin:.25rem 0 .75rem}
+    .src-tag{font-size:.72rem;color:#0f766e;font-weight:600;display:block;margin-top:2px}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>📅 Day Work</h1>
+
+  <div class="page-card">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">Select / Load a Day</h2>
+    <div class="form-row">
+      <div><label>Date</label><input id="wDate" type="date"/></div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn-primary" style="width:auto" onclick="loadDay()">Load</button>
+      </div>
+    </div>
+    <p class="note" id="loadStatus"></p>
+
+    <div class="section-title">1️⃣ Receipts</div>
+    <div class="computed-grid">
+      <div><label>IPD Received</label><div class="readonly-box" id="dIpd">₹0.00</div>
+        <span class="src-tag">auto · ipd_cash_receipts</span></div>
+      <div><label>OPD Received</label><div class="readonly-box" id="dOpd">₹0.00</div>
+        <span class="src-tag">auto · opd_cash_register</span></div>
+      <div><label>Other Received</label><div class="readonly-box" id="dOther">₹0.00</div>
+        <span class="src-tag">auto · cash_receipts</span></div>
+    </div>
+    <div class="form-row">
+      <div><label>PhonePe Received (of the above)</label><input id="dPhonepe" type="number" step="0.01" value="0" oninput="recalc()"/></div>
+      <div><label>Bank Received (of the above)</label><input id="dBank" type="number" step="0.01" value="0" oninput="recalc()"/></div>
+      <div><label>Cash Received (computed)</label><div class="computed-box" id="dCashReceived">₹0.00</div></div>
+    </div>
+    <p class="note">Cash Received = (IPD + OPD + Other) − PhonePe Received − Bank Received. IPD/OPD/Other are
+      auto-fetched and read-only here; PhonePe/Bank Received stay manual since that split isn't tracked
+      per-day in a single place across all three sources.</p>
+
+    <div class="section-title">2️⃣ Reception Cash Handling</div>
+    <div class="computed-grid">
+      <div><label>Extra Cash Given by Reception</label><div class="readonly-box" id="dExtraReception">₹0.00</div>
+        <span class="src-tag">auto · extra_out</span></div>
+      <div><label>Net Cash Due by Reception (computed)</label><div class="computed-box" id="dNetDueReception">₹0.00</div></div>
+      <div><label>Cash Actually Submitted (optional)</label><input id="dSubmitted" type="number" step="0.01" placeholder="leave blank if not reconciling yet" oninput="recalc()"/></div>
+    </div>
+    <p class="note">Net Cash Due by Reception = Cash Received − Extra Cash Given by Reception. This is the amount Reception should submit.</p>
+    <div id="varianceBox"></div>
+
+    <div class="section-title">3️⃣ Payments (Vouchers) &amp; Accountant's Extra Out</div>
+    <div class="computed-grid">
+      <div><label>Voucher Paid — Cash</label><div class="readonly-box" id="dVchCash">₹0.00</div></div>
+      <div><label>Voucher Paid — Bank</label><div class="readonly-box" id="dVchBank">₹0.00</div></div>
+      <div><label>Voucher Paid — PhonePe</label><div class="readonly-box" id="dVchPhonepe">₹0.00</div></div>
+    </div>
+    <span class="src-tag" style="margin:-.4rem 0 .5rem">auto · payment_vouchers (status = filled)</span>
+    <div class="computed-grid">
+      <div><label>Total Voucher Paid (computed)</label><div class="computed-box" id="dTotalVoucher">₹0.00</div></div>
+      <div><label>Extra Cash Given by Accountant</label><div class="readonly-box" id="dExtraAccountant">₹0.00</div>
+        <span class="src-tag">auto · extra_out</span></div>
+    </div>
+
+    <div class="section-title">4️⃣ Net Results</div>
+    <div class="computed-grid">
+      <div><label>Net Cash Flow (Inflow − Outflow, all modes)</label><div class="computed-box" id="dNetFlow">₹0.00</div></div>
+      <div><label>Net Cash (mode)</label><div class="computed-box" id="dNetCash">₹0.00</div></div>
+      <div><label>Net Bank (mode)</label><div class="computed-box" id="dNetBank">₹0.00</div></div>
+      <div><label>Net PhonePe (mode)</label><div class="computed-box" id="dNetPhonepe">₹0.00</div></div>
+    </div>
+
+    <div class="form-row">
+      <div style="flex:2 1 100%"><label>Remark</label><input id="dRemark" placeholder="optional"/></div>
+    </div>
+    <div style="margin-top:1rem">
+      <button class="btn-primary" style="width:auto" onclick="saveDay()">Save Day</button>
+    </div>
+    <p class="err" id="dErr"></p>
+    <p class="info" id="dOk" style="display:none">Saved successfully.</p>
+  </div>
+
+  <div class="page-card" style="margin-top:1.5rem">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">📊 History</h2>
+    <div class="date-filter">
+      <div><label>From</label><input id="histFrom" type="date"/></div>
+      <div><label>To</label><input id="histTo" type="date"/></div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn-primary" style="width:auto" onclick="loadHistory()">Show</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <div id="historyBox" style="color:#555">Select a date range and click Show.</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant"]);
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('wDate').value = today;
+
+  let currentRowId = null;   // existing day_work.id, if editing
+  // auto-fetched values (all read-only, refreshed on Load)
+  let autoIpd = 0, autoOpd = 0, autoOther = 0;
+  let autoExtraReception = 0, autoExtraAccountant = 0;
+  let autoVchCash = 0, autoVchBank = 0, autoVchPhonepe = 0;
+
+  function fmt(n){ return (n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function num(id){ return parseFloat(document.getElementById(id).value || 0); }
+
+  async function loadDay() {
+    const date = document.getElementById('wDate').value;
+    if (!date) return;
+    const status = document.getElementById('loadStatus');
+    status.textContent = 'Loading…';
+    document.getElementById('dErr').textContent = '';
+
+    // ---- 1. IPD Received — sum(ipd_cash_receipts.amount) for the date ----
+    const { data: ipdRows, error: ipdErr } = await BNH_PAGE.sb.from('ipd_cash_receipts')
+      .select('amount').eq('receipt_date', date);
+    if (ipdErr) { status.textContent = 'IPD fetch error: ' + ipdErr.message; }
+    autoIpd = (ipdRows||[]).reduce((s,r)=>s+Number(r.amount),0);
+    document.getElementById('dIpd').textContent = '₹'+fmt(autoIpd);
+
+    // ---- 2. OPD Received — sum(opd_cash_register.income) for the date ----
+    const { data: opdRows, error: opdErr } = await BNH_PAGE.sb.from('opd_cash_register')
+      .select('income').eq('transaction_date', date);
+    if (opdErr) { status.textContent = 'OPD fetch error: ' + opdErr.message; }
+    autoOpd = (opdRows||[]).reduce((s,r)=>s+Number(r.income||0),0);
+    document.getElementById('dOpd').textContent = '₹'+fmt(autoOpd);
+
+    // ---- 3. Other Received — sum(cash_receipts.received_amount) for the date ----
+    const { data: otherRows, error: otherErr } = await BNH_PAGE.sb.from('cash_receipts')
+      .select('received_amount').eq('receipt_date', date);
+    if (otherErr) { status.textContent = 'Other-receipts fetch error: ' + otherErr.message; }
+    autoOther = (otherRows||[]).reduce((s,r)=>s+Number(r.received_amount||0),0);
+    document.getElementById('dOther').textContent = '₹'+fmt(autoOther);
+
+    // ---- 4. Extra cash given by reception / accountant for the date ----
+    const { data: eoRows } = await BNH_PAGE.sb.from('extra_out')
+      .select('amount, given_by').eq('date', date);
+    autoExtraReception = (eoRows||[]).filter(r=>r.given_by==='reception').reduce((s,r)=>s+Number(r.amount),0);
+    autoExtraAccountant = (eoRows||[]).filter(r=>r.given_by==='accountant').reduce((s,r)=>s+Number(r.amount),0);
+    document.getElementById('dExtraReception').textContent = '₹'+fmt(autoExtraReception);
+    document.getElementById('dExtraAccountant').textContent = '₹'+fmt(autoExtraAccountant);
+
+    // ---- 5. Voucher paid, split by mode — payment_vouchers for the date, status = filled ----
+    const { data: vchRows, error: vchErr } = await BNH_PAGE.sb.from('payment_vouchers')
+      .select('amount, mode, status').eq('payment_date', date).eq('status','filled');
+    if (vchErr) { status.textContent = 'Voucher fetch error: ' + vchErr.message; }
+    autoVchCash = autoVchBank = autoVchPhonepe = 0;
+    (vchRows||[]).forEach(r=>{
+      const m = String(r.mode||'').trim().toLowerCase();
+      const amt = Number(r.amount||0);
+      if (m==='cash') autoVchCash += amt;
+      else if (m==='bank') autoVchBank += amt;
+      else if (m==='phonepe') autoVchPhonepe += amt;
+    });
+    document.getElementById('dVchCash').textContent = '₹'+fmt(autoVchCash);
+    document.getElementById('dVchBank').textContent = '₹'+fmt(autoVchBank);
+    document.getElementById('dVchPhonepe').textContent = '₹'+fmt(autoVchPhonepe);
+
+    // ---- 6. Load existing day_work row for this date, if any (manual fields + remark) ----
+    const { data: dwRows } = await BNH_PAGE.sb.from('day_work').select('*').eq('work_date', date).limit(1);
+    const existing = (dwRows && dwRows[0]) || null;
+    currentRowId = existing ? existing.id : null;
+    document.getElementById('dPhonepe').value   = existing ? existing.phonepe_received  : 0;
+    document.getElementById('dBank').value      = existing ? existing.bank_received     : 0;
+    document.getElementById('dSubmitted').value = existing && existing.cash_submitted_actual!=null ? existing.cash_submitted_actual : '';
+    document.getElementById('dRemark').value    = existing ? (existing.remark||'') : '';
+
+    status.textContent = existing
+      ? 'Existing entry for this date loaded — Save will update it. Auto-fetched figures always reflect current source data.'
+      : 'No saved entry yet for this date — auto-fetched figures are shown above; fill in PhonePe/Bank received and Save.';
+
+    recalc();
+  }
+
+  function recalc() {
+    const phonepe = num('dPhonepe'), bank = num('dBank');
+    const cashReceived = (autoIpd + autoOpd + autoOther) - phonepe - bank;
+    document.getElementById('dCashReceived').textContent = '₹'+fmt(cashReceived);
+
+    const netDueReception = cashReceived - autoExtraReception;
+    document.getElementById('dNetDueReception').textContent = '₹'+fmt(netDueReception);
+
+    const submittedVal = document.getElementById('dSubmitted').value;
+    const varBox = document.getElementById('varianceBox');
+    if (submittedVal !== '') {
+      const submitted = parseFloat(submittedVal);
+      const diff = submitted - netDueReception;
+      if (Math.abs(diff) < 0.01) {
+        varBox.innerHTML = `<div class="variance-ok">✅ Matches — no variance.</div>`;
+      } else {
+        varBox.innerHTML = `<div class="variance-warn">⚠️ Variance of ₹${fmt(Math.abs(diff))}
+          (${diff>0?'excess':'short'}) between submitted cash and net cash due.</div>`;
+      }
+    } else { varBox.innerHTML=''; }
+
+    const totalVoucher = autoVchCash + autoVchBank + autoVchPhonepe;
+    document.getElementById('dTotalVoucher').textContent = '₹'+fmt(totalVoucher);
+
+    const totalInflow = autoIpd + autoOpd + autoOther;
+    const totalOutflow = totalVoucher + autoExtraReception + autoExtraAccountant;
+    const netFlow = totalInflow - totalOutflow;
+    document.getElementById('dNetFlow').textContent = '₹'+fmt(netFlow);
+
+    const netCash = cashReceived - (autoVchCash + autoExtraReception + autoExtraAccountant);
+    const netBank = bank - autoVchBank;
+    const netPhonepe = phonepe - autoVchPhonepe;
+    document.getElementById('dNetCash').textContent = '₹'+fmt(netCash);
+    document.getElementById('dNetBank').textContent = '₹'+fmt(netBank);
+    document.getElementById('dNetPhonepe').textContent = '₹'+fmt(netPhonepe);
+
+    return { cashReceived, netDueReception, totalVoucher, netFlow, netCash, netBank, netPhonepe };
+  }
+
+  async function saveDay() {
+    const date = document.getElementById('wDate').value;
+    const err = document.getElementById('dErr'); err.textContent='';
+    if (!date) { err.textContent = 'Please select a date first.'; return; }
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const c = recalc();
+      const submittedVal = document.getElementById('dSubmitted').value;
+      const payload = BNH_PAGE.stamp({
+        work_date: date,
+        ipd_received: autoIpd,
+        opd_received: autoOpd,
+        other_received: autoOther,
+        phonepe_received: num('dPhonepe'),
+        bank_received: num('dBank'),
+        cash_received: c.cashReceived,
+        extra_cash_reception: autoExtraReception,
+        net_cash_due_reception: c.netDueReception,
+        cash_submitted_actual: submittedVal==='' ? null : parseFloat(submittedVal),
+        voucher_cash: autoVchCash,
+        voucher_bank: autoVchBank,
+        voucher_phonepe: autoVchPhonepe,
+        total_voucher: c.totalVoucher,
+        extra_cash_accountant: autoExtraAccountant,
+        net_cash_flow: c.netFlow,
+        net_cash: c.netCash,
+        net_bank: c.netBank,
+        net_phonepe: c.netPhonepe,
+        remark: document.getElementById('dRemark').value.trim() || null
+      });
+      let error;
+      if (currentRowId) {
+        ({ error } = await BNH_PAGE.sb.from('day_work').update(payload).eq('id', currentRowId));
+      } else {
+        ({ error } = await BNH_PAGE.sb.from('day_work').insert(payload));
+      }
+      if (error) throw error;
+      document.getElementById('dOk').style.display='block';
+      setTimeout(()=>document.getElementById('dOk').style.display='none', 2500);
+      loadDay();
+    } catch(ex) { err.textContent = ex.message; }
+    finally { spinner.classList.add('hidden'); }
+  }
+
+  async function loadHistory() {
+    const from = document.getElementById('histFrom').value;
+    const to   = document.getElementById('histTo').value;
+    if (!from || !to) return;
+    const box = document.getElementById('historyBox');
+    box.textContent = 'Loading…';
+    const { data } = await BNH_PAGE.sb.from('day_work').select('*')
+      .gte('work_date', from).lte('work_date', to).order('work_date');
+    if (!data || !data.length) { box.innerHTML = '<p>No entries in this range.</p>'; return; }
+    let cumCash=0, cumBank=0, cumPhonepe=0;
+    box.innerHTML = `<table><thead><tr>
+      <th>Date</th><th class="r">IPD</th><th class="r">OPD</th><th class="r">Other</th>
+      <th class="r">PhonePe Rcv</th><th class="r">Bank Rcv</th><th class="r">Cash Rcv</th>
+      <th class="r">Extra (Recep.)</th><th class="r">Net Due (Recep.)</th>
+      <th class="r">Vch Cash</th><th class="r">Vch Bank</th><th class="r">Vch PhonePe</th><th class="r">Total Vch</th>
+      <th class="r">Extra (Acct.)</th><th class="r">Net Flow</th>
+      <th class="r">Net Cash</th><th class="r">Net Bank</th><th class="r">Net PhonePe</th>
+      <th class="r">Cum. Cash</th><th class="r">Cum. Bank</th><th class="r">Cum. PhonePe</th>
+      </tr></thead><tbody>${data.map(r=>{
+        cumCash += Number(r.net_cash); cumBank += Number(r.net_bank); cumPhonepe += Number(r.net_phonepe);
+        return `<tr>
+          <td>${r.work_date}</td>
+          <td class="r">₹${fmt(r.ipd_received)}</td><td class="r">₹${fmt(r.opd_received)}</td><td class="r">₹${fmt(r.other_received)}</td>
+          <td class="r">₹${fmt(r.phonepe_received)}</td><td class="r">₹${fmt(r.bank_received)}</td><td class="r">₹${fmt(r.cash_received)}</td>
+          <td class="r">₹${fmt(r.extra_cash_reception)}</td><td class="r">₹${fmt(r.net_cash_due_reception)}</td>
+          <td class="r">₹${fmt(r.voucher_cash)}</td><td class="r">₹${fmt(r.voucher_bank)}</td><td class="r">₹${fmt(r.voucher_phonepe)}</td>
+          <td class="r">₹${fmt(r.total_voucher)}</td>
+          <td class="r">₹${fmt(r.extra_cash_accountant)}</td><td class="r">₹${fmt(r.net_cash_flow)}</td>
+          <td class="r">₹${fmt(r.net_cash)}</td><td class="r">₹${fmt(r.net_bank)}</td><td class="r">₹${fmt(r.net_phonepe)}</td>
+          <td class="r">₹${fmt(cumCash)}</td><td class="r">₹${fmt(cumBank)}</td><td class="r">₹${fmt(cumPhonepe)}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  }
+
+  loadDay();
+</script>
+</body>
+</html>
