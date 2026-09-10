@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Cash Flow</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .hidden{display:none!important}
+    .tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+    .tab-btn{background:#f0f0f0;border:none;border-radius:8px 8px 0 0;padding:.6rem 1.1rem;
+             font-weight:700;font-size:.88rem;cursor:pointer;color:#555}
+    .tab-btn.active{background:#0f766e;color:#fff}
+    .form-row{display:flex;gap:1rem;flex-wrap:wrap}
+    .form-row>*{flex:1;min-width:170px}
+    table{width:100%;border-collapse:collapse;margin-top:.75rem}
+    th{background:#f0f0f0;padding:7px 8px;text-align:left;font-size:.82rem}
+    td{padding:7px 8px;border-bottom:1px solid #eee;font-size:.82rem}
+    .r{text-align:right}
+    tfoot td{font-weight:700;background:#f9f9f9}
+    .date-filter{display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem}
+    .date-filter>*{flex:1;min-width:140px}
+    .dir-toggle{display:flex;gap:.5rem;margin-bottom:.85rem}
+    .dir-btn{flex:1;border:2px solid #e5e7eb;border-radius:8px;padding:.6rem;text-align:center;
+             font-weight:700;cursor:pointer;background:#fff;font-size:.9rem}
+    .dir-btn.in.active{border-color:#059669;background:#ecfdf5;color:#065f46}
+    .dir-btn.out.active{border-color:#dc2626;background:#fef2f2;color:#991b1b}
+    .balance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1.2rem}
+    .balance-tile{border-radius:10px;padding:.9rem 1rem;color:#fff}
+    .balance-tile .lbl{font-size:.78rem;opacity:.9}
+    .balance-tile .val{font-size:1.3rem;font-weight:800;margin-top:.2rem}
+    .tile-cash{background:linear-gradient(135deg,#059669,#047857)}
+    .tile-bank{background:linear-gradient(135deg,#2563eb,#1d4ed8)}
+    .tile-phonepe{background:linear-gradient(135deg,#7c3aed,#6d28d9)}
+    .cat-add-link{font-size:.78rem;color:#0f766e;cursor:pointer;display:inline-block;margin-top:.3rem}
+    .cat-add-row{display:none;gap:.5rem;margin-top:.4rem}
+    .cat-add-row.show{display:flex}
+    .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.75rem;font-weight:700}
+    .badge-in{background:#dcfce7;color:#166534}
+    .badge-out{background:#fee2e2;color:#991b1b}
+    .badge-xfer{background:#ede9fe;color:#5b21b6}
+    .section-title{font-size:.9rem;font-weight:700;color:#0f766e;margin:1.2rem 0 .5rem;
+                    padding-bottom:.3rem;border-bottom:1px solid #ccfbf1}
+    .chip-row{display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap}
+    .chip{background:#f0fdfa;border:1px solid #99f6e4;border-radius:99px;padding:.3rem .9rem;
+          font-size:.8rem;cursor:pointer;color:#0f766e}
+    .chip.active{background:#0f766e;color:#fff;border-color:#0f766e}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>💰 Cash Flow</h1>
+
+  <div class="balance-grid" id="balanceGrid">
+    <div class="balance-tile tile-cash"><div class="lbl">CASH BALANCE</div><div class="val" id="balCash">…</div></div>
+    <div class="balance-tile tile-bank"><div class="lbl">BANK BALANCE</div><div class="val" id="balBank">…</div></div>
+    <div class="balance-tile tile-phonepe"><div class="lbl">PHONEPE BALANCE</div><div class="val" id="balPhonepe">…</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBtn-entry"    onclick="showTab('entry')">➕ Cash In / Out</button>
+    <button class="tab-btn"        id="tabBtn-transfer" onclick="showTab('transfer')">🔄 Transfer / Deposit / Withdraw</button>
+    <button class="tab-btn"        id="tabBtn-history"  onclick="showTab('history')">📜 History</button>
+  </div>
+
+  <!-- ============ ENTRY TAB ============ -->
+  <div id="tab-entry" class="page-card">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">Record Cash In / Out</h2>
+    <div class="dir-toggle">
+      <div class="dir-btn in active" id="dirBtnIn" onclick="setDirection('in')">⬇️ Inflow</div>
+      <div class="dir-btn out" id="dirBtnOut" onclick="setDirection('out')">⬆️ Outflow</div>
+    </div>
+    <form id="entryForm">
+      <div class="form-row">
+        <div><label>Date</label><input id="enDate" type="date" required/></div>
+        <div><label>Mode</label>
+          <select id="enMode" required>
+            <option value="cash">Cash</option>
+            <option value="bank">Bank</option>
+            <option value="phonepe">PhonePe</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Category</label>
+          <select id="enCategory" required></select>
+          <span class="cat-add-link" onclick="toggleCatAdd()">+ New category</span>
+          <div class="cat-add-row" id="catAddRow">
+            <input id="newCatName" placeholder="New category name"/>
+            <button type="button" class="btn-primary" style="width:auto" onclick="addCategory()">Add</button>
+          </div>
+        </div>
+        <div><label>Amount</label><input id="enAmount" type="number" step="0.01" min="0.01" required/></div>
+      </div>
+      <div class="form-row">
+        <div style="flex:2 1 100%"><label>Remark</label><input id="enRemark" placeholder="optional"/></div>
+      </div>
+      <div style="margin-top:1rem">
+        <button class="btn-primary" style="width:auto">Save</button>
+      </div>
+      <p class="err" id="enErr"></p>
+      <p class="info" id="enOk" style="display:none">Saved successfully.</p>
+    </form>
+
+    <div class="section-title">Recent Entries</div>
+    <div id="recentEntryBox">Loading…</div>
+  </div>
+
+  <!-- ============ TRANSFER TAB ============ -->
+  <div id="tab-transfer" class="page-card hidden">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">Move Money Between Cash / Bank / PhonePe</h2>
+    <p style="font-size:.8rem;color:#6b7280;margin:0 0 .75rem">
+      Use this for deposits (e.g. Cash → Bank), withdrawals (e.g. Bank → Cash), or any interchange
+      between the three modes.
+    </p>
+    <form id="transferForm">
+      <div class="form-row">
+        <div><label>Date</label><input id="xfDate" type="date" required/></div>
+        <div></div>
+      </div>
+      <div class="form-row">
+        <div><label>From</label>
+          <select id="xfFrom" required onchange="validateTransferModes()">
+            <option value="cash">Cash</option>
+            <option value="bank">Bank</option>
+            <option value="phonepe">PhonePe</option>
+          </select>
+        </div>
+        <div><label>To</label>
+          <select id="xfTo" required onchange="validateTransferModes()">
+            <option value="bank">Bank</option>
+            <option value="cash">Cash</option>
+            <option value="phonepe">PhonePe</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><label>Amount</label><input id="xfAmount" type="number" step="0.01" min="0.01" required/></div>
+        <div style="flex:2 1 100%"><label>Remark</label><input id="xfRemark" placeholder="optional"/></div>
+      </div>
+      <div style="margin-top:1rem">
+        <button class="btn-primary" style="width:auto">Save Transfer</button>
+      </div>
+      <p class="err" id="xfErr"></p>
+      <p class="info" id="xfOk" style="display:none">Saved successfully.</p>
+    </form>
+
+    <div class="section-title">Recent Transfers</div>
+    <div id="recentXferBox">Loading…</div>
+  </div>
+
+  <!-- ============ HISTORY TAB ============ -->
+  <div id="tab-history" class="page-card hidden">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">Inflow / Outflow History</h2>
+    <div class="chip-row" id="modeChips">
+      <span class="chip active" data-m="all" onclick="setModeFilter('all')">All Modes</span>
+      <span class="chip" data-m="cash" onclick="setModeFilter('cash')">Cash</span>
+      <span class="chip" data-m="bank" onclick="setModeFilter('bank')">Bank</span>
+      <span class="chip" data-m="phonepe" onclick="setModeFilter('phonepe')">PhonePe</span>
+    </div>
+    <div class="date-filter">
+      <div><label>From</label><input id="histFrom" type="date"/></div>
+      <div><label>To</label><input id="histTo" type="date"/></div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn-primary" style="width:auto" onclick="loadHistory()">Show</button>
+      </div>
+    </div>
+    <div id="historyBox" style="font-size:.85rem;color:#555">Select a date range and click Show.</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant"]);
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('enDate').value = today;
+  document.getElementById('xfDate').value = today;
+
+  let direction = 'in';
+  let modeFilter = 'all';
+  let categories = [];
+
+  function fmt(n){ return (n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+  function showTab(name) {
+    ['entry','transfer','history'].forEach(t=>{
+      document.getElementById('tab-'+t).classList.toggle('hidden', t!==name);
+      document.getElementById('tabBtn-'+t).classList.toggle('active', t===name);
+    });
+    if (name==='entry') loadRecentEntries();
+    if (name==='transfer') loadRecentTransfers();
+  }
+
+  function setDirection(d) {
+    direction = d;
+    document.getElementById('dirBtnIn').classList.toggle('active', d==='in');
+    document.getElementById('dirBtnOut').classList.toggle('active', d==='out');
+    populateCategorySelect();
+  }
+
+  function toggleCatAdd() {
+    document.getElementById('catAddRow').classList.toggle('show');
+  }
+
+  async function loadCategories() {
+    const { data } = await BNH_PAGE.sb.from('cash_categories').select('*').order('name');
+    categories = data || [];
+    populateCategorySelect();
+  }
+
+  function populateCategorySelect() {
+    const sel = document.getElementById('enCategory');
+    const list = categories.filter(c=>c.type===direction);
+    sel.innerHTML = list.length
+      ? list.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')
+      : `<option value="">(no categories yet — add one)</option>`;
+  }
+
+  async function addCategory() {
+    const name = document.getElementById('newCatName').value.trim();
+    if (!name) return;
+    const payload = BNH_PAGE.stamp({ type: direction, name });
+    const { error } = await BNH_PAGE.sb.from('cash_categories').insert(payload);
+    if (error) { alert(error.message); return; }
+    document.getElementById('newCatName').value = '';
+    document.getElementById('catAddRow').classList.remove('show');
+    await loadCategories();
+  }
+
+  function validateTransferModes() {
+    const from = document.getElementById('xfFrom').value;
+    const to = document.getElementById('xfTo').value;
+    const err = document.getElementById('xfErr');
+    err.textContent = (from===to) ? 'From and To must be different.' : '';
+  }
+
+  async function fetchAllTxAndTransfers() {
+    const [tx, xf] = await Promise.all([
+      BNH_PAGE.sb.from('cash_transactions').select('*, cash_categories(name)'),
+      BNH_PAGE.sb.from('cash_transfers').select('*')
+    ]);
+    return { tx: tx.data||[], xf: xf.data||[] };
+  }
+
+  async function refreshBalances() {
+    const { tx, xf } = await fetchAllTxAndTransfers();
+    const bal = { cash:0, bank:0, phonepe:0 };
+    tx.forEach(r=>{
+      const sign = r.direction==='in' ? 1 : -1;
+      bal[r.mode] += sign * Number(r.amount);
+    });
+    xf.forEach(r=>{
+      bal[r.from_mode] -= Number(r.amount);
+      bal[r.to_mode] += Number(r.amount);
+    });
+    document.getElementById('balCash').textContent = '₹'+fmt(bal.cash);
+    document.getElementById('balBank').textContent = '₹'+fmt(bal.bank);
+    document.getElementById('balPhonepe').textContent = '₹'+fmt(bal.phonepe);
+  }
+
+  async function loadRecentEntries() {
+    const box = document.getElementById('recentEntryBox');
+    box.textContent = 'Loading…';
+    const { data } = await BNH_PAGE.sb.from('cash_transactions')
+      .select('*, cash_categories(name)').order('date',{ascending:false}).limit(15);
+    if (!data || !data.length) { box.innerHTML='<p>No entries yet.</p>'; return; }
+    box.innerHTML = `<table><thead><tr><th>Date</th><th>Dir</th><th>Mode</th><th>Category</th>
+      <th class="r">Amount</th><th>Remark</th></tr></thead><tbody>${
+      data.map(r=>`<tr><td>${r.date}</td>
+        <td><span class="badge ${r.direction==='in'?'badge-in':'badge-out'}">${r.direction==='in'?'In':'Out'}</span></td>
+        <td>${r.mode}</td><td>${r.cash_categories? r.cash_categories.name : ''}</td>
+        <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td></tr>`).join('')
+      }</tbody></table>`;
+  }
+
+  async function loadRecentTransfers() {
+    const box = document.getElementById('recentXferBox');
+    box.textContent = 'Loading…';
+    const { data } = await BNH_PAGE.sb.from('cash_transfers').select('*').order('date',{ascending:false}).limit(15);
+    if (!data || !data.length) { box.innerHTML='<p>No transfers yet.</p>'; return; }
+    box.innerHTML = `<table><thead><tr><th>Date</th><th>From</th><th>To</th>
+      <th class="r">Amount</th><th>Remark</th></tr></thead><tbody>${
+      data.map(r=>`<tr><td>${r.date}</td><td>${r.from_mode}</td><td>${r.to_mode}</td>
+        <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td></tr>`).join('')
+      }</tbody></table>`;
+  }
+
+  function setModeFilter(m) {
+    modeFilter = m;
+    document.querySelectorAll('#modeChips .chip').forEach(c=>c.classList.toggle('active', c.dataset.m===m));
+  }
+
+  async function loadHistory() {
+    const from = document.getElementById('histFrom').value;
+    const to   = document.getElementById('histTo').value;
+    if (!from || !to) return;
+    const box = document.getElementById('historyBox');
+    box.textContent = 'Loading…';
+    const [tx, xf] = await Promise.all([
+      BNH_PAGE.sb.from('cash_transactions').select('*, cash_categories(name)').gte('date',from).lte('date',to).order('date'),
+      BNH_PAGE.sb.from('cash_transfers').select('*').gte('date',from).lte('date',to).order('date')
+    ]);
+    let rows = [
+      ...(tx.data||[]).map(r=>({kind:'tx',...r})),
+      ...(xf.data||[]).map(r=>({kind:'xf',...r}))
+    ];
+    if (modeFilter!=='all') {
+      rows = rows.filter(r => r.kind==='tx' ? r.mode===modeFilter : (r.from_mode===modeFilter || r.to_mode===modeFilter));
+    }
+    rows.sort((a,b)=>a.date.localeCompare(b.date));
+    if (!rows.length) { box.innerHTML = '<p>No entries in this range.</p>'; return; }
+    let totalIn=0, totalOut=0;
+    box.innerHTML = `<table><thead><tr>
+      <th>Date</th><th>Type</th><th>Mode</th><th>Category / Detail</th><th class="r">Amount</th><th>Remark</th>
+      </tr></thead><tbody>${rows.map(r=>{
+        if (r.kind==='tx') {
+          if (r.direction==='in') totalIn += Number(r.amount); else totalOut += Number(r.amount);
+          return `<tr><td>${r.date}</td>
+            <td><span class="badge ${r.direction==='in'?'badge-in':'badge-out'}">${r.direction==='in'?'Inflow':'Outflow'}</span></td>
+            <td>${r.mode}</td><td>${r.cash_categories? r.cash_categories.name : ''}</td>
+            <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td></tr>`;
+        } else {
+          return `<tr><td>${r.date}</td><td><span class="badge badge-xfer">Transfer</span></td>
+            <td>${r.from_mode} → ${r.to_mode}</td><td>Internal transfer</td>
+            <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td></tr>`;
+        }
+      }).join('')}</tbody>
+      <tfoot><tr><td colspan="4">Totals (transactions only, transfers are internal)</td>
+      <td class="r">In ₹${fmt(totalIn)} / Out ₹${fmt(totalOut)}</td>
+      <td>Net ₹${fmt(totalIn-totalOut)}</td></tr></tfoot></table>`;
+  }
+
+  document.getElementById('entryForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const spinner = document.getElementById('spinner');
+    const err = document.getElementById('enErr'); err.textContent='';
+    const catId = document.getElementById('enCategory').value;
+    if (!catId) { err.textContent='Please add/select a category first.'; return; }
+    spinner.classList.remove('hidden');
+    try {
+      const payload = BNH_PAGE.stamp({
+        date: document.getElementById('enDate').value,
+        direction,
+        mode: document.getElementById('enMode').value,
+        category_id: catId,
+        amount: parseFloat(document.getElementById('enAmount').value),
+        remark: document.getElementById('enRemark').value.trim() || null
+      });
+      const { error } = await BNH_PAGE.sb.from('cash_transactions').insert(payload);
+      if (error) throw error;
+      document.getElementById('enOk').style.display='block';
+      setTimeout(()=>document.getElementById('enOk').style.display='none', 2500);
+      document.getElementById('enAmount').value='';
+      document.getElementById('enRemark').value='';
+      loadRecentEntries();
+      refreshBalances();
+    } catch(ex) { err.textContent = ex.message; }
+    finally { spinner.classList.add('hidden'); }
+  };
+
+  document.getElementById('transferForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const spinner = document.getElementById('spinner');
+    const err = document.getElementById('xfErr');
+    const from = document.getElementById('xfFrom').value;
+    const to = document.getElementById('xfTo').value;
+    if (from===to) { err.textContent='From and To must be different.'; return; }
+    err.textContent='';
+    spinner.classList.remove('hidden');
+    try {
+      const payload = BNH_PAGE.stamp({
+        date: document.getElementById('xfDate').value,
+        from_mode: from,
+        to_mode: to,
+        amount: parseFloat(document.getElementById('xfAmount').value),
+        remark: document.getElementById('xfRemark').value.trim() || null
+      });
+      const { error } = await BNH_PAGE.sb.from('cash_transfers').insert(payload);
+      if (error) throw error;
+      document.getElementById('xfOk').style.display='block';
+      setTimeout(()=>document.getElementById('xfOk').style.display='none', 2500);
+      document.getElementById('xfAmount').value='';
+      document.getElementById('xfRemark').value='';
+      loadRecentTransfers();
+      refreshBalances();
+    } catch(ex) { err.textContent = ex.message; }
+    finally { spinner.classList.add('hidden'); }
+  };
+
+  loadCategories();
+  refreshBalances();
+  loadRecentEntries();
+</script>
+</body>
+</html>
