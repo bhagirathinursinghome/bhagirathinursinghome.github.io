@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Extra Out</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .hidden{display:none!important}
+    .tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+    .tab-btn{background:#f0f0f0;border:none;border-radius:8px 8px 0 0;padding:.6rem 1.1rem;
+             font-weight:700;font-size:.88rem;cursor:pointer;color:#555}
+    .tab-btn.active{background:#4338ca;color:#fff}
+    .form-row{display:flex;gap:1rem;flex-wrap:wrap}
+    .form-row>*{flex:1;min-width:170px}
+    table{width:100%;border-collapse:collapse;margin-top:.75rem}
+    th{background:#f0f0f0;padding:7px 8px;text-align:left;font-size:.82rem}
+    td{padding:7px 8px;border-bottom:1px solid #eee;font-size:.82rem}
+    .r{text-align:right}
+    tfoot td{font-weight:700;background:#f9f9f9}
+    .date-filter{display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem}
+    .date-filter>*{flex:1;min-width:140px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.75rem;font-weight:700}
+    .badge-out{background:#fee2e2;color:#991b1b}
+    .badge-repay{background:#dcfce7;color:#166534}
+    .balance-card{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;
+                   padding:.6rem 1rem;margin-bottom:.5rem;display:flex;justify-content:space-between;
+                   align-items:center;font-size:.88rem}
+    .balance-card .amt{font-weight:700;color:#b45309}
+    .balance-card.clear{background:#f0fdf4;border-color:#bbf7d0}
+    .balance-card.clear .amt{color:#166534}
+    .chip-row{display:flex;gap:.5rem;margin-bottom:.75rem}
+    .chip{background:#eef2ff;border:1px solid #c7d2fe;border-radius:99px;padding:.3rem .9rem;
+          font-size:.8rem;cursor:pointer;color:#3730a3}
+    .chip.active{background:#4338ca;color:#fff;border-color:#4338ca}
+    .section-title{font-size:.9rem;font-weight:700;color:#312e81;margin:1.2rem 0 .5rem;
+                    padding-bottom:.3rem;border-bottom:1px solid #e0e7ff}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>🧾 Extra Out</h1>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBtn-report"   onclick="showTab('report')">📊 Report</button>
+    <button class="tab-btn"        id="tabBtn-extraout" onclick="showTab('extraout')">➖ Extra Out</button>
+    <button class="tab-btn"        id="tabBtn-adjust"   onclick="showTab('adjust')">✅ Adjust</button>
+  </div>
+
+  <!-- ============ REPORT TAB ============ -->
+  <div id="tab-report" class="page-card">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">Outstanding Balances (Not Fully Repaid)</h2>
+    <div class="chip-row">
+      <span class="chip active" data-f="all" onclick="setOutstandingFilter('all')">All</span>
+      <span class="chip" data-f="reception" onclick="setOutstandingFilter('reception')">Given by Reception</span>
+      <span class="chip" data-f="accountant" onclick="setOutstandingFilter('accountant')">Given by Accountant</span>
+    </div>
+    <div id="outstandingBox">Loading…</div>
+
+    <div class="section-title">📅 Full History (Extra Out + Repayments) — Select Date Range</div>
+    <div class="date-filter">
+      <div><label>From</label><input id="histFrom" type="date"/></div>
+      <div><label>To</label><input id="histTo" type="date"/></div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn-primary" style="width:auto" onclick="loadHistory()">Show</button>
+      </div>
+    </div>
+    <div id="historyBox" style="font-size:.85rem;color:#555">Select a date range and click Show.</div>
+  </div>
+
+  <!-- ============ EXTRA OUT TAB ============ -->
+  <div id="tab-extraout" class="page-card hidden">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">Record Extra Out</h2>
+    <form id="extraOutForm">
+      <div class="form-row">
+        <div><label>Date</label><input id="eoDate" type="date" required/></div>
+        <div><label>Name (who is taking the money)</label>
+          <input id="eoName" list="knownNames" required placeholder="e.g. Rahul"/>
+          <datalist id="knownNames"></datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><label>Amount</label><input id="eoAmount" type="number" step="0.01" min="0.01" required/></div>
+        <div><label>Given By</label>
+          <select id="eoGivenBy" required>
+            <option value="reception">Reception</option>
+            <option value="accountant">Accountant</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div style="flex:2 1 100%"><label>Reason (optional)</label><input id="eoReason" placeholder="optional"/></div>
+      </div>
+      <div style="margin-top:1rem">
+        <button class="btn-primary" style="width:auto">Save Extra Out</button>
+      </div>
+      <p class="err" id="eoErr"></p>
+      <p class="info" id="eoOk" style="display:none">Saved successfully.</p>
+    </form>
+
+    <div class="section-title">Recent Extra Out Entries</div>
+    <div id="recentEoBox">Loading…</div>
+  </div>
+
+  <!-- ============ ADJUST TAB ============ -->
+  <div id="tab-adjust" class="page-card hidden">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">Repay / Adjust</h2>
+    <form id="adjustForm">
+      <div class="form-row">
+        <div><label>Date</label><input id="adjDate" type="date" required/></div>
+        <div><label>Name (who is repaying)</label>
+          <input id="adjName" list="knownNames" required placeholder="must match name used in Extra Out"/>
+        </div>
+      </div>
+      <div id="adjOutstandingHint" style="font-size:.8rem;color:#6b7280;margin:.3rem 0 .6rem"></div>
+      <div class="form-row">
+        <div><label>Amount Repaid</label><input id="adjAmount" type="number" step="0.01" min="0.01" required/></div>
+        <div><label>Mode</label>
+          <select id="adjMode" required onchange="toggleVoucherField()">
+            <option value="money">Money (Cash)</option>
+            <option value="voucher">Voucher</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" id="voucherNoWrap" style="display:none">
+        <div><label>Voucher No.</label><input id="adjVoucherNo" placeholder="e.g. V-1023"/></div>
+      </div>
+      <div class="form-row">
+        <div style="flex:2 1 100%"><label>Remark</label><input id="adjRemark" placeholder="optional but recommended"/></div>
+      </div>
+      <div style="margin-top:1rem">
+        <button class="btn-primary" style="width:auto">Save Repayment</button>
+      </div>
+      <p class="err" id="adjErr"></p>
+      <p class="info" id="adjOk" style="display:none">Saved successfully.</p>
+    </form>
+
+    <div class="section-title">Recent Repayments</div>
+    <div id="recentAdjBox">Loading…</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant","reception"]);
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('eoDate').value = today;
+  document.getElementById('adjDate').value = today;
+  // default "Given By" to the current user's role if applicable
+  if (BNH_PAGE.user.role === 'reception' || BNH_PAGE.user.role === 'accountant') {
+    document.getElementById('eoGivenBy').value = BNH_PAGE.user.role;
+  }
+
+  let allExtraOut = [];
+  let allRepayments = [];
+  let outstandingFilter = 'all';
+
+  function showTab(name) {
+    ['report','extraout','adjust'].forEach(t=>{
+      document.getElementById('tab-'+t).classList.toggle('hidden', t!==name);
+      document.getElementById('tabBtn-'+t).classList.toggle('active', t===name);
+    });
+    if (name==='report') loadOutstanding();
+    if (name==='extraout') loadRecentExtraOut();
+    if (name==='adjust') loadRecentRepayments();
+  }
+
+  function fmt(n){ return (n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+  async function fetchAllExtraOutAndRepay() {
+    const [eo, rp] = await Promise.all([
+      BNH_PAGE.sb.from('extra_out').select('*').order('date',{ascending:false}),
+      BNH_PAGE.sb.from('extra_out_repayment').select('*').order('date',{ascending:false})
+    ]);
+    allExtraOut = eo.data || [];
+    allRepayments = rp.data || [];
+    // populate name datalist
+    const names = new Set([...allExtraOut.map(r=>r.name)]);
+    document.getElementById('knownNames').innerHTML =
+      [...names].sort().map(n=>`<option value="${n}"></option>`).join('');
+  }
+
+  function computeBalances() {
+    const map = {}; // name -> {given, givenReception, givenAccountant, repaid}
+    allExtraOut.forEach(r=>{
+      if(!map[r.name]) map[r.name] = {given:0,givenReception:0,givenAccountant:0,repaid:0};
+      map[r.name].given += Number(r.amount);
+      if (r.given_by==='reception') map[r.name].givenReception += Number(r.amount);
+      if (r.given_by==='accountant') map[r.name].givenAccountant += Number(r.amount);
+    });
+    allRepayments.forEach(r=>{
+      if(!map[r.name]) map[r.name] = {given:0,givenReception:0,givenAccountant:0,repaid:0};
+      map[r.name].repaid += Number(r.amount);
+    });
+    return map;
+  }
+
+  function setOutstandingFilter(f) {
+    outstandingFilter = f;
+    document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active', c.dataset.f===f));
+    renderOutstanding();
+  }
+
+  async function loadOutstanding() {
+    document.getElementById('outstandingBox').textContent = 'Loading…';
+    await fetchAllExtraOutAndRepay();
+    renderOutstanding();
+  }
+
+  function renderOutstanding() {
+    const map = computeBalances();
+    const rows = Object.entries(map).map(([name,v])=>{
+      const relevantGiven = outstandingFilter==='all' ? v.given
+        : outstandingFilter==='reception' ? v.givenReception : v.givenAccountant;
+      const balance = (outstandingFilter==='all' ? v.given : relevantGiven) - v.repaid;
+      return {name, given: outstandingFilter==='all'?v.given:relevantGiven, repaid: v.repaid, balance};
+    }).filter(r => r.given > 0 && Math.abs(r.balance) > 0.005)
+      .sort((a,b)=>b.balance-a.balance);
+    const box = document.getElementById('outstandingBox');
+    if (!rows.length) { box.innerHTML = '<p class="info" style="display:block">No outstanding balances 🎉</p>'; return; }
+    box.innerHTML = rows.map(r=>`
+      <div class="balance-card">
+        <span><strong>${r.name}</strong> — given ₹${fmt(r.given)}, repaid ₹${fmt(r.repaid)}</span>
+        <span class="amt">Due: ₹${fmt(r.balance)}</span>
+      </div>`).join('');
+  }
+
+  async function loadHistory() {
+    const from = document.getElementById('histFrom').value;
+    const to   = document.getElementById('histTo').value;
+    if (!from || !to) return;
+    const box = document.getElementById('historyBox');
+    box.textContent = 'Loading…';
+    const [eo, rp] = await Promise.all([
+      BNH_PAGE.sb.from('extra_out').select('*').gte('date',from).lte('date',to).order('date'),
+      BNH_PAGE.sb.from('extra_out_repayment').select('*').gte('date',from).lte('date',to).order('date')
+    ]);
+    const rows = [
+      ...(eo.data||[]).map(r=>({type:'out',...r})),
+      ...(rp.data||[]).map(r=>({type:'repay',...r}))
+    ].sort((a,b)=> a.date.localeCompare(b.date));
+    if (!rows.length) { box.innerHTML = '<p>No entries in this range.</p>'; return; }
+    let totalOut=0, totalRepay=0;
+    box.innerHTML = `<table><thead><tr>
+        <th>Date</th><th>Type</th><th>Name</th><th class="r">Amount</th><th>Details</th><th>Recorded By</th>
+      </tr></thead><tbody>${rows.map(r=>{
+        if (r.type==='out') {
+          totalOut += Number(r.amount);
+          return `<tr><td>${r.date}</td><td><span class="badge badge-out">Extra Out</span></td>
+            <td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
+            <td>Given by ${r.given_by}${r.reason? ' — '+r.reason:''}</td>
+            <td>${r.recorded_by_name||''}</td></tr>`;
+        } else {
+          totalRepay += Number(r.amount);
+          return `<tr><td>${r.date}</td><td><span class="badge badge-repay">Repayment</span></td>
+            <td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
+            <td>${r.mode}${r.voucher_no? ' #'+r.voucher_no:''}${r.remark? ' — '+r.remark:''}</td>
+            <td>${r.recorded_by_name||''}</td></tr>`;
+        }
+      }).join('')}</tbody>
+      <tfoot><tr><td colspan="3">Totals</td><td class="r">Out ₹${fmt(totalOut)} / Repaid ₹${fmt(totalRepay)}</td>
+      <td colspan="2">Net outstanding this range: ₹${fmt(totalOut-totalRepay)}</td></tr></tfoot></table>`;
+  }
+
+  async function loadRecentExtraOut() {
+    const box = document.getElementById('recentEoBox');
+    box.textContent = 'Loading…';
+    const { data } = await BNH_PAGE.sb.from('extra_out').select('*').order('date',{ascending:false}).limit(15);
+    if (!data || !data.length) { box.innerHTML='<p>No entries yet.</p>'; return; }
+    box.innerHTML = `<table><thead><tr><th>Date</th><th>Name</th><th class="r">Amount</th>
+      <th>Given By</th><th>Reason</th><th>Recorded By</th></tr></thead><tbody>${
+      data.map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
+        <td>${r.given_by}</td><td>${r.reason||''}</td><td>${r.recorded_by_name||''}</td></tr>`).join('')
+      }</tbody></table>`;
+  }
+
+  async function loadRecentRepayments() {
+    const box = document.getElementById('recentAdjBox');
+    box.textContent = 'Loading…';
+    const { data } = await BNH_PAGE.sb.from('extra_out_repayment').select('*').order('date',{ascending:false}).limit(15);
+    if (!data || !data.length) { box.innerHTML='<p>No repayments yet.</p>'; return; }
+    box.innerHTML = `<table><thead><tr><th>Date</th><th>Name</th><th class="r">Amount</th>
+      <th>Mode</th><th>Remark</th><th>Recorded By</th></tr></thead><tbody>${
+      data.map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
+        <td>${r.mode}${r.voucher_no? ' #'+r.voucher_no:''}</td><td>${r.remark||''}</td>
+        <td>${r.recorded_by_name||''}</td></tr>`).join('')
+      }</tbody></table>`;
+  }
+
+  function toggleVoucherField() {
+    const isVoucher = document.getElementById('adjMode').value === 'voucher';
+    document.getElementById('voucherNoWrap').style.display = isVoucher ? 'flex' : 'none';
+  }
+
+  document.getElementById('adjName').addEventListener('change', async () => {
+    const name = document.getElementById('adjName').value.trim();
+    const hint = document.getElementById('adjOutstandingHint');
+    if (!name) { hint.textContent=''; return; }
+    if (!allExtraOut.length && !allRepayments.length) await fetchAllExtraOutAndRepay();
+    const map = computeBalances();
+    const v = map[name];
+    if (!v) { hint.textContent = `No outstanding record found for "${name}".`; return; }
+    const bal = v.given - v.repaid;
+    hint.textContent = `Given so far: ₹${fmt(v.given)} · Repaid so far: ₹${fmt(v.repaid)} · Outstanding: ₹${fmt(bal)}`;
+  });
+
+  document.getElementById('extraOutForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const spinner = document.getElementById('spinner');
+    const err = document.getElementById('eoErr'); err.textContent='';
+    spinner.classList.remove('hidden');
+    try {
+      const payload = BNH_PAGE.stamp({
+        date: document.getElementById('eoDate').value,
+        name: document.getElementById('eoName').value.trim(),
+        amount: parseFloat(document.getElementById('eoAmount').value),
+        given_by: document.getElementById('eoGivenBy').value,
+        reason: document.getElementById('eoReason').value.trim() || null
+      });
+      const { error } = await BNH_PAGE.sb.from('extra_out').insert(payload);
+      if (error) throw error;
+      document.getElementById('eoOk').style.display='block';
+      setTimeout(()=>document.getElementById('eoOk').style.display='none', 2500);
+      e.target.reset();
+      document.getElementById('eoDate').value = today;
+      if (BNH_PAGE.user.role === 'reception' || BNH_PAGE.user.role === 'accountant') {
+        document.getElementById('eoGivenBy').value = BNH_PAGE.user.role;
+      }
+      loadRecentExtraOut();
+    } catch(ex) { err.textContent = ex.message; }
+    finally { spinner.classList.add('hidden'); }
+  };
+
+  document.getElementById('adjustForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const spinner = document.getElementById('spinner');
+    const err = document.getElementById('adjErr'); err.textContent='';
+    const mode = document.getElementById('adjMode').value;
+    if (mode==='voucher' && !document.getElementById('adjVoucherNo').value.trim()) {
+      err.textContent = 'Please enter the voucher number.'; return;
+    }
+    spinner.classList.remove('hidden');
+    try {
+      const payload = BNH_PAGE.stamp({
+        date: document.getElementById('adjDate').value,
+        name: document.getElementById('adjName').value.trim(),
+        amount: parseFloat(document.getElementById('adjAmount').value),
+        mode,
+        voucher_no: mode==='voucher' ? document.getElementById('adjVoucherNo').value.trim() : null,
+        remark: document.getElementById('adjRemark').value.trim() || null
+      });
+      const { error } = await BNH_PAGE.sb.from('extra_out_repayment').insert(payload);
+      if (error) throw error;
+      document.getElementById('adjOk').style.display='block';
+      setTimeout(()=>document.getElementById('adjOk').style.display='none', 2500);
+      e.target.reset();
+      document.getElementById('adjDate').value = today;
+      document.getElementById('adjOutstandingHint').textContent='';
+      loadRecentRepayments();
+    } catch(ex) { err.textContent = ex.message; }
+    finally { spinner.classList.add('hidden'); }
+  };
+
+  // initial load
+  fetchAllExtraOutAndRepay().then(loadOutstanding);
+</script>
+</body>
+</html>
