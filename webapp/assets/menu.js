@@ -68,6 +68,24 @@
       roles: ["admin", "accountant"],
       group: "Voucher"
    },
+    { label: "Extra Out", 
+     icon: "🧾", 
+     page: "pages/extra_out.html",
+     roles: ["admin","accountant","reception"] ,
+      group: "Voucher"
+    },
+    { label: "Cash Flow", 
+     icon: "💰", 
+     page: "pages/cash_flow.html",
+     roles: ["admin","accountant"] ,
+      group: "Voucher"
+    },
+    { label: "Day Work",  
+     icon: "📅", 
+     page: "pages/day_work.html",
+     roles: ["admin","accountant"] ,
+      group: "Voucher"
+    },
     {
       label: "Employees",
       icon: "👥",
