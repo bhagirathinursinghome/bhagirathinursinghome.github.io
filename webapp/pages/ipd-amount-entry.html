@@ -240,14 +240,17 @@
             </div>
           </div>
           <div id="aneNA" class="hidden na-label" style="margin-top:.4rem">💉 Anaesthesia: Not Applicable</div>
-          <label style="margin-top:.75rem">Package Amount (₹) <span class="optional-note">(optional — can be skipped and filled later, or via the Package Entry page)</span></label>
-          <input id="packageAmt" type="number" min="0" step="0.01" placeholder="0.00" autocomplete="off"/>
-          <div id="packagePrefillNote" class="prefill-note hidden">✓ Already entered earlier — edit if needed</div>
+          <div id="packageWrap">
+            <label style="margin-top:.75rem">Package Amount (₹) <span class="optional-note">(optional — can be skipped and filled later, or via the Package Entry page)</span></label>
+            <input id="packageAmt" type="number" min="0" step="0.01" placeholder="0.00" autocomplete="off"/>
+            <div id="packagePrefillNote" class="prefill-note hidden">✓ Already entered earlier — edit if needed</div>
+          </div>
         </div>
 
-        <!-- Doctor Case: only NH Fees -->
+        <!-- Doctor Case: NH Fees (mandatory, unless Swasthasathy/Ayushman Bharat where Surgent+Anaesthesia apply instead and NH Fees becomes optional) -->
         <div id="dcSection" class="hidden">
-          <label style="margin-top:.75rem">NH Fees (₹) <span style="color:red">*</span></label>
+          <div id="dcSpecialNote" class="prefill-note hidden" style="margin-top:.75rem">ℹ️ Swasthasathy / Ayushman Bharat Doctor Case — enter Surgent Fee &amp; Anaesthesia Fee above; NH Fee below is optional.</div>
+          <label style="margin-top:.75rem">NH Fees (₹) <span id="nhFeesMandatoryMark" style="color:red">*</span><span id="nhFeesOptionalNote" class="optional-note hidden">(optional — can be skipped and filled later)</span></label>
           <input id="nhFees" type="number" min="0" step="0.01" placeholder="0.00" autocomplete="off"/>
         </div>
 
@@ -305,6 +308,13 @@
   BNH_PAGE.requireRole(["admin","accountant","manager"]);
 
   const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+
+  // Swasthasathy / Ayushman Bharat: for Doctor Case, these modes get Surgent Fee + Anaesthesia
+  // Fee entry (instead of just NH Fees), and NH Fees becomes optional rather than mandatory.
+  function isSpecialCaseMode(mode) {
+    const m = (mode || '').toLowerCase();
+    return m.includes('swastha') || m.includes('ayushman') || m.includes('ayusman');
+  }
 
   const INCOME_OPTIONS = [
     'Aaya Masi Charge',
@@ -438,6 +448,7 @@
       const ot = otByAdm[r.id] || null;
       const entry = _entryByAdmission[r.id] || null;
       const isDoctorCase = (r.case_type||'').trim() === 'Doctor Case';
+      const isSpecialDC = isDoctorCase && isSpecialCaseMode(r.case_mode);
       const hasRefer = !!(r.refer_name && r.refer_name.trim() !== '' && r.refer_name.trim().toUpperCase() !== 'N/A');
 
       const isDischarged = !!r.is_discharged;
@@ -464,8 +475,9 @@
         return;
       }
 
-      const coreFilled = isDoctorCase ? (entry.nh_fees != null) : (entry.surgent_fees != null);
-      if (!coreFilled) card.missing.push(isDoctorCase ? 'NH Fee' : 'Surgent Fee');
+      const requiresSurgent = !isDoctorCase || isSpecialDC;
+      const coreFilled = requiresSurgent ? (entry.surgent_fees != null) : (entry.nh_fees != null);
+      if (!coreFilled) card.missing.push(requiresSurgent ? 'Surgent Fee' : 'NH Fee');
       if (!isDoctorCase && entry.package_amount == null) card.missing.push('Package');
       if (hasRefer && entry.refer_amount == null) card.missing.push('Refer Amt');
 
@@ -645,27 +657,32 @@
         const nh     = num(row['NH Fees']);
 
         const isDoctorCase = (card.type||'').trim() === 'Doctor Case';
+        const isSpecialDC = isDoctorCase && isSpecialCaseMode(card.mode);
+        // Swasthasathy/Ayushman Bharat Doctor Cases behave like non-Doctor-Case for Surgent/Anaesthesia
+        // Fee purposes (those fields apply, NH Fees becomes optional); Package still never applies to Doctor Case.
+        const requiresSurgent = !isDoctorCase || isSpecialDC;
         const hasRefer = card.refer && card.refer !== 'N/A';
         const hasAne   = !!card.anaesthesiaName;
         const existingEntry = _entryByAdmission[card.id] || null;
 
         // Required fields: blank is only OK if a value was already saved earlier (Partial re-upload).
-        if (isDoctorCase && nh == null && !(existingEntry && existingEntry.nh_fees != null)) {
+        if (isDoctorCase && !isSpecialDC && nh == null && !(existingEntry && existingEntry.nh_fees != null)) {
           skipped.push(`Row ${rowNum} (${card.name}): NH Fees is required for Doctor Case, skipped.`); return;
         }
-        if (!isDoctorCase && surg == null && !(existingEntry && existingEntry.surgent_fees != null)) {
+        if (requiresSurgent && surg == null && !(existingEntry && existingEntry.surgent_fees != null)) {
           skipped.push(`Row ${rowNum} (${card.name}): Surgent Fee is required, skipped.`); return;
         }
         // Package Amount and Refer Amount are optional — can be left blank and filled in later
-        // (via the Amount Entry edit flow or the dedicated Package Entry page).
+        // (via the Amount Entry edit flow or the dedicated Package Entry page). NH Fees is also
+        // optional for Swasthasathy/Ayushman Bharat Doctor Cases.
 
         const payload = BNH_PAGE.stamp({
           admission_id:      card.id,
           admission_no:      card.admNo,
           patient_name:      card.name,
           refer_amount:      hasRefer ? (refer != null ? refer : (existingEntry ? existingEntry.refer_amount : null)) : null,
-          surgent_fees:      !isDoctorCase ? (surg != null ? surg : (existingEntry ? existingEntry.surgent_fees : null)) : null,
-          anaesthesia_fees:  !isDoctorCase && hasAne ? (ane != null ? ane : (existingEntry ? existingEntry.anaesthesia_fees : null)) : null,
+          surgent_fees:      requiresSurgent ? (surg != null ? surg : (existingEntry ? existingEntry.surgent_fees : null)) : null,
+          anaesthesia_fees:  requiresSurgent && hasAne ? (ane != null ? ane : (existingEntry ? existingEntry.anaesthesia_fees : null)) : null,
           package_amount:    !isDoctorCase ? (pkg != null ? pkg : (existingEntry ? existingEntry.package_amount : null)) : null,
           nh_fees:           isDoctorCase ? (nh != null ? nh : (existingEntry ? existingEntry.nh_fees : null)) : null,
           amount_entry_date: (row['Entry Date']||'').toString().trim() || (existingEntry && existingEntry.amount_entry_date) || new Date().toISOString().slice(0,10),
@@ -782,11 +799,36 @@
       document.getElementById('extraMandatoryNote').classList.toggle('hidden', !isSwastha);
 
       const caseType = adm.case_type;
-      if (caseType === 'Doctor Case') {
+      const isDoctorCase = caseType === 'Doctor Case';
+      const isSpecialDC = isDoctorCase && isSpecialCaseMode(caseMode);
+
+      if (isDoctorCase && isSpecialDC) {
+        // Doctor Case + Swasthasathy/Ayushman Bharat: show Surgent + Anaesthesia fields
+        // (Package stays hidden — that's a non-Doctor-Case concept), and NH Fees becomes optional.
+        document.getElementById('nhSection').classList.remove('hidden');
+        document.getElementById('packageWrap').classList.add('hidden');
+        document.getElementById('dcSection').classList.remove('hidden');
+        document.getElementById('dcSpecialNote').classList.remove('hidden');
+        document.getElementById('nhFeesMandatoryMark').classList.add('hidden');
+        document.getElementById('nhFeesOptionalNote').classList.remove('hidden');
+        const hasAne = ot && ot.anaesthesia_id;
+        document.getElementById('hasAnaesthesia').value = hasAne ? '1' : '0';
+        if (hasAne) {
+          document.getElementById('aneFeeWrap').classList.remove('hidden');
+          document.getElementById('aneNA').classList.add('hidden');
+        } else {
+          document.getElementById('aneFeeWrap').classList.add('hidden');
+          document.getElementById('aneNA').classList.remove('hidden');
+        }
+      } else if (isDoctorCase) {
         document.getElementById('nhSection').classList.add('hidden');
         document.getElementById('dcSection').classList.remove('hidden');
+        document.getElementById('dcSpecialNote').classList.add('hidden');
+        document.getElementById('nhFeesMandatoryMark').classList.remove('hidden');
+        document.getElementById('nhFeesOptionalNote').classList.add('hidden');
       } else {
         document.getElementById('nhSection').classList.remove('hidden');
+        document.getElementById('packageWrap').classList.remove('hidden');
         document.getElementById('dcSection').classList.add('hidden');
         const hasAne = ot && ot.anaesthesia_id;
         document.getElementById('hasAnaesthesia').value = hasAne ? '1' : '0';
@@ -882,11 +924,14 @@
     const ok  = document.getElementById('ok');
     err.textContent = ''; ok.style.display = 'none';
 
-    const caseType  = document.getElementById('caseTypeH').value;
-    const caseMode  = document.getElementById('caseModeH').value;
-    const hasRefer  = document.getElementById('hasRefer').value === '1';
-    const hasAne    = document.getElementById('hasAnaesthesia').value === '1';
-    const isSwastha = caseMode.toLowerCase().includes('swastha');
+    const caseType   = document.getElementById('caseTypeH').value;
+    const caseMode   = document.getElementById('caseModeH').value;
+    const hasRefer   = document.getElementById('hasRefer').value === '1';
+    const hasAne     = document.getElementById('hasAnaesthesia').value === '1';
+    const isSwastha  = caseMode.toLowerCase().includes('swastha');
+    const isDoctorCase = caseType === 'Doctor Case';
+    const isSpecialDC  = isDoctorCase && isSpecialCaseMode(caseMode);
+    const requiresSurgent = !isDoctorCase || isSpecialDC;
 
     // Swasthasathy requires at least one expense row
     const expenseRows = collectRows('expenseRows');
@@ -909,10 +954,10 @@
         admission_no:       document.getElementById('admissionNo').value,
         patient_name:       document.getElementById('patientNameH').value,
         refer_amount:       hasRefer ? numOrNull(document.getElementById('referAmount').value) : null,
-        surgent_fees:       caseType !== 'Doctor Case' ? numOrNull(document.getElementById('surgentFees').value) : null,
-        anaesthesia_fees:   caseType !== 'Doctor Case' && hasAne ? numOrNull(document.getElementById('anaFees').value) : null,
-        package_amount:     caseType !== 'Doctor Case' ? numOrNull(document.getElementById('packageAmt').value) : null,
-        nh_fees:            caseType === 'Doctor Case' ? numOrNull(document.getElementById('nhFees').value) : null,
+        surgent_fees:       requiresSurgent ? numOrNull(document.getElementById('surgentFees').value) : null,
+        anaesthesia_fees:   requiresSurgent && hasAne ? numOrNull(document.getElementById('anaFees').value) : null,
+        package_amount:     !isDoctorCase ? numOrNull(document.getElementById('packageAmt').value) : null,
+        nh_fees:            isDoctorCase ? numOrNull(document.getElementById('nhFees').value) : null,
         amount_entry_date:  document.getElementById('entryDate').value || null,
         remark:             document.getElementById('remark').value.trim() || null
       });
