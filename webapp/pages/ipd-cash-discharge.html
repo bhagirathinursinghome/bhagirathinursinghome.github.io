@@ -233,6 +233,7 @@
       <input type="hidden" id="currentCaseMode"/>
       <input type="hidden" id="currentCaseType"/>
       <input type="hidden" id="currentAmtEntryId"/>
+      <input type="hidden" id="currentPatientName"/>
     </div>
   </div>
 </div>
@@ -702,6 +703,7 @@
               const payload = BNH_PAGE.stamp({
                 admission_id: dr.adm.id,
                 admission_no: dr.adm.admission_no,
+                patient_name: dr.adm.patient_name,
                 package_amount: newPkgVal
               });
               const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(payload);
@@ -824,6 +826,7 @@
       document.getElementById('currentCaseMode').value = adm.case_mode;
       document.getElementById('currentCaseType').value = adm.case_type;
       document.getElementById('currentAmtEntryId').value = amtEntry ? amtEntry.id : '';
+      document.getElementById('currentPatientName').value = adm.patient_name || '';
       document.getElementById('detailTitle').textContent = `${adm.patient_name} – ${adm.admission_no}`;
       document.getElementById('rcptDate').value  = new Date().toISOString().slice(0,10);
       document.getElementById('rcptErr').textContent = '';
@@ -1127,6 +1130,7 @@
     try {
       const admId    = document.getElementById('currentAdmId').value;
       const admNo    = document.getElementById('currentAdmNo').value;
+      const patientName = document.getElementById('currentPatientName').value;
       const amtEntryId = document.getElementById('currentAmtEntryId').value;
 
       if (amtEntryId) {
@@ -1137,6 +1141,7 @@
         const payload = BNH_PAGE.stamp({
           admission_id: admId,
           admission_no: admNo,
+          patient_name: patientName,
           package_amount: newAmt
         });
         const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(payload);
