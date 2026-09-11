@@ -76,6 +76,9 @@
     .patient-card:hover { background: #e0e7ff; border-color: #818cf8; }
     .patient-card .pname { font-weight: 600; color: #1e1b4b; font-size: .88rem; }
     .patient-card .pmeta { font-size: .78rem; color: #6b7280; margin-top: 2px; }
+    .badge-discharged { background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe;
+                         padding:1px 7px; border-radius:10px; font-size:.7rem; font-weight:600;
+                         margin-left:.4rem; display:inline-block; }
 
     /* Completed table */
     .completed-table { width: 100%; border-collapse: collapse; }
@@ -213,9 +216,13 @@
     const div = document.getElementById('pendingList');
     const { data: otDone } = await BNH_PAGE.sb.from('ipd_ot_entries').select('admission_id');
     const doneIds = (otDone||[]).map(r=>r.admission_id);
+    // NOTE: We intentionally do NOT filter out discharged patients here. A patient
+    // is only dropped from the Pending OT list once their OT entry is actually
+    // filed (i.e. they're "complete") AND discharged. Since the doneIds filter
+    // below already removes anyone with a filed OT entry, a discharged-but-not-yet-
+    // filed patient must still show up here so it doesn't get lost.
     const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
-      .select('id,admission_date,admission_no,patient_name')
-      .eq('is_discharged', false)
+      .select('id,admission_date,admission_no,patient_name,is_discharged')
       .eq('is_cancelled', false)
       .order('admission_date', { ascending: false });
     if (error || !data) { div.textContent = 'No active patients.'; return; }
@@ -232,7 +239,7 @@
     }
     div.innerHTML = rows.map(r=>`
       <div class="patient-card" onclick="openForm('${r.id}','${r.admission_no}','${r.patient_name.replace(/'/g,"\\'")}','${r.admission_date}')">
-        <div class="pname">${r.patient_name}</div>
+        <div class="pname">${r.patient_name}${r.is_discharged ? '<span class="badge-discharged">🏥 Discharged</span>' : ''}</div>
         <div class="pmeta">📅 ${r.admission_date} &nbsp;|&nbsp; Adm: ${r.admission_no}</div>
       </div>`).join('');
   }
