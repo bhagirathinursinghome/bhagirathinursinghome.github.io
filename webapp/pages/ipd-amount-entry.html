@@ -109,6 +109,9 @@
     .optional-note { font-size:.75rem; color:#6b7280; font-weight:500; margin-left:.3rem; }
     .prefill-note { font-size:.78rem; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe;
                     border-radius:6px; padding:.3rem .6rem; margin-top:.3rem; display:inline-block; }
+    .badge-discharged { background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe;
+                         padding:1px 7px; border-radius:10px; font-size:.7rem; font-weight:600;
+                         margin-left:.4rem; display:inline-block; }
   </style>
 </head>
 <body>
@@ -409,9 +412,12 @@
     _entryByAdmission = {};
     (entries||[]).forEach(e => { _entryByAdmission[e.admission_id] = e; });
 
+    // NOTE: We intentionally do NOT filter out discharged patients here.
+    // A discharged patient should still appear (as Full/Partial Pending) if their
+    // amount entry isn't fully filled in yet. They are only dropped from the list
+    // once their entry is fully Completed AND they are discharged (see below).
     const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
-      .select('id,admission_date,admission_no,patient_name,case_type,case_mode,refer_name')
-      .eq('is_discharged', false)
+      .select('id,admission_date,admission_no,patient_name,case_type,case_mode,refer_name,is_discharged')
       .eq('is_cancelled', false)
       .order('admission_date', { ascending: false });
 
@@ -434,6 +440,8 @@
       const isDoctorCase = (r.case_type||'').trim() === 'Doctor Case';
       const hasRefer = !!(r.refer_name && r.refer_name.trim() !== '' && r.refer_name.trim().toUpperCase() !== 'N/A');
 
+      const isDischarged = !!r.is_discharged;
+
       const card = {
         id: r.id,
         name: r.patient_name,
@@ -446,10 +454,12 @@
         surgentName: (ot && ot.surgent_name) || '',
         anaesthesiaName: (ot && ot.anaesthesia_name) || '',
         otPending: !ot,
+        isDischarged: isDischarged,
         missing: []
       };
 
       if (!entry) {
+        // No amount entry filed at all -> always Full Pending, regardless of discharge status.
         _fullCards.push(card);
         return;
       }
@@ -459,9 +469,15 @@
       if (!isDoctorCase && entry.package_amount == null) card.missing.push('Package');
       if (hasRefer && entry.refer_amount == null) card.missing.push('Refer Amt');
 
-      if (card.missing.length === 0) {
+      const isComplete = card.missing.length === 0;
+
+      if (isComplete) {
+        // Only drop the patient from the list once BOTH conditions are true:
+        // all amount data is filed (Complete) AND the patient is discharged.
+        if (isDischarged) return;
         _completedCards.push(card);
       } else {
+        // Still pending some data -> keep showing, whether discharged or not.
         _partialCards.push(card);
       }
     });
@@ -500,6 +516,7 @@
           ${r.otPending ? '<span class="badge-warn" style="margin-left:.5rem">⚠ OT Entry Pending</span>' : ''}
           ${(r.missing||[]).map(m => `<span class="badge-missing">⚠ ${m} Pending</span>`).join('')}
           ${tab === 'completed' ? '<span class="badge-done">✓ Complete</span>' : ''}
+          ${r.isDischarged ? '<span class="badge-discharged">🏥 Discharged</span>' : ''}
         </div>
         <div class="pmeta">📅 ${r.date} &nbsp;|&nbsp; Adm: ${r.admNo} &nbsp;|&nbsp; Type: ${r.type} &nbsp;|&nbsp; Refer: ${r.refer}</div>
       </div>`).join('');
