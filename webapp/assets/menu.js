@@ -93,20 +93,21 @@
       roles: ["admin", "accountant"],
       group: "Employees"
     },
-    {
+{
       label: "Salary Sheet",
       icon: "💰",
       page: "pages/salary_sheet.html",
       roles: ["admin", "accountant"],
       group: "Employees"
     },
-   /* { 
+    
+    { 
       label: "Attendance", 
       icon: "🕐", 
-      page: "pages/attendance.html", 
+      page: "pages/attendance-admin.html", 
       roles: ["admin","viewer"],
       group: "Employees"
-    },*/
+    },
     {
       label: "Credit Management",
       icon: "💳",
