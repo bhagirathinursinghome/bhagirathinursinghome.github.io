@@ -105,7 +105,7 @@
       label: "Attendance", 
       icon: "🕐", 
       page: "pages/attendance-admin.html", 
-      roles: ["admin","viewer"],
+      roles: ["admin","viewer", "manager"],
       group: "Employees"
     },
     {
