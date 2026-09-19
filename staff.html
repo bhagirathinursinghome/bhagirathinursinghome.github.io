@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Staff Attendance</title>
+<style>
+  :root{--accent:#2c3e50;--good:#1f8a3b;--bad:#c0392b;--warn:#8a6d1f}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f6f8;margin:0;color:#222}
+  .wrap{max-width:480px;margin:0 auto;padding:1.25rem}
+  h1{font-size:1.3rem;margin:0 0 1rem}
+  .card{background:#fff;border:1px solid #e3e3e3;border-radius:10px;padding:1.25rem;margin-bottom:1rem}
+  label{display:block;font-size:.85rem;margin:.6rem 0 .25rem;color:#444}
+  input{width:100%;padding:.6rem .7rem;border:1px solid #ccc;border-radius:6px;font-size:1rem}
+  button{cursor:pointer;border:none;border-radius:6px;padding:.7rem 1rem;font-size:1rem;font-weight:600}
+  .btn-primary{background:var(--accent);color:#fff;width:100%;margin-top:1rem}
+  .btn-primary:disabled{background:#aab3bb;cursor:not-allowed}
+  .btn-out{background:#c0392b;color:#fff}
+  .btn-row{display:flex;gap:.6rem;margin-top:1rem}
+  .btn-row button{flex:1}
+  .err{color:var(--bad);font-size:.85rem;min-height:1.2em;margin-top:.4rem}
+  .status-pill{display:inline-block;padding:.25rem .7rem;border-radius:20px;font-size:.8rem;font-weight:600}
+  .pill-good{background:#e3f5e6;color:var(--good)}
+  .pill-bad{background:#fbe0dd;color:var(--bad)}
+  .pill-warn{background:#fff1c2;color:var(--warn)}
+  .loc-line{display:flex;justify-content:space-between;align-items:center}
+  .row{display:flex;justify-content:space-between;font-size:.9rem;padding:.35rem 0;border-bottom:1px solid #f0f0f0}
+  .row:last-child{border-bottom:none}
+  .hist-item{padding:.5rem 0;border-bottom:1px solid #f0f0f0;font-size:.9rem;display:flex;justify-content:space-between}
+  .hist-item:last-child{border-bottom:none}
+  .muted{color:#888;font-size:.8rem}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem}
+  .link-btn{background:none;color:var(--accent);text-decoration:underline;font-size:.85rem;padding:0}
+  .spinner{border:3px solid #eee;border-top:3px solid var(--accent);border-radius:50%;width:22px;height:22px;animation:spin 0.8s linear infinite;margin:0 auto}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📍 Staff Attendance</h1>
+
+  <!-- ===== LOGIN ===== -->
+  <div class="card" id="loginCard">
+    <form id="loginForm">
+      <label>Login ID</label>
+      <input id="loginUser" required autocomplete="username"/>
+      <label>Password</label>
+      <input id="loginPass" type="password" required autocomplete="current-password"/>
+      <button class="btn-primary" type="submit">Log In</button>
+      <p class="err" id="loginErr"></p>
+    </form>
+  </div>
+
+  <!-- ===== MAIN ===== -->
+  <div id="mainArea" style="display:none">
+    <div class="topbar">
+      <div><strong id="staffName"></strong></div>
+      <button class="link-btn" id="logoutBtn">Log out</button>
+    </div>
+
+    <div class="card">
+      <div class="loc-line">
+        <span>Location</span>
+        <span id="locStatus" class="status-pill pill-warn">Checking…</span>
+      </div>
+      <p class="muted" id="locDetail"></p>
+      <button class="link-btn" id="refreshLocBtn" style="margin-top:.4rem">Refresh location</button>
+    </div>
+
+    <div class="card">
+      <div class="row"><span>Today (<span id="todayDate"></span>)</span><span></span></div>
+      <div class="row"><span>Punch In</span><span id="todayIn">—</span></div>
+      <div class="row"><span>Punch Out</span><span id="todayOut">—</span></div>
+      <div class="btn-row">
+        <button class="btn-primary" id="punchInBtn">Punch In</button>
+        <button class="btn-primary btn-out" id="punchOutBtn">Punch Out</button>
+      </div>
+      <p class="err" id="punchErr"></p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">My Attendance (last 30 days)</h3>
+      <div id="history"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* =======================================================================
+   Fill these in with the SAME values used in your portal's assets/config.js
+   (SUPABASE_URL / SUPABASE_ANON_KEY, or whatever your project calls them)
+   ======================================================================= */
+const SUPABASE_URL = "https://sfnaiezkemdjjcbxfuzw.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_tzf_Bhqi-QFGdVtYfKo9dw_QqwXD5hv";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* Fixed work location (dummy coords, converted from 24°27'29.4"N 88°04'07.5"E) */
+const TARGET_LAT = 24.458167;
+const TARGET_LNG = 88.068750;
+const RADIUS_METERS = 150; // allowed distance from TARGET to permit punching
+
+const todayStr = () => new Date().toISOString().slice(0,10);
+const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
+const fmtDur = (a,b) => {
+  if (!a || !b) return '—';
+  const mins = Math.round((new Date(b) - new Date(a)) / 60000);
+  return Math.floor(mins/60) + 'h ' + (mins%60) + 'm';
+};
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2-lat1), dLng = toRad(lng2-lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+let currentStaff = JSON.parse(localStorage.getItem('attn_staff') || 'null');
+let currentPos = null; // {lat, lng, distance}
+
+/* ---------- Login / session ---------- */
+document.getElementById('loginForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('loginErr');
+  errEl.textContent = '';
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  try {
+    const { data, error } = await sb.from('attendance_staff').select('*')
+      .eq('username', username).eq('password', password).eq('active', true).maybeSingle();
+    if (error) throw error;
+    if (!data) { errEl.textContent = 'Invalid login ID or password.'; return; }
+    currentStaff = { id: data.id, username: data.username, name: data.name };
+    localStorage.setItem('attn_staff', JSON.stringify(currentStaff));
+    showMain();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+};
+
+document.getElementById('logoutBtn').onclick = () => {
+  localStorage.removeItem('attn_staff');
+  currentStaff = null;
+  document.getElementById('mainArea').style.display = 'none';
+  document.getElementById('loginCard').style.display = 'block';
+};
+
+function showMain() {
+  document.getElementById('loginCard').style.display = 'none';
+  document.getElementById('mainArea').style.display = 'block';
+  document.getElementById('staffName').textContent = currentStaff.name;
+  document.getElementById('todayDate').textContent = todayStr();
+  checkLocation();
+  loadToday();
+  loadHistory();
+}
+
+/* ---------- Location ---------- */
+function checkLocation() {
+  const statusEl = document.getElementById('locStatus');
+  const detailEl = document.getElementById('locDetail');
+  statusEl.className = 'status-pill pill-warn';
+  statusEl.textContent = 'Checking…';
+  detailEl.textContent = '';
+
+  if (!navigator.geolocation) {
+    statusEl.className = 'status-pill pill-bad';
+    statusEl.textContent = 'Unsupported';
+    detailEl.textContent = 'This device/browser does not support location.';
+    currentPos = null;
+    updatePunchButtons();
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    const distance = Math.round(haversineMeters(lat, lng, TARGET_LAT, TARGET_LNG));
+    currentPos = { lat, lng, distance };
+    if (distance <= RADIUS_METERS) {
+      statusEl.className = 'status-pill pill-good';
+      statusEl.textContent = 'In range';
+    } else {
+      statusEl.className = 'status-pill pill-bad';
+      statusEl.textContent = 'Out of range';
+    }
+    detailEl.textContent = `${distance} m from work location (allowed: ${RADIUS_METERS} m)`;
+    updatePunchButtons();
+  }, (err) => {
+    statusEl.className = 'status-pill pill-bad';
+    statusEl.textContent = 'Location denied';
+    detailEl.textContent = 'Please allow location access to punch in/out.';
+    currentPos = null;
+    updatePunchButtons();
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+document.getElementById('refreshLocBtn').onclick = checkLocation;
+
+/* ---------- Today status ---------- */
+let todayRow = null;
+async function loadToday() {
+  const { data, error } = await sb.from('attendance_punches').select('*')
+    .eq('staff_id', currentStaff.id).eq('punch_date', todayStr()).maybeSingle();
+  if (error) { console.error(error); return; }
+  todayRow = data || null;
+  document.getElementById('todayIn').textContent = todayRow ? fmtTime(todayRow.punch_in) : '—';
+  document.getElementById('todayOut').textContent = todayRow ? fmtTime(todayRow.punch_out) : '—';
+  updatePunchButtons();
+}
+
+function updatePunchButtons() {
+  const inRange = currentPos && currentPos.distance <= RADIUS_METERS;
+  const hasIn = !!(todayRow && todayRow.punch_in);
+  const hasOut = !!(todayRow && todayRow.punch_out);
+  document.getElementById('punchInBtn').disabled = !inRange || hasIn;
+  document.getElementById('punchOutBtn').disabled = !inRange || !hasIn || hasOut;
+}
+
+document.getElementById('punchInBtn').onclick = async () => {
+  const errEl = document.getElementById('punchErr'); errEl.textContent = '';
+  if (!currentPos || currentPos.distance > RADIUS_METERS) { errEl.textContent = 'You must be at the work location to punch in.'; return; }
+  try {
+    const { error } = await sb.from('attendance_punches').insert({
+      staff_id: currentStaff.id,
+      username: currentStaff.username,
+      name: currentStaff.name,
+      punch_date: todayStr(),
+      punch_in: new Date().toISOString(),
+      punch_in_lat: currentPos.lat,
+      punch_in_lng: currentPos.lng
+    });
+    if (error) throw error;
+    await loadToday();
+    await loadHistory();
+  } catch (err) { errEl.textContent = err.message; }
+};
+
+document.getElementById('punchOutBtn').onclick = async () => {
+  const errEl = document.getElementById('punchErr'); errEl.textContent = '';
+  if (!currentPos || currentPos.distance > RADIUS_METERS) { errEl.textContent = 'You must be at the work location to punch out.'; return; }
+  if (!todayRow) { errEl.textContent = 'No punch-in found for today.'; return; }
+  try {
+    const { error } = await sb.from('attendance_punches').update({
+      punch_out: new Date().toISOString(),
+      punch_out_lat: currentPos.lat,
+      punch_out_lng: currentPos.lng
+    }).eq('id', todayRow.id);
+    if (error) throw error;
+    await loadToday();
+    await loadHistory();
+  } catch (err) { errEl.textContent = err.message; }
+};
+
+/* ---------- History ---------- */
+async function loadHistory() {
+  const from = new Date(); from.setDate(from.getDate() - 29);
+  const { data, error } = await sb.from('attendance_punches').select('*')
+    .eq('staff_id', currentStaff.id).gte('punch_date', from.toISOString().slice(0,10))
+    .order('punch_date', { ascending: false });
+  if (error) { console.error(error); return; }
+  const el = document.getElementById('history');
+  el.innerHTML = '';
+  if (!data || !data.length) { el.innerHTML = '<p class="muted">No punches yet.</p>'; return; }
+  data.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    div.innerHTML = `<span>${p.punch_date}</span><span>${fmtTime(p.punch_in)} – ${fmtTime(p.punch_out)} <span class="muted">(${fmtDur(p.punch_in,p.punch_out)})</span></span>`;
+    el.appendChild(div);
+  });
+}
+
+/* ---------- Init ---------- */
+if (currentStaff) showMain();
+</script>
+</body>
+</html>
