@@ -112,6 +112,24 @@
     .badge-discharged { background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe;
                          padding:1px 7px; border-radius:10px; font-size:.7rem; font-weight:600;
                          margin-left:.4rem; display:inline-block; }
+
+    /* Pending list filter bar (date range + pending-status) */
+    .pending-filter-bar { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:.9rem;
+                           background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:.6rem .75rem; }
+    .pending-filter-bar > * { flex:1; min-width:150px; }
+    .pending-filter-bar label { font-size:.78rem; color:#4b5563; font-weight:600; display:block; margin-bottom:2px; }
+    .pending-filter-bar select, .pending-filter-bar input[type=date] {
+      width:100%; padding:.4rem .5rem; border:1px solid #d1d5db; border-radius:6px; font-size:.85rem; box-sizing:border-box;
+    }
+    .pending-filter-actions { display:flex; gap:.5rem; flex:none!important; min-width:0!important; }
+    .pending-filter-actions button { width:auto!important; }
+
+    /* Date-wise grouping of admission cards */
+    .date-group { margin-bottom:.9rem; }
+    .date-group-header { display:flex; align-items:center; gap:.5rem; font-weight:700; font-size:.85rem;
+                          color:#374151; background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px;
+                          padding:.35rem .7rem; margin-bottom:.5rem; }
+    .date-group-count { background:#6366f1; color:#fff; border-radius:20px; padding:0 9px; font-size:.72rem; font-weight:700; }
   </style>
 </head>
 <body>
@@ -153,6 +171,31 @@
           Step 3: Do not edit or delete the "Admission ID" column — it's used to match each row to the patient.
         </div>
         <div id="bulkResult" class="bulk-result"></div>
+      </div>
+
+      <div class="pending-filter-bar">
+        <div>
+          <label>Admission From</label>
+          <input id="pendFrom" type="date" onchange="applyPendingFilters()"/>
+        </div>
+        <div>
+          <label>Admission To</label>
+          <input id="pendTo" type="date" onchange="applyPendingFilters()"/>
+        </div>
+        <div>
+          <label>Pending Status</label>
+          <select id="pendStatusFilter" onchange="applyPendingFilters()">
+            <option value="">All Statuses</option>
+            <option value="Surgent Fee">Surgent Pending</option>
+            <option value="NH Fee">NH Fee Pending</option>
+            <option value="Package">Package Pending</option>
+            <option value="Refer Amt">Refer Pending</option>
+            <option value="OT">OT Entry Pending</option>
+          </select>
+        </div>
+        <div class="pending-filter-actions">
+          <button type="button" class="bulk-btn secondary" onclick="clearPendingFilters()">✕ Clear Filters</button>
+        </div>
       </div>
 
       <div class="tab-bar">
@@ -413,6 +456,56 @@
   let _fullCards = [], _partialCards = [], _completedCards = [];
   let _entryByAdmission = {}; // admission_id -> ipd_amount_entries row (latest)
 
+  // Shared date-range + pending-status filters applied across all three tabs
+  let _pendFrom = '', _pendTo = '', _pendStatus = '';
+
+  function applyPendingFilters() {
+    _pendFrom   = document.getElementById('pendFrom').value || '';
+    _pendTo     = document.getElementById('pendTo').value || '';
+    _pendStatus = document.getElementById('pendStatusFilter').value || '';
+    renderTab('full'); renderTab('partial'); renderTab('completed');
+  }
+
+  function clearPendingFilters() {
+    document.getElementById('pendFrom').value = '';
+    document.getElementById('pendTo').value = '';
+    document.getElementById('pendStatusFilter').value = '';
+    _pendFrom = ''; _pendTo = ''; _pendStatus = '';
+    renderTab('full'); renderTab('partial'); renderTab('completed');
+  }
+
+  // Group a list of cards by admission date, newest date first
+  function groupByDate(list) {
+    const map = {};
+    list.forEach(r => {
+      const key = r.date || 'Unknown';
+      (map[key] = map[key] || []).push(r);
+    });
+    return Object.keys(map)
+      .sort((a, b) => b.localeCompare(a))
+      .map(date => ({ date, cards: map[date] }));
+  }
+
+  function formatDateHeader(d) {
+    if (!d || d === 'Unknown') return 'Unknown Date';
+    const dt = new Date(d + 'T00:00:00');
+    if (isNaN(dt)) return d;
+    return dt.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function cardHtml(r, tab) {
+    return `
+      <div class="patient-card" onclick="openAdmission('${r.id}')">
+        <div class="pname">${r.name}
+          ${r.otPending ? '<span class="badge-warn" style="margin-left:.5rem">⚠ OT Entry Pending</span>' : ''}
+          ${(r.missing||[]).map(m => `<span class="badge-missing">⚠ ${m} Pending</span>`).join('')}
+          ${tab === 'completed' ? '<span class="badge-done">✓ Complete</span>' : ''}
+          ${r.isDischarged ? '<span class="badge-discharged">🏥 Discharged</span>' : ''}
+        </div>
+        <div class="pmeta">📅 ${r.date} &nbsp;|&nbsp; Adm: ${r.admNo} &nbsp;|&nbsp; Type: ${r.type} &nbsp;|&nbsp; Refer: ${r.refer}</div>
+      </div>`;
+  }
+
   async function loadPending() {
     ['fullList','partialList','completedList'].forEach(id => {
       document.getElementById(id).textContent = 'Loading…';
@@ -520,17 +613,22 @@
     if (q) {
       list = list.filter(r => r.name.toLowerCase().includes(q) || r.admNo.toLowerCase().includes(q));
     }
+    if (_pendFrom) list = list.filter(r => r.date && r.date >= _pendFrom);
+    if (_pendTo)   list = list.filter(r => r.date && r.date <= _pendTo);
+    if (_pendStatus === 'OT') {
+      list = list.filter(r => r.otPending);
+    } else if (_pendStatus) {
+      list = list.filter(r => (r.missing||[]).includes(_pendStatus));
+    }
+
     const div = document.getElementById(tab + 'List');
     if (list.length === 0) { div.textContent = 'No matching patients.'; return; }
-    div.innerHTML = list.map(r => `
-      <div class="patient-card" onclick="openAdmission('${r.id}')">
-        <div class="pname">${r.name}
-          ${r.otPending ? '<span class="badge-warn" style="margin-left:.5rem">⚠ OT Entry Pending</span>' : ''}
-          ${(r.missing||[]).map(m => `<span class="badge-missing">⚠ ${m} Pending</span>`).join('')}
-          ${tab === 'completed' ? '<span class="badge-done">✓ Complete</span>' : ''}
-          ${r.isDischarged ? '<span class="badge-discharged">🏥 Discharged</span>' : ''}
-        </div>
-        <div class="pmeta">📅 ${r.date} &nbsp;|&nbsp; Adm: ${r.admNo} &nbsp;|&nbsp; Type: ${r.type} &nbsp;|&nbsp; Refer: ${r.refer}</div>
+
+    const groups = groupByDate(list);
+    div.innerHTML = groups.map(g => `
+      <div class="date-group">
+        <div class="date-group-header">📅 ${formatDateHeader(g.date)} <span class="date-group-count">${g.cards.length}</span></div>
+        ${g.cards.map(r => cardHtml(r, tab)).join('')}
       </div>`).join('');
   }
 
