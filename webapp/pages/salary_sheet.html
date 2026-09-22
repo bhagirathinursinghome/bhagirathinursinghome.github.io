@@ -172,6 +172,24 @@
         .or(`is_active.eq.true,inactive_date.gte.${firstDay}`)
         .order('name');
 
+      // Salary AS OF this month — pick each employee's latest salary_history
+      // entry with effective_date <= last day of the selected month, so past
+      // months keep showing the salary that actually applied back then
+      // (instead of the employee's current/live salary, which appraisals
+      // update retroactively for every month if not handled this way).
+      const empIds=(emps||[]).map(e=>e.id);
+      let salaryAsOfMap={};
+      if(empIds.length){
+        const {data:historyRows} = await BNH_PAGE.sb.from('salary_history')
+          .select('employee_id,salary,effective_date')
+          .in('employee_id', empIds)
+          .lte('effective_date', lastDay)
+          .order('effective_date', {ascending:true});
+        // ascending order means the last row per employee is the most
+        // recent one that was effective on/before lastDay — it wins
+        (historyRows||[]).forEach(h=>{ salaryAsOfMap[h.employee_id]=h.salary; });
+      }
+
       // Salary payments for this month — sum all vouchers per employee
       const {data:payments} = await BNH_PAGE.sb.from('salary_payments')
         .select('employee_id,amount').eq('month',month).eq('year',year);
@@ -191,7 +209,10 @@
       (absents||[]).forEach(a=>{ absentMap[a.employee_id]=(a.absent_days||0); });
 
       sheetData=(emps||[]).map(e=>{
-        const gross=e.salary||0;
+        // Use the salary effective as of the selected month if we have a
+        // history record for it; otherwise fall back to the employee's
+        // current salary (e.g. no salary_history rows exist yet).
+        const gross=(salaryAsOfMap[e.id]!==undefined) ? salaryAsOfMap[e.id] : (e.salary||0);
         const absent=absentMap[e.id]||0;
         const deductDays=Math.max(0,absent-APPROVED_LEAVE);
         // deduction = salary/26 * deductDays, rounded to nearest 10
