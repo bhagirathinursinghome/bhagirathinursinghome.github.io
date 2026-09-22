@@ -849,7 +849,16 @@ async function getSalaryDue(empId, month, year){
   const { data: emp } = await sb.from('employees').select('*').eq('id',empId).single();
   const { data: bonus } = await sb.from('salary_bonuses').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
   const { data: absent } = await sb.from('salary_absent').select('absent_days').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
-  const gross = parseFloat(emp.salary||0);
+  // Salary AS OF this month — use the latest salary_history entry with
+  // effective_date <= last day of the selected month, not the employee's
+  // current/live salary, so past months keep showing the salary that
+  // actually applied back then (appraisals should not apply retroactively).
+  const lastDayDate = new Date(year, month, 0);
+  const lastDay = `${year}-${String(month).padStart(2,'0')}-${String(lastDayDate.getDate()).padStart(2,'0')}`;
+  const { data: histRows } = await sb.from('salary_history')
+    .select('salary,effective_date').eq('employee_id',empId)
+    .lte('effective_date', lastDay).order('effective_date', { ascending:false }).limit(1);
+  const gross = (histRows && histRows.length) ? parseFloat(histRows[0].salary||0) : parseFloat(emp.salary||0);
   const absentDays = absent?.absent_days || 0;
   const deductDays = Math.max(0, absentDays - 4);
   const deduction = Math.round(((gross/26)*deductDays)/10)*10;
