@@ -2,80 +2,437 @@
 <html>
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=yes"/>
   <title>Refer Payment (Search by Case/Patient)</title>
   <link rel="stylesheet" href="../assets/style.css"/>
   <style>
-    .form-row { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; }
-    .form-row > * { flex:1; min-width:180px; }
-    .form-row label { display:block; font-size:.8rem; font-weight:600; color:#475569; margin-bottom:.3rem; }
-    .form-row input, .form-row select {
-      width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:6px;
-      padding:.5rem .65rem; font-size:.88rem;
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      padding: 1rem 0.75rem;
     }
-    .form-row input:focus, .form-row select:focus { outline:none; border-color:#6366f1; }
-    .req { color:#dc2626; }
+    
+    .page { max-width: 100%; margin: 0 auto; }
+    .page-card { margin-bottom: 1.25rem; }
+    
+    h1 { 
+      font-size: 1.5rem; 
+      margin: 0.5rem 0 1rem; 
+      color: #1a1a1a;
+      line-height: 1.3;
+    }
 
-    .mode-chips { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.3rem; }
-    .mode-chip { border:2px solid #c7d2fe; border-radius:8px; padding:.35rem .9rem; cursor:pointer;
-                 font-size:.85rem; font-weight:600; color:#4338ca; background:#fff; transition:all .18s; }
-    .mode-chip.active { background:#6366f1; color:#fff; border-color:#6366f1; }
+    /* FORM STYLING */
+    .form-row { 
+      display: flex; 
+      flex-wrap: wrap; 
+      gap: 0.75rem; 
+      align-items: flex-end; 
+      margin-bottom: 0.5rem;
+    }
+    .form-row > * { 
+      flex: 1; 
+      min-width: 100%; /* Mobile first: full width */
+    }
+    .form-row label { 
+      display: block; 
+      font-size: 0.9rem; 
+      font-weight: 600; 
+      color: #333; 
+      margin-bottom: 0.4rem; 
+    }
+    .form-row input, 
+    .form-row select {
+      width: 100%; 
+      box-sizing: border-box; 
+      border: 1px solid #cbd5e1; 
+      border-radius: 6px;
+      padding: 0.65rem 0.75rem; 
+      font-size: 1rem;
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: none;
+    }
+    .form-row input:focus, 
+    .form-row select:focus { 
+      outline: none; 
+      border-color: #6366f1; 
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+    .req { color: #dc2626; font-weight: 700; }
 
-    .voucher-badge { font-size:.8rem; margin-top:.35rem; min-height:1.1em; }
+    .mode-chips { 
+      display: flex; 
+      flex-wrap: wrap; 
+      gap: 0.5rem; 
+      margin-top: 0.4rem; 
+    }
+    .mode-chip { 
+      border: 2px solid #c7d2fe; 
+      border-radius: 8px; 
+      padding: 0.5rem 1rem; 
+      cursor: pointer;
+      font-size: 0.9rem; 
+      font-weight: 600; 
+      color: #4338ca; 
+      background: #fff; 
+      transition: all 0.18s;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mode-chip.active { 
+      background: #6366f1; 
+      color: #fff; 
+      border-color: #6366f1; 
+    }
+    .mode-chip:active { opacity: 0.8; }
 
-    table { width:100%; border-collapse:collapse; margin-top:.75rem; font-size:.82rem; }
-    th { background:#f0f0f0; padding:7px 8px; text-align:left; white-space:nowrap; }
-    td { padding:7px 8px; border-bottom:1px solid #eee; vertical-align:middle; }
-    .r { text-align:right; }
-    tfoot td { font-weight:700; background:#f9f9f9; }
-    tr.row-warn td { background:#fff7ed; }
-    tr.row-ok td { background:#fff; }
-    tr.row-added td { background:#ecfdf5; }
+    .voucher-badge { 
+      font-size: 0.85rem; 
+      margin-top: 0.35rem; 
+      min-height: 1.3em; 
+    }
 
-    .section-title { font-size:.9rem; font-weight:700; color:#312e81; margin:1.2rem 0 .5rem;
-                      padding-bottom:.3rem; border-bottom:1px solid #e0e7ff; }
-    .form-card { background:#f8f9ff; border:1px solid #c7d2fe; border-radius:10px; padding:1rem 1.1rem; margin-top:.75rem; }
-    .info { color:#15803d; font-size:.85rem; margin-top:.5rem; }
-    .err  { color:#dc2626; font-size:.85rem; margin-top:.5rem; white-space:pre-wrap; }
-    .hidden { display:none!important; }
+    /* TABLE RESPONSIVE */
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-top: 0.75rem; 
+      font-size: 0.9rem;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    th { 
+      background: #f0f0f0; 
+      padding: 0.75rem; 
+      text-align: left; 
+      font-weight: 600;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      border-bottom: 2px solid #ddd;
+    }
+    td { 
+      padding: 0.75rem; 
+      border-bottom: 1px solid #eee; 
+      vertical-align: middle; 
+    }
+    .r { text-align: right; }
+    tfoot td { 
+      font-weight: 700; 
+      background: #f9f9f9; 
+      border-top: 2px solid #ddd;
+    }
+    tr.row-warn td { background: #fff7ed; }
+    tr.row-ok td { background: #fff; }
+    tr.row-added td { background: #ecfdf5; }
 
-    .pill { display:inline-block; padding:2px 9px; border-radius:12px; font-size:.72rem; font-weight:700; white-space:nowrap; }
-    .pill-warn { background:#fef3c7; color:#92400e; }
-    .pill-ok   { background:#d1fae5; color:#065f46; }
-    .pill-type-op { background:#e0e7ff; color:#3730a3; }
-    .pill-type-ip { background:#fce7f3; color:#9d174d; }
+    /* RESPONSIVE TABLE WRAPPER */
+    .table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 6px;
+      margin-top: 0.75rem;
+    }
+    .table-wrapper table { margin: 0; }
 
-    .mini-input { width:120px!important; min-width:100px!important; }
-    .mini-input.name { width:150px!important; }
-    .row-inline-input { border:1px solid #cbd5e1; border-radius:5px; padding:.3rem .4rem; font-size:.8rem; box-sizing:border-box; }
-    .row-inline-input.flagged { border-color:#f59e0b; background:#fffbeb; }
-    .btn-mini { padding:.28rem .55rem; font-size:.72rem; border-radius:5px; border:none; cursor:pointer; font-weight:700; }
-    .btn-mini-save { background:#059669; color:#fff; }
-    .btn-mini-add { background:#4f46e5; color:#fff; }
-    .btn-mini-added { background:#d1fae5; color:#065f46; cursor:default; }
-    .btn-mini-remove { background:#fee2e2; color:#b91c1c; }
-    .row-warn-msg { font-size:.72rem; color:#b45309; margin-top:2px; }
-    .search-wrap { position:relative; }
-    .search-count { font-size:.78rem; color:#666; margin:.4rem 0 .2rem; }
+    .section-title { 
+      font-size: 1rem; 
+      font-weight: 700; 
+      color: #1a1a1a; 
+      margin: 1rem 0 0.5rem;
+      padding-bottom: 0.4rem; 
+      border-bottom: 2px solid #e0e7ff; 
+    }
+    .form-card { 
+      background: #f8f9ff; 
+      border: 1px solid #c7d2fe; 
+      border-radius: 10px; 
+      padding: 1rem; 
+      margin-top: 0.75rem; 
+    }
+    .info { 
+      color: #15803d; 
+      font-size: 0.9rem; 
+      margin-top: 0.5rem; 
+      padding: 0.75rem;
+      background: #f0fdf4;
+      border-left: 4px solid #15803d;
+      border-radius: 4px;
+    }
+    .err  { 
+      color: #991b1b; 
+      font-size: 0.9rem; 
+      margin-top: 0.5rem; 
+      white-space: pre-wrap;
+      padding: 0.75rem;
+      background: #fef2f2;
+      border-left: 4px solid #dc2626;
+      border-radius: 4px;
+    }
+    .hidden { display: none !important; }
 
-    .banner-warn { background:#fffbeb; border:1px solid #fcd34d; color:#92400e; border-radius:8px;
-                   padding:.6rem .9rem; font-size:.83rem; margin:.6rem 0; }
+    .pill { 
+      display: inline-block; 
+      padding: 0.35rem 0.65rem; 
+      border-radius: 12px; 
+      font-size: 0.75rem; 
+      font-weight: 700; 
+      white-space: nowrap; 
+    }
+    .pill-warn { background: #fef3c7; color: #92400e; }
+    .pill-ok { background: #d1fae5; color: #065f46; }
+    .pill-type-op { background: #e0e7ff; color: #3730a3; }
+    .pill-type-ip { background: #fce7f3; color: #9d174d; }
 
-    .split { display:grid; grid-template-columns:1fr 1fr; gap:1rem; align-items:start; }
-    @media (max-width: 900px){ .split { grid-template-columns:1fr; } }
+    /* BUTTONS */
+    .btn-primary {
+      padding: 0.75rem 1.5rem;
+      font-size: 0.95rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      background: #6366f1;
+      color: white;
+      min-height: 44px;
+      transition: all 0.2s;
+      width: 100%;
+    }
+    .btn-primary:active { opacity: 0.9; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .cart-card { background:#fff; border:2px solid #6366f1; border-radius:10px; padding:1rem 1.1rem;
-                 margin-top:1rem; position:sticky; top:.5rem; z-index:5; }
-    .cart-empty { color:#888; font-size:.85rem; padding:.5rem 0; }
-    .amt-input { width:110px; text-align:right; }
+    .btn-mini { 
+      padding: 0.5rem 0.75rem; 
+      font-size: 0.85rem; 
+      border-radius: 5px; 
+      border: none; 
+      cursor: pointer; 
+      font-weight: 600;
+      min-height: 40px;
+      transition: all 0.2s;
+    }
+    .btn-mini-save { background: #059669; color: #fff; }
+    .btn-mini-add { background: #4f46e5; color: #fff; }
+    .btn-mini-added { background: #d1fae5; color: #065f46; cursor: default; }
+    .btn-mini-remove { background: #fee2e2; color: #b91c1c; }
+    .btn-mini:active { opacity: 0.9; }
+
+    .row-warn-msg { 
+      font-size: 0.75rem; 
+      color: #b45309; 
+      margin-top: 2px; 
+    }
+    
+    .search-wrap { position: relative; }
+    .search-count { 
+      font-size: 0.85rem; 
+      color: #666; 
+      margin: 0.4rem 0 0.2rem; 
+    }
+
+    .banner-warn { 
+      background: #fffbeb; 
+      border: 1px solid #fcd34d; 
+      color: #92400e; 
+      border-radius: 8px;
+      padding: 0.75rem; 
+      font-size: 0.9rem; 
+      margin: 0.6rem 0; 
+    }
+
+    /* LAYOUT - SPLIT FOR DESKTOP, STACKED FOR MOBILE */
+    .split { 
+      display: grid; 
+      grid-template-columns: 1fr; 
+      gap: 1rem; 
+      align-items: start; 
+    }
+    @media (min-width: 768px) {
+      .split { grid-template-columns: 1fr 1fr; }
+    }
+    @media (min-width: 1024px) {
+      .split { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* CART CARD */
+    .cart-card { 
+      background: #fff; 
+      border: 2px solid #6366f1; 
+      border-radius: 10px; 
+      padding: 1rem; 
+      margin-top: 1rem;
+      position: static;
+      z-index: 5;
+    }
+    @media (min-width: 1024px) {
+      .cart-card {
+        position: sticky;
+        top: 0.5rem;
+      }
+    }
+    
+    .cart-empty { 
+      color: #888; 
+      font-size: 0.9rem; 
+      padding: 0.75rem 0; 
+    }
+
+    .amt-input { 
+      width: 100px; 
+      text-align: right; 
+      padding: 0.5rem !important;
+      font-size: 0.9rem;
+    }
+
+    .mini-input { 
+      width: 100% !important; 
+      min-width: auto !important;
+      padding: 0.5rem !important;
+      font-size: 0.9rem;
+    }
+    .mini-input.name { 
+      width: 100% !important; 
+    }
+
+    .row-inline-input { 
+      border: 1px solid #cbd5e1; 
+      border-radius: 5px; 
+      padding: 0.5rem; 
+      font-size: 0.85rem; 
+      box-sizing: border-box; 
+    }
+    .row-inline-input.flagged { 
+      border-color: #f59e0b; 
+      background: #fffbeb; 
+    }
+
+    /* MOBILE OPTIMIZATIONS */
+    @media (max-width: 640px) {
+      body { padding: 0.75rem 0.5rem; }
+      
+      h1 { font-size: 1.35rem; margin: 0.5rem 0 0.75rem; }
+      
+      .form-row > * { min-width: 100%; }
+      
+      .section-title { font-size: 0.95rem; margin: 0.85rem 0 0.35rem; }
+      
+      .form-card { padding: 0.85rem; margin-top: 0.5rem; }
+      
+      .page-card { margin-bottom: 1rem; }
+      
+      table { font-size: 0.85rem; }
+      th { padding: 0.6rem; font-size: 0.8rem; }
+      td { padding: 0.6rem; }
+      
+      .btn-primary { width: 100%; padding: 0.7rem 1rem; font-size: 0.9rem; }
+      
+      .btn-mini {
+        width: 100%;
+        padding: 0.5rem;
+        margin-top: 0.25rem;
+      }
+      
+      .mini-input { width: 100% !important; }
+      
+      .amt-input { width: 100%; }
+    }
+
+    /* INPUT STYLING FOR SELECT */
+    select {
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+      background-size: 1.2em 1.2em;
+      padding-right: 2.5rem !important;
+    }
+
+    /* RESPONSIVE FORM ROW FOR MOBILE */
+    @media (max-width: 640px) {
+      .form-row {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .form-row > * {
+        flex: 1;
+        width: 100%;
+        min-width: auto;
+      }
+    }
+
+    /* TABLET/LARGER */
+    @media (min-width: 641px) and (max-width: 767px) {
+      .form-row > * {
+        flex: 1;
+        min-width: calc(50% - 0.4rem);
+      }
+    }
+
+    /* ACCESSIBILITY */
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+
+    /* SPINNER OVERLAY */
+    .spinner-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #6366f1;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* CHECKBOX STYLING */
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #6366f1;
+    }
+
+    /* PREVENT ZOOM ON INPUT FOCUS (iOS) */
+    input, select, textarea {
+      font-size: 16px !important;
+    }
   </style>
 </head>
 <body>
 <div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
 <datalist id="referNameOptions"></datalist>
 <div class="page">
-  <h1>🔎 Refer Payment — One Voucher, OPD + IPD Together</h1>
-  <p style="font-size:.85rem;color:#666;margin-bottom:1rem">
+  <h1>🔎 Refer Payment — One Voucher</h1>
+  <p style="font-size: 0.95rem; color: #666; margin-bottom: 1rem; line-height: 1.5;">
     Enter one voucher number, search OPD and IPD cases below, add as many as you like from either side
     into the selection list, fix a missing refer link or amount inline, then submit everything together
     under that single voucher.
@@ -84,15 +441,31 @@
   <!-- ══════════════════ VOUCHER / PAYMENT DETAILS (shared) ══════════════════ -->
   <div class="page-card">
     <div class="form-card">
-      <div class="section-title" style="margin-top:0">🧾 Payment Details</div>
+      <div class="section-title" style="margin-top: 0;">🧾 Payment Details</div>
       <div class="form-row">
-        <div><label>Voucher No <span class="req">*</span></label>
+        <div>
+          <label>Voucher No <span class="req">*</span></label>
           <input id="voucherNo" onblur="checkVoucher()"/>
           <div class="voucher-badge" id="vStatus"></div>
         </div>
-        <div><label>Payment Date <span class="req">*</span></label><input id="payDate" type="date"/></div>
-        <div><label>Mode <span class="req">*</span></label><div id="modeHost"></div></div>
-        <div><label>Remark (optional)</label><input id="payRemark"/></div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Payment Date <span class="req">*</span></label>
+          <input id="payDate" type="date"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Mode <span class="req">*</span></label>
+          <div id="modeHost"></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Remark (optional)</label>
+          <input id="payRemark"/>
+        </div>
       </div>
     </div>
   </div>
@@ -100,41 +473,52 @@
   <!-- ══════════════════ SELECTED CASES CART ══════════════════ -->
   <div class="page-card">
     <div class="cart-card">
-      <div class="section-title" style="margin-top:0">🧺 Selected Cases for this Voucher</div>
+      <div class="section-title" style="margin-top: 0;">🧺 Selected Cases</div>
       <div id="cartBox"><p class="cart-empty">No cases selected yet. Search OPD or IPD below and click ➕ Add.</p></div>
       <p class="err" id="mainErr"></p>
-      <p class="info" id="mainOk" style="display:none"></p>
-      <div style="margin-top:.85rem">
-        <button class="btn-primary" style="width:auto" onclick="submitAll()">💾 Submit All Selected Cases</button>
+      <p class="info" id="mainOk" style="display: none;"></p>
+      <div style="margin-top: 1rem;">
+        <button class="btn-primary" onclick="submitAll()">💾 Submit All Cases</button>
       </div>
     </div>
   </div>
 
-  <!-- ══════════════════ TWO SEARCH PANELS SIDE BY SIDE ══════════════════ -->
+  <!-- ══════════════════ TWO SEARCH PANELS SIDE BY SIDE (RESPONSIVE) ══════════════════ -->
   <div class="split">
 
     <!-- OPD PANEL -->
     <div class="page-card">
       <div class="form-card">
-        <div class="section-title" style="margin-top:0">🚑 Find OPD Cases</div>
+        <div class="section-title" style="margin-top: 0;">🚑 Find OPD Cases</div>
         <div class="form-row">
-          <div><label>Case Date From</label><input id="opFrom" type="date"/></div>
-          <div><label>Case Date To</label><input id="opTo" type="date"/></div>
+          <div>
+            <label>Case Date From</label>
+            <input id="opFrom" type="date"/>
+          </div>
         </div>
-        <div class="form-row" style="margin-top:.3rem">
-          <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="loadOpdCases()">Load</button></div>
+        <div class="form-row">
+          <div>
+            <label>Case Date To</label>
+            <input id="opTo" type="date"/>
+          </div>
         </div>
-        <div class="form-row" style="margin-top:.5rem">
-          <div class="search-wrap" style="flex:2">
+        <div class="form-row" style="margin-top: 0.3rem;">
+          <div>
+            <button class="btn-primary" onclick="loadOpdCases()">Load OPD Cases</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top: 0.5rem;">
+          <div class="search-wrap">
             <label>Search by Case No. or Patient Name</label>
             <input id="opSearch" placeholder="e.g. OPD-0231 or Rahim Sk" oninput="renderOpdList()"/>
           </div>
-          <div style="flex:0 0 auto;min-width:auto;">
-            <label>&nbsp;</label>
-            <button class="btn-mini" style="background:#e0e7ff;color:#3730a3;padding:.5rem .8rem" id="opToggleBtn" onclick="toggleOpdList()">👁 Show Full List</button>
+        </div>
+        <div class="form-row">
+          <div>
+            <button class="btn-primary" style="background: #e0e7ff; color: #3730a3;" id="opToggleBtn" onclick="toggleOpdList()">👁 Show Full List</button>
           </div>
         </div>
-        <div class="form-row" style="margin-top:.3rem">
+        <div class="form-row">
           <div>
             <label>Show</label>
             <select id="opShow" onchange="renderOpdList()">
@@ -143,41 +527,54 @@
               <option value="payable">Only payable (due &gt; 0)</option>
             </select>
           </div>
-          <div style="flex:0 0 auto;min-width:auto;display:flex;align-items:center;gap:.4rem;padding-bottom:.5rem;">
-            <input type="checkbox" id="opShowDone" onchange="renderOpdList()" style="width:auto"/>
-            <label for="opShowDone" style="margin:0;font-weight:600;font-size:.8rem;white-space:nowrap">Show done/N-A cases</label>
+        </div>
+        <div class="form-row">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="opShowDone" onchange="renderOpdList()"/>
+            <label for="opShowDone" style="margin: 0; font-weight: 600; font-size: 0.85rem;">Show done/N-A cases</label>
           </div>
         </div>
         <p class="search-count" id="opCount"></p>
         <div class="banner-warn hidden" id="opWarnBanner"></div>
-        <div id="opCaseList" style="overflow-x:auto"></div>
+        <div class="table-wrapper" id="opCaseList"></div>
         <p class="err" id="opErr"></p>
-        <p class="info" id="opOk" style="display:none"></p>
+        <p class="info" id="opOk" style="display: none;"></p>
       </div>
     </div>
 
     <!-- IPD PANEL -->
     <div class="page-card">
       <div class="form-card">
-        <div class="section-title" style="margin-top:0">🏥 Find IPD Cases</div>
+        <div class="section-title" style="margin-top: 0;">🏥 Find IPD Cases</div>
         <div class="form-row">
-          <div><label>Admission Date From</label><input id="ipFrom" type="date"/></div>
-          <div><label>Admission Date To</label><input id="ipTo" type="date"/></div>
+          <div>
+            <label>Admission Date From</label>
+            <input id="ipFrom" type="date"/>
+          </div>
         </div>
-        <div class="form-row" style="margin-top:.3rem">
-          <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="loadIpdCases()">Load</button></div>
+        <div class="form-row">
+          <div>
+            <label>Admission Date To</label>
+            <input id="ipTo" type="date"/>
+          </div>
         </div>
-        <div class="form-row" style="margin-top:.5rem">
-          <div class="search-wrap" style="flex:2">
+        <div class="form-row" style="margin-top: 0.3rem;">
+          <div>
+            <button class="btn-primary" onclick="loadIpdCases()">Load IPD Cases</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top: 0.5rem;">
+          <div class="search-wrap">
             <label>Search by Admission No. or Patient Name</label>
-            <input id="ipSearch" placeholder="e.g. IPD-1042 or Sultana Begum" oninput="renderIpdList()"/>
-          </div>
-          <div style="flex:0 0 auto;min-width:auto;">
-            <label>&nbsp;</label>
-            <button class="btn-mini" style="background:#fce7f3;color:#9d174d;padding:.5rem .8rem" id="ipToggleBtn" onclick="toggleIpdList()">👁 Show Full List</button>
+            <input id="ipSearch" placeholder="e.g. IPD-0821 or John Doe" oninput="renderIpdList()"/>
           </div>
         </div>
-        <div class="form-row" style="margin-top:.3rem">
+        <div class="form-row">
+          <div>
+            <button class="btn-primary" style="background: #e0e7ff; color: #3730a3;" id="ipToggleBtn" onclick="toggleIpdList()">👁 Show Full List</button>
+          </div>
+        </div>
+        <div class="form-row">
           <div>
             <label>Show</label>
             <select id="ipShow" onchange="renderIpdList()">
@@ -186,20 +583,23 @@
               <option value="payable">Only payable (due &gt; 0)</option>
             </select>
           </div>
-          <div style="flex:0 0 auto;min-width:auto;display:flex;align-items:center;gap:.4rem;padding-bottom:.5rem;">
-            <input type="checkbox" id="ipShowDone" onchange="renderIpdList()" style="width:auto"/>
-            <label for="ipShowDone" style="margin:0;font-weight:600;font-size:.8rem;white-space:nowrap">Show done/N-A cases</label>
+        </div>
+        <div class="form-row">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="ipShowDone" onchange="renderIpdList()"/>
+            <label for="ipShowDone" style="margin: 0; font-weight: 600; font-size: 0.85rem;">Show done/N-A cases</label>
           </div>
         </div>
         <p class="search-count" id="ipCount"></p>
         <div class="banner-warn hidden" id="ipWarnBanner"></div>
-        <div id="ipCaseList" style="overflow-x:auto"></div>
+        <div class="table-wrapper" id="ipCaseList"></div>
         <p class="err" id="ipErr"></p>
-        <p class="info" id="ipOk" style="display:none"></p>
+        <p class="info" id="ipOk" style="display: none;"></p>
       </div>
     </div>
 
   </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -257,7 +657,6 @@ async function checkVoucher(){
 // ════════════════════════════════════════════════════════════
 // SELECTION CART — shared between OPD and IPD
 // ════════════════════════════════════════════════════════════
-// Each entry: { domain:'op'|'ip', key, no, patient_name, refer_name, due, amount }
 let cart = [];
 function cartKey(domain, key){ return domain+':'+key; }
 function isInCart(domain, key){ return cart.some(x=>cartKey(x.domain,x.key)===cartKey(domain,key)); }
@@ -266,10 +665,6 @@ function currentReferName(){
   if (cart.length) return cart[0].refer_name;
   return null;
 }
-// Voucher party_name may be stored as a composite string like
-// "Injamul SK (7679633142, Team: Jnana ranjan das)". Do a loose
-// contains-match (case-insensitive) instead of requiring an exact
-// match, so the same person isn't blocked over formatting differences.
 function namesMatch(caseName, partyName){
   const a = (caseName||'').trim().toLowerCase();
   const b = (partyName||'').trim().toLowerCase();
@@ -287,7 +682,6 @@ function addToCart(domain, key){
     err.textContent = 'This case is not payable yet — fix the refer name/amount first.';
     return;
   }
-  // enforce single refer-name per voucher
   const wantName = (src.refer_name||'').trim();
   const existingName = currentReferName();
   if (existingName && !namesMatch(wantName, existingName)) {
@@ -328,7 +722,7 @@ function cartAmtChanged(domain, key, val){
 function renderCart(){
   const box = document.getElementById('cartBox');
   if (!cart.length){ box.innerHTML = '<p class="cart-empty">No cases selected yet. Search OPD or IPD below and click ➕ Add.</p>'; return; }
-  box.innerHTML = `<table>
+  box.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table style="width:100%;font-size:0.85rem;">
     <thead><tr><th>Type</th><th>No.</th><th>Patient</th><th>Refer Name</th><th class="r">Due</th><th class="r">Pay Amount</th><th></th></tr></thead>
     <tbody>${cart.map(x=>`
       <tr>
@@ -343,7 +737,7 @@ function renderCart(){
       </tr>`).join('')}
     </tbody>
     <tfoot><tr><td colspan="5">Total to Pay</td><td class="r" id="cartTotal">₹0.00</td><td></td></tr></tfoot>
-  </table>`;
+  </table></div>`;
   cartUpdateTotal();
 }
 
@@ -408,8 +802,8 @@ function renderOpdList(){
     document.getElementById('opWarnBanner').classList.add('hidden');
     const box = document.getElementById('opCaseList');
     box.innerHTML = opAllCases.length
-      ? '<p style="color:#888">Type in the search box above, or click 👁 Show Full List to browse all loaded cases.</p>'
-      : '<p style="color:#888">Load a date range to search cases.</p>';
+      ? '<p style="color:#888;text-align:center;padding:1rem;">Type in the search box above, or click 👁 Show Full List to browse all loaded cases.</p>'
+      : '<p style="color:#888;text-align:center;padding:1rem;">Load a date range to search cases.</p>';
     return;
   }
 
@@ -420,46 +814,87 @@ function renderOpdList(){
   if (issues > 0){
     banner.classList.remove('hidden');
     banner.innerHTML = `⚠️ ${issues} case(s) below have <b>no refer name</b> and/or <b>no refer amount</b> set.
-      Fill in the fields on that row and click 💾 to update before adding it.`;
+      Fill in the fields and click 💾 to update before adding it.`;
   } else banner.classList.add('hidden');
 
   const box = document.getElementById('opCaseList');
-  if (!list.length){ box.innerHTML = opAllCases.length ? '<p style="color:#888">No cases match your search.</p>' : '<p style="color:#888">Load a date range to search cases.</p>'; return; }
+  if (!list.length){ box.innerHTML = opAllCases.length ? '<p style="color:#888;text-align:center;padding:1rem;">No cases match your search.</p>' : '<p style="color:#888;text-align:center;padding:1rem;">Load a date range to search cases.</p>'; return; }
 
-  box.innerHTML = `<table id="opTable">
-    <thead><tr><th>Case Date</th><th>Case No.</th><th>Patient</th><th>Refer Name</th><th class="r">Refer Amt</th><th></th><th class="r">Due</th><th>Status</th><th></th></tr></thead>
-    <tbody>${list.map(c=>{
-      const payable = !c.refer_na && c.linked && c.amountSet && c.due > 0.001;
-      const added = isInCart('op', c.case_no);
-      const rowClass = added ? 'row-added' : c.refer_na ? 'row-ok' : (!c.linked || !c.amountSet) ? 'row-warn' : 'row-ok';
-      const cn = esc(c.case_no);
-      const donePaid = !c.refer_na && c.linked && c.amountSet && c.due <= 0.001;
-    return `<tr class="${rowClass}" data-no="${cn}">
-        <td>${c.case_date}</td>
-        <td>${cn}</td>
-        <td>${esc(c.patient_name)}</td>
-        <td>
-          <input class="row-inline-input mini-input name ${(c.linked||c.refer_na)?'':'flagged'}" id="opName-${cn}" list="referNameOptions" value="${esc(c.refer_name)}" placeholder="Refer name" ${c.refer_na?'disabled':''}/>
-        </td>
-        <td class="r">
-          <input type="number" class="row-inline-input mini-input ${(c.amountSet||c.refer_na)?'':'flagged'}" id="opAmt-${cn}" value="${c.refer_amount||''}" min="0" step="0.01" placeholder="0.00" ${c.refer_na?'disabled':''}/>
-        </td>
-        <td style="white-space:nowrap">
-          <button class="btn-mini btn-mini-save" onclick="updateOpdReferInfo('${cn}')" ${c.refer_na?'disabled':''}>💾 Update</button>
-          <button class="btn-mini" style="background:#e2e8f0;color:#334155" onclick="markOpdReferNA('${cn}')">🚫 N/A</button>
-        </td>
-        <td class="r">${c.refer_na ? '<span style="color:#999">—</span>' : c.amountSet ? fmt(c.due) : '<span style="color:#999">—</span>'}</td>
-        <td>${c.refer_na ? '<span class="pill pill-ok">✅ Done (N/A)</span>' : donePaid ? '<span class="pill pill-ok">✅ Done</span>' : payable ? '<span class="pill pill-ok">Payable</span>' : '<span class="pill pill-warn">Fix refer link</span>'}</td>
-        <td>${added
-            ? `<button class="btn-mini btn-mini-remove" onclick="removeFromCart('op','${cn}')">✕ Remove</button>`
-            : `<button class="btn-mini btn-mini-add" onclick="addToCart('op','${cn}')" ${payable?'':'disabled'}>➕ Add</button>`}</td>
-      </tr>
-      ${(!c.refer_na && (!c.linked || !c.amountSet)) ? `<tr class="${rowClass}"><td></td><td colspan="8" class="row-warn-msg">
-        ${!c.linked ? '⚠️ Refer not linked. ' : ''}${!c.amountSet ? '⚠️ Refer amount not entered.' : ''}
-      </td></tr>` : ''}
-      `;
-    }).join('')}</tbody>
-  </table>`;
+  box.innerHTML = `<div style="display:grid;gap:1rem;">${list.map(c=>{
+    const payable = !c.refer_na && c.linked && c.amountSet && c.due > 0.001;
+    const added = isInCart('op', c.case_no);
+    const cn = esc(c.case_no);
+    const donePaid = !c.refer_na && c.linked && c.amountSet && c.due <= 0.001;
+    const statusColor = c.refer_na ? '#10b981' : donePaid ? '#10b981' : payable ? '#059669' : '#dc2626';
+    const statusText = c.refer_na ? '✅ Done (N/A)' : donePaid ? '✅ Done' : payable ? '✅ Payable' : '⚠️ Fix refer';
+    const needsUpdate = !c.refer_na && (!c.linked || !c.amountSet);
+    
+    return `<div style="background:#fff;border:2px solid ${added?'#6366f1':'#e5e7eb'};border-radius:10px;padding:1rem;${added?'box-shadow:0 0 0 3px rgba(99,102,241,0.1);':''}">
+      <div style="display:grid;gap:0.75rem;">
+        <!-- Header: Case No + Status -->
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:0.5rem;">
+          <div>
+            <div style="font-size:0.85rem;color:#666;font-weight:600;">Case No.</div>
+            <div style="font-size:1.1rem;font-weight:700;color:#1a1a1a;">${cn}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:0.75rem;color:#666;font-weight:600;">Status</div>
+            <div style="background:${statusColor};color:white;padding:0.35rem 0.75rem;border-radius:6px;font-size:0.85rem;font-weight:600;white-space:nowrap;">${statusText}</div>
+          </div>
+        </div>
+        
+        <!-- Case Date & Patient -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;font-size:0.9rem;">
+          <div>
+            <div style="font-size:0.75rem;color:#666;font-weight:600;margin-bottom:0.2rem;">Case Date</div>
+            <div style="color:#1a1a1a;">${c.case_date}</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:#666;font-weight:600;margin-bottom:0.2rem;">Patient</div>
+            <div style="color:#1a1a1a;font-weight:500;">${esc(c.patient_name)}</div>
+          </div>
+        </div>
+        
+        <!-- Refer Info Section -->
+        <div style="background:#f0f0f0;padding:0.75rem;border-radius:6px;${needsUpdate?'border:2px solid #f59e0b;background:#fffbeb;':''}">
+          <div style="font-size:0.85rem;font-weight:600;color:#333;margin-bottom:0.5rem;">Refer Information</div>
+          <div style="display:grid;gap:0.6rem;">
+            <div>
+              <label style="font-size:0.75rem;color:#666;font-weight:600;display:block;margin-bottom:0.3rem;">Refer Name</label>
+              <input class="row-inline-input mini-input name" id="opName-${cn}" list="referNameOptions" value="${esc(c.refer_name)}" placeholder="Enter refer name" ${c.refer_na?'disabled':''} style="width:100%;padding:0.6rem;font-size:0.95rem;"/>
+            </div>
+            <div>
+              <label style="font-size:0.75rem;color:#666;font-weight:600;display:block;margin-bottom:0.3rem;">Refer Amount (₹)</label>
+              <input type="number" class="row-inline-input mini-input" id="opAmt-${cn}" value="${c.refer_amount||''}" min="0" step="0.01" placeholder="0.00" ${c.refer_na?'disabled':''} style="width:100%;padding:0.6rem;font-size:0.95rem;text-align:right;"/>
+            </div>
+            <div style="display:grid;gap:0.5rem;">
+              <button class="btn-mini btn-mini-save" onclick="updateOpdReferInfo('${cn}')" ${c.refer_na?'disabled':''} style="width:100%;padding:0.65rem;">💾 Update Refer Info</button>
+              <button class="btn-mini" style="background:#e2e8f0;color:#334155;width:100%;padding:0.65rem;" onclick="markOpdReferNA('${cn}')">🚫 Mark as N/A</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Amount Info -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;font-size:0.9rem;background:#f9f9f9;padding:0.75rem;border-radius:6px;">
+          <div>
+            <div style="font-size:0.75rem;color:#666;font-weight:600;margin-bottom:0.2rem;">Refer Amount</div>
+            <div style="color:#1a1a1a;font-weight:600;">${fmt(c.refer_amount||0)}</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:#666;font-weight:600;margin-bottom:0.2rem;">Due</div>
+            <div style="color:#dc2626;font-weight:600;">${c.refer_na ? '—' : c.amountSet ? fmt(c.due) : '—'}</div>
+          </div>
+        </div>
+        
+        <!-- Action Button -->
+        <div>
+          ${added
+            ? `<button class="btn-mini btn-mini-remove" onclick="removeFromCart('op','${cn}')" style="width:100%;padding:0.65rem;">✕ Remove from Cart</button>`
+            : `<button class="btn-primary" onclick="addToCart('op','${cn}')" ${payable?'':'disabled'} style="width:100%;padding:0.65rem;background:${payable?'#6366f1':'#ccc'};cursor:${payable?'pointer':'not-allowed'};">➕ Add to Cart</button>`}
+        </div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 async function updateOpdReferInfo(caseNo){
   const nameEl = document.getElementById(`opName-${caseNo}`);
@@ -476,7 +911,6 @@ async function updateOpdReferInfo(caseNo){
     if (error) throw error;
     const c = opAllCases.find(x=>x.case_no===caseNo);
     if (c){ c.refer_name = name; c.refer_amount = amt; c.linked = true; c.amountSet = true; c.due = amt - c.paid; }
-    // keep an already-selected cart entry in sync
     const inCart = cart.find(x=>x.domain==='op' && x.key===caseNo);
     if (inCart){ inCart.refer_name = name; inCart.due = c.due; }
     ok.style.display='block'; ok.textContent = `✅ Case ${caseNo} refer link/amount updated. You can now add it.`;
@@ -496,7 +930,7 @@ async function markOpdReferNA(caseNo){
     if (error) throw error;
     const c = opAllCases.find(x=>x.case_no===caseNo);
     if (c){ c.refer_na = true; c.refer_name=''; c.refer_amount=0; c.due=0; c.linked=true; c.amountSet=true; }
-    removeFromCart('op', caseNo); // no longer payable — drop from selection if it was there
+    removeFromCart('op', caseNo);
     ok.style.display='block'; ok.textContent = `✅ Case ${caseNo} marked as Refer Not Applicable.`;
     renderOpdList();
   } catch(ex){ err.textContent = ex.message; }
@@ -566,8 +1000,8 @@ function renderIpdList(){
     document.getElementById('ipWarnBanner').classList.add('hidden');
     const box = document.getElementById('ipCaseList');
     box.innerHTML = ipAllCases.length
-      ? '<p style="color:#888">Type in the search box above, or click 👁 Show Full List to browse all loaded cases.</p>'
-      : '<p style="color:#888">Load a date range to search cases.</p>';
+      ? '<p style="color:#888;text-align:center;padding:1rem;">Type in the search box above, or click 👁 Show Full List to browse all loaded cases.</p>'
+      : '<p style="color:#888;text-align:center;padding:1rem;">Load a date range to search cases.</p>';
     return;
   }
 
@@ -578,46 +1012,87 @@ function renderIpdList(){
   if (issues > 0){
     banner.classList.remove('hidden');
     banner.innerHTML = `⚠️ ${issues} admission(s) below have <b>no refer name</b> and/or <b>no refer amount</b> set.
-      Fill in the fields on that row and click 💾 to update before adding it.`;
+      Fill in the fields and click 💾 to update before adding it.`;
   } else banner.classList.add('hidden');
 
   const box = document.getElementById('ipCaseList');
-  if (!list.length){ box.innerHTML = ipAllCases.length ? '<p style="color:#888">No cases match your search.</p>' : '<p style="color:#888">Load a date range to search cases.</p>'; return; }
+  if (!list.length){ box.innerHTML = ipAllCases.length ? '<p style="color:#888;text-align:center;padding:1rem;">No cases match your search.</p>' : '<p style="color:#888;text-align:center;padding:1rem;">Load a date range to search cases.</p>'; return; }
 
-  box.innerHTML = `<table id="ipTable">
-    <thead><tr><th>Adm Date</th><th>Adm No.</th><th>Patient</th><th>Refer Name</th><th class="r">Refer Amt</th><th></th><th class="r">Due</th><th>Status</th><th></th></tr></thead>
-    <tbody>${list.map(c=>{
-      const payable = !c.refer_na && c.linked && c.amountSet && c.due > 0.001;
-      const added = isInCart('ip', c.id);
-      const rowClass = added ? 'row-added' : c.refer_na ? 'row-ok' : (!c.linked || !c.amountSet) ? 'row-warn' : 'row-ok';
-      const id = esc(c.id);
-      const donePaid = !c.refer_na && c.linked && c.amountSet && c.due <= 0.001;
-      return `<tr class="${rowClass}" data-id="${id}">
-        <td>${c.admission_date}</td>
-        <td>${esc(c.admission_no)}</td>
-        <td>${esc(c.patient_name)}</td>
-        <td>
-          <input class="row-inline-input mini-input name ${(c.linked||c.refer_na)?'':'flagged'}" id="ipName-${id}" list="referNameOptions" value="${esc(c.refer_name)}" placeholder="Refer name" ${c.refer_na?'disabled':''}/>
-        </td>
-        <td class="r">
-          <input type="number" class="row-inline-input mini-input ${(c.amountSet||c.refer_na)?'':'flagged'}" id="ipAmt-${id}" value="${c.refer_amount||''}" min="0" step="0.01" placeholder="0.00" ${c.refer_na?'disabled':''}/>
-        </td>
-        <td style="white-space:nowrap">
-          <button class="btn-mini btn-mini-save" onclick="updateIpdReferInfo('${id}')" ${c.refer_na?'disabled':''}>💾 Update</button>
-          <button class="btn-mini" style="background:#e2e8f0;color:#334155" onclick="markIpdReferNA('${id}')">🚫 N/A</button>
-        </td>
-        <td class="r">${c.refer_na ? '<span style="color:#999">—</span>' : c.amountSet ? fmt(c.due) : '<span style="color:#999">—</span>'}</td>
-        <td>${c.refer_na ? '<span class="pill pill-ok">✅ Done (N/A)</span>' : donePaid ? '<span class="pill pill-ok">✅ Done</span>' : payable ? '<span class="pill pill-ok">Payable</span>' : '<span class="pill pill-warn">Fix refer link</span>'}</td>
-        <td>${added
-            ? `<button class="btn-mini btn-mini-remove" onclick="removeFromCart('ip','${id}')">✕ Remove</button>`
-            : `<button class="btn-mini btn-mini-add" onclick="addToCart('ip','${id}')" ${payable?'':'disabled'}>➕ Add</button>`}</td>
-      </tr>
-      ${(!c.refer_na && (!c.linked || !c.amountSet)) ? `<tr class="${rowClass}"><td></td><td colspan="8" class="row-warn-msg">
-        ${!c.linked ? '⚠️ Refer not linked. ' : ''}${!c.amountSet ? '⚠️ Refer amount not entered.' : ''}
-      </td></tr>` : ''}
-      `;
-    }).join('')}</tbody>
-  </table>`;
+  box.innerHTML = `<div style="display:grid;gap:1rem;">${list.map(c=>{
+    const payable = !c.refer_na && c.linked && c.amountSet && c.due > 0.001;
+    const added = isInCart('ip', c.id);
+    const id = esc(c.id);
+    const donePaid = !c.refer_na && c.linked && c.amountSet && c.due <= 0.001;
+    const statusColor = c.refer_na ? '#10b981' : donePaid ? '#10b981' : payable ? '#059669' : '#dc2626';
+    const statusText = c.refer_na ? '✅ Done (N/A)' : donePaid ? '✅ Done' : payable ? '✅ Payable' : '⚠️ Fix refer';
+    const needsUpdate = !c.refer_na && (!c.linked || !c.amountSet);
+    
+    return `<div style="background:#fff;border:2px solid ${added?'#6366f1':'#e5e7eb'};border-radius:10px;padding:1rem;${added?'box-shadow:0 0 0 3px rgba(99,102,241,0.1);':''}">
+      <div style="display:grid;gap:0.75rem;">
+        <!-- Header: Admission No + Status -->
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:0.5rem;">
+          <div>
+            <div style="font-size:0.85rem;color:#666;font-weight:600;">Admission No.</div>
+            <div style="font-size:1.1rem;font-weight:700;color:#1a1a1a;">${esc(c.admission_no)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:0.75rem;color:#666;font-weight:600;">Status</div>
+            <div style="background:${statusColor};color:white;padding:0.35rem 0.75rem;border-radius:6px;font-size:0.85rem;font-weight:600;white-space:nowrap;">${statusText}</div>
+          </div>
+        </div>
+        
+        <!-- Admission Date & Patient -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;font-size:0.9rem;">
+          <div>
+            <div style="font-size:0.75rem;color:#666;font-weight:600;margin-bottom:0.2rem;">Admission Date</div>
+            <div style="color:#1a1a1a;">${c.admission_date}</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:#666;font-weight:600;margin-bottom:0.2rem;">Patient</div>
+            <div style="color:#1a1a1a;font-weight:500;">${esc(c.patient_name)}</div>
+          </div>
+        </div>
+        
+        <!-- Refer Info Section -->
+        <div style="background:#f0f0f0;padding:0.75rem;border-radius:6px;${needsUpdate?'border:2px solid #f59e0b;background:#fffbeb;':''}">
+          <div style="font-size:0.85rem;font-weight:600;color:#333;margin-bottom:0.5rem;">Refer Information</div>
+          <div style="display:grid;gap:0.6rem;">
+            <div>
+              <label style="font-size:0.75rem;color:#666;font-weight:600;display:block;margin-bottom:0.3rem;">Refer Name</label>
+              <input class="row-inline-input mini-input name" id="ipName-${id}" list="referNameOptions" value="${esc(c.refer_name)}" placeholder="Enter refer name" ${c.refer_na?'disabled':''} style="width:100%;padding:0.6rem;font-size:0.95rem;"/>
+            </div>
+            <div>
+              <label style="font-size:0.75rem;color:#666;font-weight:600;display:block;margin-bottom:0.3rem;">Refer Amount (₹)</label>
+              <input type="number" class="row-inline-input mini-input" id="ipAmt-${id}" value="${c.refer_amount||''}" min="0" step="0.01" placeholder="0.00" ${c.refer_na?'disabled':''} style="width:100%;padding:0.6rem;font-size:0.95rem;text-align:right;"/>
+            </div>
+            <div style="display:grid;gap:0.5rem;">
+              <button class="btn-mini btn-mini-save" onclick="updateIpdReferInfo('${id}')" ${c.refer_na?'disabled':''} style="width:100%;padding:0.65rem;">💾 Update Refer Info</button>
+              <button class="btn-mini" style="background:#e2e8f0;color:#334155;width:100%;padding:0.65rem;" onclick="markIpdReferNA('${id}')">🚫 Mark as N/A</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Amount Info -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;font-size:0.9rem;background:#f9f9f9;padding:0.75rem;border-radius:6px;">
+          <div>
+            <div style="font-size:0.75rem;color:#666;font-weight:600;margin-bottom:0.2rem;">Refer Amount</div>
+            <div style="color:#1a1a1a;font-weight:600;">${fmt(c.refer_amount||0)}</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:#666;font-weight:600;margin-bottom:0.2rem;">Due</div>
+            <div style="color:#dc2626;font-weight:600;">${c.refer_na ? '—' : c.amountSet ? fmt(c.due) : '—'}</div>
+          </div>
+        </div>
+        
+        <!-- Action Button -->
+        <div>
+          ${added
+            ? `<button class="btn-mini btn-mini-remove" onclick="removeFromCart('ip','${id}')" style="width:100%;padding:0.65rem;">✕ Remove from Cart</button>`
+            : `<button class="btn-primary" onclick="addToCart('ip','${id}')" ${payable?'':'disabled'} style="width:100%;padding:0.65rem;background:${payable?'#6366f1':'#ccc'};cursor:${payable?'pointer':'not-allowed'};">➕ Add to Cart</button>`}
+        </div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 async function updateIpdReferInfo(id){
   const c = ipAllCases.find(x=>String(x.id)===String(id));
@@ -667,7 +1142,7 @@ async function markIpdReferNA(id){
       if (e2) throw e2;
     }
     c.refer_na = true; c.refer_name=''; c.refer_amount=0; c.due=0; c.linked=true; c.amountSet=true;
-    removeFromCart('ip', id); // no longer payable — drop from selection if it was there
+    removeFromCart('ip', id);
     ok.style.display='block'; ok.textContent = `✅ Admission ${c.admission_no} marked as Refer Not Applicable.`;
     renderIpdList();
   } catch(ex){ err.textContent = ex.message; }
@@ -675,8 +1150,7 @@ async function markIpdReferNA(id){
 }
 
 // ════════════════════════════════════════════════════════════
-// SUBMIT — writes OPD rows to opd_refer_payment and IPD rows to
-// ipd_refer_payments, all sharing the same voucher/date/mode/remark.
+// SUBMIT
 // ════════════════════════════════════════════════════════════
 async function submitAll(){
   const err = document.getElementById('mainErr'), ok = document.getElementById('mainOk');
@@ -694,7 +1168,6 @@ async function submitAll(){
   const vcheck = await checkVoucher();
   if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
 
-  // pull live pay-amounts from the cart inputs
   cart.forEach(x=>{ x.amount = parseFloat(document.getElementById(`cartAmt-${x.domain}-${x.key}`)?.value || 0); });
 
   if (cart.some(x=>!x.amount || x.amount<=0)) { err.textContent='Pay amount must be greater than 0 for every selected case.'; return; }
