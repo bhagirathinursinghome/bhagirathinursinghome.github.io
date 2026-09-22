@@ -197,12 +197,15 @@
 
   async function loadActive() {
     const div = document.getElementById('activeList');
+    // Fetch all non-cancelled admissions (active + discharged) so discharged
+    // patients can still be found via search, but keep is_discharged so the
+    // default view can hide them and search results can flag them.
     const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
-      .select('id,admission_date,admission_no,patient_name')
-      .eq('is_discharged', false).eq('is_cancelled', false).order('admission_date');
+      .select('id,admission_date,admission_no,patient_name,is_discharged')
+      .eq('is_cancelled', false).order('admission_date');
     if (error||!data||data.length===0){div.textContent='No active patients.';return;}
     _allPatients = data;
-    renderPatientCards(data);
+    renderPatientCards(data.filter(r=>!r.is_discharged));
   }
 
   function renderPatientCards(list) {
@@ -213,7 +216,7 @@
     }
     div.innerHTML = list.map(r=>`
       <div class="patient-card" onclick="openIndenForm('${r.id}','${r.admission_no}','${r.patient_name.replace(/'/g,"\\'")}','${r.admission_date}')">
-        <div class="pname">${r.patient_name}</div>
+        <div class="pname">${r.patient_name}${r.is_discharged ? ' <span style="font-size:.72rem;font-weight:600;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:1px 7px;margin-left:6px;">DISCHARGED</span>' : ''}</div>
         <div class="pmeta">📅 ${r.admission_date} &nbsp;|&nbsp; Adm: ${r.admission_no}</div>
       </div>`).join('');
   }
@@ -221,6 +224,11 @@
   function filterPatients() {
     const name  = document.getElementById('searchName').value.trim().toLowerCase();
     const admNo = document.getElementById('searchAdmNo').value.trim().toLowerCase();
+    if (!name && !admNo) {
+      // No search entered — default view: active patients only.
+      renderPatientCards(_allPatients.filter(r=>!r.is_discharged));
+      return;
+    }
     const filtered = _allPatients.filter(r =>
       (!name  || r.patient_name.toLowerCase().includes(name)) &&
       (!admNo || r.admission_no.toLowerCase().includes(admNo))
@@ -231,7 +239,7 @@
   function clearPatientSearch() {
     document.getElementById('searchName').value  = '';
     document.getElementById('searchAdmNo').value = '';
-    renderPatientCards(_allPatients);
+    renderPatientCards(_allPatients.filter(r=>!r.is_discharged));
   }
   loadActive();
 
