@@ -108,6 +108,13 @@
       roles: ["admin","viewer", "manager"],
       group: "Employees"
     },
+        { 
+      label: "Attendance Punch", 
+      icon: "🕐", 
+      page: "pages/attendance_punch.html", 
+      roles: ["admin","viewer", "manager"],
+      group: "Employees"
+    },
     {
       label: "Credit Management",
       icon: "💳",
