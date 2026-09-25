@@ -125,6 +125,6 @@
   window.BNH = {
     sb, register, login, logout, getCurrentUser, changePassword,
     listUsers, approveUser, setRole, setStatus, resetPassword,
-    ROLES: ["admin","accountant","reception","ot","pharmacy","lab","manager","viewer","other"]
+    ROLES: ["admin","accountant","reception","ot","pharmacy","lab","manager","viewer","other","staff","marketing","ward"]
   };
 })();
