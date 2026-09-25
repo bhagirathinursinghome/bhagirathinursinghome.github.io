@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Attendance</title>
+<link rel="stylesheet" href="../assets/style.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --a-ink:#16232c; --a-ink-muted:#647680; --a-ink-faint:#93a2ab;
+    --a-surface:#ffffff; --a-brand:#0f5c82; --a-brand-dark:#0a4763; --a-brand-tint:#e5f0f6;
+    --a-accent:#5ea226; --a-accent-dark:#4a8420; --a-accent-tint:#eef7e4;
+    --a-danger:#c0392b; --a-danger-dark:#a5311f; --a-border:#dfe6ea;
+    --a-radius-lg:20px; --a-radius-md:14px; --a-radius-sm:9px;
+    --a-shadow-card:0 1px 2px rgba(15,45,60,.06), 0 10px 24px -14px rgba(15,45,60,.22);
+    --a-font-head:'Poppins',-apple-system,Segoe UI,Roboto,sans-serif;
+    --a-font-body:'Inter',-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  body{font-family:var(--a-font-body);color:var(--a-ink);background:#eef3f6;margin:0}
+  .page{max-width:480px;margin:0 auto;padding:1rem 1rem 2.5rem}
+  h1{font-family:var(--a-font-head)}
+  .a-card{background:var(--a-surface);border:1px solid var(--a-border);border-radius:var(--a-radius-lg);
+    padding:1.1rem 1.15rem;margin-bottom:1rem;box-shadow:var(--a-shadow-card)}
+  .a-card h3{margin:0 0 .7rem;font-size:.98rem;font-weight:600;font-family:var(--a-font-head)}
+
+  /* Tabs */
+  .a-tabs{display:flex;gap:.4rem;margin-bottom:1rem;overflow-x:auto}
+  .a-tab{flex-shrink:0;border:1.5px solid var(--a-border);background:#fff;color:var(--a-ink-muted);
+    font-family:var(--a-font-head);font-weight:600;font-size:.85rem;padding:.5rem .95rem;
+    border-radius:999px;cursor:pointer}
+  .a-tab.active{background:var(--a-brand);border-color:var(--a-brand);color:#fff}
+
+  .a-view{display:none;animation:a-fade .18s ease}
+  .a-view.active{display:block}
+  @keyframes a-fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* Location card */
+  .loc-top{display:flex;align-items:center;gap:.6rem}
+  .loc-icon{width:38px;height:38px;border-radius:50%;background:var(--a-brand-tint);color:var(--a-brand);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .loc-title{font-weight:600;font-size:.9rem}
+  .loc-sub{font-size:.75rem;color:var(--a-ink-muted)}
+  .status-pill{display:inline-flex;align-items:center;gap:.35rem;font-size:.72rem;font-weight:600;
+    padding:.25rem .6rem;border-radius:999px;margin-left:auto;flex-shrink:0}
+  .status-pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .pill-warn{background:#fdf3d9;color:#8a6a05}
+  .pill-good{background:var(--a-accent-tint);color:var(--a-accent-dark)}
+  .pill-bad{background:#fbeae8;color:var(--a-danger-dark)}
+  .dist-row{display:flex;align-items:baseline;justify-content:space-between;margin-top:.85rem}
+  .dist-val{font-size:1.3rem;font-weight:700;font-family:var(--a-font-head)}
+  .dist-meter{height:6px;border-radius:99px;background:#eef1f3;margin-top:.5rem;overflow:hidden}
+  .dist-meter i{display:block;height:100%;border-radius:99px;transition:width .3s ease,background .3s ease}
+  .loc-note{font-size:.75rem;color:var(--a-ink-muted);margin-top:.55rem;min-height:1.1em}
+  .accuracy-warn{color:var(--a-danger-dark)}
+  .refresh-btn{background:none;border:none;color:var(--a-brand);cursor:pointer;padding:.3rem;flex-shrink:0}
+  .refresh-btn.spinning svg{animation:a-spin .8s linear infinite}
+  @keyframes a-spin{to{transform:rotate(360deg)}}
+
+  /* Punch card */
+  .punch-card{text-align:center}
+  .today-date{font-size:.8rem;color:var(--a-ink-muted);margin-bottom:.9rem}
+  .punch-btn{width:150px;height:150px;border-radius:50%;border:none;margin:0 auto;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;
+    background:linear-gradient(135deg,var(--a-brand),var(--a-brand-dark));color:#fff;
+    box-shadow:0 12px 26px -10px rgba(15,92,130,.55);transition:transform .12s ease,opacity .15s ease}
+  .punch-btn.out{background:linear-gradient(135deg,#c0392b,#a5311f);box-shadow:0 12px 26px -10px rgba(160,50,40,.5)}
+  .punch-btn:disabled{background:#b7c2c8;box-shadow:none;cursor:not-allowed;opacity:.85}
+  .punch-btn:active{transform:scale(.97)}
+  .punch-btn span.lbl{font-family:var(--a-font-head);font-weight:700;font-size:1rem}
+  .punch-btn span.sub{font-size:.72rem;opacity:.85}
+  .punch-hint{font-size:.78rem;color:var(--a-ink-muted);margin-top:1rem;min-height:1.1em}
+  .today-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-top:1.1rem}
+  .today-box{background:#f6f9fa;border-radius:var(--a-radius-sm);padding:.6rem .3rem}
+  .today-box .v{font-weight:700;font-size:.95rem;font-family:var(--a-font-head)}
+  .today-box .l{font-size:.68rem;color:var(--a-ink-muted);margin-top:.15rem}
+  .elapsed-wrap{margin-top:.9rem;font-size:.8rem;color:var(--a-accent-dark);font-weight:600}
+  .err{color:var(--a-danger);font-size:.83rem;min-height:1.1em;margin-top:.7rem}
+
+  /* History */
+  .chip-row{display:flex;gap:.5rem;margin-bottom:.9rem}
+  .chip{border:1.5px solid var(--a-border);background:#fff;color:var(--a-ink-muted);font-size:.8rem;
+    font-weight:600;padding:.4rem .85rem;border-radius:999px;cursor:pointer}
+  .chip.active{background:var(--a-brand-tint);border-color:var(--a-brand);color:var(--a-brand-dark)}
+  .hist-item{display:flex;align-items:center;gap:.7rem;padding:.7rem 0;border-bottom:1px solid var(--a-border)}
+  .hist-item:last-child{border-bottom:none}
+  .hist-bar{width:4px;height:32px;border-radius:4px;background:var(--a-accent);flex-shrink:0}
+  .hist-bar.incomplete{background:var(--a-danger)}
+  .hist-main{flex:1;min-width:0}
+  .hist-date{font-weight:600;font-size:.87rem}
+  .hist-times{font-size:.76rem;color:var(--a-ink-muted)}
+  .hist-dur{font-size:.82rem;font-weight:600;color:var(--a-ink-muted);flex-shrink:0}
+  .empty-state{text-align:center;color:var(--a-ink-faint);padding:1.5rem 0}
+  .empty-state svg{margin:0 auto .5rem}
+  .center-loading{display:flex;justify-content:center;padding:1.2rem 0}
+  .spinner{width:24px;height:24px;border:3px solid var(--a-brand-tint);border-top-color:var(--a-brand);
+    border-radius:50%;animation:a-spin .7s linear infinite}
+
+  /* Stats */
+  .stat-section-title{font-size:.78rem;font-weight:700;color:var(--a-ink-muted);text-transform:uppercase;
+    letter-spacing:.03em;margin:1rem 0 .6rem}
+  .stat-section-title:first-child{margin-top:0}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+  .stat-box{background:#f6f9fa;border-radius:var(--a-radius-sm);padding:.8rem}
+  .stat-val{font-size:1.15rem;font-weight:700;font-family:var(--a-font-head)}
+  .stat-label{font-size:.72rem;color:var(--a-ink-muted);margin-top:.2rem}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>🕒 Attendance</h1>
+
+  <div class="a-tabs">
+    <button class="a-tab active" data-view="home">Home</button>
+    <button class="a-tab" data-view="history">History</button>
+    <button class="a-tab" data-view="stats">Statistics</button>
+  </div>
+
+  <!-- HOME -->
+  <div class="a-view active" id="view-home">
+    <div class="a-card">
+      <div class="loc-top">
+        <div class="loc-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+        </div>
+        <div>
+          <div class="loc-title">Location check</div>
+          <div class="loc-sub" id="locSubtitle"></div>
+        </div>
+        <span class="status-pill pill-warn" id="locStatus"><span class="dot"></span>Checking…</span>
+        <button class="refresh-btn" id="refreshLocBtn" title="Refresh location">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v6h-6"/></svg>
+        </button>
+      </div>
+      <div class="dist-row">
+        <div class="dist-val" id="distVal">—</div>
+      </div>
+      <div class="dist-meter"><i id="distMeter" style="width:0%"></i></div>
+      <div class="loc-note" id="locNote"></div>
+    </div>
+
+    <div class="a-card punch-card">
+      <div class="today-date" id="todayDate"></div>
+      <button class="punch-btn" id="punchBtn" disabled>
+        <svg id="punchBtnIcon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <span class="lbl" id="punchBtnLabel">Punch In</span>
+        <span class="sub" id="punchBtnSub">waiting for location…</span>
+      </button>
+      <div class="punch-hint" id="punchHint">Waiting for your location…</div>
+      <p class="err" id="punchErr"></p>
+      <div class="elapsed-wrap hidden" id="elapsedWrap">On shift for <span id="elapsedVal">0h 0m</span></div>
+      <div class="today-grid">
+        <div class="today-box"><div class="v" id="todayIn">—</div><div class="l">Punch In</div></div>
+        <div class="today-box"><div class="v" id="todayOut">—</div><div class="l">Punch Out</div></div>
+        <div class="today-box"><div class="v" id="todayDur">—</div><div class="l">Duration</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="a-view" id="view-history">
+    <div class="a-card">
+      <div class="chip-row" id="histFilters">
+        <button class="chip active" data-days="7">7 days</button>
+        <button class="chip" data-days="30">30 days</button>
+        <button class="chip" data-days="90">90 days</button>
+      </div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="a-view" id="view-stats">
+    <div class="a-card">
+      <div id="statsBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- REQUIRED scripts, in this order -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+"use strict";
+
+// 1. Role guard — anyone whose job includes attendance
+BNH_PAGE.requireRole(["admin","staff","marketing","ward"]);
+
+const sb = BNH_PAGE.sb;
+const currentUser = BNH_PAGE.user;
+const CFG = window.BNH_CONFIG;
+const LOC = CFG.WORK_LOCATION || { label: "Work location", lat: 0, lng: 0 };
+const RADIUS_METERS = CFG.RADIUS_METERS || 100;
+
+/* ---------- helpers ---------- */
+const todayStr = () => new Date().toISOString().slice(0,10);
+const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
+const fmtDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString([], {weekday:'short', day:'2-digit', month:'short'});
+const fmtDur = (a,b) => {
+  if (!a || !b) return '—';
+  const mins = Math.round((new Date(b) - new Date(a)) / 60000);
+  return Math.floor(mins/60) + 'h ' + (mins%60) + 'm';
+};
+const minsBetween = (a,b) => (!a || !b) ? null : Math.round((new Date(b)-new Date(a))/60000);
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2-lat1), dLng = toRad(lng2-lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/* ---------- state ---------- */
+let currentPos = null;
+let todayRow = null;
+let elapsedTimer = null;
+let watchId = null;
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.a-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.a-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.a-view').forEach(v => v.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('view-' + tab.dataset.view).classList.add('active');
+    if (tab.dataset.view === 'history') loadHistory(currentHistDays);
+    if (tab.dataset.view === 'stats') loadStats();
+  };
+});
+
+/* ---------- Location ---------- */
+function setLocUI(status, distance, note, accuracy) {
+  const pill = document.getElementById('locStatus');
+  const dv = document.getElementById('distVal');
+  const meter = document.getElementById('distMeter');
+  const noteEl = document.getElementById('locNote');
+  document.getElementById('locSubtitle').textContent = LOC.label;
+
+  const kinds = {
+    checking: ['pill-warn', 'Checking…'],
+    good:     ['pill-good', 'In range'],
+    bad:      ['pill-bad', 'Out of range'],
+    denied:   ['pill-bad', 'Access denied'],
+    unsupported:['pill-bad', 'Unsupported']
+  };
+  const [cls, label] = kinds[status];
+  pill.className = 'status-pill ' + cls;
+  pill.innerHTML = '<span class="dot"></span>' + label;
+
+  if (distance == null) {
+    dv.textContent = '—';
+    meter.style.width = '0%'; meter.style.background = '#93a2ab';
+  } else {
+    dv.textContent = distance + ' m';
+    const pct = Math.max(4, Math.min(100, Math.round((1 - Math.min(distance, RADIUS_METERS*2)/(RADIUS_METERS*2)) * 100)));
+    meter.style.width = pct + '%';
+    meter.style.background = distance <= RADIUS_METERS ? '#5ea226' : '#c0392b';
+  }
+  let noteText = note || '';
+  if (accuracy != null) {
+    noteText += (noteText ? ' · ' : '') + `accuracy ±${Math.round(accuracy)} m`;
+    if (accuracy > 50) noteText = `<span class="accuracy-warn">Low GPS accuracy — move to open sky for a precise reading.</span> ` + noteText;
+  }
+  noteEl.innerHTML = noteText;
+}
+
+function handlePos(pos) {
+  document.getElementById('refreshLocBtn').classList.remove('spinning');
+  const lat = pos.coords.latitude, lng = pos.coords.longitude, accuracy = pos.coords.accuracy;
+  const distance = Math.round(haversineMeters(lat, lng, LOC.lat, LOC.lng));
+  currentPos = { lat, lng, distance, accuracy };
+  setLocUI(distance <= RADIUS_METERS ? 'good' : 'bad', distance,
+    distance <= RADIUS_METERS ? 'You are within the allowed punch radius.' : `Move within ${RADIUS_METERS} m of the site to punch.`,
+    accuracy);
+  updatePunchButtons();
+}
+function handleErr(err) {
+  document.getElementById('refreshLocBtn').classList.remove('spinning');
+  currentPos = null;
+  setLocUI(err.code === 1 ? 'denied' : 'bad', null,
+    err.code === 1 ? 'Allow location access in your browser settings to punch in or out.' : (err.message || 'Could not determine your location.'));
+  updatePunchButtons();
+}
+function startLocationWatch() {
+  if (!navigator.geolocation) { setLocUI('unsupported', null, 'This device or browser does not support location services.'); updatePunchButtons(); return; }
+  setLocUI('checking', null, 'Fetching your current position…');
+  document.getElementById('refreshLocBtn').classList.add('spinning');
+  navigator.geolocation.getCurrentPosition(handlePos, handleErr, { enableHighAccuracy:true, timeout:12000, maximumAge:0 });
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = navigator.geolocation.watchPosition(handlePos, handleErr, { enableHighAccuracy:true, timeout:15000, maximumAge:10000 });
+}
+document.getElementById('refreshLocBtn').onclick = () => {
+  document.getElementById('refreshLocBtn').classList.add('spinning');
+  navigator.geolocation.getCurrentPosition(handlePos, handleErr, { enableHighAccuracy:true, timeout:12000, maximumAge:0 });
+};
+
+/* ---------- Today status & punch ---------- */
+async function loadToday() {
+  const { data, error } = await sb.from('attendance_punches').select('*')
+    .eq('staff_id', currentUser.id).eq('punch_date', todayStr()).maybeSingle();
+  if (error) { console.error(error); return; }
+  todayRow = data || null;
+  document.getElementById('todayIn').textContent = todayRow ? fmtTime(todayRow.punch_in) : '—';
+  document.getElementById('todayOut').textContent = todayRow ? fmtTime(todayRow.punch_out) : '—';
+  document.getElementById('todayDur').textContent = todayRow ? fmtDur(todayRow.punch_in, todayRow.punch_out) : '—';
+  updatePunchButtons();
+  manageElapsedTimer();
+}
+function manageElapsedTimer() {
+  clearInterval(elapsedTimer);
+  const wrap = document.getElementById('elapsedWrap');
+  if (todayRow && todayRow.punch_in && !todayRow.punch_out) {
+    wrap.classList.remove('hidden');
+    const tick = () => {
+      const mins = Math.max(0, Math.round((Date.now() - new Date(todayRow.punch_in)) / 60000));
+      document.getElementById('elapsedVal').textContent = Math.floor(mins/60) + 'h ' + (mins%60) + 'm';
+    };
+    tick();
+    elapsedTimer = setInterval(tick, 30000);
+  } else {
+    wrap.classList.add('hidden');
+  }
+}
+function updatePunchButtons() {
+  const inRange = currentPos && currentPos.distance <= RADIUS_METERS;
+  const hasIn = !!(todayRow && todayRow.punch_in);
+  const hasOut = !!(todayRow && todayRow.punch_out);
+  const btn = document.getElementById('punchBtn');
+  const icon = document.getElementById('punchBtnIcon');
+  const label = document.getElementById('punchBtnLabel');
+  const sub = document.getElementById('punchBtnSub');
+  const hint = document.getElementById('punchHint');
+
+  const wantOut = hasIn && !hasOut;
+  btn.classList.toggle('out', wantOut);
+  label.textContent = wantOut ? 'Punch Out' : 'Punch In';
+  icon.innerHTML = wantOut
+    ? '<circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>'
+    : '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>';
+
+  if (hasIn && hasOut) {
+    btn.disabled = true; sub.textContent = 'shift completed';
+    hint.textContent = "You've completed today's shift.";
+  } else if (!inRange) {
+    btn.disabled = true; sub.textContent = 'move closer to site';
+    hint.textContent = currentPos ? `You're ${currentPos.distance} m away — get within ${RADIUS_METERS} m to punch.` : 'Waiting for your location…';
+  } else {
+    btn.disabled = false;
+    sub.textContent = wantOut ? 'tap to end shift' : 'tap to start shift';
+    hint.textContent = '';
+  }
+}
+
+document.getElementById('punchBtn').onclick = async () => {
+  const errEl = document.getElementById('punchErr'); errEl.textContent = '';
+  if (!currentPos || currentPos.distance > RADIUS_METERS) { errEl.textContent = 'You must be at the work location to punch.'; return; }
+  const btn = document.getElementById('punchBtn');
+  btn.disabled = true;
+  try {
+    if (!todayRow || !todayRow.punch_in) {
+      const { error } = await sb.from('attendance_punches').insert({
+        staff_id: currentUser.id, username: currentUser.username, name: currentUser.name,
+        punch_date: todayStr(), punch_in: new Date().toISOString(),
+        punch_in_lat: currentPos.lat, punch_in_lng: currentPos.lng
+      });
+      if (error) throw error;
+    } else if (!todayRow.punch_out) {
+      const { error } = await sb.from('attendance_punches').update({
+        punch_out: new Date().toISOString(),
+        punch_out_lat: currentPos.lat, punch_out_lng: currentPos.lng
+      }).eq('id', todayRow.id);
+      if (error) throw error;
+    }
+    await loadToday();
+  } catch (err) {
+    errEl.textContent = err.message || 'Something went wrong. Please try again.';
+  } finally {
+    updatePunchButtons();
+  }
+};
+
+/* ---------- History ---------- */
+let currentHistDays = 7;
+document.querySelectorAll('#histFilters .chip').forEach(chip => {
+  chip.onclick = () => {
+    document.querySelectorAll('#histFilters .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    currentHistDays = Number(chip.dataset.days);
+    loadHistory(currentHistDays);
+  };
+});
+async function loadHistory(days) {
+  const listEl = document.getElementById('historyList');
+  listEl.innerHTML = '<div class="center-loading"><div class="spinner"></div></div>';
+  const from = new Date(); from.setDate(from.getDate() - (days - 1));
+  const { data, error } = await sb.from('attendance_punches').select('*')
+    .eq('staff_id', currentUser.id).gte('punch_date', from.toISOString().slice(0,10))
+    .order('punch_date', { ascending: false });
+  if (error) { listEl.innerHTML = `<p class="err">${error.message}</p>`; return; }
+  if (!data || !data.length) {
+    listEl.innerHTML = `<div class="empty-state">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      <p>No attendance records in this period.</p></div>`;
+    return;
+  }
+  listEl.innerHTML = '';
+  data.forEach(p => {
+    const complete = p.punch_in && p.punch_out;
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    div.innerHTML = `
+      <div class="hist-bar ${complete ? '' : 'incomplete'}"></div>
+      <div class="hist-main">
+        <div class="hist-date">${fmtDate(p.punch_date)}</div>
+        <div class="hist-times">${fmtTime(p.punch_in)} – ${fmtTime(p.punch_out)}</div>
+      </div>
+      <div class="hist-dur">${fmtDur(p.punch_in, p.punch_out)}</div>`;
+    listEl.appendChild(div);
+  });
+}
+
+/* ---------- Statistics ---------- */
+async function loadStats() {
+  const body = document.getElementById('statsBody');
+  body.innerHTML = '<div class="center-loading"><div class="spinner"></div></div>';
+  const from = new Date(); from.setDate(from.getDate() - 364);
+  const { data, error } = await sb.from('attendance_punches').select('*')
+    .eq('staff_id', currentUser.id).gte('punch_date', from.toISOString().slice(0,10))
+    .order('punch_date', { ascending: false });
+  if (error) { body.innerHTML = `<p class="err">${error.message}</p>`; return; }
+  const rows = data || [];
+
+  const nowMonthKey = new Date().toISOString().slice(0,7);
+  const monthRows = rows.filter(r => r.punch_date.slice(0,7) === nowMonthKey);
+  const completedAll = rows.filter(r => r.punch_in && r.punch_out);
+  const completedMonth = monthRows.filter(r => r.punch_in && r.punch_out);
+
+  const sumMins = (arr) => arr.reduce((s,r) => s + (minsBetween(r.punch_in, r.punch_out) || 0), 0);
+  const fmtHrs = (mins) => (mins/60).toFixed(1) + ' h';
+  const avgClockMins = (arr, field) => {
+    const vals = arr.filter(r => r[field]).map(r => {
+      const d = new Date(r[field]); return d.getHours()*60 + d.getMinutes();
+    });
+    if (!vals.length) return null;
+    return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+  };
+  const fmtClock = (mins) => {
+    if (mins == null) return '—';
+    const h = Math.floor(mins/60), m = mins%60;
+    const ap = h >= 12 ? 'PM' : 'AM';
+    const h12 = ((h % 12) || 12);
+    return `${h12}:${String(m).padStart(2,'0')} ${ap}`;
+  };
+
+  const monthTotalMins = sumMins(completedMonth);
+  const monthAvgMins = completedMonth.length ? Math.round(monthTotalMins/completedMonth.length) : 0;
+  const allTotalMins = sumMins(completedAll);
+
+  body.innerHTML = `
+    <div class="stat-section-title">This Month</div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-val">${monthRows.length}</div><div class="stat-label">Days present</div></div>
+      <div class="stat-box"><div class="stat-val">${fmtHrs(monthTotalMins)}</div><div class="stat-label">Total hours logged</div></div>
+      <div class="stat-box"><div class="stat-val">${completedMonth.length ? fmtHrs(monthAvgMins) : '—'}</div><div class="stat-label">Average hours / day</div></div>
+      <div class="stat-box"><div class="stat-val">${fmtClock(avgClockMins(monthRows,'punch_in'))}</div><div class="stat-label">Average punch-in time</div></div>
+    </div>
+    <div class="stat-section-title">Last 12 Months</div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-val">${rows.length}</div><div class="stat-label">Total days present</div></div>
+      <div class="stat-box"><div class="stat-val">${fmtHrs(allTotalMins)}</div><div class="stat-label">Total hours logged</div></div>
+      <div class="stat-box"><div class="stat-val">${fmtClock(avgClockMins(rows,'punch_in'))}</div><div class="stat-label">Average punch-in time</div></div>
+      <div class="stat-box"><div class="stat-val">${fmtClock(avgClockMins(rows,'punch_out'))}</div><div class="stat-label">Average punch-out time</div></div>
+    </div>`;
+}
+
+/* ---------- Init ---------- */
+document.getElementById('todayDate').textContent = new Date().toLocaleDateString([], {weekday:'long', day:'2-digit', month:'short'});
+startLocationWatch();
+loadToday();
+</script>
+</body>
+</html>
