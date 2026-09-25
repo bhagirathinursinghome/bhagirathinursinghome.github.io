@@ -188,7 +188,7 @@
 "use strict";
 
 // 1. Role guard — anyone whose job includes attendance
-BNH_PAGE.requireRole(["admin","staff","marketing","ward"]);
+BNH_PAGE.requireRole(["*"]);
 
 const sb = BNH_PAGE.sb;
 const currentUser = BNH_PAGE.user;
