@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Attendance</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .attn-tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+    .attn-tab{padding:.5rem 1rem;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:.9rem}
+    .attn-tab.active{background:#2c3e50;color:#fff;border-color:#2c3e50}
+    .attn-panel{display:none}
+    .attn-panel.active{display:block}
+    table.attn-table{width:100%;border-collapse:collapse;margin-top:1rem;font-size:.9rem}
+    table.attn-table th, table.attn-table td{border:1px solid #ddd;padding:.5rem .6rem;text-align:left}
+    table.attn-table th{background:#f4f4f4}
+    tr.row-absent{background:#fdecea}
+    tr.row-incomplete{background:#fff8e1}
+    .badge{display:inline-block;padding:.15rem .5rem;border-radius:10px;font-size:.78rem;font-weight:600}
+    .badge-present{background:#e3f5e6;color:#1f8a3b}
+    .badge-absent{background:#fbe0dd;color:#c0392b}
+    .badge-incomplete{background:#fff1c2;color:#8a6d1f}
+    .badge-role{background:#e5f0f6;color:#0a4763}
+    .attn-row{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:.5rem}
+    .attn-row > div{display:flex;flex-direction:column}
+    .attn-row label{font-size:.8rem;margin-bottom:.2rem}
+    .stat-cards{display:flex;gap:1rem;flex-wrap:wrap;margin:1rem 0}
+    .stat-card{flex:1;min-width:140px;border:1px solid #ddd;border-radius:8px;padding:.75rem 1rem}
+    .stat-card .num{font-size:1.4rem;font-weight:700}
+    .stat-card .lbl{font-size:.8rem;color:#666}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>📍 Staff Attendance</h1>
+
+  <div class="attn-tabs">
+    <div class="attn-tab active" data-tab="dashboard">Daily Dashboard</div>
+    <div class="attn-tab" data-tab="timeline">Staff Timeline &amp; Stats</div>
+  </div>
+
+  <!-- ===== DAILY DASHBOARD ===== -->
+  <div class="attn-panel active" id="panel-dashboard">
+    <div class="page-card">
+      <div class="attn-row">
+        <div>
+          <label>Date</label>
+          <input type="date" id="dashDate" />
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="dashRole">
+            <option value="">All</option>
+            <option value="admin">Admin</option>
+            <option value="accountant">Accountant</option>
+            <option value="reception">Reception</option>
+            <option value="ot">OT</option>
+            <option value="pharmacy">Pharmacy</option>
+            <option value="lab">Lab</option>
+            <option value="manager">Manager</option>
+            <option value="viewer">Viewer</option>
+            <option value="other">Other</option>
+            <option value="staff">Staff</option>
+            <option value="marketing">Marketing</option>
+            <option value="ward">Ward</option>
+          </select>
+        </div>
+        <div><button class="btn-primary" style="width:auto" id="loadDashBtn">Load</button></div>
+      </div>
+
+      <div class="stat-cards" id="dashStats"></div>
+
+      <table class="attn-table">
+        <thead><tr><th>Name</th><th>Category</th><th>Punch In</th><th>Punch Out</th><th>Duration</th><th>Status</th></tr></thead>
+        <tbody id="dashBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== TIMELINE & STATS ===== -->
+  <div class="attn-panel" id="panel-timeline">
+    <div class="page-card">
+      <div class="attn-row">
+        <div>
+          <label>Staff</label>
+          <select id="tlStaff"></select>
+        </div>
+        <div>
+          <label>From</label>
+          <input type="date" id="tlFrom" />
+        </div>
+        <div>
+          <label>To</label>
+          <input type="date" id="tlTo" />
+        </div>
+        <div><button class="btn-primary" style="width:auto" id="loadTlBtn">Load</button></div>
+      </div>
+
+      <div class="stat-cards" id="tlStats"></div>
+
+      <table class="attn-table">
+        <thead><tr><th>Date</th><th>Punch In</th><th>Punch Out</th><th>Duration</th><th>Status</th></tr></thead>
+        <tbody id="tlBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- REQUIRED scripts, in this order -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+BNH_PAGE.requireRole(["admin", "manager"]);
+
+// Roles that show up as "attendance staff" in this dashboard — everyone
+const ATTENDANCE_ROLES = ["admin","accountant","reception","ot","pharmacy","lab","manager","viewer","other","staff","marketing","ward"];
+
+const spinner = document.getElementById('spinner');
+const showSpin = () => spinner.classList.remove('hidden');
+const hideSpin = () => spinner.classList.add('hidden');
+
+const todayStr = () => new Date().toISOString().slice(0,10);
+const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
+const fmtDur = (inIso, outIso) => {
+  if (!inIso || !outIso) return '—';
+  const mins = Math.round((new Date(outIso) - new Date(inIso)) / 60000);
+  const h = Math.floor(mins/60), m = mins%60;
+  return h + 'h ' + m + 'm';
+};
+const capitalize = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '—';
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll('.attn-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.attn-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.attn-panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'dashboard') loadDashboard();
+    if (tab.dataset.tab === 'timeline') loadTimeline();
+  };
+});
+
+/* ---------- Daily dashboard ---------- */
+document.getElementById('dashDate').value = todayStr();
+document.getElementById('loadDashBtn').onclick = loadDashboard;
+
+async function loadDashboard() {
+  showSpin();
+  try {
+    const date = document.getElementById('dashDate').value || todayStr();
+    const roleFilter = document.getElementById('dashRole').value;
+    const roles = roleFilter ? [roleFilter] : ATTENDANCE_ROLES;
+
+    const { data: staff, error: sErr } = await BNH_PAGE.sb.from('app_users')
+      .select('id,name,role').in('role', roles).eq('status', 'active').order('name');
+    if (sErr) throw sErr;
+    const { data: punches, error: pErr } = await BNH_PAGE.sb.from('attendance_punches').select('*').eq('punch_date', date);
+    if (pErr) throw pErr;
+
+    const byStaff = {};
+    (punches || []).forEach(p => byStaff[p.staff_id] = p);
+
+    const body = document.getElementById('dashBody');
+    body.innerHTML = '';
+    let present = 0, absent = 0, incomplete = 0;
+
+    (staff || []).forEach(s => {
+      const p = byStaff[s.id];
+      const tr = document.createElement('tr');
+      let statusHtml, rowClass = '';
+      if (!p || !p.punch_in) {
+        statusHtml = '<span class="badge badge-absent">Absent</span>';
+        rowClass = 'row-absent'; absent++;
+      } else if (!p.punch_out) {
+        statusHtml = '<span class="badge badge-incomplete">In progress</span>';
+        rowClass = 'row-incomplete'; incomplete++;
+      } else {
+        statusHtml = '<span class="badge badge-present">Present</span>';
+        present++;
+      }
+      tr.className = rowClass;
+      tr.innerHTML = `<td>${s.name}</td><td><span class="badge badge-role">${capitalize(s.role)}</span></td>
+        <td>${p ? fmtTime(p.punch_in) : '—'}</td>
+        <td>${p ? fmtTime(p.punch_out) : '—'}</td>
+        <td>${p ? fmtDur(p.punch_in, p.punch_out) : '—'}</td>
+        <td>${statusHtml}</td>`;
+      body.appendChild(tr);
+    });
+
+    document.getElementById('dashStats').innerHTML = `
+      <div class="stat-card"><div class="num">${(staff||[]).length}</div><div class="lbl">Total Staff</div></div>
+      <div class="stat-card"><div class="num">${present}</div><div class="lbl">Present</div></div>
+      <div class="stat-card"><div class="num">${incomplete}</div><div class="lbl">In Progress</div></div>
+      <div class="stat-card"><div class="num">${absent}</div><div class="lbl">Absent</div></div>`;
+  } catch (err) {
+    alert(err.message);
+  } finally { hideSpin(); }
+}
+document.getElementById('dashRole').onchange = loadDashboard;
+
+/* ---------- Staff timeline & stats ---------- */
+async function populateStaffDropdown() {
+  const { data } = await BNH_PAGE.sb.from('app_users')
+    .select('id,name,role').in('role', ATTENDANCE_ROLES).eq('status', 'active').order('name');
+  const sel = document.getElementById('tlStaff');
+  sel.innerHTML = '';
+  (data || []).forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id; opt.textContent = `${s.name} (${capitalize(s.role)})`;
+    sel.appendChild(opt);
+  });
+}
+
+function defaultRange() {
+  const to = new Date();
+  const from = new Date(); from.setDate(from.getDate() - 29);
+  document.getElementById('tlFrom').value = from.toISOString().slice(0,10);
+  document.getElementById('tlTo').value = to.toISOString().slice(0,10);
+}
+defaultRange();
+
+document.getElementById('loadTlBtn').onclick = loadTimeline;
+
+async function loadTimeline() {
+  const staffId = document.getElementById('tlStaff').value;
+  if (!staffId) return;
+  showSpin();
+  try {
+    const from = document.getElementById('tlFrom').value;
+    const to = document.getElementById('tlTo').value;
+    const { data: punches, error } = await BNH_PAGE.sb.from('attendance_punches').select('*')
+      .eq('staff_id', staffId).gte('punch_date', from).lte('punch_date', to).order('punch_date', {ascending:false});
+    if (error) throw error;
+
+    // Build full date range so absent days show too
+    const byDate = {};
+    (punches || []).forEach(p => byDate[p.punch_date] = p);
+    const dates = [];
+    let d = new Date(to);
+    const start = new Date(from);
+    while (d >= start) { dates.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()-1); }
+
+    const body = document.getElementById('tlBody');
+    body.innerHTML = '';
+    let presentDays = 0, absentDays = 0, totalMins = 0;
+
+    dates.forEach(date => {
+      const p = byDate[date];
+      const tr = document.createElement('tr');
+      let statusHtml, rowClass = '';
+      if (!p || !p.punch_in) {
+        statusHtml = '<span class="badge badge-absent">Absent</span>';
+        rowClass = 'row-absent'; absentDays++;
+      } else if (!p.punch_out) {
+        statusHtml = '<span class="badge badge-incomplete">In progress</span>';
+        rowClass = 'row-incomplete'; presentDays++;
+      } else {
+        statusHtml = '<span class="badge badge-present">Present</span>';
+        presentDays++;
+        totalMins += Math.round((new Date(p.punch_out) - new Date(p.punch_in)) / 60000);
+      }
+      tr.className = rowClass;
+      tr.innerHTML = `<td>${date}</td><td>${p ? fmtTime(p.punch_in) : '—'}</td>
+        <td>${p ? fmtTime(p.punch_out) : '—'}</td>
+        <td>${p ? fmtDur(p.punch_in, p.punch_out) : '—'}</td>
+        <td>${statusHtml}</td>`;
+      body.appendChild(tr);
+    });
+
+    const avgMins = presentDays ? Math.round(totalMins / presentDays) : 0;
+    document.getElementById('tlStats').innerHTML = `
+      <div class="stat-card"><div class="num">${presentDays}</div><div class="lbl">Days Present</div></div>
+      <div class="stat-card"><div class="num">${absentDays}</div><div class="lbl">Days Absent</div></div>
+      <div class="stat-card"><div class="num">${Math.floor(totalMins/60)}h ${totalMins%60}m</div><div class="lbl">Total Hours</div></div>
+      <div class="stat-card"><div class="num">${Math.floor(avgMins/60)}h ${avgMins%60}m</div><div class="lbl">Avg / Present Day</div></div>`;
+  } catch (err) {
+    alert(err.message);
+  } finally { hideSpin(); }
+}
+
+/* ---------- Init ---------- */
+(async function init() {
+  await loadDashboard();
+  await populateStaffDropdown();
+})();
+</script>
+</body>
+</html>
