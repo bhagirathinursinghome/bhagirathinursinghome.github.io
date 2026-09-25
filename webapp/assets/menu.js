@@ -112,7 +112,7 @@
       label: "Attendance Punch", 
       icon: "🕐", 
       page: "pages/attendance_punch.html", 
-      roles: ["admin","viewer", "manager"],
+      roles: ["*"],
       group: "Employees"
     },
     {
