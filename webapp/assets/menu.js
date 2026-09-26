@@ -58,7 +58,7 @@
       label: "Refer Payment",
       icon: "💵",
       page: "pages/refer_payment_by_case.html",
-      roles: ["admin", "accountant"],
+      roles: ["admin", "accountant", "manager"],
       group: "Voucher"
    },
     {
