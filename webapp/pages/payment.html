@@ -37,6 +37,24 @@
                  font-size:.85rem; font-weight:600; color:#4338ca; background:#fff; transition:all .18s; }
     .mode-chip.active { background:#6366f1; color:#fff; border-color:#6366f1; }
 
+
+    /* voucher no. with auto-prefix */
+    .vno-wrap { display:flex; align-items:stretch; }
+    .vno-pfx { display:flex; align-items:center; padding:0 .7rem; background:#e0e7ff; color:#3730a3;
+               font-weight:800; border:1px solid #cbd5e1; border-right:none; border-radius:6px 0 0 6px; }
+    .vno-pfx.off { background:#f1f5f9; color:#94a3b8; text-decoration:line-through; }
+    .vno-wrap input { flex:1; min-width:0; border-radius:0 6px 6px 0 !important; }
+    .vno-auto { display:flex !important; align-items:center; gap:.4rem; font-weight:500 !important;
+                font-size:.8rem !important; margin:.35rem 0 0 !important; cursor:pointer; color:#475569 !important; }
+    .vno-auto input { width:auto !important; margin:0; padding:0 !important; }
+
+    /* PhonePe screenshot (optional) */
+    .shot-box { display:none; margin-top:.6rem; padding:.55rem .7rem; background:#f5f3ff; border:1px dashed #a5b4fc; border-radius:8px; }
+    .shot-box.on { display:block; }
+    .shot-box label { margin-bottom:.35rem !important; font-size:.8rem !important; }
+    .shot-box input[type=file] { padding:.35rem !important; font-size:.8rem !important; background:#fff; }
+    .shot-prev { display:none; max-width:140px; max-height:180px; margin-top:.5rem; border:1px solid #cbd5e1; border-radius:6px; }
+    .shot-prev.on { display:block; }
     .voucher-badge { font-size:.8rem; margin-top:.35rem; min-height:1.1em; }
     .due-box { background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:.6rem .9rem;
                margin:.6rem 0; font-size:.86rem; }
@@ -116,7 +134,12 @@
         must use a voucher number that already exists here — this is what lets you spot a missed voucher
         (a blank row) and stops the same voucher number being reused for two different parties.
       </p>
-      <div class="form-row" style="max-width:520px">
+      <p style="font-size:.82rem;color:#4338ca;margin-bottom:.75rem">
+        Prefix is optional. e.g. Prefix <b>D</b>, 1 → 500 creates D1…D500 (doctor payments);
+        Prefix <b>B</b> creates B1…B500 (refer payments). Leave prefix blank for plain numbers.
+      </p>
+      <div class="form-row" style="max-width:640px">
+        <div style="flex:0 0 110px;min-width:90px"><label>Prefix</label><input id="rangePrefix" maxlength="5" placeholder="D / B" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')"/></div>
         <div><label>Start No. <span class="req">*</span></label><input id="rangeStart" type="number"/></div>
         <div><label>End No. <span class="req">*</span></label><input id="rangeEnd" type="number"/></div>
         <div style="flex:0"><button class="btn-primary" style="width:auto;white-space:nowrap" onclick="generateRange()">Generate</button></div>
@@ -134,6 +157,7 @@
     <div class="page-card">
       <h2 style="font-size:1rem;margin-bottom:.75rem">📋 Voucher Tracker</h2>
       <div class="form-row" style="margin-bottom:.75rem">
+        <div style="flex:0 0 110px;min-width:90px"><label>Prefix</label><input id="trackPrefix" maxlength="5" placeholder="all" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')"/></div>
         <div><label>From No.</label><input id="trackFrom" type="number"/></div>
         <div><label>To No.</label><input id="trackTo" type="number"/></div>
         <div>
@@ -145,6 +169,7 @@
           </select>
         </div>
         <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="loadTracker()">Show</button></div>
+        <div style="flex:0"><button class="btn-primary" style="width:auto;white-space:nowrap;background:#059669" onclick="downloadTrackerExcel()">⬇️ Excel</button></div>
       </div>
       <div id="trackOut">Enter a range and click Show.</div>
     </div>
@@ -248,25 +273,128 @@ function switchMainTab(id, btn){
 }
 
 // ── shared mode-chip helper ──────────────────────────────────
+
+// ── PhonePe screenshot (optional) ────────────────────────────
+const SHOT_BUCKET = 'payment-screenshots';
+function shotBoxHtml(p){
+  return `<div class="shot-box" id="${p}ShotBox">
+    <label>📸 PhonePe screenshot <span style="font-weight:400">(optional)</span></label>
+    <input type="file" id="${p}Shot" accept="image/*" onchange="shotPreview('${p}')"/>
+    <img id="${p}ShotPrev" class="shot-prev" alt="preview"/></div>`;
+}
+function shotToggle(p, val){
+  const box = document.getElementById(p+'ShotBox'); if (!box) return;
+  box.classList.toggle('on', val === 'PhonePe');
+  if (val !== 'PhonePe') shotClear(p);
+}
+function shotClear(p){
+  const f = document.getElementById(p+'Shot'), im = document.getElementById(p+'ShotPrev');
+  if (f) f.value=''; if (im){ im.classList.remove('on'); im.removeAttribute('src'); }
+}
+function shotPreview(p){
+  const f = document.getElementById(p+'Shot'), im = document.getElementById(p+'ShotPrev');
+  const file = f.files && f.files[0];
+  if (!file) { shotClear(p); return; }
+  if (!file.type.startsWith('image/')) { alert('Please choose an image file (JPG / PNG).'); shotClear(p); return; }
+  if (file.size > 15*1024*1024) { alert('Image is larger than 15 MB.'); shotClear(p); return; }
+  im.src = URL.createObjectURL(file); im.classList.add('on');
+}
+// shrink phone screenshots before upload (max 1400px, JPEG) so uploads stay fast on slow networks
+function shotCompress(file){
+  return new Promise((res, rej)=>{
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = ()=>{
+      const sc = Math.min(1, 1400/Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b=>{ URL.revokeObjectURL(url); b ? res(b) : rej(new Error('Could not process image')); }, 'image/jpeg', 0.8);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); rej(new Error('Not a valid image')); };
+    img.src = url;
+  });
+}
+// call AFTER the payment rows are saved. Never throws — a failed upload only adds a warning.
+async function saveShot(p, voucher, okEl){
+  const f = document.getElementById(p+'Shot'), mode = document.getElementById(p+'Mode').value;
+  if (!f || !f.files || !f.files[0] || mode !== 'PhonePe') return;
+  try{
+    const blob = await shotCompress(f.files[0]);
+    const path = `${String(voucher).replace(/[^A-Za-z0-9_-]/g,'_')}/${Date.now()}.jpg`;
+    const up = await sb.storage.from(SHOT_BUCKET).upload(path, blob, { contentType:'image/jpeg' });
+    if (up.error) throw up.error;
+    const { data: old } = await sb.from('voucher_screenshots').select('file_path').eq('voucher_no', voucher).maybeSingle();
+    const { error } = await sb.from('voucher_screenshots').upsert({
+      voucher_no: voucher, file_path: path,
+      uploaded_by: BNH_PAGE.user.username, uploaded_by_name: BNH_PAGE.user.name, uploaded_at: new Date().toISOString()
+    }, { onConflict:'voucher_no' });
+    if (error) throw error;
+    if (old && old.file_path && old.file_path !== path) await sb.storage.from(SHOT_BUCKET).remove([old.file_path]);
+    shotClear(p);
+    if (okEl) okEl.textContent += ' 📸 Screenshot attached.';
+  } catch(ex){
+    if (okEl) okEl.textContent += ' ⚠️ Payment saved, but the screenshot could not be uploaded: ' + ex.message;
+  }
+}
+
 function modeChipsHtml(prefix){
   return `<div class="mode-chips">
       <div class="mode-chip" onclick="selectMode(this,'${prefix}','Cash')">💵 Cash</div>
       <div class="mode-chip" onclick="selectMode(this,'${prefix}','Bank')">🏦 Bank</div>
       <div class="mode-chip" onclick="selectMode(this,'${prefix}','PhonePe')">📱 PhonePe</div>
-    </div><input type="hidden" id="${prefix}Mode"/>`;
+    </div><input type="hidden" id="${prefix}Mode"/>${shotBoxHtml(prefix)}`;
 }
 function selectMode(el, prefix, val){
   el.parentElement.querySelectorAll('.mode-chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
   document.getElementById(prefix+'Mode').value = val;
+  shotToggle(prefix, val);
 }
+
+
+// ── voucher prefix helpers ───────────────────────────────────
+// Auto-prefix: a purely numeric voucher no. gets the prefix put in front (e.g. 15 -> B15).
+// Untick "Auto prefix" to use the number exactly as typed. Anything with letters is kept as typed.
+function vnoResolve(inputId, cbId, pfx){
+  const inp = document.getElementById(inputId);
+  let v = ((inp && inp.value) || '').trim().toUpperCase().replace(/\s+/g,'');
+  const cb = document.getElementById(cbId);
+  if (v && cb && cb.checked && /^\d+$/.test(v)) v = pfx + v;
+  return v;
+}
+function vnoFieldHtml(inputId, cbId, pfxId, pfx, onblurJs){
+  return `<div class="vno-wrap"><span class="vno-pfx" id="${pfxId}">${pfx}</span>
+      <input id="${inputId}" autocomplete="off" onblur="${onblurJs}" oninput="this.value=this.value.toUpperCase()"/></div>
+    <label class="vno-auto"><input type="checkbox" id="${cbId}" checked
+      onchange="vnoToggle('${cbId}','${pfxId}');${onblurJs}"/> Auto prefix "${pfx}"</label>`;
+}
+function vnoToggle(cbId, pfxId){
+  const on = document.getElementById(cbId).checked;
+  document.getElementById(pfxId).classList.toggle('off', !on);
+}
+function vnoParse(v){
+  const m = /^([A-Za-z]*)(\d+)$/.exec(String(v||'').trim());
+  return m ? { p: m[1].toUpperCase(), n: parseInt(m[2],10) } : { p: String(v||''), n: NaN };
+}
+function vnoCompare(a, b){
+  const x = vnoParse(a), y = vnoParse(b);
+  if (x.p !== y.p) return x.p < y.p ? -1 : 1;
+  return (x.n||0) - (y.n||0);
+}
+
+// Which forms auto-prefix, and with what.  (form id-prefix -> letter)
+const VOUCHER_AUTO_PREFIX = { ir:'B', or:'B', dc:'D' };
+const voucherOf = fp => vnoResolve(fp+'Voucher', fp+'AutoPfx', VOUCHER_AUTO_PREFIX[fp]||'');
+const voucherField = fp => VOUCHER_AUTO_PREFIX[fp]
+  ? vnoFieldHtml(fp+'Voucher', fp+'AutoPfx', fp+'PfxBox', VOUCHER_AUTO_PREFIX[fp], `checkVoucher('${fp}')`)
+  : `<input id="${fp}Voucher" onblur="checkVoucher('${fp}')"/>`;
 
 // ── voucher-number live check ────────────────────────────────
 async function checkVoucher(prefix){
   const badge = document.getElementById(prefix+'VStatus');
   const vNoEl = document.getElementById(prefix+'Voucher');
   if (!badge || !vNoEl) return null;
-  const vNo = vNoEl.value.trim();
+  const vNo = voucherOf(prefix);
   if (!vNo) { badge.innerHTML=''; return null; }
   const { data } = await sb.from('payment_vouchers').select('*').eq('voucher_no', vNo).maybeSingle();
   if (!data) {
@@ -312,7 +440,7 @@ function formIpdRefer(){
     <div class="section-title" style="margin-top:0">🏥 IPD Refer Payment</div>
     <div class="form-row">
       <div><label>Voucher No <span class="req">*</span></label>
-        <input id="irVoucher" onblur="checkVoucher('ir')"/>
+        ${voucherField('ir')}
         <div class="voucher-badge" id="irVStatus"></div>
       </div>
       <div><label>Payment Date <span class="req">*</span></label><input id="irDate" type="date" value="${todayISO()}"/></div>
@@ -412,7 +540,7 @@ function irUpdateTotal(){
 async function saveIpdRefer(){
   const err = document.getElementById('irErr'), ok = document.getElementById('irOk');
   err.textContent=''; ok.style.display='none';
-  const voucher = document.getElementById('irVoucher').value.trim();
+  const voucher = voucherOf('ir');
   const date = document.getElementById('irDate').value;
   const mode = document.getElementById('irMode').value;
   const remark = document.getElementById('irRemark').value.trim() || null;
@@ -444,6 +572,7 @@ async function saveIpdRefer(){
     const { error } = await sb.from('ipd_refer_payments').insert(rows);
     if (error) throw error;
     ok.style.display='block'; ok.textContent = `✅ Saved ${rows.length} case(s) under Voucher ${voucher}.`;
+    await saveShot('ir', voucher, ok);
     document.getElementById('irRemark').value='';
     await loadIpdReferCases();
     await checkVoucher('ir');
@@ -460,7 +589,7 @@ function formOpdRefer(){
     <div class="section-title" style="margin-top:0">🚑 OPD Refer Payment</div>
     <div class="form-row">
       <div><label>Voucher No <span class="req">*</span></label>
-        <input id="orVoucher" onblur="checkVoucher('or')"/>
+        ${voucherField('or')}
         <div class="voucher-badge" id="orVStatus"></div>
       </div>
       <div><label>Payment Date <span class="req">*</span></label><input id="orDate" type="date" value="${todayISO()}"/></div>
@@ -558,7 +687,7 @@ function orUpdateTotal(){
 async function saveOpdRefer(){
   const err = document.getElementById('orErr'), ok = document.getElementById('orOk');
   err.textContent=''; ok.style.display='none';
-  const voucher = document.getElementById('orVoucher').value.trim();
+  const voucher = voucherOf('or');
   const date = document.getElementById('orDate').value;
   const mode = document.getElementById('orMode').value;
   const remark = document.getElementById('orRemark').value.trim() || null;
@@ -599,6 +728,7 @@ async function saveOpdRefer(){
       }
     }
     ok.style.display='block'; ok.textContent = `✅ Saved ${rows.length} case(s) under Voucher ${voucher}.`;
+    await saveShot('or', voucher, ok);
     document.getElementById('orRemark').value='';
     await loadOpdReferCases();
     await checkVoucher('or');
@@ -615,7 +745,7 @@ function formDoctor(){
     <div class="section-title" style="margin-top:0">👨‍⚕️ Doctor Payment</div>
     <div class="form-row">
       <div><label>Voucher No <span class="req">*</span></label>
-        <input id="dcVoucher" onblur="checkVoucher('dc')"/>
+        ${voucherField('dc')}
         <div class="voucher-badge" id="dcVStatus"></div>
       </div>
       <div><label>Payment Date <span class="req">*</span></label><input id="dcDate" type="date" value="${todayISO()}"/></div>
@@ -677,7 +807,7 @@ async function getDoctorDue(doctorId){
 async function saveDoctorPayment(){
   const err = document.getElementById('dcErr'), ok = document.getElementById('dcOk');
   err.textContent=''; ok.style.display='none';
-  const voucher = document.getElementById('dcVoucher').value.trim();
+  const voucher = voucherOf('dc');
   const date = document.getElementById('dcDate').value;
   const docId = document.getElementById('dcDoctor').value;
   const amount = parseFloat(document.getElementById('dcAmount').value||0);
@@ -703,6 +833,7 @@ async function saveDoctorPayment(){
     const { error } = await sb.from('ipd_doctor_payments').insert(payload);
     if (error) throw error;
     ok.style.display='block'; ok.textContent = '✅ Doctor payment saved.';
+    await saveShot('dc', voucher, ok);
     document.getElementById('dcAmount').value=''; document.getElementById('dcRemark').value='';
     await onDoctorSelect();
     await checkVoucher('dc');
@@ -719,7 +850,7 @@ function formLabAgent(){
     <div class="section-title" style="margin-top:0">🧪 Lab Agent Payment</div>
     <div class="form-row">
       <div><label>Voucher No <span class="req">*</span></label>
-        <input id="laVoucher" onblur="checkVoucher('la')"/>
+        ${voucherField('la')}
         <div class="voucher-badge" id="laVStatus"></div>
       </div>
       <div><label>Payment Date <span class="req">*</span></label><input id="laDate" type="date" value="${todayISO()}"/></div>
@@ -768,7 +899,7 @@ async function getAgentDue(agentId){
 async function saveLabAgentPayment(){
   const err = document.getElementById('laErr'), ok = document.getElementById('laOk');
   err.textContent=''; ok.style.display='none';
-  const voucher = document.getElementById('laVoucher').value.trim();
+  const voucher = voucherOf('la');
   const date = document.getElementById('laDate').value;
   const agentId = document.getElementById('laAgent').value;
   const amount = parseFloat(document.getElementById('laAmount').value||0);
@@ -794,6 +925,7 @@ async function saveLabAgentPayment(){
     const { error } = await sb.from('lab_agent_payment').insert(payload);
     if (error) throw error;
     ok.style.display='block'; ok.textContent = '✅ Lab agent payment saved.';
+    await saveShot('la', voucher, ok);
     document.getElementById('laAmount').value=''; document.getElementById('laRemark').value='';
     await onAgentSelect();
     await checkVoucher('la');
@@ -812,7 +944,7 @@ function formSalary(){
     <div class="section-title" style="margin-top:0">💵 Salary Payment</div>
     <div class="form-row">
       <div><label>Voucher No <span class="req">*</span></label>
-        <input id="syVoucher" onblur="checkVoucher('sy')"/>
+        ${voucherField('sy')}
         <div class="voucher-badge" id="syVStatus"></div>
       </div>
       <div><label>Payment Date <span class="req">*</span></label><input id="syDate" type="date" value="${todayISO()}"/></div>
@@ -849,16 +981,7 @@ async function getSalaryDue(empId, month, year){
   const { data: emp } = await sb.from('employees').select('*').eq('id',empId).single();
   const { data: bonus } = await sb.from('salary_bonuses').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
   const { data: absent } = await sb.from('salary_absent').select('absent_days').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
-  // Salary AS OF this month — use the latest salary_history entry with
-  // effective_date <= last day of the selected month, not the employee's
-  // current/live salary, so past months keep showing the salary that
-  // actually applied back then (appraisals should not apply retroactively).
-  const lastDayDate = new Date(year, month, 0);
-  const lastDay = `${year}-${String(month).padStart(2,'0')}-${String(lastDayDate.getDate()).padStart(2,'0')}`;
-  const { data: histRows } = await sb.from('salary_history')
-    .select('salary,effective_date').eq('employee_id',empId)
-    .lte('effective_date', lastDay).order('effective_date', { ascending:false }).limit(1);
-  const gross = (histRows && histRows.length) ? parseFloat(histRows[0].salary||0) : parseFloat(emp.salary||0);
+  const gross = parseFloat(emp.salary||0);
   const absentDays = absent?.absent_days || 0;
   const deductDays = Math.max(0, absentDays - 4);
   const deduction = Math.round(((gross/26)*deductDays)/10)*10;
@@ -883,7 +1006,7 @@ async function onEmpSelect(){
 async function saveSalaryPayment(){
   const err = document.getElementById('syErr'), ok = document.getElementById('syOk');
   err.textContent=''; ok.style.display='none';
-  const voucher = document.getElementById('syVoucher').value.trim();
+  const voucher = voucherOf('sy');
   const date = document.getElementById('syDate').value;
   const empId = document.getElementById('syEmp').value;
   const month = parseInt(document.getElementById('syMonth').value);
@@ -911,6 +1034,7 @@ async function saveSalaryPayment(){
     const { error } = await sb.from('salary_payments').insert(payload);
     if (error) throw error;
     ok.style.display='block'; ok.textContent = '✅ Salary payment saved.';
+    await saveShot('sy', voucher, ok);
     document.getElementById('syAmount').value=''; document.getElementById('syRemark').value='';
     await onEmpSelect();
     await checkVoucher('sy');
@@ -927,7 +1051,7 @@ function formCreditor(){
     <div class="section-title" style="margin-top:0">🏦 Creditor Payment</div>
     <div class="form-row">
       <div><label>Voucher No <span class="req">*</span></label>
-        <input id="crVoucher" onblur="checkVoucher('cr')"/>
+        ${voucherField('cr')}
         <div class="voucher-badge" id="crVStatus"></div>
       </div>
       <div><label>Payment Date <span class="req">*</span></label><input id="crDate" type="date" value="${todayISO()}"/></div>
@@ -995,7 +1119,7 @@ async function onCreditorSelect(){
 async function saveCreditorPayment(){
   const err = document.getElementById('crErr'), ok = document.getElementById('crOk');
   err.textContent=''; ok.style.display='none';
-  const voucher = document.getElementById('crVoucher').value.trim();
+  const voucher = voucherOf('cr');
   const date = document.getElementById('crDate').value;
   const catId = document.getElementById('crCategory').value;
   const credId = document.getElementById('crCreditor').value;
@@ -1026,6 +1150,7 @@ async function saveCreditorPayment(){
     const { error } = await sb.from('credit_entries').insert(payload);
     if (error) throw error;
     ok.style.display='block'; ok.textContent = '✅ Creditor payment saved.';
+    await saveShot('cr', voucher, ok);
     document.getElementById('crAmount').value=''; document.getElementById('crDesc').value=''; document.getElementById('crRemark').value='';
     await onCreditorSelect();
     await checkVoucher('cr');
@@ -1042,7 +1167,7 @@ function formCash(){
     <div class="section-title" style="margin-top:0">💰 Cash Voucher</div>
     <div class="form-row">
       <div><label>Voucher No <span class="req">*</span></label>
-        <input id="cvVoucher" onblur="checkVoucher('cv')"/>
+        ${voucherField('cv')}
         <div class="voucher-badge" id="cvVStatus"></div>
       </div>
       <div><label>Payment Date <span class="req">*</span></label><input id="cvDate" type="date" value="${todayISO()}"/></div>
@@ -1072,7 +1197,7 @@ async function initCashForm(){
 async function saveCashVoucher(){
   const err = document.getElementById('cvErr'), ok = document.getElementById('cvOk');
   err.textContent=''; ok.style.display='none';
-  const voucher = document.getElementById('cvVoucher').value.trim();
+  const voucher = voucherOf('cv');
   const date = document.getElementById('cvDate').value;
   const category = document.getElementById('cvCategory').value || null;
   const party = document.getElementById('cvParty').value.trim();
@@ -1096,6 +1221,7 @@ async function saveCashVoucher(){
     const { error } = await sb.from('cash_vouchers').insert(payload);
     if (error) throw error;
     ok.style.display='block'; ok.textContent = '✅ Cash voucher saved.';
+    await saveShot('cv', voucher, ok);
     document.getElementById('cvParty').value=''; document.getElementById('cvAmount').value='';
     document.getElementById('cvDesc').value=''; document.getElementById('cvRemark').value='';
     await checkVoucher('cv');
@@ -1109,18 +1235,23 @@ async function saveCashVoucher(){
 async function generateRange(){
   const err = document.getElementById('rangeErr'), ok = document.getElementById('rangeOk');
   err.textContent=''; ok.textContent='';
+  const pfx = (document.getElementById('rangePrefix').value||'').trim().toUpperCase();
   const start = parseInt(document.getElementById('rangeStart').value);
   const end = parseInt(document.getElementById('rangeEnd').value);
+  if (pfx && !/^[A-Z]{1,5}$/.test(pfx)) { err.textContent='Prefix must be 1–5 letters (e.g. D or B).'; return; }
   if (!start || !end) { err.textContent='Enter both start and end numbers.'; return; }
   if (end < start) { err.textContent='End must be greater than or equal to start.'; return; }
   spin(true);
   try{
-    const { data, error } = await sb.rpc('generate_voucher_range', {
-      p_start: start, p_end: end, p_by: BNH_PAGE.user.username, p_by_name: BNH_PAGE.user.name
-    });
+    const args = { p_start: start, p_end: end, p_by: BNH_PAGE.user.username, p_by_name: BNH_PAGE.user.name };
+    // plain-number ranges keep using the original function; prefixed ranges use the new one
+    const { data, error } = pfx
+      ? await sb.rpc('generate_voucher_range_prefixed', { p_prefix: pfx, ...args })
+      : await sb.rpc('generate_voucher_range', args);
     if (error) throw error;
-    ok.textContent = `✅ Generated voucher numbers ${start} to ${end} (${data} new row(s) created).`;
+    ok.textContent = `✅ Generated voucher numbers ${pfx}${start} to ${pfx}${end} (${data} new row(s) created).`;
     document.getElementById('rangeStart').value=''; document.getElementById('rangeEnd').value='';
+    document.getElementById('rangePrefix').value='';
     await loadRangeHistory();
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
@@ -1129,28 +1260,77 @@ async function loadRangeHistory(){
   const box = document.getElementById('rangeHist');
   const { data, error } = await sb.from('voucher_ranges').select('*').order('created_at',{ascending:false}).limit(20);
   if (error || !data || !data.length) { box.textContent = 'No ranges generated yet.'; return; }
-  box.innerHTML = `<table><thead><tr><th>Start</th><th>End</th><th>New Rows</th><th>By</th><th>When</th></tr></thead>
-    <tbody>${data.map(r=>`<tr><td>${r.range_start}</td><td>${r.range_end}</td><td>${r.rows_created}</td>
+  box.innerHTML = `<table><thead><tr><th>Prefix</th><th>Start</th><th>End</th><th>New Rows</th><th>By</th><th>When</th></tr></thead>
+    <tbody>${data.map(r=>`<tr><td><b>${esc(r.range_prefix||'—')}</b></td><td>${r.range_start}</td><td>${r.range_end}</td><td>${r.rows_created}</td>
       <td>${esc(r.created_by_name||r.created_by||'')}</td><td>${new Date(r.created_at).toLocaleString('en-IN')}</td></tr>`).join('')}</tbody></table>`;
 }
 
 // ════════════════════════════════════════════════════════════
 // VOUCHER TRACKER TAB
 // ════════════════════════════════════════════════════════════
+let trackerShown = [], trackerShots = {};
+async function viewShot(voucherNo){
+  const path = trackerShots[voucherNo]; if (!path) return;
+  spin(true);
+  const { data, error } = await sb.storage.from(SHOT_BUCKET).createSignedUrl(path, 3600);
+  spin(false);
+  if (error) { alert('Could not open screenshot: ' + error.message); return; }
+  document.getElementById('pmModalBox').innerHTML = `
+    <button class="pm-close-btn" onclick="closeEditModal()">✕</button>
+    <h3>📸 PhonePe screenshot — Voucher ${esc(voucherNo)}</h3>
+    <div style="text-align:center"><img src="${data.signedUrl}" alt="screenshot" style="max-width:100%;max-height:70vh;border:1px solid #e2e8f0;border-radius:8px"/></div>
+    <p style="text-align:center;margin-top:.6rem"><a href="${data.signedUrl}" target="_blank" rel="noopener">Open full size ↗</a></p>`;
+  document.getElementById('pmModalOverlay').classList.remove('hidden');
+}
+function downloadTrackerExcel(){
+  if (!trackerShown.length) { alert('Click Show first — there are no vouchers on screen to download.'); return; }
+  const data = trackerShown.map(r=>({
+    'Voucher No': r.voucher_no, 'Status': r.status, 'Type': r.type||'', 'Party': r.party_name||'',
+    'Amount': r.amount ? parseFloat(r.amount) : '', 'Mode': r.mode||'', 'Payment Date': r.payment_date||'',
+    'Description': r.description||'', 'Screenshot': trackerShots[r.voucher_no] ? 'Yes' : (r.mode==='PhonePe' ? 'No' : '')
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [{wch:12},{wch:9},{wch:14},{wch:26},{wch:12},{wch:10},{wch:13},{wch:40},{wch:11}];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Vouchers');
+  const pfx = (document.getElementById('trackPrefix').value||'').trim().toUpperCase();
+  XLSX.writeFile(wb, `Vouchers${pfx?'_'+pfx:''}_${todayISO()}.xlsx`);
+}
 async function loadTracker(){
   const from = document.getElementById('trackFrom').value;
   const to = document.getElementById('trackTo').value;
   const status = document.getElementById('trackStatus').value;
   const out = document.getElementById('trackOut');
   out.textContent = 'Loading…';
-  let q = sb.from('payment_vouchers').select('*');
-  if (from) q = q.gte('voucher_no', from);
-  if (to)   q = q.lte('voucher_no', to);
-  if (status) q = q.eq('status', status);
-  const { data, error } = await q;
+  const tPfx = (document.getElementById('trackPrefix').value||'').trim().toUpperCase();
+  // fetch in pages of 1000 (Supabase default cap), filter prefix/number range client-side
+  let data = [], error = null;
+  for (let off = 0; ; off += 1000){
+    let q = sb.from('payment_vouchers').select('*').order('voucher_no').range(off, off+999);
+    if (tPfx) q = q.like('voucher_no', tPfx + '%');
+    if (status) q = q.eq('status', status);
+    const res = await q;
+    if (res.error) { error = res.error; break; }
+    data = data.concat(res.data||[]);
+    if (!res.data || res.data.length < 1000) break;
+  }
   if (error) { out.innerHTML = `<p class="err">${esc(error.message)}</p>`; return; }
-  const rows = (data||[]).sort((a,b)=>parseInt(a.voucher_no)-parseInt(b.voucher_no));
+  const fromN = from ? parseInt(from,10) : null, toN = to ? parseInt(to,10) : null;
+  const rows = data.filter(r=>{
+    const v = vnoParse(r.voucher_no);
+    if (tPfx && v.p !== tPfx) return false;       // 'D' must not also match 'DX12'
+    if (fromN!=null && !(v.n >= fromN)) return false;
+    if (toN!=null && !(v.n <= toN)) return false;
+    return true;
+  }).sort((a,b)=>vnoCompare(a.voucher_no,b.voucher_no));
   if (!rows.length) { out.textContent = 'No vouchers found for this filter.'; return; }
+  trackerShown = rows;
+  trackerShots = {};
+  for (let off = 0; ; off += 1000){
+    const res = await sb.from('voucher_screenshots').select('voucher_no,file_path').order('voucher_no').range(off, off+999);
+    if (res.error || !res.data) break;               // screenshots table missing → just show no screenshots
+    res.data.forEach(x=>{ trackerShots[x.voucher_no] = x.file_path; });
+    if (res.data.length < 1000) break;
+  }
   const blankCount = rows.filter(r=>r.status==='blank').length;
   const fullAccess = hasFullAccess();
   out.innerHTML = `
@@ -1158,12 +1338,13 @@ async function loadTracker(){
       ${rows.length} voucher(s) shown — <b style="color:${blankCount?'#dc2626':'#059669'}">${blankCount} blank (missed)</b>, ${rows.length-blankCount} filled.
     </p>
     <table>
-      <thead><tr><th>Voucher No</th><th>Status</th><th>Type</th><th>Party</th><th class="r">Amount</th><th>Mode</th><th>Date</th><th>Description</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Voucher No</th><th>Status</th><th>Type</th><th>Party</th><th class="r">Amount</th><th>Mode</th><th>Screenshot</th><th>Date</th><th>Description</th><th>Actions</th></tr></thead>
       <tbody>${rows.map(r=>`<tr class="${r.status==='blank'?'row-blank':'row-filled'}">
         <td><b>${r.voucher_no}</b></td>
         <td><span class="pill ${r.status==='blank'?'pill-blank':'pill-filled'}">${r.status}</span></td>
         <td>${esc(r.type||'-')}</td><td>${esc(r.party_name||'-')}</td>
         <td class="r">${r.amount?fmt(r.amount):'-'}</td><td>${esc(r.mode||'-')}</td>
+        <td>${trackerShots[r.voucher_no] ? `<button class="btn-small btn-secondary" onclick="viewShot('${esc(r.voucher_no)}')">🖼️ View</button>` : '-'}</td>
         <td>${r.payment_date||'-'}</td><td style="max-width:280px">${esc(r.description||'-')}</td>
         <td>${trackerActionsCell(r, fullAccess)}</td>
       </tr>`).join('')}</tbody>
@@ -1511,6 +1692,13 @@ async function validateAndPreview(rawRows){
       if (raw.payment_date && typeof raw.payment_date === 'number'){
         const d = XLSX.SSF.parse_date_code(raw.payment_date);
         raw.payment_date = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+      }
+      // plain-number voucher in the sheet -> add the auto prefix for this type (B refer / D doctor)
+      raw.voucher_no = String(raw.voucher_no==null?'':raw.voucher_no).trim().toUpperCase();
+      const upPfx = ({ipd_refer:'B', opd_refer:'B', doctor:'D'})[uploadType];
+      if (upPfx && /^\d+$/.test(raw.voucher_no)) {
+        const { data: pv } = await sb.from('payment_vouchers').select('voucher_no').eq('voucher_no', upPfx + raw.voucher_no).maybeSingle();
+        if (pv) raw.voucher_no = upPfx + raw.voucher_no;   // else keep the plain number (old unprefixed range)
       }
       let error = null;
       if (!raw.voucher_no) error = 'voucher_no is required';
