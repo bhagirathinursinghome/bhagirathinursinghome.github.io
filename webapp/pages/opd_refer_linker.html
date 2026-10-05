@@ -301,6 +301,27 @@
   function showOk(msg){ const o=document.getElementById('ok'); o.style.display='block'; o.textContent=msg; setTimeout(()=>o.style.display='none',3000); }
   function showErr(msg){ const e=document.getElementById('err'); e.textContent=msg; setTimeout(()=>e.textContent='',6000); }
 
+
+  /* fetch every row (Supabase returns max 1000 per request) */
+  async function fetchAll(make, orderCol) {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      let q = make();
+      if (orderCol) q = q.order(orderCol, { ascending: true });
+      const { data, error } = await q.range(from, from + 999);
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    return out;
+  }
+  async function fetchAllSafe(make) {
+    try { return await fetchAll(make, 'id'); }
+    catch (e) { return await fetchAll(make, null); }
+  }
+
+  let billByCase = {};
+
   /* ── load quack doctors ── */
   async function loadQuackDoctors() {
     try {
@@ -328,42 +349,43 @@
 
   /* ── load ALL opd_case rows ── */
   async function loadCases() {
-    const { data, error } = await BNH_PAGE.sb.from('opd_case')
-      .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,type,ipd_link,cancel_remark,cancelled_by,cancelled_at')
-      .order('case_date', { ascending: false });
-    if (error) throw error;
-    allCases = data || [];
+    allCases = await fetchAll(() => BNH_PAGE.sb.from('opd_case')
+      .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,type,ipd_link,cancel_remark,cancelled_by,cancelled_at'), 'case_no');
+    allCases.sort((a,b)=>String(b.case_date||'').localeCompare(String(a.case_date||'')));
   }
 
   /* ── load tests for all cases ── */
   async function loadTests() {
-    const { data, error } = await BNH_PAGE.sb.from('opd_test')
-      .select('case_number,test_name');
-    if (error) { console.warn('opd_test load:', error.message); return; }
-    testsByCase = {};
-    (data||[]).forEach(r => {
-      if (!testsByCase[r.case_number]) testsByCase[r.case_number] = [];
-      if (r.test_name && !testsByCase[r.case_number].includes(r.test_name))
-        testsByCase[r.case_number].push(r.test_name);
+    let rows;
+    try {
+      rows = await fetchAllSafe(() => BNH_PAGE.sb.from('opd_test').select('case_number,test_name,test_amount'));
+    } catch (e) { console.warn('opd_test load:', e.message); return; }
+    testsByCase = {}; billByCase = {};
+    rows.forEach(r => {
+      const cn = (r.case_number||'').trim();
+      if (!testsByCase[cn]) testsByCase[cn] = [];
+      if (r.test_name && !testsByCase[cn].includes(r.test_name)) testsByCase[cn].push(r.test_name);
+      billByCase[cn] = (billByCase[cn]||0) + Number(r.test_amount||0);
     });
   }
 
   /* ── load cash register to compute paid/due per case ── */
   async function loadCash() {
-    const { data, error } = await BNH_PAGE.sb.from('opd_cash_register')
-      .select('case_no,income,discount');
-    if (error) { console.warn('opd_cash_register load:', error.message); return; }
+    let rows;
+    try {
+      rows = await fetchAllSafe(() => BNH_PAGE.sb.from('opd_cash_register').select('case_no,income,discount'));
+    } catch (e) { console.warn('opd_cash_register load:', e.message); return; }
     cashByCase = {};
-    (data||[]).forEach(r => {
-      if (!cashByCase[r.case_no]) cashByCase[r.case_no] = { paid: 0, discount: 0 };
-      cashByCase[r.case_no].paid     += Number(r.income   || 0);
-      cashByCase[r.case_no].discount += Number(r.discount || 0);
+    rows.forEach(r => {
+      const cn = (r.case_no||'').trim();
+      if (!cashByCase[cn]) cashByCase[cn] = { paid: 0, discount: 0 };
+      cashByCase[cn].paid     += Number(r.income   || 0);
+      cashByCase[cn].discount += Number(r.discount || 0);
     });
-    // compute due + status
     Object.keys(cashByCase).forEach(cn => {
       const c   = cashByCase[cn];
-      const cas = allCases.find(x => x.case_no === cn);
-      const bill = Number(cas?.total_amount || 0);
+      const cas = allCases.find(x => (x.case_no||'').trim() === cn);
+      const bill = Number(cas?.total_amount || 0) || billByCase[cn] || 0;
       c.due    = Math.max(0, bill - c.paid - c.discount);
       c.status = c.due <= 0 ? 'paid' : (c.paid > 0 || c.discount > 0) ? 'partial' : 'due';
     });
@@ -497,8 +519,9 @@
 
   /* ── payment pill HTML ── */
   function payPills(caseNo, billAmt) {
-    const c    = cashByCase[caseNo];
-    const bill = Number(billAmt || 0);
+    const key  = (caseNo||'').trim();
+    const c    = cashByCase[key];
+    const bill = Number(billAmt || 0) || billByCase[key] || 0;
     const paid = c ? c.paid     : 0;
     const disc = c ? c.discount : 0;
     const due  = c ? c.due      : bill;
@@ -553,7 +576,7 @@
     const slice = filteredPend.slice((currentPendPage-1)*PER, currentPendPage*PER);
 
     container.innerHTML = slice.map(c => {
-      const tests = (testsByCase[c.case_no] || []).join(', ') || '—';
+      const tests = (testsByCase[(c.case_no||'').trim()] || []).join(', ') || '—';
       return `
       <div class="case-card" id="case-${c.case_no}">
         <div class="case-header">
@@ -752,7 +775,7 @@
     const isFullAccess = FULL_ACCESS_ROLES.includes(currentUserRole);
 
     list.innerHTML = slice.map(c => {
-      const tests = (testsByCase[c.case_no] || []).join(', ') || '—';
+      const tests = (testsByCase[(c.case_no||'').trim()] || []).join(', ') || '—';
       
       const actionButtons = isFullAccess ? `
         <div style="margin-top: .6rem; display: flex; gap: .5rem;">
@@ -968,7 +991,7 @@
     const isFullAccess = FULL_ACCESS_ROLES.includes(currentUserRole);
 
     list.innerHTML = slice.map(c => {
-      const tests = (testsByCase[c.case_no] || []).join(', ') || '—';
+      const tests = (testsByCase[(c.case_no||'').trim()] || []).join(', ') || '—';
       const restoreBtn = isFullAccess
         ? `<button class="btn-primary btn-sm" style="background:#007bff;margin-top:.5rem;" onclick="restoreCancelledCase('${esc(c.case_no)}')">↩️ Restore to Pending</button>`
         : '';
