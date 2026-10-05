@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Send Notification</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>🔔 Send Notification</h1>
+
+  <div class="page-card">
+    <form id="nForm">
+      <label>Sent By</label>
+      <input id="recBy" readonly />
+
+      <label>Send To</label>
+      <select id="target">
+        <option value="all">Everyone</option>
+        <option value="admin">Admin</option>
+        <option value="accountant">Accountant</option>
+        <option value="reception">Reception</option>
+        <option value="ot">OT</option>
+        <option value="pharmacy">Pharmacy</option>
+        <option value="lab">Lab</option>
+        <option value="manager">Manager</option>
+        <option value="viewer">Viewer</option>
+        <option value="other">Other</option>
+      </select>
+
+      <label>Title</label>
+      <input id="title" maxlength="80" required />
+
+      <label>Message</label>
+      <textarea id="body" rows="4" maxlength="300"></textarea>
+
+      <div style="margin-top:1rem">
+        <button class="btn-primary" style="width:auto">Send Now</button>
+      </div>
+      <p class="err" id="err"></p>
+      <p class="info" id="ok" style="display:none"></p>
+    </form>
+  </div>
+
+  <div class="page-card" style="margin-top:1rem">
+    <h3>Recent notifications</h3>
+    <div id="history" style="overflow-x:auto"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+  BNH_PAGE.requireRole(["admin"]);
+
+  const $ = id => document.getElementById(id);
+  $('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // The shared secret (ADMIN_SEND_KEY) is asked once per browser session.
+  function adminKey() {
+    let k = sessionStorage.getItem('bnh_admin_send_key');
+    if (!k) {
+      k = prompt('Enter the admin send key:');
+      if (k) sessionStorage.setItem('bnh_admin_send_key', k);
+    }
+    return k;
+  }
+
+  async function loadHistory() {
+    const { data, error } = await BNH_PAGE.sb.from('notifications')
+      .select('title,body,target_role,sent_count,failed_count,recorded_by_name,recorded_at')
+      .order('recorded_at', { ascending: false }).limit(15);
+    if (error) { $('history').textContent = error.message; return; }
+    $('history').innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:.9rem">' +
+      '<tr><th align="left">When</th><th align="left">Title</th><th align="left">To</th><th>Sent</th><th>Failed</th></tr>' +
+      data.map(n => '<tr><td>' + new Date(n.recorded_at).toLocaleString() + '</td><td>' + esc(n.title) +
+        '</td><td>' + esc(n.target_role) + '</td><td align="center">' + (n.sent_count ?? 0) +
+        '</td><td align="center">' + (n.failed_count ?? 0) + '</td></tr>').join('') + '</table>';
+  }
+  loadHistory();
+
+  $('nForm').onsubmit = async (e) => {
+    e.preventDefault();
+    $('err').textContent = ''; $('ok').style.display = 'none';
+    const key = adminKey();
+    if (!key) return;
+    const spinner = $('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const payload = BNH_PAGE.stamp({
+        title: $('title').value.trim(),
+        body: $('body').value.trim(),
+        target_role: $('target').value,
+        url: '/webapp/app.html'
+      });
+      const { data: row, error } = await BNH_PAGE.sb.from('notifications')
+        .insert(payload).select('id').single();
+      if (error) throw error;
+
+      const { data, error: fnErr } = await BNH_PAGE.sb.functions.invoke('send-push', {
+        headers: { 'x-admin-key': key },
+        body: { notification_id: row.id }
+      });
+      if (fnErr) {
+        sessionStorage.removeItem('bnh_admin_send_key'); // in case the key was wrong
+        throw fnErr;
+      }
+
+      $('ok').style.display = 'block';
+      $('ok').textContent = 'Sent to ' + data.sent + ' device(s)' +
+        (data.failed ? ', ' + data.failed + ' failed.' : '.');
+      e.target.reset();
+      $('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+      loadHistory();
+    } catch (err) {
+      $('err').textContent = err.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  };
+</script>
+</body>
+</html>
