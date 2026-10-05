@@ -43,6 +43,13 @@
       roles: ["admin"],
       group: "Administration"
     },
+     {
+      label: "Notification",
+      icon: "🔔", 
+      page: "pages/send-notification.html",
+      roles: ["admin"],
+      group: "Administration"
+    },
 
     // ==========================================
     // HR & ACCOUNTS
