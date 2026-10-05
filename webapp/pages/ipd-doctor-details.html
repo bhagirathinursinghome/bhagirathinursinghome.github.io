@@ -284,6 +284,19 @@
     return { fees, nhAdj, isDoctorCase, feeSet };
   }
 
+  // Effective case type / mode text (handles the "Other" free-text variants)
+  function effCaseType(adm) {
+    if (!adm) return '';
+    return adm.case_type === 'Other' ? (adm.case_type_other || 'Other') : (adm.case_type || '');
+  }
+  function effCaseMode(adm) {
+    if (!adm) return '';
+    return adm.case_mode === 'Other' ? (adm.case_mode_other || 'Other') : (adm.case_mode || '');
+  }
+  const isDoctorCaseType = t => /doctor\s*case/i.test(t || '');
+  // Anaesthesia "Amount not set" (red) is only relevant for scheme cases.
+  const isSchemeMode = m => /swasth|ayush/i.test(m || '');
+
   // Cache used by the case-details popup (built fresh each time the ledger loads)
   let ledgerCaseCache = {};      // admission_id -> { admission, ot, amt }
   let ledgerContext   = null;    // { docId, docType }
@@ -375,19 +388,20 @@
         ? (amt?.surgent_fees === null || amt?.surgent_fees === undefined)
         : (amt?.anaesthesia_fees === null || amt?.anaesthesia_fees === undefined);
       const nhBlank = (amt?.nh_fees === null || amt?.nh_fees === undefined);
-      const admIsDoctorCase = adm?.case_type === 'Doctor Case';
+      const admIsDoctorCase = isDoctorCaseType(adm?.case_type) || isDoctorCaseType(adm?.case_type_other);
+      const modeText = effCaseMode(adm);
       rows.push({
         date: ot.ot_date, type: 'OT Case', admissionId: ot.admission_id,
         patient: ot.patient_name, admissionNo: ot.admission_no,
-        caseDetail: ot.case_detail || '', caseMode: adm?.case_mode || '',
-        dr: fees, nhAdj, cr: 0, isDoctorCase, feeSet,
+        caseDetail: ot.case_detail || '', caseMode: modeText, caseType: effCaseType(adm),
+        dr: fees, nhAdj, cr: 0, isDoctorCase: isDoctorCase || admIsDoctorCase, feeSet,
         feeBlank, nhBlank, admIsDoctorCase
       });
     });
     (payments||[]).forEach(p => {
       rows.push({
         date: p.payment_date, type: 'Payment', admissionId: null,
-        patient: '-', admissionNo: '', caseDetail: `Payment received — Mode: ${p.mode||'-'}`, caseMode:'',
+        patient: '-', admissionNo: '', caseDetail: `Payment received — Mode: ${p.mode||'-'}`, caseMode:'', caseType:'',
         dr: 0, nhAdj: 0, cr: parseFloat(p.amount||0), isDoctorCase: false, feeSet: true,
         feeBlank: false, nhBlank: false, admIsDoctorCase: false
       });
@@ -412,13 +426,15 @@
       // Red highlight rule (display only):
       //  - Doctor Case  -> only red when BOTH the OT fee and the NH fee are blank.
       //  - Regular case -> red when this doctor's OT fee hasn't been entered yet.
-      const isUnset = !isPayment && (r.admIsDoctorCase ? (r.feeBlank && r.nhBlank) : r.feeBlank);
+      let isUnset = !isPayment && (r.admIsDoctorCase ? (r.feeBlank && r.nhBlank) : r.feeBlank);
+      // Anaesthesia: only flag as due/not-set for Swasthasathi / Ayushman Bharat. Cash etc. never red.
+      if (docType === 'Anaesthesia' && !isSchemeMode(r.caseMode)) isUnset = false;
       const rowClass = isPayment ? 'row-payment' : (isUnset ? 'row-unset case-row' : 'case-row');
 
       // Case Details column: Admission No + Case Detail text + Case Mode, as requested.
       const caseDetails = !isPayment
         ? `${r.caseDetail ? r.caseDetail : (r.patient + (r.admissionNo ? ' (' + r.admissionNo + ')' : ''))}
-           <div class="case-mode-note">Adm No: ${r.admissionNo||'-'}${r.caseMode ? ' &middot; Mode: ' + r.caseMode : ''}</div>
+           <div class="case-mode-note">Adm No: ${r.admissionNo||'-'} &middot; Type: ${r.caseType||'-'}${r.caseMode ? ' &middot; Mode: ' + r.caseMode : ''}</div>
            ${r.isDoctorCase ? '<span class="case-tag">Doctor Case</span>' : ''}
            ${isUnset ? '<span class="unset-flag">Amount not set</span>' : ''}
            <span class="click-hint"> — click for case details</span>`
@@ -443,9 +459,9 @@
         ${docInfo?.specialisation||''} &nbsp;|&nbsp; Mobile: ${docInfo?.mobile||'-'}<br>
         Opening Balance (static, all-time): <b>${fmt(staticOpBal)}</b> &nbsp;|&nbsp;
         Opening Balance as of ${from}: <b>${fmt(periodOpBal)}</b> &nbsp;|&nbsp; Period: ${from} to ${to}
-        ${docType==='Anaesthesia' ? '<br><span class="case-tag">Doctor Case</span> = case marked with an NH fee adjustment' : ''}
+        ${'<br><span class="case-tag">Doctor Case</span> = case type is Doctor Case, or the case has an NH fee adjustment'}
         <br><span class="unset-flag" style="margin-left:0">Amount not set</span> = fee not entered
-        (for Doctor Cases, both OT fee and NH fee must be blank) &nbsp;|&nbsp;
+        (for Doctor Cases, both OT fee and NH fee must be blank; for Anaesthesia only Swasthasathi / Ayushman Bharat cases are flagged, Cash is never red) &nbsp;|&nbsp;
         Payment rows are highlighted <b style="color:#059669">green</b>. Cancelled cases are not shown.
       </div>
       <table id="ledgerTable">
@@ -522,6 +538,8 @@
       const v = document.getElementById(id).value;
       return v === '' ? null : parseFloat(v);
     };
+    const cached = ledgerCaseCache[admissionId] || {};
+    const admissionNo = cached.ot?.admission_no || cached.admission?.admission_no || null;
     const payload = {
       surgent_fees:     num('cmSurgentFees'),
       anaesthesia_fees: num('cmAnaesthesiaFees'),
@@ -537,8 +555,9 @@
         .from('ipd_amount_entries').update(payload).eq('admission_id', admissionId).select();
       if (updErr) throw updErr;
       if (!updated || updated.length === 0) {
+        if (!admissionNo) throw new Error('Admission No not found for this case — cannot create amount entry.');
         const { error: insErr } = await BNH_PAGE.sb
-          .from('ipd_amount_entries').insert({ admission_id: admissionId, ...payload });
+          .from('ipd_amount_entries').insert({ admission_id: admissionId, admission_no: admissionNo, ...payload });
         if (insErr) throw insErr;
       }
       closeCaseModal();
