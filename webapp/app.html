@@ -73,6 +73,7 @@
     <button class="btn-ghost" id="btnPwd">Change Password</button>
     <button class="btn-ghost" id="btnLogout">Logout</button>
     <button class="btn-ghost" id="btnPublish" style="display:none">🚀 Publish Update</button>
+    <button class="btn-ghost" id="btnNotify" style="display:none">🔔 Enable Notifications</button>
   </div>
 </header>
 
@@ -187,6 +188,37 @@ btnPublish.onclick = async () => {
   } catch (err) { alert('Failed: ' + err.message); }
   finally { hide(spinner); }
 };
+
+  // Push notifications ---------------------------------------------------------------------------
+  // Loaded on its own and wrapped in try/catch, so it can never break the rest of the app.
+  (function setupPush() {
+    const loadScript = src => new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src));
+      document.head.appendChild(s);
+    });
+    (async () => {
+      try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+        await loadScript('assets/page.js');
+        await loadScript('assets/push.js');
+        const sb = BNH_PAGE.sb;
+        const btn = document.getElementById('btnNotify');
+        if (Notification.permission === 'granted') {
+          await BNH_PUSH.sync(sb, user);            // keep this device registered
+        } else if (Notification.permission === 'default') {
+          btn.style.display = '';
+          btn.onclick = async () => {
+            try {
+              await BNH_PUSH.enable(sb, user);
+              btn.style.display = 'none';
+              alert('Notifications enabled on this device.');
+            } catch (err) { alert(err.message); }
+          };
+        }
+      } catch (e) { console.warn('[Push] setup skipped:', e); }
+    })();
+  })();
 </script>
 </body>
 </html>
