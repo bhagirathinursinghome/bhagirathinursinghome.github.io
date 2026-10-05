@@ -45,6 +45,16 @@
     .chip{background:#f0fdfa;border:1px solid #99f6e4;border-radius:99px;padding:.3rem .9rem;
           font-size:.8rem;cursor:pointer;color:#0f766e}
     .chip.active{background:#0f766e;color:#fff;border-color:#0f766e}
+  
+    .mini-btn{border:none;background:#f3f4f6;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:.8rem;margin-left:3px}
+    .mini-btn.del{background:#fee2e2}
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}
+    .modal-box{background:#fff;border-radius:12px;padding:1.2rem;width:100%;max-width:460px;max-height:90vh;overflow:auto}
+    .modal-box h3{margin:0 0 .8rem;font-size:1rem}
+    .modal-box .mf{margin-bottom:.6rem}
+    .modal-box .mf label{display:block;font-size:.8rem;margin-bottom:.2rem}
+    .modal-box .mf input,.modal-box .mf select{width:100%;box-sizing:border-box}
+    .modal-actions{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem}
   </style>
 </head>
 <body>
@@ -187,6 +197,115 @@
 
   function fmt(n){ return (n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
+
+  // ===== Admin edit / delete =====
+  const IS_ADMIN = !!(BNH_PAGE.user && BNH_PAGE.user.role === 'admin');
+  const adminTh = () => IS_ADMIN ? '<th></th>' : '';
+  const actionTd = (table, id) => IS_ADMIN
+    ? `<td class="r" style="white-space:nowrap"><button type="button" class="mini-btn" title="Edit" onclick="openEdit('${table}','${id}')">✏️</button><button type="button" class="mini-btn del" title="Delete" onclick="deleteRow('${table}','${id}')">🗑️</button></td>`
+    : '';
+  const adminTd = () => IS_ADMIN ? '<td></td>' : '';
+
+  const EDIT_SCHEMA = {
+    cash_transactions: {
+      title: 'Edit Cash In / Out Entry',
+      fields: [
+        {key:'date', label:'Date', type:'date', required:true},
+        {key:'direction', label:'Direction', type:'select', options:[['in','Inflow'],['out','Outflow']]},
+        {key:'mode', label:'Mode', type:'select', options:[['cash','Cash'],['bank','Bank'],['phonepe','PhonePe']]},
+        {key:'category_id', label:'Category', type:'select', options: row => categories.filter(c=>c.type===row.direction).map(c=>[c.id,c.name])},
+        {key:'amount', label:'Amount', type:'number'},
+        {key:'remark', label:'Remark', type:'text'}
+      ],
+      onOpen: bg => {
+        const dir = bg.querySelector('[data-k="direction"]');
+        const cat = bg.querySelector('[data-k="category_id"]');
+        dir.onchange = () => {
+          cat.innerHTML = categories.filter(c=>c.type===dir.value).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+        };
+      },
+      validate: u => u.category_id ? '' : 'Please select a category.'
+    },
+    cash_transfers: {
+      title: 'Edit Transfer',
+      fields: [
+        {key:'date', label:'Date', type:'date', required:true},
+        {key:'from_mode', label:'From', type:'select', options:[['cash','Cash'],['bank','Bank'],['phonepe','PhonePe']]},
+        {key:'to_mode', label:'To', type:'select', options:[['cash','Cash'],['bank','Bank'],['phonepe','PhonePe']]},
+        {key:'amount', label:'Amount', type:'number'},
+        {key:'remark', label:'Remark', type:'text'}
+      ],
+      validate: u => u.from_mode===u.to_mode ? 'From and To must be different.' : ''
+    }
+  };
+
+  function fieldOptions(f, row) {
+    return typeof f.options === 'function' ? f.options(row) : f.options;
+  }
+
+  async function openEdit(table, id) {
+    if (!IS_ADMIN) return;
+    const { data: row, error } = await BNH_PAGE.sb.from(table).select('*').eq('id', id).single();
+    if (error || !row) { alert(error ? error.message : 'Entry not found.'); return; }
+    const schema = EDIT_SCHEMA[table];
+    const bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    const fieldsHtml = schema.fields.map(f => {
+      const v = row[f.key] == null ? '' : row[f.key];
+      if (f.type === 'select') {
+        const opts = fieldOptions(f, row).map(o => `<option value="${o[0]}" ${String(o[0])===String(v)?'selected':''}>${o[1]}</option>`).join('');
+        return `<div class="mf"><label>${f.label}</label><select data-k="${f.key}">${opts}</select></div>`;
+      }
+      const extra = f.type === 'number' ? 'step="0.01" min="0.01"' : '';
+      return `<div class="mf"><label>${f.label}</label><input data-k="${f.key}" type="${f.type}" ${extra} value="${String(v).replace(/"/g,'&quot;')}"/></div>`;
+    }).join('');
+    bg.innerHTML = `<div class="modal-box"><h3>${schema.title}</h3>${fieldsHtml}
+      <p class="err" id="editErr"></p>
+      <div class="modal-actions">
+        <button type="button" class="mini-btn" id="editCancel" style="padding:.5rem 1rem">Cancel</button>
+        <button type="button" class="btn-primary" id="editSave" style="width:auto">Save changes</button>
+      </div></div>`;
+    document.body.appendChild(bg);
+    if (schema.onOpen) schema.onOpen(bg);
+    bg.querySelector('#editCancel').onclick = () => bg.remove();
+    bg.querySelector('#editSave').onclick = async () => {
+      const errEl = bg.querySelector('#editErr'); errEl.textContent = '';
+      const upd = {};
+      for (const f of schema.fields) {
+        const el = bg.querySelector(`[data-k="${f.key}"]`);
+        let val = el.value.trim();
+        if (f.type === 'number') {
+          val = parseFloat(val);
+          if (!(val > 0)) { errEl.textContent = 'Enter a valid amount.'; return; }
+        } else if (f.required && !val) { errEl.textContent = f.label + ' is required.'; return; }
+        else if (val === '') val = null;
+        upd[f.key] = val;
+      }
+      if (schema.validate) { const msg = schema.validate(upd); if (msg) { errEl.textContent = msg; return; } }
+      const { data, error } = await BNH_PAGE.sb.from(table).update(upd).eq('id', id).select();
+      if (error) { errEl.textContent = error.message; return; }
+      if (!data || !data.length) { errEl.textContent = 'Nothing was updated. Check database permissions (RLS) for admin.'; return; }
+      bg.remove();
+      afterChange();
+    };
+  }
+
+  async function deleteRow(table, id) {
+    if (!IS_ADMIN) return;
+    if (!confirm('Delete this entry permanently? This cannot be undone.')) return;
+    const { data, error } = await BNH_PAGE.sb.from(table).delete().eq('id', id).select();
+    if (error) { alert(error.message); return; }
+    if (!data || !data.length) { alert('Nothing was deleted. Check database permissions (RLS) for admin.'); return; }
+    afterChange();
+  }
+
+  function afterChange() {
+    refreshBalances();
+    loadRecentEntries();
+    loadRecentTransfers();
+    if (document.getElementById('histFrom').value && document.getElementById('histTo').value) loadHistory();
+  }
+
   function showTab(name) {
     ['entry','transfer','history'].forEach(t=>{
       document.getElementById('tab-'+t).classList.toggle('hidden', t!==name);
@@ -270,11 +389,11 @@
       .select('*, cash_categories(name)').order('date',{ascending:false}).limit(15);
     if (!data || !data.length) { box.innerHTML='<p>No entries yet.</p>'; return; }
     box.innerHTML = `<table><thead><tr><th>Date</th><th>Dir</th><th>Mode</th><th>Category</th>
-      <th class="r">Amount</th><th>Remark</th></tr></thead><tbody>${
+      <th class="r">Amount</th><th>Remark</th>${adminTh()}</tr></thead><tbody>${
       data.map(r=>`<tr><td>${r.date}</td>
         <td><span class="badge ${r.direction==='in'?'badge-in':'badge-out'}">${r.direction==='in'?'In':'Out'}</span></td>
         <td>${r.mode}</td><td>${r.cash_categories? r.cash_categories.name : ''}</td>
-        <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td></tr>`).join('')
+        <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td>${actionTd('cash_transactions',r.id)}</tr>`).join('')
       }</tbody></table>`;
   }
 
@@ -284,9 +403,9 @@
     const { data } = await BNH_PAGE.sb.from('cash_transfers').select('*').order('date',{ascending:false}).limit(15);
     if (!data || !data.length) { box.innerHTML='<p>No transfers yet.</p>'; return; }
     box.innerHTML = `<table><thead><tr><th>Date</th><th>From</th><th>To</th>
-      <th class="r">Amount</th><th>Remark</th></tr></thead><tbody>${
+      <th class="r">Amount</th><th>Remark</th>${adminTh()}</tr></thead><tbody>${
       data.map(r=>`<tr><td>${r.date}</td><td>${r.from_mode}</td><td>${r.to_mode}</td>
-        <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td></tr>`).join('')
+        <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td>${actionTd('cash_transfers',r.id)}</tr>`).join('')
       }</tbody></table>`;
   }
 
@@ -316,23 +435,23 @@
     if (!rows.length) { box.innerHTML = '<p>No entries in this range.</p>'; return; }
     let totalIn=0, totalOut=0;
     box.innerHTML = `<table><thead><tr>
-      <th>Date</th><th>Type</th><th>Mode</th><th>Category / Detail</th><th class="r">Amount</th><th>Remark</th>
+      <th>Date</th><th>Type</th><th>Mode</th><th>Category / Detail</th><th class="r">Amount</th><th>Remark</th>${adminTh()}
       </tr></thead><tbody>${rows.map(r=>{
         if (r.kind==='tx') {
           if (r.direction==='in') totalIn += Number(r.amount); else totalOut += Number(r.amount);
           return `<tr><td>${r.date}</td>
             <td><span class="badge ${r.direction==='in'?'badge-in':'badge-out'}">${r.direction==='in'?'Inflow':'Outflow'}</span></td>
             <td>${r.mode}</td><td>${r.cash_categories? r.cash_categories.name : ''}</td>
-            <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td></tr>`;
+            <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td>${actionTd('cash_transactions',r.id)}</tr>`;
         } else {
           return `<tr><td>${r.date}</td><td><span class="badge badge-xfer">Transfer</span></td>
             <td>${r.from_mode} → ${r.to_mode}</td><td>Internal transfer</td>
-            <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td></tr>`;
+            <td class="r">₹${fmt(r.amount)}</td><td>${r.remark||''}</td>${actionTd('cash_transfers',r.id)}</tr>`;
         }
       }).join('')}</tbody>
       <tfoot><tr><td colspan="4">Totals (transactions only, transfers are internal)</td>
       <td class="r">In ₹${fmt(totalIn)} / Out ₹${fmt(totalOut)}</td>
-      <td>Net ₹${fmt(totalIn-totalOut)}</td></tr></tfoot></table>`;
+      <td>Net ₹${fmt(totalIn-totalOut)}</td>${adminTd()}</tr></tfoot></table>`;
   }
 
   document.getElementById('entryForm').onsubmit = async (e) => {
