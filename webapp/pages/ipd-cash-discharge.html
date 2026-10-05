@@ -285,6 +285,10 @@
       <!-- Discharge Button -->
       <div class="section-title no-print">🏁 Discharge / Cancel</div>
       <div id="dischargeInfo" class="warn-box no-print"></div>
+      <div class="no-print" style="margin-bottom:.75rem;max-width:220px">
+        <label style="font-size:.85rem;font-weight:600;color:#374151">Discharge Date</label>
+        <input id="dischargeDate" type="date"/>
+      </div>
       <button id="dischargeBtn" class="btn-discharge no-print" onclick="discharge()" disabled>
         🏁 Discharge Patient
       </button>
@@ -962,6 +966,7 @@
       document.getElementById('currentPatientName').value = adm.patient_name || '';
       document.getElementById('detailTitle').textContent = `${adm.patient_name} – ${adm.admission_no}`;
       document.getElementById('rcptDate').value  = new Date().toISOString().slice(0,10);
+      document.getElementById('dischargeDate').value = new Date().toISOString().slice(0,10);
       document.getElementById('rcptErr').textContent = '';
       document.getElementById('dischargeErr').textContent = '';
       document.getElementById('cancelCaseBtn').classList.remove('hidden');
@@ -1065,9 +1070,9 @@
           </div>
         </div>`;
 
-      // Hide receipt form for cashless schemes
+      // Hide receipt form for cashless schemes, unless additional charges exist (then money can be received)
       const isCashless = ['Swastha Swasthy','Ayusman Bharat'].includes(adm.case_mode);
-      document.getElementById('receiptFormWrap').style.display = isCashless ? 'none' : '';
+      document.getElementById('receiptFormWrap').style.display = (isCashless && totalAddlIncome <= 0) ? 'none' : '';
 
       // Discharge eligibility check
       checkDischarge(adm, amtEntry, receipts, opdBills, addlIncomeRows, opdCashByCase);
@@ -1099,6 +1104,12 @@
       if (balance > 0.01) {
         reasons.push(`Package + Additional Charges payment pending: ${fmt(balance)} remaining`);
       }
+    } else if (totalAddlIncome > 0) {
+      // Cashless: scheme covers the package, patient pays only additional charges
+      const addlBalance = totalAddlIncome - totalRcpt - totalDisc;
+      if (addlBalance > 0.01) {
+        reasons.push(`Additional Charges payment pending: ${fmt(addlBalance)} remaining`);
+      }
     }
 
     if (opdDue > 0.01) {
@@ -1128,9 +1139,10 @@
     spinner.classList.remove('hidden');
     try {
       const admId = document.getElementById('currentAdmId').value;
+      const dDate = document.getElementById('dischargeDate').value || new Date().toISOString().slice(0,10);
       const { error } = await BNH_PAGE.sb.from('ipd_admissions').update({
         is_discharged: true,
-        discharge_date: new Date().toISOString().slice(0,10)
+        discharge_date: dDate
       }).eq('id', admId);
       if (error) throw error;
       showList();
