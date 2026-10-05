@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Daily Sheet</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .hidden{display:none!important}
+    .form-row{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end}
+    .form-row>*{flex:1;min-width:150px}
+    table{width:100%;border-collapse:collapse;font-size:.84rem}
+    th{background:#f0f0f0;padding:6px 8px;text-align:left}
+    td{padding:6px 8px;border-bottom:1px solid #eee}
+    .r{text-align:right}
+    tfoot td{font-weight:700;background:#f9f9f9}
+    .sec{font-size:.9rem;font-weight:700;color:#0f766e;margin:1.3rem 0 .5rem;padding-bottom:.3rem;border-bottom:1px solid #ccfbf1}
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem}
+    @media(max-width:560px){.grid3{grid-template-columns:1fr}}
+    .box{border:1px solid #e5e7eb;border-radius:10px;padding:.7rem .9rem;background:#fff}
+    .box .l{font-size:.75rem;color:#6b7280;font-weight:700}
+    .box .v{font-size:1.2rem;font-weight:800;margin-top:.15rem}
+    .open{background:#eff6ff;border-color:#bfdbfe}
+    .open input{width:100%;box-sizing:border-box;margin-top:.2rem;font-weight:800}
+    .close{background:#ecfdf5;border-color:#a7f3d0}
+    .cols{display:grid;grid-template-columns:minmax(260px,1fr) minmax(300px,1.6fr);gap:1rem;align-items:start}
+    @media(max-width:760px){.cols{grid-template-columns:1fr}}
+    .panel{border:1px solid #e5e7eb;border-radius:10px;padding:.7rem .8rem;background:#fff}
+    .panel h3{margin:0 0 .5rem;font-size:.85rem;color:#0f766e}
+    .rcv-row{display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:.85rem}
+    .rcv-row.tot{font-weight:800;border-top:2px solid #cbd5e1;border-bottom:none;margin-top:.2rem}
+    .rcv-row input{width:120px;text-align:right}
+    .vtbl{font-size:.7rem}
+    .vtbl th,.vtbl td{padding:4px 6px}
+    .vtbl tfoot td{font-size:.72rem}
+    .warn{background:#fff7ed;border:1px solid #fed7aa;color:#b45309;border-radius:8px;padding:.5rem .75rem;font-size:.82rem;margin:.5rem 0}
+    .okmsg{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:8px;padding:.5rem .75rem;font-size:.82rem;margin:.5rem 0}
+    .note{font-size:.76rem;color:#6b7280;margin:.3rem 0}
+    .head{text-align:center;margin:.8rem 0}
+    .head h2{margin:0;font-size:1.15rem}
+    .cfd{font-size:.72rem;color:#475569;margin-top:.4rem}
+    @page{size:A4;margin:10mm}
+    @media print{
+      *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .noprint{display:none!important}
+      body{background:#fff;margin:0}
+      .page{max-width:none!important;width:100%!important;margin:0!important;padding:0!important}
+      .page-card{box-shadow:none;border:none;padding:0!important;margin:0!important;max-width:none!important}
+      .open input{border:none;background:transparent;padding:0}
+      .rcv-row input{border:none;background:transparent;padding:0}
+      /* keep the desktop layout in print: never collapse to a single column */
+      .grid3{grid-template-columns:repeat(3,1fr)!important}
+      .cols{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)!important}
+      .panel,.box,table,tr,.cfd{break-inside:avoid;page-break-inside:avoid}
+      .sec{break-after:avoid;page-break-after:avoid}
+    }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1 class="noprint">🗒️ Daily Sheet</h1>
+  <div class="page-card">
+    <div class="form-row noprint">
+      <div><label>Date</label><input id="sDate" type="date"/></div>
+      <div style="flex:0;display:flex;gap:.5rem">
+        <button class="btn-primary" style="width:auto" onclick="loadSheet()">Load</button>
+        <button class="btn-primary" style="width:auto;background:#059669" onclick="window.print()">🖨️ Print</button>
+      </div>
+    </div>
+    <div id="msg" class="noprint"></div>
+
+    <div class="head">
+      <h2>BHAGIRATHI DIAGNOSTIC AND HEALTH CARE</h2>
+      <div style="font-weight:700">DAILY SHEET &nbsp;|&nbsp; DATE : <span id="hDate"></span></div>
+    </div>
+
+    <!-- 1. OPENING -->
+    <div class="grid3">
+      <div class="box open"><div class="l">OPENING CASH BALANCE</div><input id="oCash" type="number" step="0.01" oninput="recalc()"/></div>
+      <div class="box open"><div class="l">OPENING PHONEPE BALANCE</div><input id="oPp" type="number" step="0.01" oninput="recalc()"/></div>
+      <div class="box open"><div class="l">OPENING BANK BALANCE</div><input id="oBank" type="number" step="0.01" oninput="recalc()"/></div>
+    </div>
+    <p class="note noprint" id="openNote"></p>
+
+    <!-- 2. RECEIVE (left) + VOUCHERS (right) -->
+    <div class="sec">RECEIVE PAYMENT / VOUCHERS</div>
+    <div class="cols">
+      <div class="panel">
+        <h3>RECEIVE PAYMENT</h3>
+        <div class="rcv-row"><span>IPD RECEIVE</span><b id="vIpd"></b></div>
+        <div class="rcv-row"><span>OPD RECEIVE</span><b id="vOpd"></b></div>
+        <div class="rcv-row"><span>OTHER RECEIVE</span><b id="vOther"></b></div>
+        <div class="rcv-row tot"><span>TOTAL RECEIVE</span><span id="vTotRcv"></span></div>
+        <div class="rcv-row"><span>PHONEPE RECEIVE</span><input id="iPp" type="number" step="0.01" value="0" oninput="recalc()"/></div>
+        <div class="rcv-row"><span>CASH RECEIVE <small style="color:#6b7280">(auto)</small></span><b id="vCashRcv"></b></div>
+        <div class="rcv-row"><span>BANK RECEIVE</span><input id="iBank" type="number" step="0.01" value="0" oninput="recalc()"/></div>
+      </div>
+      <div class="panel">
+        <h3>VOUCHERS</h3>
+        <div id="vchBox"></div>
+      </div>
+    </div>
+
+    <!-- 3. CASH FLOW (below Receive/Vouchers; hidden when there is nothing from Cash Flow page) -->
+    <div id="cfSection" class="hidden">
+      <div class="sec">CASH FLOW</div>
+      <table>
+        <thead><tr><th></th><th class="r">PHONE PE</th><th class="r">BANK</th><th class="r">CASH</th></tr></thead>
+        <tbody>
+          <tr><td><b>CASH INFLOW</b></td><td class="r" id="cfInPp"></td><td class="r" id="cfInBank"></td><td class="r" id="cfInCash"></td></tr>
+          <tr><td><b>CASH OUTFLOW</b></td><td class="r" id="cfOutPp"></td><td class="r" id="cfOutBank"></td><td class="r" id="cfOutCash"></td></tr>
+        </tbody>
+        <tfoot><tr><td>NET FLOW (INFLOW – OUTFLOW)</td><td class="r" id="cfNetPp"></td><td class="r" id="cfNetBank"></td><td class="r" id="cfNetCash"></td></tr></tfoot>
+      </table>
+      <div class="cfd" id="cfDetail"></div>
+    </div>
+
+    <!-- 4. CLOSING -->
+    <div class="sec">CLOSING BALANCE</div>
+    <div class="grid3">
+      <div class="box close"><div class="l">CLOSING CASH BALANCE</div><div class="v" id="cCash"></div></div>
+      <div class="box close"><div class="l">CLOSING PHONEPE BALANCE</div><div class="v" id="cPp"></div></div>
+      <div class="box close"><div class="l">CLOSING BANK BALANCE</div><div class="v" id="cBank"></div></div>
+    </div>
+
+    <div class="form-row noprint" style="margin-top:1rem">
+      <div style="flex:3"><label>Remark</label><input id="sRemark" placeholder="optional"/></div>
+      <div style="flex:0"><button class="btn-primary" style="width:auto;white-space:nowrap" onclick="saveSheet()">💾 Save Daily Sheet</button></div>
+    </div>
+    <p class="err noprint" id="sErr"></p>
+  </div>
+
+  <div class="page-card noprint" style="margin-top:1.5rem">
+    <h2 style="font-size:1rem">Saved Sheets</h2>
+    <div id="listBox">Loading…</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+BNH_PAGE.requireRole(["admin","accountant"]);
+const sb = BNH_PAGE.sb;
+const fmt = n => '₹' + (Number(n)||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const $ = id => document.getElementById(id);
+const num = id => parseFloat($(id).value || 0) || 0;
+function localISO(){ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+const dmy = iso => iso.split('-').reverse().join('/');
+$('sDate').value = localISO();
+
+const MODES = ['cash','bank','phonepe'];
+const MODE_LABEL = {cash:'Cash', bank:'Bank', phonepe:'PhonePe'};
+const normMode = m => { m = String(m||'').trim().toLowerCase().replace(/\s+/g,''); return MODES.includes(m) ? m : null; };
+const TYPE_LABEL = { ipd_refer:'IPD Refer', opd_refer:'OPD Refer', doctor:'Doctor', lab_agent:'Lab Agent',
+                     salary:'Salary', creditor:'Creditor', cash:'Cash Voucher', cash_voucher:'Cash Voucher' };
+
+let D = null, hasPrev = false;
+
+async function loadSheet(){
+  const date = $('sDate').value; if (!date) return;
+  $('sErr').textContent = ''; $('msg').innerHTML = '';
+  $('hDate').textContent = dmy(date);
+  $('spinner').classList.remove('hidden');
+  try{
+    const [ipd, opd, oth, vch, tx, xf, prev, later, own, dw] = await Promise.all([
+      sb.from('ipd_cash_receipts').select('amount').eq('receipt_date', date),
+      sb.from('opd_cash_register').select('income').eq('transaction_date', date),
+      sb.from('cash_receipts').select('received_amount').eq('receipt_date', date),
+      sb.from('payment_vouchers').select('voucher_no,type,party_name,description,amount,mode').eq('payment_date', date).eq('status','filled'),
+      sb.from('cash_transactions').select('*, cash_categories(name)').eq('date', date),
+      sb.from('cash_transfers').select('*').eq('date', date),
+      sb.from('daily_sheet').select('*').lt('sheet_date', date).order('sheet_date',{ascending:false}).limit(1),
+      sb.from('daily_sheet').select('sheet_date').gt('sheet_date', date).limit(1),
+      sb.from('daily_sheet').select('*').eq('sheet_date', date).maybeSingle(),
+      sb.from('day_work').select('phonepe_received,bank_received').eq('work_date', date).limit(1)
+    ]);
+    [ipd,opd,oth,vch,tx,xf,prev,later,own].forEach(r=>{ if (r.error) throw r.error; });
+
+    D = {
+      ipd: (ipd.data||[]).reduce((s,r)=>s+Number(r.amount||0),0),
+      opd: (opd.data||[]).reduce((s,r)=>s+Number(r.income||0),0),
+      other: (oth.data||[]).reduce((s,r)=>s+Number(r.received_amount||0),0),
+      vouchers: (vch.data||[]).slice().sort((a,b)=>String(a.voucher_no).localeCompare(String(b.voucher_no),undefined,{numeric:true})),
+      tx: tx.data||[], xf: xf.data||[]
+    };
+
+    const p = prev.data && prev.data[0];
+    hasPrev = !!p;
+    if (p){
+      $('oCash').value = p.closing_cash; $('oPp').value = p.closing_phonepe; $('oBank').value = p.closing_bank;
+      $('openNote').textContent = `Opening taken from closing of saved sheet dated ${dmy(p.sheet_date)}.`;
+      const gap = Math.round((new Date(date)-new Date(p.sheet_date))/86400000);
+      if (gap > 1) $('msg').innerHTML += `<div class="warn">⚠️ Last saved sheet is ${dmy(p.sheet_date)} — ${gap-1} day(s) in between have no sheet, so their transactions are not in this opening balance.</div>`;
+    } else {
+      const o = own.data;
+      $('oCash').value = o ? o.opening_cash : 0; $('oPp').value = o ? o.opening_phonepe : 0; $('oBank').value = o ? o.opening_bank : 0;
+      $('openNote').textContent = 'No earlier saved sheet — enter the starting opening balances once (first sheet only).';
+    }
+    ['oCash','oPp','oBank'].forEach(id=>$(id).readOnly = hasPrev);
+
+    const src = own.data || (dw.data && dw.data[0]);
+    $('iPp').value = src ? (src.phonepe_received||0) : 0;
+    $('iBank').value = src ? (src.bank_received||0) : 0;
+    $('sRemark').value = own.data ? (own.data.remark||'') : '';
+
+    if (later.data && later.data.length) $('msg').innerHTML += `<div class="warn">⚠️ Sheets exist after this date (from ${dmy(later.data[0].sheet_date)}). If you change this day, re-save the later days in order.</div>`;
+    if (own.data) $('msg').innerHTML += `<div class="okmsg">A saved sheet exists for this date — saving will update it.</div>`;
+    recalc();
+  } catch(ex){
+    $('msg').innerHTML = `<div class="warn">Load failed: ${esc(ex.message)}</div>`;
+  } finally { $('spinner').classList.add('hidden'); }
+}
+
+function compute(){
+  const totalRcv = D.ipd + D.opd + D.other;
+  const pp = num('iPp'), bank = num('iBank');
+  const cashRcv = totalRcv - pp - bank;
+  const rcv = {cash:cashRcv, bank, phonepe:pp};
+
+  const v = {cash:0,bank:0,phonepe:0};
+  D.vouchers.forEach(r=>{ const m = normMode(r.mode); if (m) v[m] += Number(r.amount||0); });
+
+  // Cash Flow page only: cash_transactions + cash_transfers
+  const cfIn = {cash:0,bank:0,phonepe:0}, cfOut = {cash:0,bank:0,phonepe:0};
+  D.tx.forEach(r=>{ const m = normMode(r.mode); if (!m) return;
+    if (r.direction==='in') cfIn[m] += Number(r.amount||0); else cfOut[m] += Number(r.amount||0); });
+  D.xf.forEach(r=>{ const a=Number(r.amount||0), f=normMode(r.from_mode), t=normMode(r.to_mode);
+    if (f) cfOut[f]+=a; if (t) cfIn[t]+=a; });
+  const cfNet = {}; MODES.forEach(m=> cfNet[m] = cfIn[m]-cfOut[m]);
+
+  const open = {cash:num('oCash'), bank:num('oBank'), phonepe:num('oPp')};
+  const net = {}, close = {};
+  MODES.forEach(m=>{ net[m] = rcv[m] - v[m] + cfNet[m]; close[m] = open[m] + net[m]; });
+  return { totalRcv, pp, bank, cashRcv, rcv, v, cfIn, cfOut, cfNet, open, net, close };
+}
+
+function recalc(){
+  if (!D) return;
+  const c = compute();
+
+  // cash flow section
+  const hasCF = D.tx.length || D.xf.length;
+  $('cfSection').classList.toggle('hidden', !hasCF);
+  if (hasCF){
+    const row = (k, o) => { $(k+'Pp').textContent = fmt(o.phonepe); $(k+'Bank').textContent = fmt(o.bank); $(k+'Cash').textContent = fmt(o.cash); };
+    row('cfIn', c.cfIn); row('cfOut', c.cfOut); row('cfNet', c.cfNet);
+    const lines = [
+      ...D.tx.map(r=>`${r.direction==='in'?'IN':'OUT'} · ${MODE_LABEL[normMode(r.mode)]||esc(r.mode)} · ${esc(r.cash_categories?r.cash_categories.name:'')} · ${fmt(r.amount)}${r.remark?' · '+esc(r.remark):''}`),
+      ...D.xf.map(r=>`TRANSFER · ${MODE_LABEL[normMode(r.from_mode)]||esc(r.from_mode)} → ${MODE_LABEL[normMode(r.to_mode)]||esc(r.to_mode)} · ${fmt(r.amount)}${r.remark?' · '+esc(r.remark):''}`)
+    ];
+    $('cfDetail').innerHTML = lines.join('<br>');
+  }
+
+  // receive
+  $('vIpd').textContent = fmt(D.ipd); $('vOpd').textContent = fmt(D.opd); $('vOther').textContent = fmt(D.other);
+  $('vTotRcv').textContent = fmt(c.totalRcv); $('vCashRcv').textContent = fmt(c.cashRcv);
+
+  // vouchers
+  const tot = c.v.cash + c.v.bank + c.v.phonepe;
+  $('vchBox').innerHTML = `<table class="vtbl"><thead><tr><th>VOUCHER NO</th><th>CATEGORY</th><th>DESCRIPTION</th><th class="r">AMOUNT</th><th>MODE</th></tr></thead><tbody>${
+    D.vouchers.length ? D.vouchers.map(r=>`<tr><td><b>${esc(r.voucher_no)}</b></td><td>${esc(TYPE_LABEL[r.type]||r.type||'')}</td>
+      <td>${esc([r.party_name,r.description].filter(Boolean).join(' — '))}</td><td class="r">${fmt(r.amount)}</td><td>${esc((r.mode||'').toUpperCase())}</td></tr>`).join('')
+      : '<tr><td colspan="5" style="color:#888">No vouchers on this date.</td></tr>'
+  }</tbody><tfoot>
+    <tr><td colspan="3">TOTAL CASH VOUCHER</td><td class="r" colspan="2">${fmt(c.v.cash)}</td></tr>
+    <tr><td colspan="3">TOTAL PHONEPE VOUCHER</td><td class="r" colspan="2">${fmt(c.v.phonepe)}</td></tr>
+    <tr><td colspan="3">TOTAL BANK VOUCHER</td><td class="r" colspan="2">${fmt(c.v.bank)}</td></tr>
+    <tr><td colspan="3">TOTAL VOUCHER</td><td class="r" colspan="2">${fmt(tot)}</td></tr>
+  </tfoot></table>`;
+
+  // closing
+  $('cCash').textContent = fmt(c.close.cash); $('cPp').textContent = fmt(c.close.phonepe); $('cBank').textContent = fmt(c.close.bank);
+}
+
+async function saveSheet(){
+  if (!D) { $('sErr').textContent = 'Load a date first.'; return; }
+  const date = $('sDate').value, c = compute();
+  $('sErr').textContent = '';
+  if (c.cashRcv < -0.005) { $('sErr').textContent = 'PhonePe + Bank receive is more than total receive.'; return; }
+  const row = {
+    sheet_date: date,
+    opening_cash:c.open.cash, opening_bank:c.open.bank, opening_phonepe:c.open.phonepe,
+    ipd_received:D.ipd, opd_received:D.opd, other_received:D.other, total_received:c.totalRcv,
+    phonepe_received:c.pp, bank_received:c.bank, cash_received:c.cashRcv,
+    extra_out_cash:0,
+    voucher_cash:c.v.cash, voucher_bank:c.v.bank, voucher_phonepe:c.v.phonepe,
+    total_voucher:c.v.cash+c.v.bank+c.v.phonepe,
+    cf_in_cash:c.cfIn.cash, cf_in_bank:c.cfIn.bank, cf_in_phonepe:c.cfIn.phonepe,
+    cf_out_cash:c.cfOut.cash, cf_out_bank:c.cfOut.bank, cf_out_phonepe:c.cfOut.phonepe,
+    transfer_cash:c.cfNet.cash, transfer_bank:c.cfNet.bank, transfer_phonepe:c.cfNet.phonepe,
+    net_cash:c.net.cash, net_bank:c.net.bank, net_phonepe:c.net.phonepe,
+    closing_cash:c.close.cash, closing_bank:c.close.bank, closing_phonepe:c.close.phonepe,
+    remark: $('sRemark').value.trim() || null,
+    created_by: BNH_PAGE.user && BNH_PAGE.user.username,
+    created_by_name: BNH_PAGE.user && BNH_PAGE.user.name,
+    updated_at: new Date().toISOString()
+  };
+  $('spinner').classList.remove('hidden');
+  try{
+    const { error } = await sb.from('daily_sheet').upsert(row, { onConflict:'sheet_date' });
+    if (error) throw error;
+    $('msg').innerHTML = `<div class="okmsg">✅ Daily sheet for ${dmy(date)} saved. Its closing balances will be the next day's opening.</div>`;
+    loadList();
+  } catch(ex){ $('sErr').textContent = ex.message; }
+  finally { $('spinner').classList.add('hidden'); }
+}
+
+async function loadList(){
+  const { data, error } = await sb.from('daily_sheet').select('sheet_date,closing_cash,closing_phonepe,closing_bank')
+    .order('sheet_date',{ascending:false}).limit(31);
+  if (error) { $('listBox').textContent = error.message; return; }
+  if (!data.length) { $('listBox').textContent = 'No saved sheets yet.'; return; }
+  $('listBox').innerHTML = `<table><thead><tr><th>Date</th><th class="r">Closing Cash</th><th class="r">Closing PhonePe</th><th class="r">Closing Bank</th></tr></thead><tbody>${
+    data.map(r=>`<tr style="cursor:pointer" onclick="$('sDate').value='${r.sheet_date}';loadSheet();window.scrollTo(0,0)">
+      <td>${dmy(r.sheet_date)}</td><td class="r">${fmt(r.closing_cash)}</td><td class="r">${fmt(r.closing_phonepe)}</td><td class="r">${fmt(r.closing_bank)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+loadSheet();
+loadList();
+</script>
+</body>
+</html>
