@@ -72,7 +72,8 @@
     <span class="role-badge" id="uChipRole"></span>
     <button class="btn-ghost" id="btnPwd">Change Password</button>
     <button class="btn-ghost" id="btnLogout">Logout</button>
-    <button class="btn-ghost" id="btnPublish" style="display:none">🚀 Publish Update</button>  </div>
+    <button class="btn-ghost" id="btnPublish" style="display:none">🚀 Publish Update</button>
+  </div>
 </header>
 
 <div class="layout">
@@ -223,21 +224,19 @@ btnPublish.onclick = async () => {
 
         if (Notification.permission === 'granted') {
           await BNH_PUSH.sync(sb, user);            // keep this device registered
-        } else if (Notification.permission === 'denied') {
-          // The browser will not ask again; show how to switch it back on.
-          text.textContent = 'Notifications are blocked for this app. Open your phone/browser settings → Site settings (or App settings) → Notifications → Allow, then reopen the app.';
-          enableBtn.style.display = 'none';
-          show(modal);
         } else {
-          // 'default' → not enabled yet: ask on EVERY app open until the user allows
+          // Not enabled yet → show the popup on EVERY app open until the user allows.
+          // One tap on the button asks the browser for permission and registers the device.
           enableBtn.onclick = async () => {
             err.textContent = '';
             try {
               await BNH_PUSH.enable(sb, user);
               hide(modal);
             } catch (e) {
-              err.textContent = e.message;
-              if (Notification.permission === 'denied') enableBtn.style.display = 'none';
+              // Only reached if the browser refused (user chose Block, or it was blocked earlier)
+              err.textContent = Notification.permission === 'denied'
+                ? 'Notifications are blocked on this phone. Open phone Settings → Apps → Bhagirathy → Notifications → Allow (or Chrome → Site settings → Notifications → Allow), then tap Enable again.'
+                : e.message;
             }
           };
           show(modal);
