@@ -79,6 +79,44 @@ self.addEventListener('message', event => {
   }
 });
 
+// ── Push: show a notification when the server pushes one ─────────────────────
+// Delivered by the push service as soon as the phone is online, even if the
+// app is closed. (Separate from the Publish Update / SW_UPDATED logic above.)
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; }
+  catch (e) { data = { title: 'Bhagirathy Nursing Home', body: event.data ? event.data.text() : '' }; }
+
+  const title = data.title || 'Bhagirathy Nursing Home';
+  const options = {
+    body: data.body || '',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
+    tag: data.id || undefined,          // same id = replaces instead of stacking
+    data: { url: data.url || '/webapp/app.html', id: data.id || null },
+    vibrate: [100, 50, 100]
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// ── Click: open the app (or focus it if already open) ────────────────────────
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target = new URL(
+    (event.notification.data && event.notification.data.url) || '/webapp/app.html',
+    self.location.origin
+  ).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      for (const c of clients) {
+        if (c.url.includes('/webapp/') && 'focus' in c) return c.focus();
+      }
+      return self.clients.openWindow(target);
+    })
+  );
+});
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 // Fetch fresh from the server, skipping the browser's HTTP cache.
 // (GitHub Pages sends max-age=600, which is why users saw stale files.)
