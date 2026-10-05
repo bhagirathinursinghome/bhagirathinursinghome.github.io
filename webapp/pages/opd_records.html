@@ -256,6 +256,37 @@
   let editMode=null, editRecordId=null;
   const IPP=20;
 
+
+  /* fetch every row (Supabase returns max 1000 per request) */
+  async function fetchAll(make, orderCol) {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      let q = make();
+      if (orderCol) q = q.order(orderCol, { ascending: true });
+      const { data, error } = await q.range(from, from + 999);
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    return out;
+  }
+  async function fetchAllSafe(make) {
+    try { return await fetchAll(make, 'id'); }
+    catch (e) { return await fetchAll(make, null); }
+  }
+
+  let billByCase={};
+  let testRowsByCase={};
+  function discPct(disc,bill){disc=Number(disc||0);bill=Number(bill||0);return(disc>0&&bill>0)?(Math.round(disc/bill*1000)/10)+'%':'';}
+  function recomputeDue(){
+    Object.keys(cashByCase).forEach(cn=>{
+      const cas=allCases.find(x=>(x.case_no||'').trim()===cn);
+      const bill=Number(cas?.total_amount||0)||billByCase[cn]||0;
+      cashByCase[cn].due=Math.max(0,bill-cashByCase[cn].paid-cashByCase[cn].discount);
+    });
+    allCases.forEach(c=>{ if(!Number(c.total_amount||0)&&billByCase[(c.case_no||'').trim()]) c.total_amount=billByCase[(c.case_no||'').trim()]; });
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────
   function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
   function fmt(n){return n!=null&&n!==''?'₹'+Number(n).toLocaleString('en-IN'):'—';}
@@ -287,34 +318,34 @@
 
   // ── Load data ─────────────────────────────────────────────────────────────
   async function loadAllCases(){
-    const{data,error}=await BNH_PAGE.sb.from('opd_case')
-      .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,refer_amount,refer_payment_status,refer_payment_id,type,ipd_link,created_at,updated_at,cancel_remark,cancelled_by,cancelled_at')
-      .order('case_date',{ascending:false});
-    if(error){showErr('Load cases: '+error.message);return;}
-    allCases=data||[];
-    renderCaseStats();
-    filterAll();
-    filterCompleted();
+    try{
+      allCases=await fetchAll(()=>BNH_PAGE.sb.from('opd_case')
+        .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,refer_amount,refer_payment_status,refer_payment_id,type,ipd_link,created_at,updated_at,cancel_remark,cancelled_by,cancelled_at'),'case_no');
+    }catch(error){showErr('Load cases: '+error.message);return;}
+    allCases.sort((a,b)=>String(b.case_date||'').localeCompare(String(a.case_date||'')));
   }
 
   async function loadTests(){
-    const{data,error}=await BNH_PAGE.sb.from('opd_test')
-      .select('case_number,test_name,test_amount,case_date,patient_name,created_by_name');
-    if(error){console.warn('opd_test:',error.message);return;}
-    allTests=data||[];
-    testsByCase={};
+    try{
+      allTests=await fetchAllSafe(()=>BNH_PAGE.sb.from('opd_test')
+        .select('case_number,test_name,test_amount,case_date,patient_name,created_by_name'));
+    }catch(e){console.warn('opd_test:',e.message);return;}
+    testsByCase={};billByCase={};testRowsByCase={};
     allTests.forEach(r=>{
-      if(!testsByCase[r.case_number])testsByCase[r.case_number]=[];
-      if(r.test_name&&!testsByCase[r.case_number].includes(r.test_name))
-        testsByCase[r.case_number].push(r.test_name);
+      const cn=(r.case_number||'').trim();
+      if(!testRowsByCase[cn])testRowsByCase[cn]=[];
+      testRowsByCase[cn].push({name:r.test_name||'—',amount:Number(r.test_amount||0)});
+      if(!testsByCase[cn])testsByCase[cn]=[];
+      if(r.test_name&&!testsByCase[cn].includes(r.test_name))testsByCase[cn].push(r.test_name);
+      billByCase[cn]=(billByCase[cn]||0)+Number(r.test_amount||0);
     });
   }
 
   async function loadCashRegister(){
-    const{data,error}=await BNH_PAGE.sb.from('opd_cash_register')
-      .select('*').order('transaction_date',{ascending:false});
-    if(error){console.warn('opd_cash_register:',error.message);return;}
-    allCashRows=data||[];
+    try{
+      allCashRows=await fetchAllSafe(()=>BNH_PAGE.sb.from('opd_cash_register').select('*'));
+    }catch(e){console.warn('opd_cash_register:',e.message);return;}
+    allCashRows.sort((a,b)=>String(b.transaction_date||'').localeCompare(String(a.transaction_date||'')));
 
     // Build cashByCase index
     cashByCase={};
@@ -324,12 +355,6 @@
       cashByCase[cn].paid     +=Number(r.income||0);
       cashByCase[cn].discount +=Number(r.discount||0);
       cashByCase[cn].rows.push(r);
-    });
-    // Compute due per case using total_amount from allCases
-    Object.keys(cashByCase).forEach(cn=>{
-      const cas=allCases.find(x=>x.case_no===cn);
-      const bill=Number(cas?.total_amount||0);
-      cashByCase[cn].due=Math.max(0,bill-cashByCase[cn].paid-cashByCase[cn].discount);
     });
 
     buildCashEntryByFilter();
@@ -371,7 +396,7 @@
       <div class="stat-box"><div class="val" style="color:#28a745">${completed}</div><div class="lbl">Completed</div></div>
       <div class="stat-box"><div class="val" style="color:#dc3545">${cancelled}</div><div class="lbl">Cancelled</div></div>
       <div class="stat-box"><div class="val">${fmt(tBill)}</div><div class="lbl">Total Bill</div></div>
-      <div class="stat-box"><div class="val" style="color:#6c757d">${fmt(tDisc)}</div><div class="lbl">Discount</div></div>
+      <div class="stat-box"><div class="val" style="color:#6c757d">${fmt(tDisc)}</div><div class="lbl">Discount${discPct(tDisc,tBill)?' ('+discPct(tDisc,tBill)+')':''}</div></div>
       <div class="stat-box"><div class="val" style="color:#28a745">${fmt(tPaid)}</div><div class="lbl">Total Paid</div></div>
       <div class="stat-box"><div class="val" style="color:#dc3545">${fmt(tBill-tPaid-tDisc)}</div><div class="lbl">Total Due</div></div>`;
     document.getElementById('statsAll').innerHTML=html;
@@ -384,7 +409,7 @@
     const rows=records.slice((page-1)*IPP,page*IPP);
     div.innerHTML=`<table>
       <thead><tr>
-        <th>Case No</th><th>Date</th><th>Patient</th><th>Bill</th><th>Paid</th><th>Discount</th><th>Due</th>
+        <th>Case No</th><th>Date</th><th>Patient</th><th>Bill</th><th>Paid</th><th>Discount</th><th>Disc %</th><th>Due</th>
         <th>Type</th><th>Refer</th><th>IPD Link</th><th>Pay Status</th><th>Refer Pay</th><th>Status</th>
       </tr></thead>
       <tbody>${rows.map(r=>{
@@ -409,6 +434,7 @@
           <td>${fmt(r.total_amount)}</td>
           <td style="color:#28a745">${fmt(c.paid)}</td>
           <td style="color:#6c757d">${c.discount>0?fmt(c.discount):'—'}</td>
+          <td style="color:#6c757d">${discPct(c.discount,r.total_amount)||'—'}</td>
           <td style="color:${c.due>0?'#dc3545':'#28a745'}">${fmt(c.due)}</td>
           <td><span style="font-size:.78rem;color:#555">${esc(r.type||'—')}</span></td>
           <td>${esc(r.refer_name||'—')}</td>
@@ -560,8 +586,14 @@
       const tests=(testsByCase[caseNo]||[]);
 
       // Tests section
+      const trows=testRowsByCase[caseNo]||[];
+      const testsTotal=trows.reduce((a,t)=>a+t.amount,0);
       const testsHTML=`<div class="detail-section"><h3>🧪 Tests Performed</h3>
-        <p style="color:#555;font-size:.88rem;margin:0">${tests.length?esc(tests.join(', ')):'<span style="color:#aaa">No test records found.</span>'}</p>
+        ${trows.length?`<table class="cash-table">
+          <thead><tr><th>#</th><th>Test</th><th style="text-align:right">Amount</th></tr></thead>
+          <tbody>${trows.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(t.name)}</td><td style="text-align:right">${fmt(t.amount)}</td></tr>`).join('')}</tbody>
+          <tfoot><tr><td></td><td style="font-weight:700">Total Amount</td><td style="text-align:right;font-weight:700">${fmt(testsTotal)}</td></tr></tfoot>
+        </table>`:'<span style="color:#aaa;font-size:.88rem">No test records found.</span>'}
       </div>`;
 
       // Cash register for this case
@@ -570,12 +602,13 @@
       if(casePayments.length){
         cashHTML=`<div class="detail-section"><h3>💵 Cash Register Entries</h3>
           <table class="cash-table">
-            <thead><tr><th>Trans Date</th><th>Trans No</th><th>Income</th><th>Discount</th><th>Net</th><th>Entry By</th></tr></thead>
+            <thead><tr><th>Trans Date</th><th>Trans No</th><th>Income</th><th>Discount</th><th>Disc %</th><th>Net</th><th>Entry By</th></tr></thead>
             <tbody>${casePayments.map(p=>`<tr>
               <td>${fmtDate(p.transaction_date)}</td>
               <td style="font-size:.8rem">${esc(p.transaction_no||'—')}</td>
               <td style="color:#28a745;font-weight:600">${fmt(p.income)}</td>
               <td style="color:#6c757d">${Number(p.discount||0)>0?fmt(p.discount):'—'}</td>
+              <td style="color:#6c757d">${discPct(p.discount,r.total_amount)||'—'}</td>
               <td style="font-weight:700">${fmt(Number(p.income||0)-Number(p.discount||0))}</td>
               <td style="font-size:.8rem;color:#666">${esc(p.entry_by||p.created_by_name||'—')}</td>
             </tr>`).join('')}</tbody>
@@ -651,6 +684,7 @@
             <div><div class="amount-label">Bill Amount</div><div class="amount-value">${fmt(r.total_amount)}</div></div>
             <div><div class="amount-label">Total Paid</div><div class="amount-value" style="color:#28a745">${fmt(c.paid)}</div></div>
             <div><div class="amount-label">Discount</div><div class="amount-value" style="color:#6c757d">${fmt(c.discount)}</div></div>
+            <div><div class="amount-label">Discount %</div><div class="amount-value" style="color:#6c757d">${discPct(c.discount,r.total_amount)||'0%'}</div></div>
             <div><div class="amount-label">Due Amount</div><div class="amount-value" style="color:${c.due>0?'#dc3545':'#28a745'}">${fmt(c.due)}</div></div>
             <div><div class="amount-label">Status</div><div class="amount-value" style="font-size:.9rem;color:${ps.s==='paid'?'#28a745':ps.s==='due'?'#dc3545':'#ff9800'}">${ps.t}</div></div>
           </div>
@@ -828,6 +862,7 @@
       const tasks=[loadAllCases(), loadTests(), loadCashRegister(), loadReferPayments()];
       if(isFullAccess)tasks.push(loadUploads(), loadPaymentsData());
       await Promise.all(tasks);
+      recomputeDue();
       // Re-run stats after cash is loaded (cashByCase now populated)
       renderCaseStats();
       filterAll();
