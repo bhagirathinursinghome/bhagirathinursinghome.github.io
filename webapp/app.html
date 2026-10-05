@@ -72,6 +72,7 @@
     <span class="role-badge" id="uChipRole"></span>
     <button class="btn-ghost" id="btnPwd">Change Password</button>
     <button class="btn-ghost" id="btnLogout">Logout</button>
+    <button class="btn-ghost" id="btnPublish" style="display:none">🚀 Publish Update</button>
   </div>
 </header>
 
@@ -114,6 +115,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/auth.js"></script>
 <script src="assets/menu.js"></script>
+<script src="assets/updater.js"></script>
 <script>
   const spinner = document.getElementById('spinner');
   const show = el => el.classList.remove('hidden');
@@ -170,6 +172,21 @@
       document.getElementById('pwdErr').textContent = err.message;
     } finally { hide(spinner); }
   };
+
+  // Publish Update (admin only) ----------------------------------------------------------------
+const btnPublish = document.getElementById('btnPublish');
+if (user.role === 'admin') btnPublish.style.display = '';
+btnPublish.onclick = async () => {
+  if (!confirm('Push update popup to ALL users now?')) return;
+  const note = prompt('What changed? (shown to users, optional)', 'New update is ready.');
+  if (note === null) return;
+  show(spinner);
+  try {
+    await BNH_UPDATER.publish(note);
+    alert('Update published. Users will see the popup within a minute.');
+  } catch (err) { alert('Failed: ' + err.message); }
+  finally { hide(spinner); }
+};
 </script>
 </body>
 </html>
