@@ -353,10 +353,15 @@
       roles: ["admin", "accountant", "pharmacy", "viewer"],
       group: "Reports"
     },
-    { label: "Daily Sheet", 
+    { label: "Pharmecy Daily Sheet", 
       icon: "📊", 
       page: "pages/pharmacy-daily-sheet.html",
       roles: ["admin","accountant","pharmacy"],
+      group: "Reports" },
+        { label: "BHC Daily Sheet", 
+      icon: "📊", 
+      page: "pages/daily_sheet.html",
+      roles: ["admin","accountant"],
       group: "Reports" },
     {
       label: "Pharmacy Extra Pay",
