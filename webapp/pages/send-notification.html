@@ -65,14 +65,9 @@
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   // The shared secret (ADMIN_SEND_KEY) is asked once per browser session.
-  function adminKey() {
-    let k = sessionStorage.getItem('bnh_admin_send_key');
-    if (!k) {
-      k = prompt('Enter the admin send key:');
-      if (k) sessionStorage.setItem('bnh_admin_send_key', k);
-    }
-    return k;
-  }
+function adminKey() {
+  return window.BNH_ADMIN_SEND_KEY;
+}
 
   async function loadHistory() {
     const { data, error } = await BNH_PAGE.sb.from('notifications')
@@ -110,7 +105,6 @@
         body: { notification_id: row.id }
       });
       if (fnErr) {
-        sessionStorage.removeItem('bnh_admin_send_key'); // in case the key was wrong
         throw fnErr;
       }
 
