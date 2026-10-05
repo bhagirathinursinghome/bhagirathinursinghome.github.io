@@ -72,9 +72,7 @@
     <span class="role-badge" id="uChipRole"></span>
     <button class="btn-ghost" id="btnPwd">Change Password</button>
     <button class="btn-ghost" id="btnLogout">Logout</button>
-    <button class="btn-ghost" id="btnPublish" style="display:none">🚀 Publish Update</button>
-    <button class="btn-ghost" id="btnNotify" style="display:none">🔔 Enable Notifications</button>
-  </div>
+    <button class="btn-ghost" id="btnPublish" style="display:none">🚀 Publish Update</button>  </div>
 </header>
 
 <div class="layout">
@@ -109,6 +107,20 @@
       </div>
       <p class="err" id="pwdErr"></p>
     </form>
+  </div>
+</div>
+
+<!-- Notification permission popup (shown on every app open until enabled) -->
+<div class="modal hidden" id="notifModal">
+  <div class="modal-card" style="text-align:center">
+    <div style="font-size:2.5rem">🔔</div>
+    <h3>Turn on notifications</h3>
+    <p id="notifText">Allow notifications so you get important updates from Bhagirathy Nursing Home on your phone, even when the app is closed.</p>
+    <p class="err" id="notifErr"></p>
+    <div class="modal-actions" style="justify-content:center">
+      <button type="button" class="btn-ghost" id="notifLater">Not now</button>
+      <button type="button" class="btn-primary" id="notifEnable">Enable Notifications</button>
+    </div>
   </div>
 </div>
 
@@ -203,18 +215,32 @@ btnPublish.onclick = async () => {
         await loadScript('assets/page.js');
         await loadScript('assets/push.js');
         const sb = BNH_PAGE.sb;
-        const btn = document.getElementById('btnNotify');
+        const modal = document.getElementById('notifModal');
+        const text = document.getElementById('notifText');
+        const err = document.getElementById('notifErr');
+        const enableBtn = document.getElementById('notifEnable');
+        document.getElementById('notifLater').onclick = () => hide(modal);
+
         if (Notification.permission === 'granted') {
           await BNH_PUSH.sync(sb, user);            // keep this device registered
-        } else if (Notification.permission === 'default') {
-          btn.style.display = '';
-          btn.onclick = async () => {
+        } else if (Notification.permission === 'denied') {
+          // The browser will not ask again; show how to switch it back on.
+          text.textContent = 'Notifications are blocked for this app. Open your phone/browser settings → Site settings (or App settings) → Notifications → Allow, then reopen the app.';
+          enableBtn.style.display = 'none';
+          show(modal);
+        } else {
+          // 'default' → not enabled yet: ask on EVERY app open until the user allows
+          enableBtn.onclick = async () => {
+            err.textContent = '';
             try {
               await BNH_PUSH.enable(sb, user);
-              btn.style.display = 'none';
-              alert('Notifications enabled on this device.');
-            } catch (err) { alert(err.message); }
+              hide(modal);
+            } catch (e) {
+              err.textContent = e.message;
+              if (Notification.permission === 'denied') enableBtn.style.display = 'none';
+            }
           };
+          show(modal);
         }
       } catch (e) { console.warn('[Push] setup skipped:', e); }
     })();
