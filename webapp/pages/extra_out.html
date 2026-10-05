@@ -35,6 +35,16 @@
     .chip.active{background:#4338ca;color:#fff;border-color:#4338ca}
     .section-title{font-size:.9rem;font-weight:700;color:#312e81;margin:1.2rem 0 .5rem;
                     padding-bottom:.3rem;border-bottom:1px solid #e0e7ff}
+  
+    .mini-btn{border:none;background:#f3f4f6;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:.8rem;margin-left:3px}
+    .mini-btn.del{background:#fee2e2}
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}
+    .modal-box{background:#fff;border-radius:12px;padding:1.2rem;width:100%;max-width:460px;max-height:90vh;overflow:auto}
+    .modal-box h3{margin:0 0 .8rem;font-size:1rem}
+    .modal-box .mf{margin-bottom:.6rem}
+    .modal-box .mf label{display:block;font-size:.8rem;margin-bottom:.2rem}
+    .modal-box .mf input,.modal-box .mf select{width:100%;box-sizing:border-box}
+    .modal-actions{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem}
   </style>
 </head>
 <body>
@@ -159,6 +169,107 @@
   let allRepayments = [];
   let outstandingFilter = 'all';
 
+
+  // ===== Admin edit / delete =====
+  const IS_ADMIN = !!(BNH_PAGE.user && BNH_PAGE.user.role === 'admin');
+  const adminTh = () => IS_ADMIN ? '<th></th>' : '';
+  const actionTd = (table, id) => IS_ADMIN
+    ? `<td class="r" style="white-space:nowrap"><button type="button" class="mini-btn" title="Edit" onclick="openEdit('${table}','${id}')">✏️</button><button type="button" class="mini-btn del" title="Delete" onclick="deleteRow('${table}','${id}')">🗑️</button></td>`
+    : '';
+  const adminTd = () => IS_ADMIN ? '<td></td>' : '';
+
+  const EDIT_SCHEMA = {
+    extra_out: {
+      title: 'Edit Extra Out',
+      fields: [
+        {key:'date', label:'Date', type:'date', required:true},
+        {key:'name', label:'Name', type:'text', required:true},
+        {key:'amount', label:'Amount', type:'number'},
+        {key:'given_by', label:'Given By', type:'select', options:[['reception','Reception'],['accountant','Accountant']]},
+        {key:'reason', label:'Reason', type:'text'}
+      ]
+    },
+    extra_out_repayment: {
+      title: 'Edit Repayment',
+      fields: [
+        {key:'date', label:'Date', type:'date', required:true},
+        {key:'name', label:'Name', type:'text', required:true},
+        {key:'amount', label:'Amount Repaid', type:'number'},
+        {key:'mode', label:'Mode', type:'select', options:[['money','Money (Cash)'],['voucher','Voucher']]},
+        {key:'voucher_no', label:'Voucher No.', type:'text'},
+        {key:'remark', label:'Remark', type:'text'}
+      ],
+      validate: u => (u.mode==='voucher' && !u.voucher_no) ? 'Please enter the voucher number.' : ''
+    }
+  };
+
+  function fieldOptions(f, row) {
+    return typeof f.options === 'function' ? f.options(row) : f.options;
+  }
+
+  async function openEdit(table, id) {
+    if (!IS_ADMIN) return;
+    const { data: row, error } = await BNH_PAGE.sb.from(table).select('*').eq('id', id).single();
+    if (error || !row) { alert(error ? error.message : 'Entry not found.'); return; }
+    const schema = EDIT_SCHEMA[table];
+    const bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    const fieldsHtml = schema.fields.map(f => {
+      const v = row[f.key] == null ? '' : row[f.key];
+      if (f.type === 'select') {
+        const opts = fieldOptions(f, row).map(o => `<option value="${o[0]}" ${String(o[0])===String(v)?'selected':''}>${o[1]}</option>`).join('');
+        return `<div class="mf"><label>${f.label}</label><select data-k="${f.key}">${opts}</select></div>`;
+      }
+      const extra = f.type === 'number' ? 'step="0.01" min="0.01"' : '';
+      return `<div class="mf"><label>${f.label}</label><input data-k="${f.key}" type="${f.type}" ${extra} value="${String(v).replace(/"/g,'&quot;')}"/></div>`;
+    }).join('');
+    bg.innerHTML = `<div class="modal-box"><h3>${schema.title}</h3>${fieldsHtml}
+      <p class="err" id="editErr"></p>
+      <div class="modal-actions">
+        <button type="button" class="mini-btn" id="editCancel" style="padding:.5rem 1rem">Cancel</button>
+        <button type="button" class="btn-primary" id="editSave" style="width:auto">Save changes</button>
+      </div></div>`;
+    document.body.appendChild(bg);
+    if (schema.onOpen) schema.onOpen(bg);
+    bg.querySelector('#editCancel').onclick = () => bg.remove();
+    bg.querySelector('#editSave').onclick = async () => {
+      const errEl = bg.querySelector('#editErr'); errEl.textContent = '';
+      const upd = {};
+      for (const f of schema.fields) {
+        const el = bg.querySelector(`[data-k="${f.key}"]`);
+        let val = el.value.trim();
+        if (f.type === 'number') {
+          val = parseFloat(val);
+          if (!(val > 0)) { errEl.textContent = 'Enter a valid amount.'; return; }
+        } else if (f.required && !val) { errEl.textContent = f.label + ' is required.'; return; }
+        else if (val === '') val = null;
+        upd[f.key] = val;
+      }
+      if (schema.validate) { const msg = schema.validate(upd); if (msg) { errEl.textContent = msg; return; } }
+      const { data, error } = await BNH_PAGE.sb.from(table).update(upd).eq('id', id).select();
+      if (error) { errEl.textContent = error.message; return; }
+      if (!data || !data.length) { errEl.textContent = 'Nothing was updated. Check database permissions (RLS) for admin.'; return; }
+      bg.remove();
+      afterChange();
+    };
+  }
+
+  async function deleteRow(table, id) {
+    if (!IS_ADMIN) return;
+    if (!confirm('Delete this entry permanently? This cannot be undone.')) return;
+    const { data, error } = await BNH_PAGE.sb.from(table).delete().eq('id', id).select();
+    if (error) { alert(error.message); return; }
+    if (!data || !data.length) { alert('Nothing was deleted. Check database permissions (RLS) for admin.'); return; }
+    afterChange();
+  }
+
+  function afterChange() {
+    loadOutstanding();
+    loadRecentExtraOut();
+    loadRecentRepayments();
+    if (document.getElementById('histFrom').value && document.getElementById('histTo').value) loadHistory();
+  }
+
   function showTab(name) {
     ['report','extraout','adjust'].forEach(t=>{
       document.getElementById('tab-'+t).classList.toggle('hidden', t!==name);
@@ -246,24 +357,24 @@
     if (!rows.length) { box.innerHTML = '<p>No entries in this range.</p>'; return; }
     let totalOut=0, totalRepay=0;
     box.innerHTML = `<table><thead><tr>
-        <th>Date</th><th>Type</th><th>Name</th><th class="r">Amount</th><th>Details</th><th>Recorded By</th>
+        <th>Date</th><th>Type</th><th>Name</th><th class="r">Amount</th><th>Details</th><th>Recorded By</th>${adminTh()}
       </tr></thead><tbody>${rows.map(r=>{
         if (r.type==='out') {
           totalOut += Number(r.amount);
           return `<tr><td>${r.date}</td><td><span class="badge badge-out">Extra Out</span></td>
             <td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
             <td>Given by ${r.given_by}${r.reason? ' — '+r.reason:''}</td>
-            <td>${r.recorded_by_name||''}</td></tr>`;
+            <td>${r.recorded_by_name||''}</td>${actionTd('extra_out',r.id)}</tr>`;
         } else {
           totalRepay += Number(r.amount);
           return `<tr><td>${r.date}</td><td><span class="badge badge-repay">Repayment</span></td>
             <td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
             <td>${r.mode}${r.voucher_no? ' #'+r.voucher_no:''}${r.remark? ' — '+r.remark:''}</td>
-            <td>${r.recorded_by_name||''}</td></tr>`;
+            <td>${r.recorded_by_name||''}</td>${actionTd('extra_out_repayment',r.id)}</tr>`;
         }
       }).join('')}</tbody>
       <tfoot><tr><td colspan="3">Totals</td><td class="r">Out ₹${fmt(totalOut)} / Repaid ₹${fmt(totalRepay)}</td>
-      <td colspan="2">Net outstanding this range: ₹${fmt(totalOut-totalRepay)}</td></tr></tfoot></table>`;
+      <td colspan="2">Net outstanding this range: ₹${fmt(totalOut-totalRepay)}</td>${adminTd()}</tr></tfoot></table>`;
   }
 
   async function loadRecentExtraOut() {
@@ -272,9 +383,9 @@
     const { data } = await BNH_PAGE.sb.from('extra_out').select('*').order('date',{ascending:false}).limit(15);
     if (!data || !data.length) { box.innerHTML='<p>No entries yet.</p>'; return; }
     box.innerHTML = `<table><thead><tr><th>Date</th><th>Name</th><th class="r">Amount</th>
-      <th>Given By</th><th>Reason</th><th>Recorded By</th></tr></thead><tbody>${
+      <th>Given By</th><th>Reason</th><th>Recorded By</th>${adminTh()}</tr></thead><tbody>${
       data.map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
-        <td>${r.given_by}</td><td>${r.reason||''}</td><td>${r.recorded_by_name||''}</td></tr>`).join('')
+        <td>${r.given_by}</td><td>${r.reason||''}</td><td>${r.recorded_by_name||''}</td>${actionTd('extra_out',r.id)}</tr>`).join('')
       }</tbody></table>`;
   }
 
@@ -284,10 +395,10 @@
     const { data } = await BNH_PAGE.sb.from('extra_out_repayment').select('*').order('date',{ascending:false}).limit(15);
     if (!data || !data.length) { box.innerHTML='<p>No repayments yet.</p>'; return; }
     box.innerHTML = `<table><thead><tr><th>Date</th><th>Name</th><th class="r">Amount</th>
-      <th>Mode</th><th>Remark</th><th>Recorded By</th></tr></thead><tbody>${
+      <th>Mode</th><th>Remark</th><th>Recorded By</th>${adminTh()}</tr></thead><tbody>${
       data.map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
         <td>${r.mode}${r.voucher_no? ' #'+r.voucher_no:''}</td><td>${r.remark||''}</td>
-        <td>${r.recorded_by_name||''}</td></tr>`).join('')
+        <td>${r.recorded_by_name||''}</td>${actionTd('extra_out_repayment',r.id)}</tr>`).join('')
       }</tbody></table>`;
   }
 
