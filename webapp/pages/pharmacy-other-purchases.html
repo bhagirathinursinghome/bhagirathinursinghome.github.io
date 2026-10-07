@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Other Purchases – Pharmacy</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .form-row > * { flex:1; min-width:180px; }
+    .notice { background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:10px; padding:.8rem 1rem;
+              font-size:.84rem; color:#1e40af; margin-bottom:1rem; }
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f0f4ff; padding:9px 10px; text-align:left; font-size:.82rem; color:#4338ca;
+         font-weight:700; border-bottom:2px solid #e0e7ff; }
+    td { padding:8px 10px; border-bottom:1px solid #f0f0f0; font-size:.83rem; vertical-align:middle; }
+    tr:hover td { background:#fafafe; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+    .badge { display:inline-block; padding:2px 9px; border-radius:12px; font-size:.72rem; font-weight:700; }
+    .cat-disp { background:#dbeafe; color:#1e40af; }
+    .cat-ipd  { background:#ede9fe; color:#5b21b6; }
+    .btn-sm { padding:4px 11px; border-radius:6px; font-size:.77rem; font-weight:600; cursor:pointer; border:none; }
+    .btn-edit { background:#e0e7ff; color:#3730a3; }
+    .btn-del  { background:#fee2e2; color:#991b1b; }
+    .filters { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1rem; }
+    .filters > div { min-width:140px; flex:1; }
+    .empty-state { text-align:center; padding:2rem 1rem; color:#9ca3af; font-size:.9rem; }
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000;
+                     align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:#fff; border-radius:14px; padding:1.75rem; width:min(94vw,520px); max-height:92vh;
+             overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+    .modal h2 { font-size:1.05rem; margin:0 0 1rem; color:#1e1b4b; }
+    .modal label { display:block; font-size:.82rem; font-weight:600; color:#374151; margin:.65rem 0 .2rem; }
+    .modal input, .modal textarea, .modal select { width:100%; padding:.45rem .7rem; border:1.5px solid #d1d5db;
+      border-radius:8px; font-size:.9rem; box-sizing:border-box; outline:none; background:#fff; }
+    .modal-2col { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
+    .modal-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.25rem; }
+    .btn-cancel { padding:.45rem 1.1rem; border-radius:8px; background:#f3f4f6; color:#374151; font-weight:600; cursor:pointer; border:none; }
+    .btn-save   { padding:.45rem 1.1rem; border-radius:8px; background:#6366f1; color:#fff; font-weight:600; cursor:pointer; border:none; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<!-- EDIT MODAL (admin only) -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2>✏️ Edit Other Purchase</h2>
+    <div class="modal-2col">
+      <div><label>Date *</label><input id="eDate" type="date"/></div>
+      <div><label>Bill / Invoice No.</label><input id="eBill" type="text"/></div>
+    </div>
+    <label>Supplier *</label><select id="eSupplier"></select>
+    <div class="modal-2col">
+      <div><label>Category *</label>
+        <select id="eCategory"><option>Dispensary</option><option>IPD</option></select></div>
+      <div><label>Amount (₹) *</label><input id="eAmount" type="number" min="0.01" step="0.01"/></div>
+    </div>
+    <label>Item / Description *</label><input id="eItem" type="text"/>
+    <label>Remark</label><textarea id="eRemark" rows="2"></textarea>
+    <p class="err" id="eErr"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
+      <button class="btn-save" onclick="saveEdit()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <h1>🧾 Other Purchases</h1>
+
+  <div class="notice">
+    ℹ️ Use this page for <strong>non-medicine</strong> items bought from a supplier (equipment, consumables,
+    stationery, packaging, etc.). The amount is added to the supplier's <strong>due</strong>, but it does
+    <strong>not</strong> change medicine stock or the medicine purchase records.
+  </div>
+
+  <div class="page-card">
+    <h2 style="font-size:1rem;margin-bottom:1rem">➕ New Other Purchase</h2>
+    <form id="opForm">
+      <label>Recorded By</label>
+      <input id="recBy" readonly />
+      <div class="form-row" style="margin-top:.65rem">
+        <div><label>Date <span style="color:red">*</span></label><input id="opDate" type="date" required/></div>
+        <div><label>Supplier <span style="color:red">*</span></label>
+          <select id="opSupplier" required><option value="">-- Select Supplier --</option></select></div>
+        <div><label>Category <span style="color:red">*</span></label>
+          <select id="opCategory" required>
+            <option value="">-- Select Category --</option>
+            <option value="Dispensary">Dispensary</option>
+            <option value="IPD">IPD</option>
+          </select></div>
+      </div>
+      <div class="form-row" style="margin-top:.65rem">
+        <div style="flex:2"><label>Item / Description <span style="color:red">*</span></label>
+          <input id="opItem" type="text" placeholder="e.g. Weighing machine, printer paper…" required/></div>
+        <div><label>Bill / Invoice No.</label><input id="opBill" type="text" placeholder="Optional"/></div>
+        <div><label>Amount (₹) <span style="color:red">*</span></label>
+          <input id="opAmount" type="number" min="0.01" step="0.01" required/></div>
+      </div>
+      <label style="margin-top:.65rem;display:block">Remark</label>
+      <textarea id="opRemark" rows="2" placeholder="Optional…"></textarea>
+      <div style="margin-top:1rem">
+        <button type="submit" class="btn-primary" style="width:auto">💾 Save Purchase</button>
+      </div>
+      <p class="err" id="opErr"></p>
+      <p class="info" id="opOk" style="display:none"></p>
+    </form>
+  </div>
+
+  <div class="page-card" style="margin-top:1.5rem">
+    <h2 style="font-size:1rem;margin-bottom:.9rem">📋 Other Purchase Records</h2>
+    <div class="filters">
+      <div><label>From</label><input id="fFrom" type="date" onchange="renderList()"/></div>
+      <div><label>To</label><input id="fTo" type="date" onchange="renderList()"/></div>
+      <div><label>Supplier</label>
+        <select id="fSupplier" onchange="renderList()"><option value="">All suppliers</option></select></div>
+      <div><label>Category</label>
+        <select id="fCategory" onchange="renderList()">
+          <option value="">All</option><option>Dispensary</option><option>IPD</option>
+        </select></div>
+    </div>
+    <div id="listWrap">Loading…</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  const FULL_ACCESS_ROLES = ["admin"];                         // can edit / delete records
+  BNH_PAGE.requireRole(["admin", "manager", "pharmacy", "accountant"]);
+  const isFull = FULL_ACCESS_ROLES.includes(BNH_PAGE.user.role);
+
+  const TABLE = 'pharmacy_other_purchases';
+  const num = v => parseFloat(v || 0) || 0;
+  const fmt = n => '₹' + num(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const spin = show => document.getElementById('spinner').classList[show ? 'remove' : 'add']('hidden');
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                     .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const catBadge = c => `<span class="badge ${c === 'IPD' ? 'cat-ipd' : 'cat-disp'}">${c === 'IPD' ? 'IPD' : 'Dispensary'}</span>`;
+
+  let suppliers = [], rows = [], editingId = null;
+  const today = new Date().toISOString().slice(0, 10);
+
+  document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+  document.getElementById('opDate').value = today;
+  document.getElementById('fFrom').value = today.slice(0, 7) + '-01';
+  document.getElementById('fTo').value = today;
+
+  function fill(selId, list, keepFirst) {
+    const sel = document.getElementById(selId), cur = sel.value;
+    while (sel.options.length > (keepFirst ? 1 : 0)) sel.remove(keepFirst ? 1 : 0);
+    list.forEach(n => { const o = document.createElement('option'); o.value = o.textContent = n; sel.appendChild(o); });
+    if (cur) sel.value = cur;
+  }
+
+  async function loadSuppliers() {
+    const { data, error } = await BNH_PAGE.sb.from('pharmacy_suppliers').select('supplier_name,is_active').order('supplier_name');
+    if (error) { document.getElementById('opErr').textContent = error.message; return; }
+    suppliers = data || [];
+    fill('opSupplier', suppliers.filter(s => s.is_active !== false).map(s => s.supplier_name), true);
+    fill('fSupplier',  suppliers.map(s => s.supplier_name), true);
+  }
+
+  async function loadRows() {
+    const wrap = document.getElementById('listWrap');
+    let all = [], from = 0;
+    while (true) {
+      const { data, error } = await BNH_PAGE.sb.from(TABLE).select('*').order('purchase_date', { ascending: false }).range(from, from + 999);
+      if (error) { wrap.innerHTML = `<p class="err">${esc(error.message)}<br>Run <b>pharmacy-other-purchases.sql</b> in Supabase if the table is missing.</p>`; return; }
+      all = all.concat(data || []);
+      if (!data || data.length < 1000) break;
+      from += 1000;
+    }
+    rows = all;
+    renderList();
+  }
+
+  function renderList() {
+    const wrap = document.getElementById('listWrap');
+    const f = document.getElementById('fFrom').value, t = document.getElementById('fTo').value;
+    const s = document.getElementById('fSupplier').value, c = document.getElementById('fCategory').value;
+    const list = rows.filter(r => (!f || r.purchase_date >= f) && (!t || r.purchase_date <= t) &&
+                                  (!s || r.supplier_name === s) && (!c || (r.category || 'Dispensary') === c));
+    if (!list.length) { wrap.innerHTML = '<div class="empty-state">No other purchases found for this filter.</div>'; return; }
+    const total = list.reduce((a, r) => a + num(r.amount), 0);
+    const actHead = isFull ? '<th>Actions</th>' : '';
+    const body = list.map(r => `<tr>
+      <td>${r.purchase_date}</td>
+      <td><strong>${esc(r.supplier_name)}</strong></td>
+      <td>${catBadge(r.category)}</td>
+      <td>${esc(r.item_description)}</td>
+      <td>${r.bill_no ? esc(r.bill_no) : '<span style="color:#ccc">—</span>'}</td>
+      <td class="r">${fmt(r.amount)}</td>
+      <td>${r.remark ? esc(r.remark) : '<span style="color:#ccc">—</span>'}</td>
+      <td>${esc(r.recorded_by_name || r.recorded_by || '—')}</td>
+      ${isFull ? `<td><div style="display:flex;gap:.35rem">
+        <button class="btn-sm btn-edit" onclick="openEdit('${r.id}')">✏️ Edit</button>
+        <button class="btn-sm btn-del" onclick="delRow('${r.id}')">🗑️</button></div></td>` : ''}
+    </tr>`).join('');
+    wrap.innerHTML = `<div style="overflow-x:auto"><table>
+      <thead><tr><th>Date</th><th>Supplier</th><th>Category</th><th>Item / Description</th><th>Bill No.</th>
+        <th class="r">Amount</th><th>Remark</th><th>By</th>${actHead}</tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td colspan="5" style="text-align:right">Total (${list.length} records)</td>
+        <td class="r">${fmt(total)}</td><td colspan="${isFull ? 3 : 2}"></td></tr></tfoot>
+    </table></div>`;
+  }
+
+  document.getElementById('opForm').onsubmit = async e => {
+    e.preventDefault();
+    const err = document.getElementById('opErr'), ok = document.getElementById('opOk');
+    err.textContent = ''; ok.style.display = 'none';
+    spin(true);
+    try {
+      const payload = BNH_PAGE.stamp({
+        purchase_date:    document.getElementById('opDate').value,
+        supplier_name:    document.getElementById('opSupplier').value,
+        category:         document.getElementById('opCategory').value,
+        item_description: document.getElementById('opItem').value.trim(),
+        bill_no:          document.getElementById('opBill').value.trim() || null,
+        amount:           parseFloat(document.getElementById('opAmount').value),
+        remark:           document.getElementById('opRemark').value.trim() || null
+      });
+      const { error } = await BNH_PAGE.sb.from(TABLE).insert(payload);
+      if (error) throw error;
+      ok.style.display = 'block';
+      ok.textContent = '✅ Purchase saved. Supplier due has been updated.';
+      e.target.reset();
+      document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+      document.getElementById('opDate').value = today;
+      await loadRows();
+    } catch (ex) { err.textContent = ex.message; }
+    finally { spin(false); }
+  };
+
+  // ── Edit / delete (admin only) ──
+  function openEdit(id) {
+    if (!isFull) return;
+    const r = rows.find(x => String(x.id) === String(id)); if (!r) return;
+    editingId = r.id;
+    fill('eSupplier', suppliers.filter(s => s.is_active !== false || s.supplier_name === r.supplier_name).map(s => s.supplier_name), false);
+    document.getElementById('eSupplier').value = r.supplier_name;
+    document.getElementById('eDate').value     = r.purchase_date;
+    document.getElementById('eBill').value     = r.bill_no || '';
+    document.getElementById('eCategory').value = r.category === 'IPD' ? 'IPD' : 'Dispensary';
+    document.getElementById('eAmount').value   = r.amount;
+    document.getElementById('eItem').value     = r.item_description || '';
+    document.getElementById('eRemark').value   = r.remark || '';
+    document.getElementById('eErr').textContent = '';
+    document.getElementById('editModal').classList.add('open');
+  }
+  function closeEdit() { editingId = null; document.getElementById('editModal').classList.remove('open'); }
+  document.getElementById('editModal').addEventListener('click', function (e) { if (e.target === this) closeEdit(); });
+
+  async function saveEdit() {
+    const errEl = document.getElementById('eErr'); errEl.textContent = '';
+    const date = eDate.value, sup = eSupplier.value, cat = eCategory.value,
+          item = eItem.value.trim(), amt = parseFloat(eAmount.value);
+    if (!date || !sup || !cat || !item || isNaN(amt) || amt <= 0) { errEl.textContent = 'All required fields must be filled.'; return; }
+    spin(true);
+    try {
+      const st = BNH_PAGE.stamp({});
+      const { error } = await BNH_PAGE.sb.from(TABLE).update({
+        purchase_date: date, supplier_name: sup, category: cat, item_description: item, amount: amt,
+        bill_no: eBill.value.trim() || null, remark: eRemark.value.trim() || null,
+        updated_by: st.recorded_by, updated_by_name: st.recorded_by_name, updated_at: st.recorded_at
+      }).eq('id', editingId);
+      if (error) throw error;
+      closeEdit(); await loadRows();
+    } catch (ex) { errEl.textContent = ex.message; }
+    finally { spin(false); }
+  }
+
+  async function delRow(id) {
+    if (!isFull) return;
+    const r = rows.find(x => String(x.id) === String(id)); if (!r) return;
+    if (!confirm('Delete this purchase?\n' + r.supplier_name + ' – ' + r.item_description + ' – ' + fmt(r.amount) +
+                 '\n\nThis will reduce the supplier due and cannot be undone.')) return;
+    spin(true);
+    try {
+      const { error } = await BNH_PAGE.sb.from(TABLE).delete().eq('id', r.id);
+      if (error) throw error;
+      await loadRows();
+    } catch (ex) { alert(ex.message); }
+    finally { spin(false); }
+  }
+
+  (async () => { await loadSuppliers(); await loadRows(); })();
+</script>
+</body>
+</html>
