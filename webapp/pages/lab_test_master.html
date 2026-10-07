@@ -94,6 +94,12 @@
           </div>
         </div>
         <div style="margin-top:.75rem">
+          <label>Agent *</label>
+          <select id="testAgent" style="width:100%;padding:.5rem;border:1px solid #ccc;border-radius:6px;font-size:.9rem;">
+            <option value="">— Select Agent —</option>
+          </select>
+        </div>
+        <div style="margin-top:.75rem">
           <label>Biopsy Per Slide Cost (₹) <span style="color:#888;font-size:.8rem">(leave 0 if not biopsy)</span></label>
           <input id="biopsyCost" type="number" min="0" step="0.01" placeholder="0.00"/>
         </div>
@@ -112,9 +118,9 @@
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
-            <th>#</th><th>Test Name</th><th>Test Cost</th><th>Biopsy/Slide</th><th>Added By</th><th>Actions</th>
+            <th>#</th><th>Test Name</th><th>Agent</th><th>Test Cost</th><th>Biopsy/Slide</th><th>Added By</th><th>Actions</th>
           </tr></thead>
-          <tbody id="testsTbody"><tr><td colspan="6" style="text-align:center;color:#888">Loading…</td></tr></tbody>
+          <tbody id="testsTbody"><tr><td colspan="7" style="text-align:center;color:#888">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -240,7 +246,7 @@ function switchTab(e,name){
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   e.target.classList.add('active');
   document.getElementById(name+'-tab').classList.add('active');
-  if(name==='tests' && allTests.length===0) loadTests();
+  if(name==='tests') loadTests();
   if(name==='agents' && allAgents.length===0) loadAgents();
   if(name==='agent-summary') loadSummary();
   if(name==='agent-ledger') loadAgentDropdown();
@@ -256,20 +262,34 @@ function hideMsg(id){ document.getElementById(id).textContent=''; }
 // ══════════ TESTS ══════════
 async function loadTests(){
   spin(true);
+  if(allAgents.length===0){
+    const ar=await sb.from('lab_sample_agent').select('*').order('agent_name');
+    allAgents=ar.data||[];
+    populateTestAgentDropdown();
+  }
   const {data,error}=await sb.from('lab_test_catalogue').select('*').order('test_name');
   spin(false);
   if(error){showErr('testErr',error.message);return;}
   allTests=data||[];
   renderTests(allTests);
 }
+function agentNameById(id){ const a=allAgents.find(x=>x.id===id); return a?a.agent_name:'—'; }
+function populateTestAgentDropdown(){
+  const sel=document.getElementById('testAgent');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Select Agent —</option>'+
+    allAgents.map(a=>`<option value="${a.id}">${esc(a.agent_name)}</option>`).join('');
+  if(cur) sel.value=cur;
+}
 function renderTests(list){
   document.getElementById('testCount').textContent=list.length+' tests';
   const tb=document.getElementById('testsTbody');
-  if(!list.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#888">No tests found</td></tr>';return;}
+  if(!list.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#888">No tests found</td></tr>';return;}
   tb.innerHTML=list.map((t,i)=>`
     <tr>
       <td>${i+1}</td>
       <td><strong>${esc(t.test_name)}</strong></td>
+      <td>${esc(agentNameById(t.agent_id))}</td>
       <td>${fmt(t.test_cost)}</td>
       <td>${parseFloat(t.biopsy_per_slide||0)>0?fmt(t.biopsy_per_slide):'—'}</td>
       <td style="font-size:.78rem;color:#666">${esc(t.recorded_by_name||'')}</td>
@@ -281,7 +301,7 @@ function renderTests(list){
 }
 function filterTests(){
   const q=document.getElementById('testSearch').value.toLowerCase();
-  renderTests(allTests.filter(t=>t.test_name.toLowerCase().includes(q)));
+  renderTests(allTests.filter(t=>t.test_name.toLowerCase().includes(q)||agentNameById(t.agent_id).toLowerCase().includes(q)));
 }
 async function saveTest(){
   hideMsg('testErr');
@@ -289,9 +309,13 @@ async function saveTest(){
   const name=document.getElementById('testName').value.trim();
   const cost=parseFloat(document.getElementById('testCost').value)||0;
   const biopsy=parseFloat(document.getElementById('biopsyCost').value)||0;
+  const agentId=document.getElementById('testAgent').value;
   if(!name||cost<=0){showErr('testErr','Test name and cost are required.');return;}
+  if(!agentId){showErr('testErr','Please select an agent.');return;}
+  const dup=allTests.find(t=>t.agent_id===agentId&&t.test_name.trim().toLowerCase()===name.toLowerCase()&&String(t.id)!==String(id));
+  if(dup){showErr('testErr','This test already has a rate for the selected agent. Edit that row instead.');return;}
   spin(true);
-  const payload=BNH_PAGE.stamp({test_name:name,test_cost:cost,biopsy_per_slide:biopsy});
+  const payload=BNH_PAGE.stamp({test_name:name,agent_id:agentId,test_cost:cost,biopsy_per_slide:biopsy});
   let error;
   if(id){ ({error}=await sb.from('lab_test_catalogue').update(payload).eq('id',id)); }
   else   { ({error}=await sb.from('lab_test_catalogue').insert(payload)); }
@@ -304,6 +328,7 @@ function editTest(t){
   document.getElementById('editTestId').value=t.id;
   document.getElementById('testName').value=t.test_name;
   document.getElementById('testCost').value=t.test_cost;
+  document.getElementById('testAgent').value=t.agent_id||'';
   document.getElementById('biopsyCost').value=t.biopsy_per_slide||0;
   document.getElementById('cancelTestBtn').hidden=false;
   window.scrollTo({top:0,behavior:'smooth'});
@@ -312,6 +337,7 @@ function cancelEditTest(){
   document.getElementById('editTestId').value='';
   document.getElementById('testName').value='';
   document.getElementById('testCost').value='';
+  document.getElementById('testAgent').value='';
   document.getElementById('biopsyCost').value='';
   document.getElementById('cancelTestBtn').hidden=true;
 }
@@ -325,6 +351,8 @@ async function loadAgents(){
   allAgents=data||[];
   renderAgents(allAgents);
   populateLedgerDropdown();
+  populateTestAgentDropdown();
+  if(allTests.length) renderTests(allTests);
 }
 function renderAgents(list){
   document.getElementById('agentCount').textContent=list.length+' agents';
