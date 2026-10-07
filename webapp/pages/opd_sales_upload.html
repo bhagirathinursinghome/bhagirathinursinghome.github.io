@@ -239,6 +239,8 @@
           <span id="dupDetail"></span> — these already exist in Supabase and will be <strong>skipped</strong> during upload.
         </div>
 
+        <div class="dup-banner" id="testDupBanner" style="background:#fff3cd;border-color:#e0a800;color:#856404;"></div>
+
         <div class="summary-grid" id="summaryGrid"></div>
         <div class="reconciliation-box" id="reconciliationBox"></div>
 
@@ -409,6 +411,7 @@ let salesFileObj = null, cashFileObj = null, rcFileObj = null;
 let mergedData   = [];
 let rawSalesRows = [];
 let rawCashRows  = [];
+let droppedTestLines = [];   // repeated (case, test) lines removed as bad Excel data
 let existingCases = new Set();
 
 // receipts state
@@ -719,8 +722,34 @@ async function runNormalizer() {
 
 // ─── merge + reconcile (due = bill − (paid + discount)) ───────────────────
 async function mergeAndReconcile(salesRows, cashRows) {
-  rawSalesRows = salesRows;
-  rawCashRows  = cashRows;
+  // A case can't have the same test twice (opd_test is UNIQUE on case_number + test_name).
+  // If the Excel repeats one, that line is bad data: keep the first, drop the rest,
+  // and let the bill total be built only from the kept lines.
+  const seenTests = new Set();
+  const droppedList = [];
+  rawSalesRows = [];
+  salesRows.forEach(r => {
+    const key = r.case_number + '\u0001' + r.test_name;
+    if (seenTests.has(key)) { droppedList.push(r); return; }
+    seenTests.add(key);
+    rawSalesRows.push(r);
+  });
+  droppedTestLines = droppedList;
+  rawCashRows = cashRows;
+
+  const tdBanner = document.getElementById('testDupBanner');
+  if (droppedList.length > 0) {
+    const sumDropped = droppedList.reduce((s, r) => s + (parseFloat(r.test_amount) || 0), 0);
+    log(`⚠️ ${droppedList.length} repeated test line(s) dropped (₹${fmt(sumDropped)} removed from bills): ` +
+        droppedList.map(r => `${r.case_number} – ${r.test_name}`).join('; '), 'log-warn');
+    tdBanner.innerHTML = `<strong>⚠️ Repeated tests removed from the Sales Report</strong>
+      ${droppedList.length} line(s) repeated a test already in the same case — the first was kept and the rest dropped
+      (₹${fmt(sumDropped)} removed from the bill total):<br>` +
+      droppedList.map(r => `${escHtml(r.case_number)} – ${escHtml(r.test_name)} (₹${fmt(parseFloat(r.test_amount) || 0)})`).join('<br>');
+    tdBanner.style.display = 'block';
+  } else {
+    tdBanner.style.display = 'none';
+  }
 
   try {
     const { data: existing } = await BNH_PAGE.sb.from('opd_case').select('case_no');
@@ -732,7 +761,7 @@ async function mergeAndReconcile(salesRows, cashRows) {
 
   const salesByCase = {};
   const testsByCase = {};
-  salesRows.forEach(row => {
+  rawSalesRows.forEach(row => {
     const cn = row.case_number;
     if (!salesByCase[cn]) {
       salesByCase[cn] = { case_no: cn, case_date: row.case_date, patient_name: row.patient_name, bill_amount: 0, tests: [] };
@@ -932,6 +961,8 @@ async function uploadAll() {
 
     // 2. opd_test
     log('📝 [2/4] Inserting test line items…');
+    // rawSalesRows was already de-duplicated on (case_number, test_name) during normalize,
+    // so the preview's bill totals match exactly what is saved here.
     const testRows = rawSalesRows
       .filter(r => newCaseNos.has(r.case_number))
       .map(r => ({
@@ -939,11 +970,21 @@ async function uploadAll() {
         test_name: r.test_name, test_amount: r.test_amount,
         created_by_id: stamp.created_by_id, created_by_name: stamp.created_by_name,
       }));
+
+    let testsInserted = 0;
     if (testRows.length > 0) {
-      const { error } = await BNH_PAGE.sb.from('opd_test').insert(testRows);
+      // upsert + ignoreDuplicates = ON CONFLICT (case_number, test_name) DO NOTHING,
+      // so re-running never errors or double-inserts; .select() returns only rows actually inserted.
+      const { data: insertedTests, error } = await BNH_PAGE.sb
+        .from('opd_test')
+        .upsert(testRows, { onConflict: 'case_number,test_name', ignoreDuplicates: true })
+        .select('case_number');
       if (error) throw new Error('opd_test: ' + error.message);
+      testsInserted = (insertedTests || []).length;
     }
-    done.push(`${testRows.length} test line(s)`);
+    const testsSkipped = testRows.length - testsInserted;
+    if (testsSkipped > 0) log(`ℹ️ ${testsSkipped} test line(s) already existed and were skipped.`, 'log-warn');
+    done.push(`${testsInserted} test line(s)`);
     setProgress(50);
 
     // 3. opd_cash_register — every new transaction (a case from an earlier upload can still get a new payment)
@@ -1015,11 +1056,13 @@ async function uploadAll() {
     document.getElementById('successBox').style.display = 'block';
     document.getElementById('successMessage').innerHTML = `
       ✅ <strong>${caseRows.length} new case(s)</strong>,
-      <strong>${testRows.length} test line(s)</strong>,
+      <strong>${testsInserted} test line(s)</strong>,
       <strong>${cashRowsOut.length} OPD cash entr${cashRowsOut.length === 1 ? 'y' : 'ies'}</strong>
       ${rcOut.length ? `and <strong>${rcOut.length} cash receipt(s)</strong>` : ''} saved to Supabase.<br>
       ${skippedCases > 0 ? `⚠️ ${skippedCases} duplicate case(s) skipped.<br>` : ''}
       ${skippedTx > 0 ? `⚠️ ${skippedTx} duplicate OPD transaction(s) skipped.<br>` : ''}
+      ${testsSkipped > 0 ? `⚠️ ${testsSkipped} test line(s) already existed and were skipped.<br>` : ''}
+      ${droppedTestLines.length > 0 ? `ℹ️ ${droppedTestLines.length} repeated test line(s) in the Sales Report were dropped and excluded from the bill totals.<br>` : ''}
       ${rcUpdated > 0 ? `ℹ️ ${rcUpdated} cash receipt(s) already existed and were updated.<br>` : ''}
       ${stubCases.length > 0 ? `ℹ️ ${stubCases.length} case(s) were created from Cash Register data only (no matching tests).<br>` : ''}
       Ready for refer linking in the next step.
