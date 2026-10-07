@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>OPD Sales & Cash Receipts</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    /* ══════════════ MAIN TABS ══════════════ */
+    .main-tabs { display: flex; gap: .25rem; border-bottom: 2px solid #e9ecef; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .main-tab-btn {
+      background: none; border: none; padding: .75rem 1.25rem; font-size: 1rem; cursor: pointer;
+      border-bottom: 3px solid transparent; margin-bottom: -2px; color: #444;
+    }
+    .main-tab-btn:hover { background: #f1f3f5; }
+    .main-tab-btn.active { border-bottom-color: #007bff; font-weight: 600; color: #007bff; }
+    .main-panel { display: none; }
+    .main-panel.active { display: block; }
+
+    /* ══════════════ STEPS ══════════════ */
+    .step-container { margin-bottom: 2rem; }
+    .step-header { display: flex; align-items: center; margin-bottom: 1rem; }
+    .step-number {
+      background: #007bff; color: white; width: 36px; height: 36px;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-weight: bold; margin-right: 1rem; font-size: 1rem; flex-shrink: 0;
+    }
+    .step-number.done    { background: #28a745; }
+    .step-number.pending { background: #adb5bd; }
+    .step-header h3 { margin: 0; }
+
+    /* ══════════════ THREE UPLOAD ZONES ══════════════ */
+    .upload-triple { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    @media (max-width: 800px) { .upload-triple { grid-template-columns: 1fr; } }
+
+    .upload-zone {
+      border: 2px dashed #007bff; padding: 1.5rem 1rem; border-radius: 8px;
+      text-align: center; cursor: pointer; transition: all 0.2s; background: #f8fbff;
+    }
+    .upload-zone.dragover   { background: #e7f3ff; border-color: #0056b3; }
+    .upload-zone.has-file   { border-color: #28a745; background: #f0fff4; }
+    .upload-zone input[type="file"] { display: none; }
+    .upload-zone label { cursor: pointer; display: block; }
+    .upload-icon { font-size: 2rem; margin-bottom: 0.4rem; }
+    .upload-label { font-size: 0.82rem; color: #555; margin-top: 0.5rem; }
+    .upload-label strong { color: #007bff; display: block; margin-bottom: 2px; }
+    .zone-title { font-weight: 600; margin: 0 0 0.5rem; }
+    .optional-tag { font-size: .7rem; font-weight: 500; color: #888; margin-left: .35rem; }
+
+    .btn-normalize {
+      width: 100%; margin-top: 1rem; padding: 0.9rem;
+      background: #0056b3; color: white; border: none;
+      border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-normalize:hover:not(:disabled) { background: #004494; }
+    .btn-normalize:disabled { background: #adb5bd; cursor: not-allowed; }
+
+    details.map-details { margin-top: 1rem; background: #f8f9fa; border: 1px solid #e3e6ea; border-radius: 6px; padding: .6rem .9rem; }
+    details.map-details summary { cursor: pointer; font-size: .85rem; font-weight: 600; color: #444; }
+
+    .normalize-log {
+      background: #0d1b2a; color: #7dd3fc; font-family: monospace;
+      font-size: 0.82rem; padding: 0.75rem; border-radius: 4px;
+      max-height: 140px; overflow-y: auto; margin-top: 0.75rem; display: none;
+    }
+    .normalize-log .log-ok   { color: #4ade80; }
+    .normalize-log .log-warn { color: #fbbf24; }
+    .normalize-log .log-err  { color: #f87171; }
+
+    /* ══════════════ PREVIEW TABS ══════════════ */
+    .sub-tabs { display: flex; border-bottom: 2px solid #e9ecef; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .sub-tab-btn {
+      flex: 1; min-width: 140px; padding: 0.85rem; background: #f8f9fa; border: none;
+      cursor: pointer; font-size: 0.9rem; font-weight: 500;
+      border-bottom: 3px solid transparent; transition: all 0.2s;
+    }
+    .sub-tab-btn:hover { background: #e9ecef; }
+    .sub-tab-btn.active { background: white; color: #007bff; border-bottom-color: #007bff; }
+    .sub-tab-content { display: none; }
+    .sub-tab-content.active { display: block; }
+
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .summary-card { padding: 1.25rem; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .summary-card.success { background: linear-gradient(135deg, #d4edda, #b8dfc4); }
+    .summary-card.warning { background: linear-gradient(135deg, #fff3cd, #fde68a); }
+    .summary-card.info    { background: linear-gradient(135deg, #cfe2ff, #b6d4fe); }
+    .summary-card.muted   { background: linear-gradient(135deg, #f5f5f5, #e0e0e0); }
+    .summary-label { font-size: 0.75rem; color: #555; text-transform: uppercase; font-weight: 600; margin-bottom: 0.4rem; }
+    .summary-value { font-size: 1.6rem; font-weight: bold; color: #333; }
+
+    .table-container { max-height: 460px; overflow: auto; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 1rem; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    .data-table th { background: #f0f0f0; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #ddd; position: sticky; top: 0; }
+    .data-table td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+    .data-table tbody tr:hover { background: #f9f9f9; }
+    .data-table tr.excluded { opacity: .35; }
+    .data-table input[type="text"], .data-table input[type="number"] { width: 100%; border: 1px solid #ccc; padding: 2px 4px; font-size: .83rem; }
+
+    .badge { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 0.73rem; font-weight: 600; }
+    .badge-success  { background: #d4edda; color: #155724; }
+    .badge-warning  { background: #fff3cd; color: #856404; }
+    .badge-danger   { background: #f8d7da; color: #721c24; }
+    .badge-info     { background: #cfe2ff; color: #084298; }
+    .badge-dup      { background: #e2d9f3; color: #432874; }
+
+    .reconciliation-box { background: #f8f9fa; padding: 1.25rem; border-radius: 4px; border-left: 4px solid #007bff; margin-bottom: 1.5rem; }
+    .reconciliation-box h4 { margin: 0 0 0.75rem; }
+    .reconciliation-item { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1.5rem; }
+    .reconciliation-label { font-size: 0.75rem; color: #888; text-transform: uppercase; }
+    .reconciliation-value { font-size: 1.15rem; font-weight: bold; color: #007bff; margin-top: 0.3rem; }
+
+    .dup-banner {
+      display: none; background: #e2d9f3; border: 1px solid #9b59b6;
+      border-radius: 6px; padding: 0.85rem 1rem; margin-bottom: 1rem;
+      font-size: 0.88rem; color: #432874;
+    }
+    .dup-banner strong { display: block; margin-bottom: 0.25rem; }
+
+    .progress-bar { width: 100%; height: 28px; background: #f0f0f0; border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem; display: none; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #007bff, #0056b3); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.83rem; font-weight: 500; transition: width 0.4s; }
+
+    .action-bar { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #eee; }
+    .action-bar button { flex: 1; min-width: 180px; }
+
+    .success-box { background: #d4edda; border: 1px solid #c3e6cb; padding: 1rem; border-radius: 4px; }
+    .success-box h4 { margin-top: 0; color: #155724; }
+    .info-box { background: #cfe2ff; border: 1px solid #b6d4fe; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+    .info-box h4 { margin-top: 0; color: #084298; }
+
+    /* ══════════════ MANAGE TAB ══════════════ */
+    .map-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin:.75rem 0}
+    .map-grid label{display:block;font-size:.85rem;margin-bottom:.25rem}
+    .map-grid select{width:100%}
+    table.prev{width:100%;border-collapse:collapse;font-size:.85rem}
+    table.prev th,table.prev td{border:1px solid #ddd;padding:4px 6px;text-align:left}
+    table.prev input,table.prev select{width:100%;border:1px solid #ccc;padding:2px 4px;font-size:.85rem}
+    .scrollbox{max-height:420px;overflow:auto;margin-top:1rem}
+    .filters{display:flex;gap:.75rem;flex-wrap:wrap;align-items:end;margin-bottom:1rem}
+    .filters label{display:block;font-size:.8rem;margin-bottom:.2rem}
+    .agg-cards{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+    .agg-card{background:#f8f9fb;border:1px solid #eee;border-radius:8px;padding:.75rem 1rem;min-width:140px}
+    .agg-card .num{font-size:1.4rem;font-weight:700}
+    .agg-card .lbl{font-size:.75rem;color:#666}
+    table.byrec{width:100%;max-width:420px;border-collapse:collapse;font-size:.85rem;margin-bottom:1rem}
+    table.byrec th,table.byrec td{border:1px solid #ddd;padding:4px 8px;text-align:left}
+    .del-btn{background:#dc2626;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:.8rem}
+    .save-btn{background:#16a34a;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:.8rem}
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>📊 OPD Sales &amp; Cash Receipts</h1>
+
+  <div class="page-card">
+
+    <div class="main-tabs">
+      <button class="main-tab-btn active" data-panel="upload">📤 Upload &amp; Reconcile</button>
+      <button class="main-tab-btn" data-panel="crView" data-cash="1">🗂️ Cash Receipts – View &amp; Manage</button>
+    </div>
+
+    <!-- ═════════════════ PANEL 1: ONE-SHOT UPLOAD ═════════════════ -->
+    <div class="main-panel active" id="panel-upload">
+
+      <!-- STEP 1 -->
+      <div class="step-container">
+        <div class="step-header">
+          <div class="step-number" id="step1Number">1</div>
+          <h3>Select the three Excel files</h3>
+        </div>
+        <p style="color:#666; margin:0 0 .5rem;">Add all files, then click <strong>Normalize</strong> once. Everything is processed in your browser — nothing is saved until you click <strong>Upload All</strong>.</p>
+
+        <div class="upload-triple">
+          <div>
+            <p class="zone-title">📈 Sales Report</p>
+            <div class="upload-zone" id="salesZone"
+                 ondrop="handleDrop(event,'sales')" ondragover="dndOver(event,'sales')" ondragleave="dndLeave('sales')">
+              <input type="file" id="salesFile" accept=".xls,.xlsx" onchange="fileSelected('sales',event)"/>
+              <label for="salesFile">
+                <div class="upload-icon">📊</div>
+                <div><strong>Click or drag &amp; drop</strong></div>
+                <div class="upload-label">Sales_Report.xls / .xlsx</div>
+              </label>
+              <div id="salesName" class="upload-label" style="display:none;color:#28a745;"></div>
+            </div>
+          </div>
+
+          <div>
+            <p class="zone-title">💰 OPD Cash Register</p>
+            <div class="upload-zone" id="cashZone"
+                 ondrop="handleDrop(event,'cash')" ondragover="dndOver(event,'cash')" ondragleave="dndLeave('cash')">
+              <input type="file" id="cashFile" accept=".xls,.xlsx" onchange="fileSelected('cash',event)"/>
+              <label for="cashFile">
+                <div class="upload-icon">🧾</div>
+                <div><strong>Click or drag &amp; drop</strong></div>
+                <div class="upload-label">Cash_Register.xls / .xlsx</div>
+              </label>
+              <div id="cashName" class="upload-label" style="display:none;color:#28a745;"></div>
+            </div>
+          </div>
+
+          <div>
+            <p class="zone-title">📥 Cash Receipts<span class="optional-tag">(optional)</span></p>
+            <div class="upload-zone" id="rcZone"
+                 ondrop="handleDrop(event,'rc')" ondragover="dndOver(event,'rc')" ondragleave="dndLeave('rc')">
+              <input type="file" id="rcFile" accept=".xls,.xlsx,.csv" onchange="fileSelected('rc',event)"/>
+              <label for="rcFile">
+                <div class="upload-icon">📥</div>
+                <div><strong>Click or drag &amp; drop</strong></div>
+                <div class="upload-label">Cash receipts .xls / .xlsx / .csv</div>
+              </label>
+              <div id="rcName" class="upload-label" style="display:none;color:#28a745;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Receipts column mapping (filled once a receipts file is chosen) -->
+        <details class="map-details" id="rcMapDetails" style="display:none;">
+          <summary>Cash Receipts columns (auto-set — adjust only if your layout differs)</summary>
+          <p style="font-size:.8rem;color:#666;margin:.5rem 0 0;">Defaults: Date = B, Transaction No = C, Name = D, Recorded By = I, Received Amount = J. Samples are shown under each dropdown.</p>
+          <div class="map-grid" id="rcMapGrid"></div>
+        </details>
+
+        <button class="btn-normalize" id="btnNormalize" disabled onclick="runNormalizer()">
+          ⚡ Normalize &amp; Preview
+        </button>
+        <div class="normalize-log" id="normalizeLog"></div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="step-container" id="step2" style="display:none;">
+        <div class="step-header">
+          <div class="step-number pending" id="step2Number">2</div>
+          <h3>Preview &amp; Reconciliation</h3>
+        </div>
+
+        <div class="dup-banner" id="dupBanner">
+          <strong>⚠️ Duplicate Cases Detected</strong>
+          <span id="dupDetail"></span> — these already exist in Supabase and will be <strong>skipped</strong> during upload.
+        </div>
+
+        <div class="summary-grid" id="summaryGrid"></div>
+        <div class="reconciliation-box" id="reconciliationBox"></div>
+
+        <div class="sub-tabs">
+          <button class="sub-tab-btn active" onclick="switchSubTab(event,'cases')">📋 OPD Cases</button>
+          <button class="sub-tab-btn" onclick="switchSubTab(event,'payment')">💰 Payment Details</button>
+          <button class="sub-tab-btn" onclick="switchSubTab(event,'receipts')">📥 Cash Receipts <span id="rcTabCount"></span></button>
+          <button class="sub-tab-btn" onclick="switchSubTab(event,'summary')">📊 Summary</button>
+        </div>
+
+        <div id="cases-tab" class="sub-tab-content active">
+          <div class="table-container">
+            <table class="data-table">
+              <thead><tr>
+                <th>Case No</th><th>Date</th><th>Patient Name</th>
+                <th>Tests</th><th>Bill</th><th>Paid</th><th>Discount</th><th>Due</th><th>Status</th>
+              </tr></thead>
+              <tbody id="casesBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="payment-tab" class="sub-tab-content">
+          <div class="table-container">
+            <table class="data-table">
+              <thead><tr>
+                <th>Case No</th><th>Patient</th><th>Bill</th><th>Paid</th>
+                <th>Discount</th><th>Due</th><th>Status</th><th>Upload</th>
+              </tr></thead>
+              <tbody id="paymentBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="receipts-tab" class="sub-tab-content">
+          <p style="font-size:.85rem;color:#666;margin:0 0 .5rem;" id="rcHint">Untick any row you don't want to import. Edit any cell directly if needed.</p>
+          <div class="table-container">
+            <table class="data-table" id="rcTable"></table>
+          </div>
+        </div>
+
+        <div id="summary-tab" class="sub-tab-content">
+          <div class="info-box">
+            <h4>📊 OPD Summary</h4>
+            <div class="reconciliation-item">
+              <div><div class="reconciliation-label">Total Cases</div><div class="reconciliation-value" id="summaryTotalCases">0</div></div>
+              <div><div class="reconciliation-label">Total Bill</div><div class="reconciliation-value" id="summaryTotalBill">₹0</div></div>
+              <div><div class="reconciliation-label">Total Paid</div><div class="reconciliation-value" id="summaryTotalPaid">₹0</div></div>
+              <div><div class="reconciliation-label">Total Discount</div><div class="reconciliation-value" id="summaryTotalDiscount">₹0</div></div>
+              <div><div class="reconciliation-label">Total Due</div><div class="reconciliation-value" id="summaryTotalDue">₹0</div></div>
+            </div>
+            <div class="reconciliation-item" style="margin-top:1rem;padding-top:1rem;border-top:1px solid #b6d4fe;">
+              <div><div class="reconciliation-label">Fully Paid</div><div class="reconciliation-value" id="summaryPaidCount">0</div></div>
+              <div><div class="reconciliation-label">Partial</div><div class="reconciliation-value" id="summaryPartialCount">0</div></div>
+              <div><div class="reconciliation-label">Outstanding</div><div class="reconciliation-value" id="summaryDueCount">0</div></div>
+              <div><div class="reconciliation-label">Collection Rate</div><div class="reconciliation-value" id="summaryCollectionRate">0%</div></div>
+              <div><div class="reconciliation-label">Duplicates Skipped</div><div class="reconciliation-value" id="summaryDupCount" style="color:#9b59b6;">0</div></div>
+            </div>
+          </div>
+          <div class="info-box" style="background:#e7f6ec;border-color:#c3e6cb;">
+            <h4 style="color:#155724;">📥 Cash Receipts Summary</h4>
+            <div class="reconciliation-item">
+              <div><div class="reconciliation-label">Rows Selected</div><div class="reconciliation-value" id="summaryRcRows">0</div></div>
+              <div><div class="reconciliation-label">Total Amount</div><div class="reconciliation-value" id="summaryRcTotal">₹0</div></div>
+              <div><div class="reconciliation-label">New</div><div class="reconciliation-value" id="summaryRcNew">0</div></div>
+              <div><div class="reconciliation-label">Will Update</div><div class="reconciliation-value" id="summaryRcUpd">0</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="step-container" id="step3" style="display:none;">
+        <div class="step-header">
+          <div class="step-number pending" id="step3Number">3</div>
+          <h3>Upload everything to Supabase</h3>
+        </div>
+        <div class="progress-bar" id="progressBar">
+          <div class="progress-fill" id="progressFill" style="width:0%">0%</div>
+        </div>
+        <div class="success-box" id="successBox" style="display:none;">
+          <h4>✅ Upload Complete!</h4>
+          <p id="successMessage"></p>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <button class="btn-primary" onclick="uploadAll()" id="uploadBtn" style="display:none;background:#28a745;">
+          💾 Upload All to Supabase
+        </button>
+        <button class="btn-primary" onclick="proceedToReferLinker()" id="proceedBtn" style="display:none;background:#007bff;">
+          ➜ Proceed to Refer Linker
+        </button>
+        <button class="btn-primary" onclick="resetUpload()" style="background:#6c757d;">
+          🔄 Reset
+        </button>
+      </div>
+
+      <p class="err" id="err"></p>
+      <p class="info" id="ok" style="display:none;"></p>
+    </div>
+
+    <!-- ═════════════════ PANEL 2: VIEW & MANAGE CASH RECEIPTS ═════════════════ -->
+    <div class="main-panel" id="panel-crView">
+      <div class="filters">
+        <div><label>From date</label><input type="date" id="fFrom" /></div>
+        <div><label>To date</label><input type="date" id="fTo" /></div>
+        <div><label>Recorded By</label><select id="fRecordedBy"><option value="">All</option></select></div>
+        <div><label>Search name / trans no</label><input type="text" id="fSearch" placeholder="type to search" /></div>
+        <div><button class="btn-primary" style="width:auto" id="loadBtn">Apply filters</button></div>
+      </div>
+
+      <div class="agg-cards" id="aggCards"></div>
+      <table class="byrec" id="byRecTable"></table>
+
+      <div class="scrollbox">
+        <table class="prev" id="viewTable"></table>
+      </div>
+      <span id="viewStatus"></span>
+      <p class="err" id="crViewErr"></p>
+    </div>
+
+  </div><!-- /page-card -->
+</div><!-- /page -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="../assets/opd-normalizer.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+
+<!-- ═══════════════ SHARED + MAIN TABS ═══════════════ -->
+<script>
+BNH_PAGE.requireRole(["manager", "admin", "accountant"]);
+
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmt(n) { return (Math.round(n * 100) / 100).toLocaleString('en-IN'); }
+
+function showMainPanel(name) {
+  const btn = document.querySelector('.main-tab-btn[data-panel="' + name + '"]');
+  if (!btn || btn.style.display === 'none') name = 'upload';
+  document.querySelectorAll('.main-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.panel === name));
+  document.querySelectorAll('.main-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  if (name === 'crView' && typeof window.crLoadViewData === 'function') window.crLoadViewData();
+  try { history.replaceState(null, '', '#' + name); } catch (e) {}
+}
+document.querySelectorAll('.main-tab-btn').forEach(b =>
+  b.addEventListener('click', () => showMainPanel(b.dataset.panel)));
+
+// Cash-receipt data is admin/accountant only. NOTE: assumes BNH_PAGE.user.role holds the
+// role string; adjust if page.js stores it under a different field.
+const IS_MANAGER = (BNH_PAGE.user && BNH_PAGE.user.role) === 'manager';
+if (IS_MANAGER) {
+  document.querySelectorAll('.main-tab-btn[data-cash]').forEach(b => b.style.display = 'none');
+}
+
+window.addEventListener('load', () => {
+  const h = (location.hash || '').replace('#', '');
+  if (h && document.getElementById('panel-' + h)) showMainPanel(h);
+});
+</script>
+
+<!-- ═══════════════ UPLOAD & RECONCILE (3 files → 1 click) ═══════════════ -->
+<script>
+let salesFileObj = null, cashFileObj = null, rcFileObj = null;
+let mergedData   = [];
+let rawSalesRows = [];
+let rawCashRows  = [];
+let existingCases = new Set();
+
+// receipts state
+let rcRawRows = [];
+let rcNumCols = 0;
+let rcParsed  = [];
+
+const RC_FIELDS = [
+  { key: 'date_col',  label: 'Date',            fixedCol: 1 },  // B
+  { key: 'trans_col', label: 'Transaction No',  fixedCol: 2 },  // C
+  { key: 'name_col',  label: 'Name',            fixedCol: 3 },  // D
+  { key: 'recby_col', label: 'Recorded By',     fixedCol: 8 },  // I
+  { key: 'amt_col',   label: 'Received Amount', fixedCol: 9 },  // J
+];
+
+// ─── file selection ───────────────────────────────────────────────────────
+const ZONE_IDS = { sales: ['salesZone','salesName'], cash: ['cashZone','cashName'], rc: ['rcZone','rcName'] };
+
+function fileSelected(which, event) {
+  const file = event.target.files[0];
+  if (file) setFile(which, file);
+}
+
+async function setFile(which, file) {
+  const [zoneId, nameId] = ZONE_IDS[which];
+  document.getElementById(zoneId).classList.add('has-file');
+  const nameEl = document.getElementById(nameId);
+  nameEl.textContent = '✓ ' + file.name;
+  nameEl.style.display = 'block';
+
+  if (which === 'sales') salesFileObj = file;
+  else if (which === 'cash') cashFileObj = file;
+  else { rcFileObj = file; await rcLoadFile(file); }
+
+  document.getElementById('btnNormalize').disabled = !(salesFileObj && cashFileObj);
+}
+
+function dndOver(event, which) {
+  event.preventDefault();
+  document.getElementById(ZONE_IDS[which][0]).classList.add('dragover');
+}
+function dndLeave(which) {
+  document.getElementById(ZONE_IDS[which][0]).classList.remove('dragover');
+}
+function handleDrop(event, which) {
+  event.preventDefault();
+  dndLeave(which);
+  const file = event.dataTransfer.files[0];
+  if (!file) return;
+  const ok = which === 'rc' ? /\.(xls|xlsx|csv)$/i.test(file.name) : /\.(xls|xlsx)$/i.test(file.name);
+  if (ok) setFile(which, file);
+}
+
+// ─── log helpers ──────────────────────────────────────────────────────────
+function log(msg, cls) {
+  const box = document.getElementById('normalizeLog');
+  box.style.display = 'block';
+  const span = document.createElement('span');
+  if (cls) span.className = cls;
+  span.textContent = msg + '\n';
+  box.appendChild(span);
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() {
+  const box = document.getElementById('normalizeLog');
+  box.innerHTML = '';
+  box.style.display = 'none';
+}
+
+// ═════════════════════ CASH RECEIPTS PARSING ═════════════════════
+function colLetter(i) {
+  let s = ''; i += 1;
+  while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - m) / 26); }
+  return s;
+}
+function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+function localDateStr(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+
+function cellText(v) {
+  if (v === null || v === undefined) return '';
+  if (v instanceof Date) return localDateStr(v);
+  return String(v).trim();
+}
+
+// Excel serial → YYYY-MM-DD with pure arithmetic (no timezone shift). 25569 = 1970-01-01.
+function excelSerialToDateStr(serial) {
+  const d = new Date((Math.floor(serial) - 25569) * 86400 * 1000);
+  return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+}
+function parseAmount(v) {
+  if (typeof v === 'number') return v;
+  const n = parseFloat(String(v).replace(/,/g, ''));
+  return isNaN(n) ? null : n;
+}
+function parseDateVal(v) {
+  if (typeof v === 'number') return excelSerialToDateStr(v);
+  if (v instanceof Date) return localDateStr(v);
+  const s = cellText(v);
+  if (!s) return '';
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + pad2(parseInt(m[2], 10)) + '-' + pad2(parseInt(m[1], 10));
+  return s;
+}
+
+function rcSampleValues(c) {
+  const out = [];
+  for (const row of rcRawRows) {
+    const nonEmpty = row.filter(v => cellText(v) !== '').length;
+    if (nonEmpty >= 4 && cellText(row[c]) !== '') {
+      out.push(cellText(row[c]));
+      if (out.length >= 2) break;
+    }
+  }
+  return out;
+}
+
+async function rcLoadFile(file) {
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    rcRawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+    rcNumCols = rcRawRows.reduce((m, r) => Math.max(m, r.length), 0);
+    rcBuildMapUI();
+    document.getElementById('rcMapDetails').style.display = 'block';
+  } catch (err) {
+    rcRawRows = [];
+    document.getElementById('err').textContent = 'Could not read Cash Receipts file: ' + err.message;
+  }
+}
+
+function rcBuildMapUI() {
+  const grid = document.getElementById('rcMapGrid');
+  grid.innerHTML = '';
+  RC_FIELDS.forEach(f => {
+    const defaultCol = Math.min(f.fixedCol, Math.max(rcNumCols - 1, 0));
+    const wrap = document.createElement('div');
+    const label = document.createElement('label');
+    label.textContent = f.label;
+    const select = document.createElement('select');
+    select.id = 'rcsel_' + f.key;
+    for (let c = 0; c < rcNumCols; c++) {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = 'Column ' + colLetter(c);
+      if (c === defaultCol) opt.selected = true;
+      select.appendChild(opt);
+    }
+    const sampleEl = document.createElement('div');
+    sampleEl.style.cssText = 'font-size:.75rem;color:#888;';
+    const upd = () => { sampleEl.textContent = 'e.g. ' + rcSampleValues(parseInt(select.value, 10)).join(' / '); };
+    select.addEventListener('change', upd);
+    upd();
+    wrap.append(label, select, sampleEl);
+    grid.appendChild(wrap);
+  });
+}
+
+async function rcBuildPreview() {
+  rcParsed = [];
+  if (!rcFileObj || rcRawRows.length === 0) { renderReceipts(); return; }
+
+  const g = k => parseInt(document.getElementById('rcsel_' + k).value, 10);
+  const dateCol = g('date_col'), transCol = g('trans_col'), nameCol = g('name_col'),
+        recByCol = g('recby_col'), amtCol = g('amt_col');
+
+  const seen = new Set();
+  let dupInFile = 0;
+  for (const row of rcRawRows) {
+    const transRaw = cellText(row[transCol]);
+    const amt = parseAmount(row[amtCol]);
+    if (!transRaw || amt === null || amt <= 0) continue;
+    if (!/\d/.test(transRaw)) continue;
+    const key = transRaw.toLowerCase();
+    if (seen.has(key)) { dupInFile++; continue; }
+    seen.add(key);
+    rcParsed.push({
+      receipt_date:    parseDateVal(row[dateCol]),
+      trans_no:        transRaw,
+      patient_name:    cellText(row[nameCol]),
+      recorded_by:     cellText(row[recByCol]),
+      received_amount: amt,
+      included:        true,
+      alreadyExists:   false
+    });
+  }
+  if (dupInFile > 0) log(`ℹ️ Cash Receipts: ${dupInFile} repeated Transaction No row(s) in the file were skipped (first occurrence kept).`, 'log-warn');
+
+  // flag rows already saved (upload will update them rather than duplicate)
+  if (rcParsed.length > 0) {
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('cash_receipts').select('trans_no').in('trans_no', rcParsed.map(r => r.trans_no));
+      if (error) throw error;
+      const existing = new Set((data || []).map(r => r.trans_no));
+      rcParsed.forEach(r => { r.alreadyExists = existing.has(r.trans_no); });
+    } catch (e) {
+      log('⚠️ Could not check existing cash receipts: ' + e.message, 'log-warn');
+    }
+  }
+  renderReceipts();
+}
+
+function renderReceipts() {
+  const table = document.getElementById('rcTable');
+  table.innerHTML = '';
+
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  ['', 'Date', 'Trans No', 'Name', 'Recorded By', 'Received Amount', 'Status'].forEach(h => {
+    const th = document.createElement('th'); th.textContent = h; hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  rcParsed.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.classList.toggle('excluded', !r.included);
+
+    const tdChk = document.createElement('td');
+    const chk = document.createElement('input');
+    chk.type = 'checkbox'; chk.checked = r.included;
+    chk.addEventListener('change', () => { r.included = chk.checked; tr.classList.toggle('excluded', !r.included); updateReceiptSummary(); });
+    tdChk.appendChild(chk); tr.appendChild(tdChk);
+
+    [['receipt_date','text'],['trans_no','text'],['patient_name','text'],['recorded_by','text'],['received_amount','number']].forEach(([key, type]) => {
+      const td = document.createElement('td');
+      const input = document.createElement('input');
+      input.type = type; input.value = r[key];
+      input.addEventListener('input', () => {
+        r[key] = type === 'number' ? parseFloat(input.value) : input.value;
+        updateReceiptSummary();
+      });
+      td.appendChild(input); tr.appendChild(td);
+    });
+
+    const tdS = document.createElement('td');
+    tdS.style.fontSize = '.75rem';
+    tdS.textContent = r.alreadyExists ? 'Already saved — will update' : 'New';
+    tdS.style.color = r.alreadyExists ? '#b45309' : '#16a34a';
+    tr.appendChild(tdS);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+
+  document.getElementById('rcTabCount').textContent = rcFileObj ? '(' + rcParsed.length + ')' : '';
+  document.getElementById('rcHint').textContent = rcFileObj
+    ? 'Untick any row you don\'t want to import. Edit any cell directly if needed.'
+    : 'No Cash Receipts file was added — nothing to import here.';
+  updateReceiptSummary();
+}
+
+function updateReceiptSummary() {
+  const sel = rcParsed.filter(r => r.included);
+  document.getElementById('summaryRcRows').textContent  = sel.length;
+  document.getElementById('summaryRcTotal').textContent = '₹' + fmt(sel.reduce((s, r) => s + (parseFloat(r.received_amount) || 0), 0));
+  document.getElementById('summaryRcNew').textContent   = sel.filter(r => !r.alreadyExists).length;
+  document.getElementById('summaryRcUpd').textContent   = sel.filter(r => r.alreadyExists).length;
+}
+
+// ═════════════════════ NORMALIZE (all three files) ═════════════════════
+async function runNormalizer() {
+  clearLog();
+  document.getElementById('err').textContent = '';
+  document.getElementById('ok').style.display = 'none';
+  document.getElementById('btnNormalize').disabled = true;
+  document.getElementById('step2').style.display = 'none';
+  document.getElementById('step3').style.display = 'none';
+  document.getElementById('uploadBtn').style.display = 'none';
+
+  log('⚙️ Reading and parsing Excel files in your browser…');
+
+  try {
+    const result = await OPDNormalizer.normalize(salesFileObj, cashFileObj);
+    log(`✅ Sales: ${result.sales.length} test rows  |  OPD Cash: ${result.cash.length} entries`, 'log-ok');
+
+    log('🔗 Merging and reconciling…');
+    await mergeAndReconcile(result.sales, result.cash);
+
+    if (rcFileObj && !IS_MANAGER) {
+      log('📥 Parsing Cash Receipts…');
+      await rcBuildPreview();
+      log(`✅ Cash Receipts: ${rcParsed.length} rows`, 'log-ok');
+    } else {
+      rcParsed = [];
+      renderReceipts();
+      if (rcFileObj && IS_MANAGER) log('ℹ️ Cash Receipts are admin/accountant only — file ignored.', 'log-warn');
+    }
+
+    log(`✅ Done — ${mergedData.length} OPD cases and ${rcParsed.length} cash receipts ready for review`, 'log-ok');
+
+    document.getElementById('step2').style.display = 'block';
+    document.getElementById('step3').style.display = 'block';
+    document.getElementById('uploadBtn').style.display = 'block';
+    document.getElementById('step2Number').classList.remove('pending');
+    document.getElementById('step1Number').classList.add('done');
+    document.getElementById('step1Number').textContent = '✓';
+
+  } catch (ex) {
+    log('❌ Error: ' + ex.message, 'log-err');
+    document.getElementById('err').textContent = 'Normalizer error: ' + ex.message;
+  } finally {
+    document.getElementById('btnNormalize').disabled = false;
+  }
+}
+
+// ─── merge + reconcile (due = bill − (paid + discount)) ───────────────────
+async function mergeAndReconcile(salesRows, cashRows) {
+  rawSalesRows = salesRows;
+  rawCashRows  = cashRows;
+
+  try {
+    const { data: existing } = await BNH_PAGE.sb.from('opd_case').select('case_no');
+    existingCases = new Set((existing || []).map(r => r.case_no));
+    if (existingCases.size > 0) log(`ℹ️ Found ${existingCases.size} existing cases in Supabase (duplicates will be skipped)`, 'log-warn');
+  } catch (e) {
+    log('⚠️ Could not check duplicates: ' + e.message, 'log-warn');
+  }
+
+  const salesByCase = {};
+  const testsByCase = {};
+  salesRows.forEach(row => {
+    const cn = row.case_number;
+    if (!salesByCase[cn]) {
+      salesByCase[cn] = { case_no: cn, case_date: row.case_date, patient_name: row.patient_name, bill_amount: 0, tests: [] };
+      testsByCase[cn] = [];
+    }
+    salesByCase[cn].bill_amount += (parseFloat(row.test_amount) || 0);
+    if (row.test_name && !testsByCase[cn].includes(row.test_name)) testsByCase[cn].push(row.test_name);
+  });
+  Object.keys(testsByCase).forEach(cn => { salesByCase[cn].tests = testsByCase[cn]; });
+
+  const cashByCase = {};
+  cashRows.forEach(row => {
+    const cn = row.case_number;
+    if (!cashByCase[cn]) cashByCase[cn] = { trans_dates: [], trans_nos: [], entry_by: row.entry_by || '', paid_amount: 0, discount: 0 };
+    cashByCase[cn].trans_dates.push(row.trans_date);
+    cashByCase[cn].trans_nos.push(row.trans_number);
+    cashByCase[cn].paid_amount += (parseFloat(row.income)   || 0);
+    cashByCase[cn].discount    += (parseFloat(row.discount) || 0);
+  });
+
+  mergedData = [];
+  Object.keys(salesByCase).forEach(cn => {
+    const sale = salesByCase[cn];
+    const cash = cashByCase[cn] || { trans_dates: [], trans_nos: [], entry_by: '', paid_amount: 0, discount: 0 };
+    const due = Math.max(0, sale.bill_amount - (cash.paid_amount + cash.discount));
+
+    let status;
+    if (due <= 0) status = 'paid';
+    else if (cash.paid_amount > 0 || cash.discount > 0) status = 'partial';
+    else status = 'due';
+
+    mergedData.push({
+      case_no: sale.case_no, case_date: sale.case_date, patient_name: sale.patient_name,
+      tests: sale.tests.join(', '),
+      bill_amount: sale.bill_amount, paid_amount: cash.paid_amount, discount: cash.discount, due_amount: due,
+      trans_nos: cash.trans_nos.join(', '), entry_by: cash.entry_by,
+      status, is_duplicate: existingCases.has(cn)
+    });
+  });
+
+  displayPreview();
+}
+
+function displayPreview() {
+  const newData = mergedData.filter(c => !c.is_duplicate);
+  const dupData = mergedData.filter(c =>  c.is_duplicate);
+
+  const totalBill = newData.reduce((s, c) => s + c.bill_amount, 0);
+  const totalPaid = newData.reduce((s, c) => s + c.paid_amount, 0);
+  const totalDisc = newData.reduce((s, c) => s + c.discount, 0);
+  const totalDue  = newData.reduce((s, c) => s + c.due_amount, 0);
+  const paidCount    = newData.filter(c => c.status === 'paid').length;
+  const partialCount = newData.filter(c => c.status === 'partial').length;
+  const dueCount     = newData.filter(c => c.status === 'due').length;
+  const collRate = totalBill > 0 ? Math.round(((totalPaid + totalDisc) / totalBill) * 100) : 0;
+
+  const banner = document.getElementById('dupBanner');
+  if (dupData.length > 0) {
+    banner.style.display = 'block';
+    document.getElementById('dupDetail').textContent = `${dupData.length} case(s) (${dupData.map(d => d.case_no).join(', ')})`;
+  } else banner.style.display = 'none';
+
+  document.getElementById('summaryGrid').innerHTML = `
+    <div class="summary-card success"><div class="summary-label">✓ New Cases</div><div class="summary-value">${newData.length}</div></div>
+    <div class="summary-card info"><div class="summary-label">💰 Bill</div><div class="summary-value">₹${fmt(totalBill)}</div></div>
+    <div class="summary-card info"><div class="summary-label">✓ Paid</div><div class="summary-value">₹${fmt(totalPaid)}</div></div>
+    <div class="summary-card muted"><div class="summary-label">🏷️ Discount</div><div class="summary-value">₹${fmt(totalDisc)}</div></div>
+    <div class="summary-card warning"><div class="summary-label">⏳ Due</div><div class="summary-value">₹${fmt(totalDue)}</div></div>
+    <div class="summary-card info"><div class="summary-label">📊 Collection</div><div class="summary-value">${collRate}%</div></div>
+  `;
+
+  document.getElementById('reconciliationBox').innerHTML = `
+    <h4>📋 Reconciliation (new cases only)</h4>
+    <div class="reconciliation-item">
+      <div><div class="reconciliation-label">Fully Paid</div><div class="reconciliation-value" style="color:#28a745">${paidCount}</div></div>
+      <div><div class="reconciliation-label">Partial</div><div class="reconciliation-value" style="color:#ffc107">${partialCount}</div></div>
+      <div><div class="reconciliation-label">Outstanding</div><div class="reconciliation-value" style="color:#dc3545">${dueCount}</div></div>
+      <div><div class="reconciliation-label">Duplicates Skipped</div><div class="reconciliation-value" style="color:#9b59b6">${dupData.length}</div></div>
+    </div>
+  `;
+
+  const statusBadge = c => c.is_duplicate
+    ? '<span class="badge badge-dup">⚠️ Duplicate</span>'
+    : `<span class="badge ${c.status === 'paid' ? 'badge-success' : c.status === 'partial' ? 'badge-warning' : 'badge-danger'}">
+         ${c.status === 'paid' ? '✓ Paid' : c.status === 'partial' ? '⚠ Partial' : '⏳ Due'}
+       </span>`;
+
+  document.getElementById('casesBody').innerHTML = mergedData.map(c => `
+    <tr style="${c.is_duplicate ? 'opacity:0.5;' : ''}">
+      <td><strong>${escHtml(c.case_no)}</strong></td>
+      <td>${escHtml(c.case_date)}</td>
+      <td>${escHtml(c.patient_name)}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(c.tests)}">${escHtml(c.tests.substring(0, 35))}${c.tests.length > 35 ? '…' : ''}</td>
+      <td>₹${fmt(c.bill_amount)}</td>
+      <td>₹${fmt(c.paid_amount)}</td>
+      <td>₹${fmt(c.discount)}</td>
+      <td><span class="badge ${c.due_amount === 0 ? 'badge-success' : 'badge-danger'}">₹${fmt(c.due_amount)}</span></td>
+      <td>${statusBadge(c)}</td>
+    </tr>`).join('');
+
+  document.getElementById('paymentBody').innerHTML = mergedData.map(c => `
+    <tr style="${c.is_duplicate ? 'opacity:0.5;' : ''}">
+      <td><strong>${escHtml(c.case_no)}</strong></td>
+      <td>${escHtml(c.patient_name)}</td>
+      <td>₹${fmt(c.bill_amount)}</td>
+      <td>₹${fmt(c.paid_amount)}</td>
+      <td>₹${fmt(c.discount)}</td>
+      <td>₹${fmt(c.due_amount)}</td>
+      <td>${c.is_duplicate ? '<span class="badge badge-dup">Duplicate — skip</span>' : statusBadge(c)}</td>
+      <td>${c.is_duplicate ? '—' : '✓ Will upload'}</td>
+    </tr>`).join('');
+
+  document.getElementById('summaryTotalCases').textContent     = newData.length;
+  document.getElementById('summaryTotalBill').textContent      = '₹' + fmt(totalBill);
+  document.getElementById('summaryTotalPaid').textContent      = '₹' + fmt(totalPaid);
+  document.getElementById('summaryTotalDiscount').textContent  = '₹' + fmt(totalDisc);
+  document.getElementById('summaryTotalDue').textContent       = '₹' + fmt(totalDue);
+  document.getElementById('summaryPaidCount').textContent      = paidCount;
+  document.getElementById('summaryPartialCount').textContent   = partialCount;
+  document.getElementById('summaryDueCount').textContent       = dueCount;
+  document.getElementById('summaryCollectionRate').textContent = collRate + '%';
+  document.getElementById('summaryDupCount').textContent       = dupData.length;
+}
+
+// DD-MM-YYYY (from normalizer) → YYYY-MM-DD (Postgres)
+function toISODate(d) {
+  if (!d) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.substring(0, 10);
+  const m = d.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  return d;
+}
+
+// opd_* tables use created_by_id + created_by_name. NOTE: assumes BNH_PAGE.stamp()
+// attaches recorded_by (user id) and recorded_by_name.
+function getCreatorStamp() {
+  const s = BNH_PAGE.stamp({});
+  return { created_by_id: s.recorded_by || null, created_by_name: s.recorded_by_name || null };
+}
+
+function switchSubTab(event, name) {
+  document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sub-tab-content').forEach(t => t.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById(name + '-tab').classList.add('active');
+}
+
+// ═════════════════════ ONE-CLICK UPLOAD OF EVERYTHING ═════════════════════
+async function uploadAll() {
+  const newCases  = mergedData.filter(c => !c.is_duplicate);
+  const rcSelected = rcParsed.filter(r => r.included);
+  const err = document.getElementById('err');
+
+  if (newCases.length === 0 && rawCashRows.length === 0 && rcSelected.length === 0) {
+    err.textContent = 'Nothing to upload (all cases are duplicates and no cash receipts selected).';
+    return;
+  }
+
+  // validate receipts before touching the database
+  const seen = new Set();
+  for (const r of rcSelected) {
+    const key = String(r.trans_no).trim().toLowerCase();
+    if (!key) { err.textContent = 'A selected Cash Receipt row has an empty Transaction No.'; return; }
+    if (seen.has(key)) {
+      err.textContent = 'Duplicate Transaction No "' + r.trans_no + '" among checked Cash Receipt rows. Fix or untick one before uploading.';
+      return;
+    }
+    seen.add(key);
+  }
+
+  const spinner = document.getElementById('spinner');
+  const bar  = document.getElementById('progressBar');
+  const fill = document.getElementById('progressFill');
+  const setProgress = p => { fill.style.width = p + '%'; fill.textContent = p + '%'; };
+
+  err.textContent = '';
+  document.getElementById('uploadBtn').disabled = true;
+  spinner.classList.remove('hidden');
+  bar.style.display = 'block';
+  setProgress(5);
+
+  const stamp = getCreatorStamp();
+  const done = [];   // what has been saved so far (for error reporting)
+
+  try {
+    const newCaseNos = new Set(newCases.map(c => c.case_no));
+
+    // 1. opd_case
+    log('📝 [1/4] Creating case records…');
+    const caseRows = newCases.map(c => ({ case_no: c.case_no, case_date: toISODate(c.case_date), patient_name: c.patient_name }));
+    if (caseRows.length > 0) {
+      const { error } = await BNH_PAGE.sb.from('opd_case').upsert(caseRows, { onConflict: 'case_no', ignoreDuplicates: true });
+      if (error) throw new Error('opd_case: ' + error.message);
+    }
+    done.push(`${caseRows.length} case(s)`);
+    setProgress(25);
+
+    // 2. opd_test
+    log('📝 [2/4] Inserting test line items…');
+    const testRows = rawSalesRows
+      .filter(r => newCaseNos.has(r.case_number))
+      .map(r => ({
+        case_date: toISODate(r.case_date), case_number: r.case_number, patient_name: r.patient_name,
+        test_name: r.test_name, test_amount: r.test_amount,
+        created_by_id: stamp.created_by_id, created_by_name: stamp.created_by_name,
+      }));
+    if (testRows.length > 0) {
+      const { error } = await BNH_PAGE.sb.from('opd_test').insert(testRows);
+      if (error) throw new Error('opd_test: ' + error.message);
+    }
+    done.push(`${testRows.length} test line(s)`);
+    setProgress(50);
+
+    // 3. opd_cash_register — every new transaction (a case from an earlier upload can still get a new payment)
+    log('📝 [3/4] Inserting OPD cash register entries…');
+    let existingTransNos = new Set();
+    try {
+      const { data: existingTx } = await BNH_PAGE.sb
+        .from('opd_cash_register').select('transaction_no')
+        .in('transaction_no', rawCashRows.map(r => r.trans_number).filter(Boolean));
+      existingTransNos = new Set((existingTx || []).map(r => r.transaction_no));
+    } catch (e) {
+      log('⚠️ Could not check existing transactions: ' + e.message, 'log-warn');
+    }
+    const cashToInsert = rawCashRows.filter(r => r.trans_number && !existingTransNos.has(r.trans_number));
+
+    // stub case rows for payments whose case isn't in opd_case (FK safety)
+    const knownCaseNos = new Set([...existingCases, ...newCaseNos]);
+    const stubCases = [], seenStub = new Set();
+    cashToInsert.forEach(r => {
+      if (!knownCaseNos.has(r.case_number) && !seenStub.has(r.case_number)) {
+        stubCases.push({ case_no: r.case_number, case_date: toISODate(r.case_date || r.trans_date), patient_name: r.patient_name });
+        seenStub.add(r.case_number); knownCaseNos.add(r.case_number);
+      }
+    });
+    if (stubCases.length > 0) {
+      log(`⚠️ ${stubCases.length} payment(s) reference a case not in this Sales Report — creating case record from Cash Register data only.`, 'log-warn');
+      const { error } = await BNH_PAGE.sb.from('opd_case').upsert(stubCases, { onConflict: 'case_no', ignoreDuplicates: true });
+      if (error) throw new Error('opd_case (stub): ' + error.message);
+    }
+
+    const cashRowsOut = cashToInsert.map(r => ({
+      transaction_date: toISODate(r.trans_date), case_date: toISODate(r.case_date),
+      transaction_no: r.trans_number, case_no: r.case_number, patient_name: r.patient_name,
+      entry_by: r.entry_by, income: r.income, discount: r.discount,
+      created_by_id: stamp.created_by_id, created_by_name: stamp.created_by_name,
+    }));
+    if (cashRowsOut.length > 0) {
+      const { error } = await BNH_PAGE.sb.from('opd_cash_register').insert(cashRowsOut);
+      if (error) throw new Error('opd_cash_register: ' + error.message);
+    }
+    done.push(`${cashRowsOut.length} OPD cash entr${cashRowsOut.length === 1 ? 'y' : 'ies'}`);
+    setProgress(75);
+
+    // 4. cash_receipts (upsert on trans_no)
+    let rcOut = [];
+    if (rcSelected.length > 0) {
+      log('📝 [4/4] Saving cash receipts…');
+      const importedAt = new Date().toISOString();
+      rcOut = rcSelected.map(r => ({
+        receipt_date: r.receipt_date, trans_no: r.trans_no, patient_name: r.patient_name,
+        recorded_by: r.recorded_by, received_amount: r.received_amount,
+        imported_by: BNH_PAGE.user.username, imported_by_name: BNH_PAGE.user.name, imported_at: importedAt
+      }));
+      const { error } = await BNH_PAGE.sb.from('cash_receipts').upsert(rcOut, { onConflict: 'trans_no' });
+      if (error) throw new Error('cash_receipts: ' + error.message);
+      done.push(`${rcOut.length} cash receipt(s)`);
+      if (typeof window.crInvalidateFilters === 'function') window.crInvalidateFilters();
+    } else {
+      log('ℹ️ [4/4] No cash receipts selected — skipped.');
+    }
+    setProgress(100);
+
+    const skippedCases = mergedData.length - newCases.length;
+    const skippedTx    = rawCashRows.length - cashToInsert.length;
+    const rcUpdated    = rcSelected.filter(r => r.alreadyExists).length;
+
+    document.getElementById('step3Number').classList.replace('pending', 'done');
+    document.getElementById('step3Number').textContent = '✓';
+    document.getElementById('successBox').style.display = 'block';
+    document.getElementById('successMessage').innerHTML = `
+      ✅ <strong>${caseRows.length} new case(s)</strong>,
+      <strong>${testRows.length} test line(s)</strong>,
+      <strong>${cashRowsOut.length} OPD cash entr${cashRowsOut.length === 1 ? 'y' : 'ies'}</strong>
+      ${rcOut.length ? `and <strong>${rcOut.length} cash receipt(s)</strong>` : ''} saved to Supabase.<br>
+      ${skippedCases > 0 ? `⚠️ ${skippedCases} duplicate case(s) skipped.<br>` : ''}
+      ${skippedTx > 0 ? `⚠️ ${skippedTx} duplicate OPD transaction(s) skipped.<br>` : ''}
+      ${rcUpdated > 0 ? `ℹ️ ${rcUpdated} cash receipt(s) already existed and were updated.<br>` : ''}
+      ${stubCases.length > 0 ? `ℹ️ ${stubCases.length} case(s) were created from Cash Register data only (no matching tests).<br>` : ''}
+      Ready for refer linking in the next step.
+    `;
+    document.getElementById('uploadBtn').style.display  = 'none';
+    document.getElementById('proceedBtn').style.display = 'block';
+
+  } catch (ex) {
+    log('❌ Upload error: ' + ex.message, 'log-err');
+    err.textContent = 'Upload error: ' + ex.message +
+      (done.length ? '  — already saved before the error: ' + done.join(', ') + '. Do not re-run blindly; check Supabase first.' : '');
+    document.getElementById('uploadBtn').disabled = false;
+  } finally {
+    spinner.classList.add('hidden');
+  }
+}
+
+function proceedToReferLinker() { window.location.href = '../pages/opd_refer_linker.html'; }
+function resetUpload()          { location.reload(); }
+</script>
+
+<!-- ═══════════════ VIEW & MANAGE CASH RECEIPTS ═══════════════ -->
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  let viewRows = [];
+  let recordedByOptionsLoaded = false;
+
+  async function populateRecordedByFilter(){
+    if (recordedByOptionsLoaded) return;
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('cash_receipts').select('recorded_by');
+      if (error) throw error;
+      const uniq = [...new Set((data || []).map(r => r.recorded_by).filter(Boolean))].sort();
+      const sel = $('fRecordedBy');
+      const current = sel.value;
+      sel.innerHTML = '<option value="">All</option>';
+      uniq.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name; opt.textContent = name;
+        sel.appendChild(opt);
+      });
+      sel.value = current;
+      recordedByOptionsLoaded = true;
+    } catch (err) { /* non-fatal */ }
+  }
+
+  async function loadViewData(){
+    if (IS_MANAGER) return;
+    await populateRecordedByFilter();
+
+    const from = $('fFrom').value, to = $('fTo').value;
+    const recBy = $('fRecordedBy').value;
+    const search = $('fSearch').value.trim();
+
+    $('viewStatus').textContent = 'Loading...';
+    $('crViewErr').textContent = '';
+
+    try {
+      let q = BNH_PAGE.sb.from('cash_receipts').select('*').order('receipt_date', { ascending: false });
+      if (from) q = q.gte('receipt_date', from);
+      if (to) q = q.lte('receipt_date', to);
+      if (recBy) q = q.eq('recorded_by', recBy);
+      if (search) q = q.or('patient_name.ilike.%' + search + '%,trans_no.ilike.%' + search + '%');
+
+      const { data, error } = await q;
+      if (error) throw error;
+      viewRows = data || [];
+      renderViewTable();
+      renderAggregates();
+      $('viewStatus').textContent = viewRows.length + ' rows';
+    } catch (err) {
+      $('crViewErr').textContent = err.message;
+      $('viewStatus').textContent = '';
+    }
+  }
+  $('loadBtn').addEventListener('click', loadViewData);
+  window.crLoadViewData = loadViewData;
+  window.crInvalidateFilters = () => { recordedByOptionsLoaded = false; };
+
+  function renderAggregates(){
+    const total = viewRows.reduce((s, r) => s + (parseFloat(r.received_amount) || 0), 0);
+    const count = viewRows.length;
+    const avg = count ? total / count : 0;
+
+    const cards = $('aggCards');
+    cards.innerHTML = '';
+    [
+      ['Total Amount', '₹' + total.toLocaleString('en-IN', { maximumFractionDigits: 2 })],
+      ['Transactions', count],
+      ['Average', '₹' + avg.toLocaleString('en-IN', { maximumFractionDigits: 2 })]
+    ].forEach(([lbl, num]) => {
+      const div = document.createElement('div');
+      div.className = 'agg-card';
+      div.innerHTML = '<div class="num">' + num + '</div><div class="lbl">' + lbl + '</div>';
+      cards.appendChild(div);
+    });
+
+    const byRec = {};
+    viewRows.forEach(r => {
+      const key = r.recorded_by || '(blank)';
+      if (!byRec[key]) byRec[key] = { count: 0, sum: 0 };
+      byRec[key].count += 1;
+      byRec[key].sum += parseFloat(r.received_amount) || 0;
+    });
+    const rows = Object.entries(byRec).sort((a, b) => b[1].sum - a[1].sum);
+
+    const table = $('byRecTable');
+    table.innerHTML = '';
+    const thead = document.createElement('tr');
+    ['Recorded By', 'Count', 'Sum'].forEach(h => { const th = document.createElement('th'); th.textContent = h; thead.appendChild(th); });
+    table.appendChild(thead);
+    rows.forEach(([name, agg]) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escHtml(name) + '</td><td>' + agg.count + '</td><td>₹' +
+        agg.sum.toLocaleString('en-IN', { maximumFractionDigits: 2 }) + '</td>';
+      table.appendChild(tr);
+    });
+  }
+
+  function renderViewTable(){
+    const table = $('viewTable');
+    table.innerHTML = '';
+    const thead = document.createElement('tr');
+    ['Date', 'Trans No', 'Name', 'Recorded By', 'Received Amount', 'Imported By', ''].forEach(h => {
+      const th = document.createElement('th'); th.textContent = h; thead.appendChild(th);
+    });
+    table.appendChild(thead);
+
+    viewRows.forEach(r => {
+      const tr = document.createElement('tr');
+      [['receipt_date','date'],['trans_no','text'],['patient_name','text'],['recorded_by','text'],['received_amount','number']].forEach(([key, type]) => {
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = type; input.value = r[key] || '';
+        input.addEventListener('input', () => { r[key] = type === 'number' ? parseFloat(input.value) : input.value; });
+        td.appendChild(input); tr.appendChild(td);
+      });
+
+      const tdImp = document.createElement('td');
+      tdImp.style.cssText = 'font-size:.75rem;color:#888;';
+      tdImp.textContent = r.imported_by_name || r.imported_by || '';
+      tr.appendChild(tdImp);
+
+      const tdA = document.createElement('td');
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = 'Save'; saveBtn.className = 'save-btn'; saveBtn.style.marginRight = '4px';
+      saveBtn.addEventListener('click', () => saveRow(r));
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete'; delBtn.className = 'del-btn';
+      delBtn.addEventListener('click', () => deleteRow(r));
+      tdA.append(saveBtn, delBtn);
+      tr.appendChild(tdA);
+      table.appendChild(tr);
+    });
+  }
+
+  async function saveRow(r){
+    $('crViewErr').textContent = '';
+    try {
+      const { error } = await BNH_PAGE.sb.from('cash_receipts')
+        .update({ receipt_date: r.receipt_date, trans_no: r.trans_no, patient_name: r.patient_name, recorded_by: r.recorded_by, received_amount: r.received_amount })
+        .eq('id', r.id);
+      if (error) throw error;
+      $('viewStatus').textContent = 'Saved row (' + r.trans_no + ')';
+      renderAggregates();
+    } catch (err) { $('crViewErr').textContent = err.message; }
+  }
+
+  async function deleteRow(r){
+    if (!confirm('Delete transaction ' + r.trans_no + ' for ' + r.patient_name + '?')) return;
+    $('crViewErr').textContent = '';
+    try {
+      const { error } = await BNH_PAGE.sb.from('cash_receipts').delete().eq('id', r.id);
+      if (error) throw error;
+      viewRows = viewRows.filter(x => x.id !== r.id);
+      renderViewTable();
+      renderAggregates();
+    } catch (err) { $('crViewErr').textContent = err.message; }
+  }
+})();
+</script>
+</body>
+</html>
