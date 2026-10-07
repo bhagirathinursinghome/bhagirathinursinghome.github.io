@@ -80,39 +80,112 @@
     }
 
     /* ── Modal Overlay ── */
-    .modal-overlay {
+    .ps-overlay {
       display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
       z-index:1000; align-items:center; justify-content:center;
     }
-    .modal-overlay.open { display:flex; }
-    .modal {
-      background:#fff; border-radius:14px; padding:1.75rem; width:min(94vw,480px);
+    .ps-overlay.ps-open { display:flex; }
+    .ps-dialog { position:static; transform:none; height:auto; margin:0;
+      background:#fff; border-radius:14px; padding:1.75rem; width:min(94vw,520px); max-height:92vh; overflow-y:auto;
       box-shadow:0 20px 60px rgba(0,0,0,.2);
     }
-    .modal h2 { font-size:1.05rem; margin:0 0 1.1rem; color:#1e1b4b; }
-    .modal label { display:block; font-size:.82rem; font-weight:600; color:#374151; margin:.65rem 0 .2rem; }
-    .modal input, .modal textarea {
+    .ps-dialog h2 { font-size:1.05rem; margin:0 0 1.1rem; color:#1e1b4b; }
+    .ps-dialog label { display:block; font-size:.82rem; font-weight:600; color:#374151; margin:.65rem 0 .2rem; }
+    .ps-dialog input, .ps-dialog textarea {
       width:100%; padding:.45rem .7rem; border:1.5px solid #d1d5db;
       border-radius:8px; font-size:.9rem; box-sizing:border-box; outline:none;
     }
-    .modal input:focus, .modal textarea:focus { border-color:#6366f1; }
-    .modal-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.25rem; }
+    .ps-dialog input:focus, .ps-dialog textarea:focus { border-color:#6366f1; }
+    .ps-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.25rem; }
     .btn-cancel { padding:.45rem 1.1rem; border-radius:8px; background:#f3f4f6; color:#374151; font-weight:600; cursor:pointer; border:none; }
     .btn-save   { padding:.45rem 1.1rem; border-radius:8px; background:#6366f1; color:#fff; font-weight:600; cursor:pointer; border:none; }
     .btn-save:hover { background:#4f46e5; }
 
     /* ── Delete Confirm Modal ── */
-    .confirm-modal {
+    .ps-confirm {
       background:#fff; border-radius:14px; padding:1.75rem; width:min(94vw,400px);
       box-shadow:0 20px 60px rgba(0,0,0,.2); text-align:center;
     }
-    .confirm-modal .ci { font-size:2.5rem; margin-bottom:.4rem; }
-    .confirm-modal p { font-size:.9rem; color:#374151; margin:.4rem 0 1.1rem; }
+    .ps-confirm .ci { font-size:2.5rem; margin-bottom:.4rem; }
+    .ps-confirm p { font-size:.9rem; color:#374151; margin:.4rem 0 1.1rem; }
     .btn-danger       { padding:.45rem 1.2rem; border-radius:8px; background:#dc2626; color:#fff; font-weight:600; cursor:pointer; border:none; }
     .btn-danger:hover { background:#b91c1c; }
 
     .empty-state { text-align:center; padding:2.5rem 1rem; color:#9ca3af; font-size:.9rem; }
 
+    .ps-dialog select { width:100%; padding:.45rem .7rem; border:1.5px solid #d1d5db; border-radius:8px;
+      font-size:.9rem; box-sizing:border-box; outline:none; background:#fff; }
+    .ps-dialog select:focus { border-color:#6366f1; }
+    .ps-2col { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
+    .due-box { display:none; background:#f5f3ff; border:1.5px solid #ddd6fe; border-radius:10px;
+      padding:.7rem .9rem; margin-top:.8rem; font-size:.83rem; }
+    .due-chips { display:flex; gap:.5rem; flex-wrap:wrap; }
+    .due-chip { flex:1; min-width:110px; background:#fff; border:1.5px solid #e5e7eb; border-radius:8px; padding:.4rem .6rem; }
+    .due-chip small { display:block; color:#6b7280; font-weight:600; font-size:.72rem; }
+    .due-chip b { font-size:.95rem; }
+    .due-chip.sel { border-color:#6366f1; background:#eef2ff; }
+    .cat-disp { background:#dbeafe; color:#1e40af; }
+    .cat-ipd  { background:#ede9fe; color:#5b21b6; }
+    th.c { text-align:center; }
+    /* ── Stacked due cards ── */
+    .due-wrap { border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; background:#fff;
+                box-shadow:0 4px 18px rgba(30,41,59,.06); }
+    .due-scroll { overflow-x:auto; }
+    .due-table { border-collapse:separate; border-spacing:0; width:100%; font-variant-numeric:tabular-nums; }
+    .due-table thead th { background:linear-gradient(180deg,#1e3a5f,#183050); color:#fff; text-transform:uppercase;
+                          letter-spacing:.06em; font-size:.7rem; font-weight:700; padding:13px 14px; border:none;
+                          text-align:right; white-space:nowrap; }
+    .due-table thead th:nth-child(1), .due-table thead th:nth-child(2) { text-align:left; }
+    .due-table td { padding:10px 14px; font-size:.86rem; text-align:right; border-bottom:1px solid #eef0f4; color:#1f2937; }
+    .due-table tr.grp-start td { border-top:2px solid #dde2ea; }
+    .due-table tbody tr.grp-start:first-child td { border-top:none; }
+    .due-table tr.row-disp td.n { background:#fffaf4; }
+    .due-table tr.row-ipd  td.n { background:#f5fbf5; }
+    .due-table tbody tr:hover td.n { filter:brightness(.96); }
+    .due-table td.cat { text-align:left; }
+    .due-table td.due-c { font-weight:700; }
+    .due-table td .z { color:#c4c8d0; }
+    .due-table td[data-inc]::after { content:attr(data-inc); display:block; font-size:.67rem; color:#6b7280; font-weight:600; }
+    .due-table td.sup-name { text-align:left; font-weight:700; color:#1e3a8a; background:#fff; min-width:160px;
+                             vertical-align:middle; border-right:1px solid #eef0f4; }
+    .due-table td.sup-name[data-sup] { cursor:pointer; }
+    .due-table td.sup-name[data-sup]:hover { background:#eef2ff; }
+    .due-table td.sup-name[data-sup]::after { content:'View ledger ›'; display:block; font-size:.68rem;
+                                              font-weight:600; color:#6366f1; margin-top:2px; }
+    .due-table td.tot-due { text-align:center; font-weight:800; font-size:1rem; vertical-align:middle;
+                            border-left:1px solid #eef0f4; min-width:130px; }
+    .due-table td.tot-pos  { background:#fef2f2; color:#b91c1c; }
+    .due-table td.tot-zero { background:#f0fdf4; color:#15803d; }
+    .due-table td.tot-neg  { background:#fffbeb; color:#b45309; }
+    .pill { display:inline-block; padding:2px 11px; border-radius:999px; font-size:.72rem; font-weight:700; }
+    .pill-disp { background:#ffe6d0; color:#9a4a0c; }
+    .pill-ipd  { background:#d6efda; color:#1d6b32; }
+    .due-table tfoot tr.grand td { border-bottom:none; font-weight:800; }
+    .due-table tfoot tr.grand td.n { background:#eef1f6; }
+    .due-table tfoot tr.grand td.sup-name { background:#e2e8f0; color:#0f172a; }
+    .due-table tfoot tr.grand.grp-start td { border-top:2px solid #1e3a5f; }
+    .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:.75rem; margin-bottom:1rem; }
+    .kpi { background:#fff; border:1px solid #e5e7eb; border-left:4px solid #6366f1; border-radius:12px; padding:.7rem .95rem; }
+    .kpi small { display:block; color:#6b7280; font-weight:700; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; }
+    .kpi b { font-size:1.12rem; color:#111827; }
+    .kpi.k-red { border-left-color:#dc2626; } .kpi.k-orange { border-left-color:#f59e0b; } .kpi.k-green { border-left-color:#16a34a; }
+    .ps-dialog.ps-wide { width:min(96vw,940px); }
+    .lm-head { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:.9rem; }
+    .lm-sub { font-size:.72rem; font-weight:700; color:#6366f1; text-transform:uppercase; letter-spacing:.06em; }
+    .lm-filters { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.75rem; align-items:end; }
+    .lm-btns { display:flex; gap:.5rem; }
+    .lm-chips { display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.7rem; align-items:center; font-size:.76rem; color:#6b7280; }
+    .chip-btn { padding:3px 11px; border-radius:999px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca;
+                font-size:.76rem; font-weight:600; cursor:pointer; }
+    .chip-btn:hover { background:#e0e7ff; }
+    #lmOut { max-height:55vh; overflow:auto; border:1px solid #e5e7eb; border-radius:10px; padding:.6rem .8rem; margin-top:.9rem; }
+    #lmOut thead th { position:sticky; top:0; }
+    .due-filters .hz { display:flex; align-items:center; gap:.45rem; font-size:.83rem; font-weight:700; cursor:pointer;
+                       user-select:none; background:#eef2ff; border:1.5px solid #c7d2fe;
+                       color:#3730a3; padding:.4rem .85rem; border-radius:999px; }
+    .due-filters { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; margin-bottom:1rem; }
+    .due-filters input[type=text] { flex:1; min-width:180px; padding:.45rem .75rem; border:1.5px solid #d1d5db;
+                                    border-radius:8px; font-size:.9rem; outline:none; }
     @media print { .tab-bar, button, #roleBadge, .notice { display:none!important; } }
   </style>
 </head>
@@ -120,17 +193,25 @@
 <div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
 
 <!-- ══════════ EDIT SUPPLIER MODAL ══════════ -->
-<div class="modal-overlay" id="editModal">
-  <div class="modal">
+<div class="ps-overlay" id="editModal">
+  <div class="ps-dialog">
     <h2>✏️ Edit Supplier</h2>
     <label>Supplier Name <span style="color:red">*</span></label>
     <input id="editName" type="text" required />
-    <label>Opening Balance (₹)</label>
-    <input id="editOpBal" type="number" min="0" step="0.01" />
+    <div class="ps-2col">
+      <div>
+        <label>Opening Balance – Dispensary (₹)</label>
+        <input id="editOpDisp" type="number" min="0" step="0.01" />
+      </div>
+      <div>
+        <label>Opening Balance – IPD (₹)</label>
+        <input id="editOpIpd" type="number" min="0" step="0.01" />
+      </div>
+    </div>
     <label>Remark</label>
     <textarea id="editRemark" rows="2"></textarea>
     <p class="err" id="editErr"></p>
-    <div class="modal-actions">
+    <div class="ps-actions">
       <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
       <button class="btn-save"   onclick="saveEdit()">💾 Save Changes</button>
     </div>
@@ -138,8 +219,8 @@
 </div>
 
 <!-- ══════════ DELETE CONFIRM MODAL ══════════ -->
-<div class="modal-overlay" id="delModal">
-  <div class="confirm-modal">
+<div class="ps-overlay" id="delModal">
+  <div class="ps-confirm">
     <div class="ci">🗑️</div>
     <strong id="delName" style="font-size:1rem;display:block;margin-bottom:.3rem"></strong>
     <p>This will permanently delete this supplier.<br>This action cannot be undone.</p>
@@ -153,8 +234,8 @@
 
 
 <!-- ══════════ EDIT PAYMENT MODAL ══════════ -->
-<div class="modal-overlay" id="editPayModal">
-  <div class="modal">
+<div class="ps-overlay" id="editPayModal">
+  <div class="ps-dialog">
     <h2>✏️ Edit Payment</h2>
     <label>Date <span style="color:red">*</span></label>
     <input id="epDate" type="date" required />
@@ -162,8 +243,14 @@
     <select id="epSupplier" required>
       <option value="">-- Select Supplier --</option>
     </select>
+    <label>Category <span style="color:red">*</span></label>
+    <select id="epCategory" required>
+      <option value="Dispensary">Dispensary</option>
+      <option value="IPD">IPD</option>
+    </select>
     <label>Amount (₹) <span style="color:red">*</span></label>
     <input id="epAmount" type="number" min="0.01" step="0.01" required />
+    <div id="epDueBox" class="due-box"></div>
     <label>Mode <span style="color:red">*</span></label>
     <select id="epMode" required>
       <option value="">-- Select Mode --</option>
@@ -174,7 +261,7 @@
     <label>Remark</label>
     <textarea id="epRemark" rows="2"></textarea>
     <p class="err" id="epErr"></p>
-    <div class="modal-actions">
+    <div class="ps-actions">
       <button class="btn-cancel" onclick="closeEditPay()">Cancel</button>
       <button class="btn-save"   onclick="saveEditPay()">💾 Save Changes</button>
     </div>
@@ -182,8 +269,8 @@
 </div>
 
 <!-- ══════════ DELETE PAYMENT CONFIRM MODAL ══════════ -->
-<div class="modal-overlay" id="delPayModal">
-  <div class="confirm-modal">
+<div class="ps-overlay" id="delPayModal">
+  <div class="ps-confirm">
     <div class="ci">🗑️</div>
     <strong id="delPayDesc" style="font-size:1rem;display:block;margin-bottom:.3rem"></strong>
     <p>This will permanently delete this payment record.<br>This action cannot be undone.</p>
@@ -192,6 +279,32 @@
       <button class="btn-danger" onclick="confirmDeletePay()">Yes, Delete</button>
     </div>
     <p class="err" id="delPayErr" style="margin-top:.6rem"></p>
+  </div>
+</div>
+
+<!-- ══════════ SUPPLIER LEDGER POP-UP ══════════ -->
+<div class="ps-overlay" id="ledgerModal">
+  <div class="ps-dialog ps-wide">
+    <div class="lm-head">
+      <div><div class="lm-sub">Supplier Ledger</div><h2 id="lmTitle" style="margin:.15rem 0 0"></h2></div>
+      <button class="btn-cancel" onclick="closeSupLedger()">✕ Close</button>
+    </div>
+    <div class="lm-filters">
+      <div><label>From</label><input id="lmFrom" type="date" /></div>
+      <div><label>To</label><input id="lmTo" type="date" /></div>
+      <div><label>Category</label><select id="lmCat"></select></div>
+      <div class="lm-btns">
+        <button class="btn-save" onclick="loadPopLedger()">Show</button>
+        <button class="btn-save" style="background:#059669" onclick="downloadPopLedger()">⬇ PDF</button>
+      </div>
+    </div>
+    <div class="lm-chips">Quick range:
+      <button class="chip-btn" onclick="setPopRange(1)">Last 30 days</button>
+      <button class="chip-btn" onclick="setPopRange(3)">3 months</button>
+      <button class="chip-btn" onclick="setPopRange(6)">6 months</button>
+      <button class="chip-btn" onclick="setPopRange(12)">1 year</button>
+    </div>
+    <div id="lmOut"></div>
   </div>
 </div>
 
@@ -236,8 +349,12 @@
             <input id="supplierName" type="text" placeholder="e.g. Medico Pharma Ltd." required />
           </div>
           <div>
-            <label>Opening Balance (₹)</label>
-            <input id="openingBalance" type="number" min="0" step="0.01" placeholder="0.00" />
+            <label>Opening Balance – Dispensary (₹)</label>
+            <input id="openingBalDisp" type="number" min="0" step="0.01" placeholder="0.00" />
+          </div>
+          <div>
+            <label>Opening Balance – IPD (₹)</label>
+            <input id="openingBalIpd" type="number" min="0" step="0.01" placeholder="0.00" />
           </div>
         </div>
         <label style="margin-top:.65rem;display:block">Remark</label>
@@ -292,6 +409,14 @@
             <input id="payAmount" type="number" min="0.01" step="0.01" required />
           </div>
           <div>
+            <label>Category <span style="color:red">*</span></label>
+            <select id="payCategory" required>
+              <option value="">-- Select Category --</option>
+              <option value="Dispensary">Dispensary</option>
+              <option value="IPD">IPD</option>
+            </select>
+          </div>
+          <div>
             <label>Mode <span style="color:red">*</span></label>
             <select id="payMode" required>
               <option value="">-- Select Mode --</option>
@@ -301,6 +426,7 @@
             </select>
           </div>
         </div>
+        <div id="payDueBox" class="due-box"></div>
         <label style="margin-top:.65rem;display:block">Remark</label>
         <textarea id="payRemark" rows="2" placeholder="Optional…"></textarea>
         <div style="margin-top:1rem">
@@ -323,7 +449,14 @@
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
         <button class="btn-primary" style="width:auto" onclick="loadSupplierDue()">🔄 Refresh</button>
         <button class="btn-primary" style="width:auto;background:#059669"
-          onclick="downloadPDF('supplierDueTable','Supplier_Due_Report')">⬇ Download PDF</button>
+          onclick="downloadPDF('supplierDueTable','Supplier_Due_Report','portrait')">⬇ Download PDF</button>
+      </div>
+      <div class="due-filters">
+        <input type="text" id="dueSearch" placeholder="🔍 Search supplier…" oninput="renderDueSummary()" />
+        <label class="hz">
+          <input type="checkbox" id="dueOnly" onchange="renderDueSummary()" style="width:auto" />
+          Hide suppliers with 0 due
+        </label>
       </div>
       <div id="supplierDueOut">Click Refresh to load.</div>
     </div>
@@ -336,7 +469,15 @@
       <div class="form-row">
         <div>
           <label>Supplier</label>
-          <select id="ledgerSupplier"><option value="">-- Select Supplier --</option></select>
+          <select id="ledgerSupplier" onchange="updateLedgerCats()"><option value="">-- Select Supplier --</option></select>
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="ledgerCategory">
+            <option value="">Dispensary + IPD</option>
+            <option value="Dispensary">Dispensary</option>
+            <option value="IPD">IPD</option>
+          </select>
         </div>
         <div><label>From Date</label><input id="ledgerFrom" type="date"/></div>
         <div><label>To Date</label>  <input id="ledgerTo"   type="date"/></div>
@@ -360,14 +501,10 @@
 <script>
 // ═══════════════════════════════════════════════════════════════
 //  ROLE LISTS
-//  Edit these two arrays to control who gets which access level.
-//
-//  FULL_ACCESS_ROLES  → can Add, Edit, Delete, Toggle suppliers
-//                       + all other features (payments, reports)
-//
-//  LIMITED_ACCESS_ROLES → can view supplier list, add payments,
+//  FULL_ACCESS_ROLES    → can Add, Edit, Delete, Toggle suppliers
+//                         + edit/delete payments + everything else
+//  LIMITED_ACCESS_ROLES → can view suppliers, add payments,
 //                         see Due Summary and Supplier Ledger
-//                         (cannot add/edit/delete suppliers)
 // ═══════════════════════════════════════════════════════════════
 const FULL_ACCESS_ROLES    = ["admin"];
 const LIMITED_ACCESS_ROLES = ["manager", "pharmacy", "accountant"];
@@ -386,7 +523,6 @@ badge.textContent = isFullAccess
   : '🔒 Limited Access — ' + currentRole;
 badge.classList.add(isFullAccess ? 'role-full' : 'role-limited');
 
-// ── Show notice and hide full-access-only tabs for limited users ──
 if (!isFullAccess) {
   document.getElementById('limitedNotice').style.display  = 'flex';
   document.getElementById('btnAddSupplier').style.display = 'none';
@@ -399,27 +535,80 @@ function switchTab(id, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
+  // refresh purchases so the "due" shown in Add Payment is current
+  if (id === 'tabPayment') loadPurchases().then(updatePayDue);
+  if (id === 'tabLedger')  loadPurchases().then(updateLedgerCats);
 }
 
 // ── Helpers ──────────────────────────────────────────────────
-const fmt = n => '₹' + parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+const CATS = ['Dispensary', 'IPD'];
+const num  = v => parseFloat(v || 0) || 0;
+const fmt  = n => '₹' + num(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 const spin = show => document.getElementById('spinner').classList[show ? 'remove' : 'add']('hidden');
 function esc(str) {
-  return String(str)
+  return String(str == null ? '' : str)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+const catBadge = c => `<span class="badge ${c === 'IPD' ? 'cat-ipd' : 'cat-disp'}">${c}</span>`;
+
+// Category helpers.
+// Old rows (before categories existed) fall back to Dispensary so nothing is lost.
+const opDisp = s => (s.opening_balance_dispensary == null && s.opening_balance_ipd == null)
+                      ? num(s.opening_balance) : num(s.opening_balance_dispensary);
+const opIpd  = s => num(s.opening_balance_ipd);
+const purCat = r => r.purchase_type === 'IPD' ? 'IPD' : 'Dispensary';
+const payCat = r => r.category      === 'IPD' ? 'IPD' : 'Dispensary';
+
+// Fetch every row (Supabase returns max 1000 rows per request)
+async function fetchAll(table, cols) {
+  let all = [], from = 0;
+  const step = 1000;
+  while (true) {
+    const { data, error } = await BNH_PAGE.sb.from(table).select(cols).order('id').range(from, from + step - 1);
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < step) break;
+    from += step;
+  }
+  return all;
+}
+
+// Opening / purchase / payment / due for one supplier, split by category
+const othCat = r => r.category === 'IPD' ? 'IPD' : 'Dispensary';
+
+function calcSupplier(s, purchases, payments, others) {
+  const r = {
+    name: s.supplier_name,
+    op:  { Dispensary: opDisp(s), IPD: opIpd(s) },
+    pur: { Dispensary: 0, IPD: 0 },   // medicine purchases (affect stock)
+    oth: { Dispensary: 0, IPD: 0 },   // other purchases (due only, no stock)
+    pay: { Dispensary: 0, IPD: 0 },
+    due: {}
+  };
+  purchases.forEach(p => { if (p.supplier_name === s.supplier_name) r.pur[purCat(p)] += num(p.amount); });
+  (others || []).forEach(p => { if (p.supplier_name === s.supplier_name) r.oth[othCat(p)] += num(p.amount); });
+  payments .forEach(p => { if (p.supplier_name === s.supplier_name) r.pay[payCat(p)] += num(p.amount); });
+  CATS.forEach(c => { r.due[c] = r.op[c] + r.pur[c] + r.oth[c] - r.pay[c]; });
+  r.total = r.due.Dispensary + r.due.IPD;
+  return r;
 }
 
 // ── Shared state ─────────────────────────────────────────────
 let allSuppliers = [];
+let allPurchases = [];
+let allPayments  = [];
+let allOther     = [];
 let editingId    = null;
 let deletingId   = null;
+let editingPayId = null, deletingPayId = null;
 
 // ─────────────────────────────────────────────────────────────
-//  BOOT — set defaults, load data
+//  BOOT
 // ─────────────────────────────────────────────────────────────
-document.getElementById('recBy').value    = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
-document.getElementById('payRecBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+const userLabel = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+document.getElementById('recBy').value    = userLabel;
+document.getElementById('payRecBy').value = userLabel;
 document.getElementById('payDate').value  = new Date().toISOString().slice(0, 10);
 
 const today      = new Date().toISOString().slice(0, 10);
@@ -428,12 +617,30 @@ document.getElementById('ledgerFrom').value = monthStart;
 document.getElementById('ledgerTo').value   = today;
 
 (async () => {
-  await loadAllSuppliers();
-  await loadRecentPayments();
+  await Promise.all([loadAllSuppliers(), loadRecentPayments(), loadPurchases()]);
+  updatePayDue();
+  updateLedgerCats();
 })();
 
+// "Other purchases" (non-medicine). If the table doesn't exist yet, treat as empty.
+async function fetchOthers() {
+  try { return await fetchAll('pharmacy_other_purchases', 'id,supplier_name,category,amount'); }
+  catch (ex) { console.warn('pharmacy_other_purchases not available:', ex.message); return []; }
+}
+
+async function loadPurchases() {
+  try { allPurchases = await fetchAll('pharmacy_purchases', 'id,supplier_name,purchase_type,amount'); }
+  catch (ex) { console.error(ex); }
+  allOther = await fetchOthers();
+}
+
+// Categories in which a supplier has any activity (opening, purchase, other purchase, payment)
+function activeCats(r) {
+  return CATS.filter(c => [r.op, r.pur, r.oth, r.pay].some(m => Math.abs(m[c]) > 0.004));
+}
+
 // ─────────────────────────────────────────────────────────────
-//  LOAD ALL SUPPLIERS — populates every dropdown + both tables
+//  SUPPLIERS — load + dropdowns
 // ─────────────────────────────────────────────────────────────
 async function loadAllSuppliers() {
   const { data, error } = await BNH_PAGE.sb
@@ -444,10 +651,14 @@ async function loadAllSuppliers() {
     return;
   }
   allSuppliers = data || [];
-  fillDropdown('paySupplier',    allSuppliers.filter(s => s.is_active !== false));
-  fillDropdown('ledgerSupplier', allSuppliers);
+  refreshDropdowns();
   renderViewList();
   if (isFullAccess) renderManageTable();
+}
+
+function refreshDropdowns() {
+  fillDropdown('paySupplier',    allSuppliers.filter(s => s.is_active !== false));
+  fillDropdown('ledgerSupplier', allSuppliers);
 }
 
 function fillDropdown(selId, list) {
@@ -463,7 +674,7 @@ function fillDropdown(selId, list) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  TAB: SUPPLIER LIST  (all roles — read-only)
+//  TAB: SUPPLIER LIST (read-only)
 // ─────────────────────────────────────────────────────────────
 function renderViewList() {
   const wrap = document.getElementById('supplierListWrap');
@@ -474,7 +685,8 @@ function renderViewList() {
   const rows = allSuppliers.map((r, i) => `<tr>
     <td>${i + 1}</td>
     <td><strong>${esc(r.supplier_name)}</strong></td>
-    <td class="r">${fmt(r.opening_balance)}</td>
+    <td class="r">${fmt(opDisp(r))}</td>
+    <td class="r">${fmt(opIpd(r))}</td>
     <td>${r.remark ? esc(r.remark) : '<span style="color:#ccc">—</span>'}</td>
     <td><span class="badge ${r.is_active !== false ? 'badge-active' : 'badge-inactive'}">
       ${r.is_active !== false ? 'Active' : 'Inactive'}</span></td>
@@ -482,7 +694,8 @@ function renderViewList() {
   </tr>`).join('');
   wrap.innerHTML = `<div style="overflow-x:auto"><table>
     <thead><tr>
-      <th>#</th><th>Supplier Name</th><th class="r">Opening Bal.</th>
+      <th>#</th><th>Supplier Name</th>
+      <th class="r">Op. Bal (Dispensary)</th><th class="r">Op. Bal (IPD)</th>
       <th>Remark</th><th>Status</th><th>Added By</th>
     </tr></thead>
     <tbody>${rows}</tbody>
@@ -490,28 +703,32 @@ function renderViewList() {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  TAB: ADD SUPPLIER  (full access only)
+//  TAB: ADD SUPPLIER (full access only)
 // ─────────────────────────────────────────────────────────────
 document.getElementById('supplierForm').onsubmit = async e => {
   e.preventDefault();
-  if (!isFullAccess) return; // extra guard
+  if (!isFullAccess) return;
   const err = document.getElementById('supplierErr');
   const ok  = document.getElementById('supplierOk');
   err.textContent = ''; ok.style.display = 'none';
   spin(true);
   try {
+    const opD = num(document.getElementById('openingBalDisp').value);
+    const opI = num(document.getElementById('openingBalIpd').value);
     const payload = BNH_PAGE.stamp({
-      supplier_name:   document.getElementById('supplierName').value.trim(),
-      opening_balance: parseFloat(document.getElementById('openingBalance').value || 0),
-      remark:          document.getElementById('supplierRemark').value.trim() || null,
-      is_active:       true
+      supplier_name:           document.getElementById('supplierName').value.trim(),
+      opening_balance_dispensary: opD,
+      opening_balance_ipd:        opI,
+      opening_balance:            opD + opI,
+      remark:                  document.getElementById('supplierRemark').value.trim() || null,
+      is_active:               true
     });
     const { error } = await BNH_PAGE.sb.from('pharmacy_suppliers').insert(payload);
     if (error) throw error;
     ok.style.display = 'block';
     ok.textContent = '✅ Supplier added successfully!';
     e.target.reset();
-    document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+    document.getElementById('recBy').value = userLabel;
     await loadAllSuppliers();
   } catch (ex) {
     err.textContent = ex.message;
@@ -521,7 +738,7 @@ document.getElementById('supplierForm').onsubmit = async e => {
 };
 
 // ─────────────────────────────────────────────────────────────
-//  TAB: MANAGE SUPPLIERS  (full access only)
+//  TAB: MANAGE SUPPLIERS (full access only)
 // ─────────────────────────────────────────────────────────────
 function renderManageTable() {
   if (!isFullAccess) return;
@@ -542,7 +759,8 @@ function renderManageTable() {
   }
   const rows = list.map(s => `<tr>
     <td><strong>${esc(s.supplier_name)}</strong></td>
-    <td class="r">${fmt(s.opening_balance)}</td>
+    <td class="r">${fmt(opDisp(s))}</td>
+    <td class="r">${fmt(opIpd(s))}</td>
     <td>${s.remark ? esc(s.remark) : '<span style="color:#ccc">—</span>'}</td>
     <td><span class="badge ${s.is_active !== false ? 'badge-active' : 'badge-inactive'}">
       ${s.is_active !== false ? 'Active' : 'Inactive'}</span></td>
@@ -554,34 +772,35 @@ function renderManageTable() {
                 onclick="toggleActive('${s.id}', ${s.is_active !== false})">
           ${s.is_active !== false ? '🔴 Deactivate' : '🟢 Activate'}
         </button>
-        <button class="btn-sm btn-del" onclick="openDelete('${s.id}', '${esc(s.supplier_name)}')">🗑️ Delete</button>
+        <button class="btn-sm btn-del" onclick="openDelete('${s.id}')">🗑️ Delete</button>
       </div>
     </td>
   </tr>`).join('');
 
   wrap.innerHTML = `<div style="overflow-x:auto"><table>
     <thead><tr>
-      <th>Supplier Name</th><th class="r">Op. Balance</th>
+      <th>Supplier Name</th><th class="r">Op. Bal (Dispensary)</th><th class="r">Op. Bal (IPD)</th>
       <th>Remark</th><th>Status</th><th>Added By</th><th>Actions</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
 
-// ── Edit ─────────────────────────────────────────────────────
+// ── Edit supplier (pop-up) ───────────────────────────────────
 function openEdit(id) {
-  const s = allSuppliers.find(x => x.id === id);
+  const s = allSuppliers.find(x => String(x.id) === String(id));
   if (!s) return;
-  editingId = id;
-  document.getElementById('editName').value   = s.supplier_name;
-  document.getElementById('editOpBal').value  = s.opening_balance || 0;
-  document.getElementById('editRemark').value = s.remark || '';
+  editingId = s.id;
+  document.getElementById('editName').value      = s.supplier_name;
+  document.getElementById('editOpDisp').value    = opDisp(s);
+  document.getElementById('editOpIpd').value     = opIpd(s);
+  document.getElementById('editRemark').value    = s.remark || '';
   document.getElementById('editErr').textContent = '';
-  document.getElementById('editModal').classList.add('open');
+  document.getElementById('editModal').classList.add('ps-open');
 }
 function closeEdit() {
   editingId = null;
-  document.getElementById('editModal').classList.remove('open');
+  document.getElementById('editModal').classList.remove('ps-open');
 }
 async function saveEdit() {
   const name  = document.getElementById('editName').value.trim();
@@ -590,12 +809,15 @@ async function saveEdit() {
   if (!name) { errEl.textContent = 'Supplier name is required.'; return; }
   spin(true);
   try {
+    const opD = num(document.getElementById('editOpDisp').value);
+    const opI = num(document.getElementById('editOpIpd').value);
     const updates = BNH_PAGE.stamp({
-      supplier_name:   name,
-      opening_balance: parseFloat(document.getElementById('editOpBal').value || 0),
-      remark:          document.getElementById('editRemark').value.trim() || null
+      supplier_name:              name,
+      opening_balance_dispensary: opD,
+      opening_balance_ipd:        opI,
+      opening_balance:            opD + opI,
+      remark:                     document.getElementById('editRemark').value.trim() || null
     });
-    // Rename stamp keys for an update operation
     updates.updated_by      = updates.recorded_by;
     updates.updated_by_name = updates.recorded_by_name;
     updates.updated_at      = updates.recorded_at;
@@ -610,12 +832,15 @@ async function saveEdit() {
     const idx = allSuppliers.findIndex(x => x.id === editingId);
     if (idx > -1) Object.assign(allSuppliers[idx], {
       supplier_name: name,
-      opening_balance: updates.opening_balance,
+      opening_balance_dispensary: opD,
+      opening_balance_ipd: opI,
+      opening_balance: opD + opI,
       remark: updates.remark
     });
     closeEdit();
     renderManageTable();
     renderViewList();
+    refreshDropdowns();
   } catch (ex) {
     errEl.textContent = ex.message;
   } finally {
@@ -630,11 +855,11 @@ async function toggleActive(id, currentlyActive) {
     const { error } = await BNH_PAGE.sb
       .from('pharmacy_suppliers').update({ is_active: !currentlyActive }).eq('id', id);
     if (error) throw error;
-    const idx = allSuppliers.findIndex(x => x.id === id);
+    const idx = allSuppliers.findIndex(x => String(x.id) === String(id));
     if (idx > -1) allSuppliers[idx].is_active = !currentlyActive;
     renderManageTable();
     renderViewList();
-    fillDropdown('paySupplier', allSuppliers.filter(s => s.is_active !== false));
+    refreshDropdowns();
   } catch (ex) {
     alert(ex.message);
   } finally {
@@ -642,16 +867,18 @@ async function toggleActive(id, currentlyActive) {
   }
 }
 
-// ── Delete ───────────────────────────────────────────────────
-function openDelete(id, name) {
-  deletingId = id;
-  document.getElementById('delName').textContent = name;
+// ── Delete supplier (pop-up) ─────────────────────────────────
+function openDelete(id) {
+  const s = allSuppliers.find(x => String(x.id) === String(id));
+  if (!s) return;
+  deletingId = s.id;
+  document.getElementById('delName').textContent = s.supplier_name;
   document.getElementById('delErr').textContent  = '';
-  document.getElementById('delModal').classList.add('open');
+  document.getElementById('delModal').classList.add('ps-open');
 }
 function closeDelete() {
   deletingId = null;
-  document.getElementById('delModal').classList.remove('open');
+  document.getElementById('delModal').classList.remove('ps-open');
 }
 async function confirmDelete() {
   const errEl = document.getElementById('delErr');
@@ -665,8 +892,7 @@ async function confirmDelete() {
     closeDelete();
     renderManageTable();
     renderViewList();
-    fillDropdown('paySupplier',    allSuppliers.filter(s => s.is_active !== false));
-    fillDropdown('ledgerSupplier', allSuppliers);
+    refreshDropdowns();
   } catch (ex) {
     errEl.textContent = ex.message;
   } finally {
@@ -674,23 +900,65 @@ async function confirmDelete() {
   }
 }
 
-// Close modals on outside click
-document.getElementById('editModal').addEventListener('click', function(e){ if(e.target===this) closeEdit(); });
-document.getElementById('editPayModal').addEventListener('click', function(e){ if(e.target===this) closeEditPay(); });
-document.getElementById('delPayModal').addEventListener('click', function(e){ if(e.target===this) closeDeletePay(); });
-document.getElementById('delModal').addEventListener('click', function(e){ if(e.target===this) closeDelete(); });
+// Close pop-ups on outside click
+[['editModal', closeEdit], ['editPayModal', closeEditPay],
+ ['delPayModal', closeDeletePay], ['delModal', closeDelete], ['ledgerModal', closeSupLedger]].forEach(([id, fn]) => {
+  document.getElementById(id).addEventListener('click', function (e) { if (e.target === this) fn(); });
+});
 
 // ─────────────────────────────────────────────────────────────
-//  TAB: ADD PAYMENT  (all roles)
+//  DUE BOX — shows Dispensary / IPD / Total due for a supplier
 // ─────────────────────────────────────────────────────────────
-let allPayments = [];
-let editingPayId = null, deletingPayId = null;
+function renderDueBox(boxId, name, cat, newAmt) {
+  const box = document.getElementById(boxId);
+  const s = allSuppliers.find(x => x.supplier_name === name);
+  if (!name || !s) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const r = calcSupplier(s, allPurchases, allPayments, allOther);
+  const act  = activeCats(r);
+  const show = CATS.filter(c => act.includes(c) || c === cat);   // hide categories with no transactions
+  const chip = (label, val, sel) => `<div class="due-chip${sel ? ' sel' : ''}">
+      <small>${label}</small><b style="color:${val > 0 ? '#dc2626' : '#059669'}">${fmt(val)}</b></div>`;
+  let extra = '';
+  if (cat && newAmt > 0) {
+    const after = r.due[cat] - newAmt;
+    extra = `<div style="margin-top:.5rem;font-size:.8rem">
+      ${cat} due after this payment:
+      <strong style="color:${after > 0 ? '#dc2626' : '#059669'}">${fmt(after)}</strong>
+      ${after < 0 ? '<span style="color:#b45309"> ⚠ payment is more than the due</span>' : ''}</div>`;
+  }
+  box.innerHTML = `<div style="font-weight:700;color:#4338ca;margin-bottom:.4rem">
+      Supplier Due — ${esc(name)}</div>
+    <div class="due-chips">
+      ${show.map(c => chip(c + ' Due', r.due[c], c === cat)).join('') ||
+        '<span style="color:#6b7280">No transactions yet</span>'}
+      ${show.length > 1 ? chip('Total Due', r.total, false) : ''}
+    </div>${extra}`;
+  box.style.display = 'block';
+}
 
+function updatePayDue() {
+  renderDueBox('payDueBox',
+    document.getElementById('paySupplier').value,
+    document.getElementById('payCategory').value,
+    num(document.getElementById('payAmount').value));
+}
+function updateEditPayDue() {
+  renderDueBox('epDueBox',
+    document.getElementById('epSupplier').value,
+    document.getElementById('epCategory').value, 0);
+}
+['paySupplier', 'payCategory'].forEach(id => document.getElementById(id).addEventListener('change', updatePayDue));
+document.getElementById('payAmount').addEventListener('input', updatePayDue);
+['epSupplier', 'epCategory'].forEach(id => document.getElementById(id).addEventListener('change', updateEditPayDue));
+
+// ─────────────────────────────────────────────────────────────
+//  TAB: ADD PAYMENT
+// ─────────────────────────────────────────────────────────────
 async function loadRecentPayments() {
-  const { data } = await BNH_PAGE.sb
-    .from('pharmacy_supplier_payments')
-    .select('*').order('pay_date', { ascending: false });
-  allPayments = data || [];
+  try {
+    allPayments = await fetchAll('pharmacy_supplier_payments', '*');
+    allPayments.sort((a, b) => (b.pay_date || '').localeCompare(a.pay_date || ''));
+  } catch (ex) { console.error(ex); allPayments = []; }
   renderPaymentList();
 }
 
@@ -702,11 +970,12 @@ function renderPaymentList() {
     const actions = isFullAccess ? `<td>
       <div style="display:flex;gap:.35rem;flex-wrap:wrap">
         <button class="btn-sm btn-edit" onclick="openEditPay('${r.id}')">✏️ Edit</button>
-        <button class="btn-sm btn-del"  onclick="openDeletePay('${r.id}','${esc(r.supplier_name)} – ${r.pay_date}')">🗑️</button>
+        <button class="btn-sm btn-del"  onclick="openDeletePay('${r.id}')">🗑️</button>
       </div></td>` : '';
     return `<tr>
       <td>${r.pay_date}</td>
       <td>${esc(r.supplier_name)}</td>
+      <td>${catBadge(payCat(r))}</td>
       <td class="r">${fmt(r.amount)}</td>
       <td>${esc(r.mode)}</td>
       <td>${r.remark ? esc(r.remark) : '<span style="color:#ccc">—</span>'}</td>
@@ -716,61 +985,64 @@ function renderPaymentList() {
   }).join('');
   div.innerHTML = `<div style="overflow-x:auto"><table>
     <thead><tr>
-      <th>Date</th><th>Supplier</th><th class="r">Amount</th>
+      <th>Date</th><th>Supplier</th><th>Category</th><th class="r">Amount</th>
       <th>Mode</th><th>Remark</th><th>By</th>${actionsCol}
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
 
-// ── Edit Payment ─────────────────────────────────────────────
+// ── Edit Payment (pop-up) ────────────────────────────────────
 function openEditPay(id) {
-  const r = allPayments.find(x => x.id === id); if (!r) return;
-  editingPayId = id;
+  const r = allPayments.find(x => String(x.id) === String(id)); if (!r) return;
+  editingPayId = r.id;
   document.getElementById('epDate').value     = r.pay_date;
   document.getElementById('epAmount').value   = r.amount;
   document.getElementById('epMode').value     = r.mode;
+  document.getElementById('epCategory').value = payCat(r);
   document.getElementById('epRemark').value   = r.remark || '';
   document.getElementById('epErr').textContent = '';
-  // populate and set supplier
   const sel = document.getElementById('epSupplier');
   while (sel.options.length > 1) sel.remove(1);
-  allSuppliers.filter(s => s.is_active !== false).forEach(s => {
+  allSuppliers.filter(s => s.is_active !== false || s.supplier_name === r.supplier_name).forEach(s => {
     const o = document.createElement('option');
     o.value = o.textContent = s.supplier_name;
     sel.appendChild(o);
   });
   sel.value = r.supplier_name;
-  document.getElementById('editPayModal').classList.add('open');
+  updateEditPayDue();
+  document.getElementById('editPayModal').classList.add('ps-open');
 }
-function closeEditPay() { editingPayId = null; document.getElementById('editPayModal').classList.remove('open'); }
+function closeEditPay() { editingPayId = null; document.getElementById('editPayModal').classList.remove('ps-open'); }
 async function saveEditPay() {
   const errEl = document.getElementById('epErr'); errEl.textContent = '';
-  const date   = document.getElementById('epDate').value;
-  const sup    = document.getElementById('epSupplier').value;
-  const amt    = parseFloat(document.getElementById('epAmount').value);
-  const mode   = document.getElementById('epMode').value;
-  if (!date || !sup || isNaN(amt) || !mode) { errEl.textContent = 'All required fields must be filled.'; return; }
+  const date = document.getElementById('epDate').value;
+  const sup  = document.getElementById('epSupplier').value;
+  const cat  = document.getElementById('epCategory').value;
+  const amt  = parseFloat(document.getElementById('epAmount').value);
+  const mode = document.getElementById('epMode').value;
+  if (!date || !sup || !cat || isNaN(amt) || !mode) { errEl.textContent = 'All required fields must be filled.'; return; }
   spin(true);
   try {
     const { error } = await BNH_PAGE.sb.from('pharmacy_supplier_payments').update({
-      pay_date: date, supplier_name: sup, amount: amt, mode: mode,
+      pay_date: date, supplier_name: sup, category: cat, amount: amt, mode: mode,
       remark: document.getElementById('epRemark').value.trim() || null
     }).eq('id', editingPayId);
     if (error) throw error;
-    await loadRecentPayments(); closeEditPay();
+    await loadRecentPayments(); closeEditPay(); updatePayDue();
   } catch (ex) { errEl.textContent = ex.message; }
   finally { spin(false); }
 }
 
-// ── Delete Payment ───────────────────────────────────────────
-function openDeletePay(id, desc) {
-  deletingPayId = id;
-  document.getElementById('delPayDesc').textContent = desc;
+// ── Delete Payment (pop-up) ──────────────────────────────────
+function openDeletePay(id) {
+  const r = allPayments.find(x => String(x.id) === String(id)); if (!r) return;
+  deletingPayId = r.id;
+  document.getElementById('delPayDesc').textContent = r.supplier_name + ' – ' + payCat(r) + ' – ' + r.pay_date;
   document.getElementById('delPayErr').textContent  = '';
-  document.getElementById('delPayModal').classList.add('open');
+  document.getElementById('delPayModal').classList.add('ps-open');
 }
-function closeDeletePay() { deletingPayId = null; document.getElementById('delPayModal').classList.remove('open'); }
+function closeDeletePay() { deletingPayId = null; document.getElementById('delPayModal').classList.remove('ps-open'); }
 async function confirmDeletePay() {
   const errEl = document.getElementById('delPayErr'); errEl.textContent = '';
   spin(true);
@@ -778,11 +1050,12 @@ async function confirmDeletePay() {
     const { error } = await BNH_PAGE.sb.from('pharmacy_supplier_payments').delete().eq('id', deletingPayId);
     if (error) throw error;
     allPayments = allPayments.filter(x => x.id !== deletingPayId);
-    closeDeletePay(); renderPaymentList();
+    closeDeletePay(); renderPaymentList(); updatePayDue();
   } catch (ex) { errEl.textContent = ex.message; }
   finally { spin(false); }
 }
 
+// ── Save new payment ─────────────────────────────────────────
 document.getElementById('paymentForm').onsubmit = async e => {
   e.preventDefault();
   const err = document.getElementById('payErr');
@@ -793,6 +1066,7 @@ document.getElementById('paymentForm').onsubmit = async e => {
     const payload = BNH_PAGE.stamp({
       pay_date:      document.getElementById('payDate').value,
       supplier_name: document.getElementById('paySupplier').value,
+      category:      document.getElementById('payCategory').value,
       amount:        parseFloat(document.getElementById('payAmount').value),
       mode:          document.getElementById('payMode').value,
       remark:        document.getElementById('payRemark').value.trim() || null
@@ -803,8 +1077,9 @@ document.getElementById('paymentForm').onsubmit = async e => {
     ok.textContent = '✅ Payment recorded successfully!';
     e.target.reset();
     document.getElementById('payDate').value  = new Date().toISOString().slice(0, 10);
-    document.getElementById('payRecBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+    document.getElementById('payRecBy').value = userLabel;
     await loadRecentPayments();
+    updatePayDue();
   } catch (ex) {
     err.textContent = ex.message;
   } finally {
@@ -813,148 +1088,286 @@ document.getElementById('paymentForm').onsubmit = async e => {
 };
 
 // ─────────────────────────────────────────────────────────────
-//  TAB: DUE SUMMARY  (all roles)
+//  TAB: DUE SUMMARY — one stacked card per supplier
 // ─────────────────────────────────────────────────────────────
+let dueCache = null;
+
 async function loadSupplierDue() {
   spin(true);
-  const [
-    { data: suppliers },
-    { data: purchases },
-    { data: payments }
-  ] = await Promise.all([
-    BNH_PAGE.sb.from('pharmacy_suppliers').select('supplier_name, opening_balance').order('supplier_name'),
-    BNH_PAGE.sb.from('pharmacy_purchases').select('supplier_name, amount'),
-    BNH_PAGE.sb.from('pharmacy_supplier_payments').select('supplier_name, amount')
-  ]);
-  spin(false);
-
-  const rows = (suppliers || []).map(s => {
-    const op  = parseFloat(s.opening_balance || 0);
-    const pur = (purchases || [])
-      .filter(p => p.supplier_name === s.supplier_name)
-      .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
-    const pay = (payments || [])
-      .filter(p => p.supplier_name === s.supplier_name)
-      .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
-    return { name: s.supplier_name, op, pur, pay, due: op + pur - pay };
-  });
-  const tot = rows.reduce(
-    (a, r) => ({ op: a.op+r.op, pur: a.pur+r.pur, pay: a.pay+r.pay, due: a.due+r.due }),
-    { op:0, pur:0, pay:0, due:0 }
-  );
-
-  const color = v => v > 0 ? '#dc2626' : '#059669';
-  const dueRows = rows.map((r, i) => `<tr>
-    <td>${i+1}</td><td>${esc(r.name)}</td>
-    <td class="r">${fmt(r.op)}</td>
-    <td class="r">${fmt(r.pur)}</td>
-    <td class="r">${fmt(r.pay)}</td>
-    <td class="r" style="color:${color(r.due)};font-weight:700">${fmt(r.due)}</td>
-  </tr>`).join('');
-
-  document.getElementById('supplierDueOut').innerHTML = `
-    <div style="overflow-x:auto">
-      <table id="supplierDueTable">
-        <thead><tr>
-          <th>#</th><th>Supplier</th>
-          <th class="r">Op. Bal</th><th class="r">Purchase</th>
-          <th class="r">Payment</th><th class="r">Due</th>
-        </tr></thead>
-        <tbody>${dueRows || '<tr><td colspan="6" class="empty-state">No data.</td></tr>'}</tbody>
-        <tfoot><tr>
-          <td colspan="2" style="text-align:right">Total</td>
-          <td class="r">${fmt(tot.op)}</td>
-          <td class="r">${fmt(tot.pur)}</td>
-          <td class="r">${fmt(tot.pay)}</td>
-          <td class="r" style="color:${color(tot.due)}">${fmt(tot.due)}</td>
-        </tr></tfoot>
-      </table>
-    </div>`;
+  const out = document.getElementById('supplierDueOut');
+  try {
+    const [{ data: suppliers, error: e1 }, purchases, payments, others] = await Promise.all([
+      BNH_PAGE.sb.from('pharmacy_suppliers').select('*').order('supplier_name'),
+      fetchAll('pharmacy_purchases', 'id,supplier_name,purchase_type,amount'),
+      fetchAll('pharmacy_supplier_payments', 'id,supplier_name,category,amount'),
+      fetchOthers()
+    ]);
+    if (e1) throw e1;
+    dueCache = (suppliers || []).map(s => calcSupplier(s, purchases, payments, others));
+    renderDueSummary();
+  } catch (ex) {
+    out.innerHTML = `<p class="err">Error: ${esc(ex.message)}</p>`;
+  } finally {
+    spin(false);
+  }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  TAB: SUPPLIER LEDGER  (all roles)
-// ─────────────────────────────────────────────────────────────
-async function loadLedger() {
-  const sup  = document.getElementById('ledgerSupplier').value;
-  const from = document.getElementById('ledgerFrom').value;
-  const to   = document.getElementById('ledgerTo').value;
-  const out  = document.getElementById('ledgerOut');
+const dueColor = v => v > 0.004 ? '#dc2626' : (v < -0.004 ? '#b45309' : '#059669');
+const amt = v => Math.abs(v) > 0.004 ? fmt(v) : '<span class="z">—</span>';
 
-  if (!sup)  { out.textContent = 'Please select a supplier.'; return; }
-  if (!from || !to) { out.textContent = 'Please select a date range.'; return; }
+// Rows for one supplier (or the grand total): one row per category the supplier uses.
+// Supplier name and Total Due are merged (rowspan) across those rows.
+function groupRows(label, d, cats, grand) {
+  const list  = cats.length ? cats : [null];            // no activity → single empty row
+  const total = cats.reduce((a, c) => a + d.due[c], 0);
+  const tcls  = total > 0.004 ? 'tot-pos' : (total < -0.004 ? 'tot-neg' : 'tot-zero');
+  return list.map((c, i) => {
+    const v = k => c ? d[k][c] : 0;
+    const purchase = c ? d.pur[c] + d.oth[c] : 0;       // medicine + other purchases
+    const incl = c && Math.abs(d.oth[c]) > 0.004 ? ` data-inc="incl. other ${fmt(d.oth[c])}"` : '';
+    const cls  = [c ? (c === 'IPD' ? 'row-ipd' : 'row-disp') : '', i === 0 ? 'grp-start' : '', grand ? 'grand' : ''].join(' ');
+    const first = i === 0
+      ? `<td rowspan="${list.length}" class="sup-name"${grand ? '' : ` data-sup="${esc(label)}" title="Click to view ledger"`}>${esc(label)}</td>` : '';
+    const last = i === 0
+      ? `<td rowspan="${list.length}" class="tot-due ${tcls}">${fmt(total)}</td>` : '';
+    const pill = c ? `<span class="pill ${c === 'IPD' ? 'pill-ipd' : 'pill-disp'}">${c}</span>` : '<span class="z">—</span>';
+    return `<tr class="${cls}">${first}
+      <td class="n cat">${pill}</td>
+      <td class="n">${amt(v('op'))}</td>
+      <td class="n"${incl}>${amt(purchase)}</td>
+      <td class="n">${amt(v('pay'))}</td>
+      <td class="n due-c" style="color:${dueColor(v('due'))}">${fmt(v('due'))}</td>
+      ${last}</tr>`;
+  }).join('');
+}
 
-  spin(true);
-  const [
-    { data: sArr },
-    { data: purch },
-    { data: pymts }
-  ] = await Promise.all([
-    BNH_PAGE.sb.from('pharmacy_suppliers').select('opening_balance').eq('supplier_name', sup),
+function renderDueSummary() {
+  const out = document.getElementById('supplierDueOut');
+  if (!dueCache) return;
+  const q        = document.getElementById('dueSearch').value.trim().toLowerCase();
+  const hideZero = document.getElementById('dueOnly').checked;       // hide suppliers with 0 due
+  const list = dueCache
+    .filter(r => (!q || r.name.toLowerCase().includes(q)) && (!hideZero || Math.abs(r.total) > 0.004))
+    .sort((a, b) => (b.total - a.total) || a.name.localeCompare(b.name));   // highest total due first
+  if (!list.length) { out.innerHTML = '<div class="empty-state">😶 No suppliers to show.</div>'; return; }
+
+  const KEYS = ['op', 'pur', 'oth', 'pay', 'due'];
+  const T = {};
+  KEYS.forEach(k => T[k] = { Dispensary: 0, IPD: 0 });
+  list.forEach(r => CATS.forEach(c => KEYS.forEach(k => { T[k][c] += r[k][c]; })));
+  const totCats = CATS.filter(c => ['op', 'pur', 'oth', 'pay'].some(k => Math.abs(T[k][c]) > 0.004));
+  const grandTotal = T.due.Dispensary + T.due.IPD;
+  const withDue = list.filter(r => r.total > 0.004).length;
+  const kpi = (label, val, cls) => `<div class="kpi ${cls}"><small>${label}</small><b>${val}</b></div>`;
+
+  out.innerHTML = `
+    <div class="kpis">
+      ${kpi('Total Due', fmt(grandTotal), 'k-red')}
+      ${totCats.includes('Dispensary') ? kpi('Dispensary Due', fmt(T.due.Dispensary), 'k-orange') : ''}
+      ${totCats.includes('IPD') ? kpi('IPD Due', fmt(T.due.IPD), 'k-green') : ''}
+      ${kpi('Suppliers with due', withDue + ' of ' + list.length, '')}
+    </div>
+    <div class="due-wrap"><div class="due-scroll">
+    <table id="supplierDueTable" class="due-table">
+      <thead><tr>
+        <th>Supplier</th><th>Category</th><th>Opening Bal</th><th>Purchase</th>
+        <th>Payment</th><th>Due</th><th style="text-align:center">Total Due</th>
+      </tr></thead>
+      <tbody>${list.map(r => groupRows(r.name, r, activeCats(r))).join('')}</tbody>
+      <tfoot>${groupRows('Grand Total', T, totCats.length ? totCats : CATS, true)}</tfoot>
+    </table></div></div>
+    <p style="font-size:.75rem;color:#6b7280;margin:.6rem 0 0">Sorted by Total Due (highest first) · Click a supplier name to open its ledger.</p>`;
+}
+
+// Click a supplier → pop-up ledger
+document.getElementById('supplierDueOut').addEventListener('click', e => {
+  const t = e.target.closest('[data-sup]');
+  if (t) openSupLedger(t.dataset.sup);
+});
+
+// ─────────────────────────────────────────────────────────────
+//  TAB: SUPPLIER LEDGER — optional category filter
+// ─────────────────────────────────────────────────────────────
+
+// Only offer categories in which the chosen supplier has transactions
+function updateLedgerCats() {
+  const sel  = document.getElementById('ledgerCategory');
+  const name = document.getElementById('ledgerSupplier').value;
+  const s    = allSuppliers.find(x => x.supplier_name === name);
+  const act  = s ? activeCats(calcSupplier(s, allPurchases, allPayments, allOther)) : CATS;
+  const keep = sel.value;
+  sel.innerHTML = '';
+  const add = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); };
+  if (act.length !== 1) add('', 'Dispensary + IPD');
+  if (act.length === 2) CATS.forEach(c => add(c, c));
+  if (act.length === 1) add(act[0], act[0]);
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : sel.options[0].value;
+}
+
+// Builds the ledger table HTML (shared by the Ledger tab and the supplier pop-up)
+async function ledgerHtml(sup, from, to, catF, tableId) {
+  const cats = catF ? [catF] : CATS;
+  const [{ data: sArr }, { data: purch }, { data: pymts }, { data: oth }] = await Promise.all([
+    BNH_PAGE.sb.from('pharmacy_suppliers').select('*').eq('supplier_name', sup),
     BNH_PAGE.sb.from('pharmacy_purchases').select('*')
-      .eq('supplier_name', sup).gte('purchase_date', from).lte('purchase_date', to).order('purchase_date'),
+      .eq('supplier_name', sup).lte('purchase_date', to).order('purchase_date'),
     BNH_PAGE.sb.from('pharmacy_supplier_payments').select('*')
-      .eq('supplier_name', sup).gte('pay_date', from).lte('pay_date', to).order('pay_date')
+      .eq('supplier_name', sup).lte('pay_date', to).order('pay_date'),
+    BNH_PAGE.sb.from('pharmacy_other_purchases').select('*')
+      .eq('supplier_name', sup).lte('purchase_date', to).order('purchase_date')
   ]);
-  spin(false);
 
-  const opBal = parseFloat(sArr?.[0]?.opening_balance || 0);
-  let entries = [];
-  (purch || []).forEach(r => entries.push({ date: r.purchase_date, desc: 'Purchase',               dr: parseFloat(r.amount), cr: 0 }));
-  (pymts || []).forEach(r => entries.push({ date: r.pay_date,      desc: 'Payment (' + r.mode + ')', dr: 0, cr: parseFloat(r.amount) }));
+  const s = sArr?.[0] || {};
+  // Opening balance at the start of the period = supplier opening
+  // + everything bought (medicine + other) − everything paid before "from"
+  const openBy = { Dispensary: opDisp(s), IPD: opIpd(s) };
+  (purch || []).filter(r => r.purchase_date < from).forEach(r => { openBy[purCat(r)] += num(r.amount); });
+  (oth   || []).filter(r => r.purchase_date < from).forEach(r => { openBy[othCat(r)] += num(r.amount); });
+  (pymts || []).filter(r => r.pay_date < from).forEach(r => { openBy[payCat(r)] -= num(r.amount); });
+  const opBal = cats.reduce((a, c) => a + openBy[c], 0);
+
+  const entries = [];
+  (purch || []).filter(r => r.purchase_date >= from && cats.includes(purCat(r))).forEach(r =>
+    entries.push({ date: r.purchase_date, desc: 'Medicine Purchase', cat: purCat(r), dr: num(r.amount), cr: 0 }));
+  (oth || []).filter(r => r.purchase_date >= from && cats.includes(othCat(r))).forEach(r =>
+    entries.push({ date: r.purchase_date, desc: 'Other Purchase' + (r.item_description ? ' – ' + r.item_description : ''),
+                   cat: othCat(r), dr: num(r.amount), cr: 0 }));
+  (pymts || []).filter(r => r.pay_date >= from && cats.includes(payCat(r))).forEach(r =>
+    entries.push({ date: r.pay_date, desc: 'Payment (' + r.mode + ')', cat: payCat(r), dr: 0, cr: num(r.amount) }));
   entries.sort((a, b) => a.date.localeCompare(b.date));
 
   let bal = opBal;
   const tableRows = entries.map((r, i) => {
     bal += r.dr - r.cr;
     return `<tr>
-      <td>${i+1}</td><td>${r.date}</td><td>${esc(r.desc)}</td>
+      <td>${i+1}</td><td>${r.date}</td><td>${esc(r.desc)}</td><td>${catBadge(r.cat)}</td>
       <td class="r">${r.dr ? fmt(r.dr) : '—'}</td>
       <td class="r">${r.cr ? fmt(r.cr) : '—'}</td>
       <td class="r" style="font-weight:600">${fmt(bal)}</td>
     </tr>`;
   }).join('');
 
-  out.innerHTML = `
+  const split = catF ? '' :
+    ` (Dispensary ${fmt(openBy.Dispensary)} · IPD ${fmt(openBy.IPD)})`;
+  return `
     <p style="font-size:.85rem;color:#555;margin-bottom:.5rem">
       <strong>${esc(sup)}</strong> &nbsp;|&nbsp;
-      Opening Balance: <strong>${fmt(opBal)}</strong> &nbsp;|&nbsp;
+      Category: <strong>${catF || 'Dispensary + IPD'}</strong> &nbsp;|&nbsp;
+      Opening Balance: <strong>${fmt(opBal)}</strong>${split} &nbsp;|&nbsp;
       Period: ${from} → ${to}
     </p>
     <div style="overflow-x:auto">
-      <table id="ledgerTable">
+      <table id="${tableId}">
         <thead><tr>
-          <th>#</th><th>Date</th><th>Description</th>
+          <th>#</th><th>Date</th><th>Description</th><th>Category</th>
           <th class="r">Dr (Purchase)</th><th class="r">Cr (Payment)</th><th class="r">Balance</th>
         </tr></thead>
-        <tbody>${tableRows || '<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:1.5rem">No transactions in this period.</td></tr>'}</tbody>
+        <tbody>${tableRows || '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:1.5rem">No transactions in this period.</td></tr>'}</tbody>
         <tfoot><tr>
-          <td colspan="5" style="text-align:right">Closing Balance</td>
+          <td colspan="6" style="text-align:right">Closing Balance</td>
           <td class="r">${fmt(bal)}</td>
         </tr></tfoot>
       </table>
     </div>`;
 }
 
+async function loadLedger() {
+  const sup  = document.getElementById('ledgerSupplier').value;
+  const from = document.getElementById('ledgerFrom').value;
+  const to   = document.getElementById('ledgerTo').value;
+  const catF = document.getElementById('ledgerCategory').value;   // '' = both
+  const out  = document.getElementById('ledgerOut');
+
+  if (!sup)  { out.textContent = 'Please select a supplier.'; return; }
+  if (!from || !to) { out.textContent = 'Please select a date range.'; return; }
+
+  spin(true);
+  try {
+    out.innerHTML = await ledgerHtml(sup, from, to, catF, 'ledgerTable');
+  } catch (ex) {
+    out.innerHTML = `<p class="err">Error: ${esc(ex.message)}</p>`;
+  } finally {
+    spin(false);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  SUPPLIER LEDGER POP-UP (opened by clicking a supplier in Due Summary)
+// ─────────────────────────────────────────────────────────────
+let popSup = null;
+
+function openSupLedger(name) {
+  popSup = name;
+  document.getElementById('lmTitle').textContent = name;
+
+  // only offer categories this supplier actually uses
+  const r   = dueCache && dueCache.find(x => x.name === name);
+  const act = r ? activeCats(r) : CATS;
+  const sel = document.getElementById('lmCat');
+  sel.innerHTML = '';
+  const add = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); };
+  if (act.length !== 1) add('', 'Dispensary + IPD');
+  if (act.length === 2) CATS.forEach(c => add(c, c));
+  if (act.length === 1) add(act[0], act[0]);
+
+  setPopRange(1, true);                      // default: last one month
+  document.getElementById('ledgerModal').classList.add('ps-open');
+  loadPopLedger();
+}
+
+function setPopRange(months, noLoad) {
+  const d = new Date(); d.setMonth(d.getMonth() - months);
+  document.getElementById('lmFrom').value = d.toISOString().slice(0, 10);
+  document.getElementById('lmTo').value   = today;
+  if (!noLoad) loadPopLedger();
+}
+
+async function loadPopLedger() {
+  const out  = document.getElementById('lmOut');
+  const from = document.getElementById('lmFrom').value;
+  const to   = document.getElementById('lmTo').value;
+  if (!popSup) return;
+  if (!from || !to) { out.textContent = 'Please select a date range.'; return; }
+  if (from > to)    { out.textContent = '"From" date must be before "To" date.'; return; }
+  out.innerHTML = '<div class="empty-state">Loading…</div>';
+  try {
+    out.innerHTML = await ledgerHtml(popSup, from, to, document.getElementById('lmCat').value, 'modalLedgerTable');
+  } catch (ex) {
+    out.innerHTML = `<p class="err">Error: ${esc(ex.message)}</p>`;
+  }
+}
+
+function downloadPopLedger() {
+  const from = document.getElementById('lmFrom').value, to = document.getElementById('lmTo').value;
+  downloadPDF('modalLedgerTable', 'Ledger_' + popSup.replace(/[^\w ]/g, '') + '_' + from + '_to_' + to);
+}
+
+function closeSupLedger() {
+  popSup = null;
+  document.getElementById('ledgerModal').classList.remove('ps-open');
+}
+
 // ─────────────────────────────────────────────────────────────
 //  PDF DOWNLOAD
 // ─────────────────────────────────────────────────────────────
-function downloadPDF(elementId, title) {
+function downloadPDF(elementId, title, orientation) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ orientation: orientation || 'portrait', unit: 'mm', format: 'a4' });
   doc.setFontSize(14); doc.text('Bhagirathy Nursing Home – Pharmacy', 15, 15);
   doc.setFontSize(11); doc.text(title.replace(/_/g, ' '), 15, 22);
   doc.setFontSize(8);  doc.text('Generated: ' + new Date().toLocaleString('en-IN'), 15, 28);
   const el = document.getElementById(elementId);
   if (!el) { alert('Table not found. Please load the report first.'); return; }
-  const tables = el.querySelectorAll('table');
+  const tables = el.tagName === 'TABLE' ? [el] : el.querySelectorAll('table');
   let y = 32;
   tables.forEach(tbl => {
+    const isDue = tbl.id === 'supplierDueTable';
     doc.autoTable({
-      html: tbl, startY: y,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [99, 102, 241] },
-      margin: { left: 15, right: 15 }
+      html: tbl, startY: y, useCss: isDue,
+      styles: { fontSize: isDue ? 8 : 7.5, halign: isDue ? 'center' : undefined, valign: 'middle' },
+      headStyles: isDue ? { fillColor: [189, 215, 238], textColor: [31, 41, 55], halign: 'center' }
+                        : { fillColor: [99, 102, 241], halign: 'center' },
+      margin: { left: 10, right: 10 }
     });
     y = doc.lastAutoTable.finalY + 6;
   });
