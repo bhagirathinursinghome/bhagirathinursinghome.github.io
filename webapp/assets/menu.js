@@ -325,6 +325,13 @@
       roles: ["admin", "accountant", "pharmacy"],
       group: "Pharmacy"
     },
+        {
+      label: "Other Purchase",
+      icon: "🛒",
+      page: "pages/pharmacy-other-purchases.html",
+      roles: ["admin", "accountant", "pharmacy"],
+      group: "Pharmacy"
+    },
     {
       label: "Pharmacy Sale",
       icon: "💊",
