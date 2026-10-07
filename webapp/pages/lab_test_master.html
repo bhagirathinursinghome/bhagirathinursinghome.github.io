@@ -517,12 +517,16 @@ function askDelete(type,id,name){
 }
 function closeDelModal(){ document.getElementById('delModal').classList.remove('open'); delTarget=null; delType=null; }
 async function confirmDelete(){
-  closeDelModal(); spin(true);
-  const table=delType==='test'?'lab_test_catalogue':'lab_sample_agent';
-  const {error}=await sb.from(table).delete().eq('id',delTarget);
+  // capture before closeDelModal() clears them
+  const type=delType, target=delTarget;
+  closeDelModal();
+  if(!type||!target) return;
+  spin(true);
+  const table=type==='test'?'lab_test_catalogue':'lab_sample_agent';
+  const {error}=await sb.from(table).delete().eq('id',target);
   spin(false);
   if(error){alert('Delete failed: '+error.message);return;}
-  if(delType==='test') await loadTests();
+  if(type==='test') await loadTests();
   else await loadAgents();
 }
 
