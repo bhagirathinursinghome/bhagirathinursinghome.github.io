@@ -224,9 +224,21 @@ const normName = s => (s||'').toLowerCase().replace(/\s*-\s*/g,'-').replace(/\s+
 // entry (which carries the base cost + per-slide rate). All other tests still
 // require an exact (normalized) name match.
 function isBiopsy(name){ return (name||'').trim().toLowerCase().startsWith('biopsy'); }
-function findCatTest(name){
-  if(isBiopsy(name)) return allTests.find(x=>isBiopsy(x.test_name));
-  return allTests.find(x=>normName(x.test_name)===normName(name));
+// Rates are now agent-wise: each catalogue row = test + agent + cost.
+// findCatTest(name, agentId):
+//   - with agentId  → that agent's rate row only (null if the agent has no rate for the test)
+//   - without agentId (in-house / not yet assigned) → default reference rate
+//     (Bio Care row if present, otherwise the first matching row)
+function matchRows(name){
+  return isBiopsy(name)
+    ? allTests.filter(x=>isBiopsy(x.test_name))
+    : allTests.filter(x=>normName(x.test_name)===normName(name));
+}
+function findCatTest(name, agentId){
+  const rows=matchRows(name);
+  if(agentId) return rows.find(x=>String(x.agent_id)===String(agentId))||null;
+  const bio=allAgents.find(a=>(a.agent_name||'').trim().toLowerCase()==='bio care');
+  return (bio&&rows.find(x=>String(x.agent_id)===String(bio.id)))||rows[0]||null;
 }
 function spin(on){ document.getElementById('spinner').classList.toggle('hidden',!on); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -452,47 +464,61 @@ function agentSelectHtml(idx,selectedId){
 
 function buildTestAllocUI(savedAgents,savedSlides){
   document.getElementById('testAllocDiv').innerHTML=currentCaseTests.map((t,i)=>{
-    const cat=findCatTest(t.test_name);
-    const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
     const biopsy=isBiopsy(t.test_name);
-    const perSlide=biopsy&&cat?parseFloat(cat.biopsy_per_slide||0):0;
     const slidesVal=savedSlides[i]||'';
     return `<div class="test-alloc-block">
       <div class="test-alloc-header">
         <span>🧪 ${esc(t.test_name)}</span>
-        <span class="test-cost">${fmt(cost)}</span>
+        <span class="test-cost" id="testCost_${i}">—</span>
       </div>
       <div class="test-alloc-body">
         ${agentSelectHtml(i,savedAgents[i]||'')}
-        ${biopsy&&perSlide>0?`
-        <div class="biopsy-inline">
+        <div class="biopsy-calc-note" id="rateWarn_${i}" style="color:#c0392b;display:none"></div>
+        ${biopsy?`
+        <div class="biopsy-inline" id="bioBox_${i}" style="display:none">
           <label>🔬 Slides used</label>
           <input type="number" id="bioSlides_${i}" min="1" placeholder="qty"
             value="${esc(String(slidesVal))}" oninput="recalcAmount()"/>
         </div>
-        <div class="biopsy-calc-note" id="biopsyNote_${i}">₹${cost} base + ₹${perSlide} × slides</div>`:''}
+        <div class="biopsy-calc-note" id="biopsyNote_${i}"></div>`:''}
       </div>
     </div>`;
   }).join('');
 }
 
+// Rate for one test row in the modal, based on the agent currently selected for it
+function rateFor(t,i){
+  const agentId=(document.getElementById('agentSel_'+i)||{}).value||'';
+  const cat=findCatTest(t.test_name,agentId);
+  return {
+    agentId,
+    missing:!!agentId&&!cat,
+    cost:parseFloat(cat?cat.test_cost:0)||0,
+    perSlide:(isBiopsy(t.test_name)&&cat)?(parseFloat(cat.biopsy_per_slide||0)||0):0
+  };
+}
+
 function recalcAmount(){
   let total=0;
   currentCaseTests.forEach((t,i)=>{
-    const agentId=(document.getElementById('agentSel_'+i)||{}).value||'';
-    if(!agentId) return; // not allocable — skip agent amount
-    const cat=findCatTest(t.test_name);
-    const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
-    total+=cost;
-    if(isBiopsy(t.test_name)&&cat){
-      const perSlide=parseFloat(cat.biopsy_per_slide||0);
-      const slides=parseInt((document.getElementById('bioSlides_'+i)||{}).value)||0;
-      if(perSlide>0&&slides>0){
-        total+=perSlide*slides;
-        const note=document.getElementById('biopsyNote_'+i);
-        if(note) note.textContent=`₹${cost} base + ₹${perSlide} × ${slides} slides = ₹${cost+perSlide*slides}`;
-      }
+    const r=rateFor(t,i);
+    const costEl=document.getElementById('testCost_'+i);
+    const warn=document.getElementById('rateWarn_'+i);
+    if(costEl) costEl.textContent=fmt(r.cost);
+    if(warn){
+      warn.style.display=r.missing?'block':'none';
+      warn.textContent=r.missing?'⚠ No rate set for this agent in Test Master':'';
     }
+    const bioBox=document.getElementById('bioBox_'+i);
+    if(bioBox) bioBox.style.display=r.perSlide>0?'flex':'none';
+    const slides=parseInt((document.getElementById('bioSlides_'+i)||{}).value)||0;
+    const note=document.getElementById('biopsyNote_'+i);
+    if(note) note.textContent=r.perSlide>0
+      ?(slides>0?`₹${r.cost} base + ₹${r.perSlide} × ${slides} slides = ₹${r.cost+r.perSlide*slides}`:`₹${r.cost} base + ₹${r.perSlide} × slides`)
+      :'';
+    if(!r.agentId) return; // not allocable — skip agent amount
+    total+=r.cost;
+    if(r.perSlide>0&&slides>0) total+=r.perSlide*slides;
   });
   document.getElementById('modalAmount').textContent=fmt(total);
 }
@@ -506,30 +532,36 @@ async function saveEntry(){
   document.getElementById('modalErr').textContent='';
 
   // Build per-test alloc array
+  // Block save if a selected agent has no rate for one of the tests
+  const missing=currentCaseTests.filter((t,i)=>rateFor(t,i).missing).map(t=>t.test_name);
+  if(missing.length){
+    document.getElementById('modalErr').textContent='No rate set for the selected agent: '+missing.join(', ')+'. Add it in Lab Test Master.';
+    return;
+  }
+
   const allocArr=currentCaseTests.map((t,i)=>{
-    const cat=findCatTest(t.test_name);
-    const agentId=(document.getElementById('agentSel_'+i)||{}).value||'';
-    const cost=parseFloat(cat?cat.test_cost:t.test_amount||0);
-    let slides=0,perSlide=0;
-    if(isBiopsy(t.test_name)&&cat){
-      perSlide=parseFloat(cat.biopsy_per_slide||0);
-      slides=parseInt((document.getElementById('bioSlides_'+i)||{}).value)||0;
-    }
+    const r=rateFor(t,i);
+    const agentId=r.agentId;
+    const slides=r.perSlide>0?(parseInt((document.getElementById('bioSlides_'+i)||{}).value)||0):0;
     const agentObj=allAgents.find(a=>a.id===agentId);
-    const agentAmt=agentId?(cost+(perSlide>0&&slides>0?perSlide*slides:0)):0;
-    return {test_name:t.test_name,agent_id:agentId||null,agent_name:agentObj?.agent_name||'Not Allocable',slides:slides||null,agent_amount:agentAmt};
+    const agentAmt=agentId?(r.cost+(r.perSlide>0&&slides>0?r.perSlide*slides:0)):0;
+    return {test_name:t.test_name,agent_id:agentId||null,agent_name:agentObj?.agent_name||'Not Allocable',slides:slides||null,agent_amount:agentAmt,rate:r.cost,per_slide:r.perSlide};
   });
 
-  // Lab amount = sum of ALL tests + biopsy slide cost (regardless of agent)
+  // Lab amount = sum of ALL tests + biopsy slide cost, using the selected agent's rate
+  // (in-house tests use the default reference rate)
   let labAmount=0,agentAmount=0,totalBiopsySlides=0;
-  allocArr.forEach(a=>{
-    const cat=findCatTest(a.test_name);
-    const base=parseFloat(cat?cat.test_cost:0);
-    labAmount+=base;
-    if(isBiopsy(a.test_name)&&cat){
-      const perSlide=parseFloat(cat.biopsy_per_slide||0);
-      if(perSlide>0&&a.slides){ labAmount+=perSlide*a.slides; totalBiopsySlides+=a.slides; }
+  allocArr.forEach((a,i)=>{
+    let base=a.rate, perSlide=a.per_slide;
+    if(!a.agent_id){
+      const cat=findCatTest(a.test_name);
+      base=parseFloat(cat?cat.test_cost:0)||0;
+      perSlide=(isBiopsy(a.test_name)&&cat)?(parseFloat(cat.biopsy_per_slide||0)||0):0;
+      const el=document.getElementById('bioSlides_'+i);
+      if(perSlide>0) a.slides=parseInt(el&&el.value)||null;
     }
+    labAmount+=base;
+    if(perSlide>0&&a.slides){ labAmount+=perSlide*a.slides; totalBiopsySlides+=a.slides; }
     agentAmount+=a.agent_amount;
   });
 
