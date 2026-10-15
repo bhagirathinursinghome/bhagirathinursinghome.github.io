@@ -248,7 +248,7 @@
       label: "IPD - OT Entry",
       icon: "🔬",
       page: "pages/ipd-ot-entry.html",
-      roles: ["admin", "accountant", "ot"],
+      roles: ["admin", "accountant", "ot", "manager"],
       group: "IPD"
     },
     {
