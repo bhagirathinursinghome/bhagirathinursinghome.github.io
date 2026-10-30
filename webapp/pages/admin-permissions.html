@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page & User Access Control</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <style>
+    .tabs-bar {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.2rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      padding: 0.55rem 1.1rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--glass);
+      color: var(--text);
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: 0.15s;
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--primary), #5aa8ce);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 12px rgba(56,137,184,0.25);
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.85rem;
+    }
+    .perm-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .perm-check {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: var(--primary);
+    }
+    .group-badge {
+      display: inline-block;
+      padding: 0.18rem 0.55rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+    }
+    .center-col {
+      text-align: center !important;
+    }
+    .sticky-save-bar {
+      position: sticky;
+      bottom: 0.75rem;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      padding: 0.8rem 1.1rem;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+      backdrop-filter: blur(18px);
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>🔐 Page Directory & User Permissions</h1>
+  <p class="muted" style="margin-top:-0.4rem;margin-bottom:1.2rem;">
+    Register newly uploaded GitHub pages into Supabase and assign user-wise granular permissions (View / Entry / Edit / Delete).
+  </p>
+
+  <div class="tabs-bar">
+    <button type="button" class="tab-btn active" id="tabBtnPerms">👤 User-Wise Access Matrix</button>
+    <button type="button" class="tab-btn" id="tabBtnPages">📄 Manage App Pages (Add / Edit)</button>
+  </div>
+
+  <!-- ================= TAB 1: USER PERMISSIONS ================= -->
+  <section id="secPerms">
+    <div class="page-card">
+      <div class="perm-toolbar">
+        <div style="flex:1;min-width:240px;">
+          <label style="margin-top:0">Select User to Configure Access</label>
+          <select id="userSelect"></select>
+        </div>
+        <div style="flex:1;min-width:200px;">
+          <label style="margin-top:0">Filter by Group / Search Page</label>
+          <input type="text" id="permSearch" placeholder="Search page name, path, or group..." />
+        </div>
+        <div class="actions-row">
+          <button type="button" class="btn-ghost" id="btnGrantAllView">👁️ Grant All View</button>
+          <button type="button" class="btn-ghost" id="btnGrantFullAll">✅ Grant Full All</button>
+          <button type="button" class="btn-ghost" id="btnClearAll">🗑️ Revoke All</button>
+        </div>
+      </div>
+
+      <div id="adminNotice" class="info hidden" style="margin-bottom:1rem;">
+        ℹ️ <strong>Note:</strong> Users with the <code>admin</code> role automatically receive full access (View, Entry, Edit, Delete) to all pages.
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Page Label</th>
+              <th>File Location (Path)</th>
+              <th class="center-col">👁️ View<br/><small>(Show in Menu)</small></th>
+              <th class="center-col">➕ Entry<br/><small>(Add / Create)</small></th>
+              <th class="center-col">✏️ Edit<br/><small>(Update)</small></th>
+              <th class="center-col">🗑️ Delete<br/><small>(Remove)</small></th>
+              <th class="center-col">Quick Row</th>
+            </tr>
+          </thead>
+          <tbody id="permTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="sticky-save-bar">
+        <span id="permStatusMsg" class="muted">Select a user and toggle checkboxes above.</span>
+        <button type="button" class="btn-primary" id="btnSavePerms" style="width:auto;padding:0.65rem 1.5rem;">
+          💾 Save User Permissions
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 2: MANAGE APP PAGES ================= -->
+  <section id="secPages" class="hidden">
+    <div class="page-card">
+      <h3 id="pageFormTitle" style="margin-top:0">➕ Register New Page in Supabase</h3>
+      <form id="pageForm">
+        <input type="hidden" id="editPageId" />
+        <div class="grid-2">
+          <div>
+            <label>Menu Label *</label>
+            <input type="text" id="pgLabel" placeholder="e.g., OPD Billing" required />
+          </div>
+          <div>
+            <label>Icon (Emoji) *</label>
+            <input type="text" id="pgIcon" placeholder="e.g., 💵" value="📄" required />
+          </div>
+          <div>
+            <label>GitHub Page Path *</label>
+            <input type="text" id="pgPath" placeholder="pages/my-new-page.html" required />
+          </div>
+          <div>
+            <label>Sidebar Group</label>
+            <input type="text" id="pgGroup" list="groupOptions" placeholder="e.g., OPD, IPD, Pharmacy (Blank = Pinned Top)" />
+            <datalist id="groupOptions">
+              <option value="Administration"></option>
+              <option value="Voucher"></option>
+              <option value="Employees"></option>
+              <option value="OPD"></option>
+              <option value="Lab"></option>
+              <option value="Marketing"></option>
+              <option value="IPD"></option>
+              <option value="Pharmacy"></option>
+              <option value="Reports"></option>
+            </datalist>
+          </div>
+          <div>
+            <label>Sort Order</label>
+            <input type="number" id="pgOrder" value="100" required />
+          </div>
+          <div style="display:flex;align-items:center;gap:1.2rem;padding-top:1.6rem;">
+            <label style="display:inline-flex;align-items:center;gap:0.4rem;margin:0;cursor:pointer;">
+              <input type="checkbox" id="pgPublic" class="perm-check" style="width:18px;" />
+              Public (All Users)
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:0.4rem;margin:0;cursor:pointer;">
+              <input type="checkbox" id="pgActive" class="perm-check" style="width:18px;" checked />
+              Active
+            </label>
+          </div>
+        </div>
+        <div class="actions-row" style="margin-top:1rem;">
+          <button type="submit" class="btn-primary" style="width:auto;" id="btnSavePage">Save Page to Supabase</button>
+          <button type="button" class="btn-ghost hidden" id="btnCancelEdit">Cancel Edit</button>
+        </div>
+        <p class="err" id="pageErr"></p>
+        <p class="info hidden" id="pageOk"></p>
+      </form>
+    </div>
+
+    <div class="page-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.8rem;">
+        <h3 style="margin:0">📚 Registered Pages (<span id="pageCount">0</span>)</h3>
+        <input type="text" id="pageListSearch" placeholder="Filter pages..." style="max-width:260px;padding:0.45rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);" />
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Icon & Label</th>
+              <th>Page Path</th>
+              <th>Group</th>
+              <th>Visibility</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pagesTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/menu.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  // Strictly admin-only management page
+  BNH_PAGE.requireRole(["admin"]);
+  const sb = BNH_PAGE.sb;
+  const spinner = document.getElementById("spinner");
+  const showSpin = () => spinner.classList.remove("hidden");
+  const hideSpin = () => spinner.classList.add("hidden");
+
+  let allUsers = [];
+  let allPages = [];
+  let currentPerms = {}; // page_path -> { can_view, can_entry, can_edit, can_delete }
+
+  // Tab switching
+  const tabBtnPerms = document.getElementById("tabBtnPerms");
+  const tabBtnPages = document.getElementById("tabBtnPages");
+  const secPerms = document.getElementById("secPerms");
+  const secPages = document.getElementById("secPages");
+
+  tabBtnPerms.onclick = () => {
+    tabBtnPerms.classList.add("active");
+    tabBtnPages.classList.remove("active");
+    secPerms.classList.remove("hidden");
+    secPages.classList.add("hidden");
+  };
+  tabBtnPages.onclick = () => {
+    tabBtnPages.classList.add("active");
+    tabBtnPerms.classList.remove("active");
+    secPages.classList.remove("hidden");
+    secPerms.classList.add("hidden");
+  };
+
+  async function init() {
+    showSpin();
+    try {
+      const [uRes, pRes] = await Promise.all([
+        sb.from("app_users").select("id,name,username,role,status").order("name", { ascending: true }),
+        sb.from("app_pages").select("*").order("sort_order", { ascending: true }).order("label", { ascending: true })
+      ]);
+
+      if (uRes.error) throw uRes.error;
+      if (pRes.error) throw pRes.error;
+
+      allUsers = uRes.data || [];
+      allPages = pRes.data || [];
+
+      renderUserDropdown();
+      renderPagesTable();
+      if (allUsers.length > 0) {
+        await loadUserPermissions(document.getElementById("userSelect").value);
+      }
+    } catch (err) {
+      alert("Error loading data. Did you run supabase_permissions_setup.sql?\n\n" + err.message);
+    } finally {
+      hideSpin();
+    }
+  }
+
+  function renderUserDropdown() {
+    const sel = document.getElementById("userSelect");
+    sel.innerHTML = "";
+    allUsers.forEach(u => {
+      const opt = document.createElement("option");
+      opt.value = u.id;
+      opt.textContent = `${u.name} (@${u.username}) — [${u.role || "no-role"} / ${u.status}]`;
+      sel.appendChild(opt);
+    });
+  }
+
+  async function loadUserPermissions(userId) {
+    if (!userId) return;
+    showSpin();
+    try {
+      const selectedUser = allUsers.find(u => u.id === userId);
+      const isAdmin = selectedUser && selectedUser.role === "admin";
+      document.getElementById("adminNotice").classList.toggle("hidden", !isAdmin);
+
+      const { data, error } = await sb
+        .from("user_page_permissions")
+        .select("*")
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      currentPerms = {};
+      (data || []).forEach(r => {
+        currentPerms[r.page_path] = {
+          can_view: Boolean(r.can_view),
+          can_entry: Boolean(r.can_entry),
+          can_edit: Boolean(r.can_edit),
+          can_delete: Boolean(r.can_delete)
+        };
+      });
+
+      renderPermMatrix();
+      document.getElementById("permStatusMsg").textContent =
+        `Editing permissions for ${selectedUser ? selectedUser.name : "user"}`;
+    } catch (err) {
+      alert("Failed to load user permissions: " + err.message);
+    } finally {
+      hideSpin();
+    }
+  }
+
+  function renderPermMatrix() {
+    const tbody = document.getElementById("permTableBody");
+    const q = document.getElementById("permSearch").value.trim().toLowerCase();
+    tbody.innerHTML = "";
+
+    const activePages = allPages.filter(p => p.is_active);
+    const filtered = activePages.filter(p => {
+      if (!q) return true;
+      return (
+        (p.label || "").toLowerCase().includes(q) ||
+        (p.page_path || "").toLowerCase().includes(q) ||
+        (p.group_name || "").toLowerCase().includes(q)
+      );
+    });
+
+    filtered.forEach(p => {
+      const state = currentPerms[p.page_path] || {
+        can_view: Boolean(p.is_public),
+        can_entry: Boolean(p.is_public),
+        can_edit: false,
+        can_delete: false
+      };
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><span class="group-badge">${p.group_name || "Pinned Top"}</span></td>
+        <td><strong>${p.icon || "📄"} ${p.label}</strong> ${p.is_public ? '<span class="status-pill status-active">Public</span>' : ''}</td>
+        <td><code>${p.page_path}</code></td>
+        <td class="center-col"><input type="checkbox" class="perm-check" data-path="${p.page_path}" data-col="can_view" ${state.can_view ? "checked" : ""} /></td>
+        <td class="center-col"><input type="checkbox" class="perm-check" data-path="${p.page_path}" data-col="can_entry" ${state.can_entry ? "checked" : ""} /></td>
+        <td class="center-col"><input type="checkbox" class="perm-check" data-path="${p.page_path}" data-col="can_edit" ${state.can_edit ? "checked" : ""} /></td>
+        <td class="center-col"><input type="checkbox" class="perm-check" data-path="${p.page_path}" data-col="can_delete" ${state.can_delete ? "checked" : ""} /></td>
+        <td class="center-col">
+          <button type="button" class="btn-ghost" data-row-all="${p.page_path}" style="padding:0.25rem 0.5rem;font-size:0.75rem;">All</button>
+          <button type="button" class="btn-ghost" data-row-none="${p.page_path}" style="padding:0.25rem 0.5rem;font-size:0.75rem;">None</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Bind checkbox changes
+    tbody.querySelectorAll(".perm-check").forEach(chk => {
+      chk.addEventListener("change", e => {
+        const path = e.target.dataset.path;
+        const col = e.target.dataset.col;
+        if (!currentPerms[path]) {
+          currentPerms[path] = { can_view: false, can_entry: false, can_edit: false, can_delete: false };
+        }
+        currentPerms[path][col] = e.target.checked;
+
+        // Auto-enable View if Entry, Edit, or Delete is checked
+        if ((col === "can_entry" || col === "can_edit" || col === "can_delete") && e.target.checked) {
+          currentPerms[path].can_view = true;
+          const viewChk = tbody.querySelector(`.perm-check[data-path="${CSS.escape(path)}"][data-col="can_view"]`);
+          if (viewChk) viewChk.checked = true;
+        }
+        // If View is unchecked, uncheck Entry, Edit, Delete
+        if (col === "can_view" && !e.target.checked) {
+          currentPerms[path].can_entry = false;
+          currentPerms[path].can_edit = false;
+          currentPerms[path].can_delete = false;
+          ["can_entry", "can_edit", "can_delete"].forEach(c => {
+            const box = tbody.querySelector(`.perm-check[data-path="${CSS.escape(path)}"][data-col="${c}"]`);
+            if (box) box.checked = false;
+          });
+        }
+      });
+    });
+
+    // Quick row buttons
+    tbody.querySelectorAll("[data-row-all]").forEach(btn => {
+      btn.onclick = () => {
+        const path = btn.dataset.rowAll;
+        currentPerms[path] = { can_view: true, can_entry: true, can_edit: true, can_delete: true };
+        renderPermMatrix();
+      };
+    });
+    tbody.querySelectorAll("[data-row-none]").forEach(btn => {
+      btn.onclick = () => {
+        const path = btn.dataset.rowNone;
+        currentPerms[path] = { can_view: false, can_entry: false, can_edit: false, can_delete: false };
+        renderPermMatrix();
+      };
+    });
+  }
+
+  document.getElementById("userSelect").onchange = e => loadUserPermissions(e.target.value);
+  document.getElementById("permSearch").oninput = () => renderPermMatrix();
+
+  document.getElementById("btnGrantAllView").onclick = () => {
+    allPages.forEach(p => {
+      if (!currentPerms[p.page_path]) currentPerms[p.page_path] = { can_view: true, can_entry: false, can_edit: false, can_delete: false };
+      else currentPerms[p.page_path].can_view = true;
+    });
+    renderPermMatrix();
+  };
+
+  document.getElementById("btnGrantFullAll").onclick = () => {
+    allPages.forEach(p => {
+      currentPerms[p.page_path] = { can_view: true, can_entry: true, can_edit: true, can_delete: true };
+    });
+    renderPermMatrix();
+  };
+
+  document.getElementById("btnClearAll").onclick = () => {
+    allPages.forEach(p => {
+      currentPerms[p.page_path] = { can_view: false, can_entry: false, can_edit: false, can_delete: false };
+    });
+    renderPermMatrix();
+  };
+
+  document.getElementById("btnSavePerms").onclick = async () => {
+    const userId = document.getElementById("userSelect").value;
+    if (!userId) return;
+
+    showSpin();
+    try {
+      const payload = allPages.map(p => {
+        const st = currentPerms[p.page_path] || { can_view: false, can_entry: false, can_edit: false, can_delete: false };
+        return {
+          user_id: userId,
+          page_path: p.page_path,
+          can_view: Boolean(st.can_view),
+          can_entry: Boolean(st.can_entry),
+          can_edit: Boolean(st.can_edit),
+          can_delete: Boolean(st.can_delete),
+          updated_by: BNH_PAGE.user.username,
+          updated_at: new Date().toISOString()
+        };
+      });
+
+      const { error } = await sb
+        .from("user_page_permissions")
+        .upsert(payload, { onConflict: "user_id,page_path" });
+
+      if (error) throw error;
+
+      document.getElementById("permStatusMsg").textContent = "✅ Permissions saved to Supabase successfully!";
+      try {
+        const parentMenu = window.parent.BNH_MENU;
+        const parentDocument = window.parent.document;
+        const menuContainer = parentDocument.getElementById("menu");
+        if (parentMenu && menuContainer) {
+          parentMenu.render(BNH_PAGE.user, menuContainer, item => {
+            parentDocument.getElementById("frame").src = item.page;
+            parentDocument.getElementById("pageTitle").textContent = item.label;
+          });
+        }
+      } catch (refreshError) {
+        console.warn("Permissions were saved, but the parent menu could not be refreshed.", refreshError);
+      }
+    } catch (err) {
+      alert("Failed to save permissions: " + err.message);
+    } finally {
+      hideSpin();
+    }
+  };
+
+  // ================= MANAGE PAGES LOGIC =================
+  function renderPagesTable() {
+    const tbody = document.getElementById("pagesTableBody");
+    const q = document.getElementById("pageListSearch").value.trim().toLowerCase();
+    document.getElementById("pageCount").textContent = allPages.length;
+    tbody.innerHTML = "";
+
+    allPages
+      .filter(p => !q || p.label.toLowerCase().includes(q) || p.page_path.toLowerCase().includes(q) || (p.group_name || "").toLowerCase().includes(q))
+      .forEach(p => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${p.sort_order}</td>
+          <td><strong>${p.icon || "📄"} ${p.label}</strong></td>
+          <td><code>${p.page_path}</code></td>
+          <td><span class="group-badge">${p.group_name || "Pinned Top"}</span></td>
+          <td>${p.is_public ? '<span class="status-pill status-active">Public</span>' : '<span class="status-pill status-pending">Permission Based</span>'}</td>
+          <td>${p.is_active ? '<span class="status-pill status-active">Active</span>' : '<span class="status-pill status-deactivated">Hidden</span>'}</td>
+          <td class="actions-row">
+            <button type="button" class="btn-ghost" data-edit-id="${p.id}">✏️ Edit</button>
+            <button type="button" class="btn-danger" data-del-id="${p.id}">🗑️ Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+    tbody.querySelectorAll("[data-edit-id]").forEach(btn => {
+      btn.onclick = () => startEditPage(btn.dataset.editId);
+    });
+    tbody.querySelectorAll("[data-del-id]").forEach(btn => {
+      btn.onclick = () => deletePage(btn.dataset.delId);
+    });
+  }
+
+  document.getElementById("pageListSearch").oninput = () => renderPagesTable();
+
+  function startEditPage(id) {
+    const p = allPages.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById("editPageId").value = p.id;
+    document.getElementById("pgLabel").value = p.label;
+    document.getElementById("pgIcon").value = p.icon || "📄";
+    document.getElementById("pgPath").value = p.page_path;
+    document.getElementById("pgGroup").value = p.group_name || "";
+    document.getElementById("pgOrder").value = p.sort_order ?? 100;
+    document.getElementById("pgPublic").checked = Boolean(p.is_public);
+    document.getElementById("pgActive").checked = Boolean(p.is_active);
+    document.getElementById("pageFormTitle").textContent = "✏️ Edit Page: " + p.label;
+    document.getElementById("btnCancelEdit").classList.remove("hidden");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function resetPageForm() {
+    document.getElementById("pageForm").reset();
+    document.getElementById("editPageId").value = "";
+    document.getElementById("pgIcon").value = "📄";
+    document.getElementById("pgOrder").value = "100";
+    document.getElementById("pgActive").checked = true;
+    document.getElementById("pageFormTitle").textContent = "➕ Register New Page in Supabase";
+    document.getElementById("btnCancelEdit").classList.add("hidden");
+  }
+
+  document.getElementById("btnCancelEdit").onclick = resetPageForm;
+
+  document.getElementById("pageForm").onsubmit = async e => {
+    e.preventDefault();
+    const errEl = document.getElementById("pageErr");
+    const okEl = document.getElementById("pageOk");
+    errEl.textContent = "";
+    okEl.classList.add("hidden");
+
+    const editId = document.getElementById("editPageId").value;
+    const payload = {
+      label: document.getElementById("pgLabel").value.trim(),
+      icon: document.getElementById("pgIcon").value.trim() || "📄",
+      page_path: document.getElementById("pgPath").value.trim().replace(/^\/+/, ""),
+      group_name: document.getElementById("pgGroup").value.trim() || null,
+      sort_order: parseInt(document.getElementById("pgOrder").value, 10) || 100,
+      is_public: document.getElementById("pgPublic").checked,
+      is_active: document.getElementById("pgActive").checked
+    };
+
+    showSpin();
+    try {
+      if (editId) {
+        const { error } = await sb.from("app_pages").update(payload).eq("id", editId);
+        if (error) throw error;
+      } else {
+        const { error } = await sb.from("app_pages").insert(payload);
+        if (error) throw error;
+      }
+
+      resetPageForm();
+      await init();
+      okEl.textContent = "✅ Page saved! Now switch to the User-Wise Access Matrix tab to grant users access.";
+      okEl.classList.remove("hidden");
+    } catch (err) {
+      errEl.textContent = err.message;
+    } finally {
+      hideSpin();
+    }
+  };
+
+  async function deletePage(id) {
+    const p = allPages.find(x => x.id === id);
+    if (!p) return;
+    if (!confirm(`Remove "${p.label}" (${p.page_path}) from the menu table?`)) return;
+
+    showSpin();
+    try {
+      const { error } = await sb.from("app_pages").delete().eq("id", id);
+      if (error) throw error;
+      await init();
+    } catch (err) {
+      alert("Delete failed: " + err.message);
+    } finally {
+      hideSpin();
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

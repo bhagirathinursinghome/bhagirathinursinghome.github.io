@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>OPD Refer Linker</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .form-row > * { flex: 1; min-width: 200px; }
+    .case-card { background: #f9f9f9; border: 1px solid #ddd; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+    .case-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+    .case-info { flex: 1; }
+    .case-no { font-weight: bold; color: #007bff; font-size: 1.1rem; }
+    .case-detail { font-size: 0.85rem; color: #666; margin-top: 0.25rem; }
+    .case-tests { background: white; padding: 0.5rem; border-radius: 3px; font-size: 0.8rem; color: #555; max-height: 80px; overflow-y: auto; margin-top: 0.5rem; }
+    .pay-summary { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
+    .pay-pill { background: white; border: 1px solid #ddd; border-radius: 3px; padding: 0.2rem 0.6rem; font-size: 0.78rem; color: #444; }
+    .pay-pill.paid { border-color: #28a745; color: #155724; }
+    .pay-pill.due  { border-color: #dc3545; color: #721c24; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 0.5rem; border: 1px solid #ccc;
+      border-radius: 3px; font-size: 0.9rem; box-sizing: border-box;
+    }
+    .quack-display { background: #fff3e0; padding: 0.75rem; border-radius: 3px; border-left: 3px solid #ff9800; font-size: 0.9rem; margin-top: 0.5rem; }
+    .quack-display strong { display: block; color: #e65100; }
+    .case-actions { display: flex; gap: 0.5rem; }
+    .btn-sm { padding: 0.5rem 1rem; font-size: 0.85rem; }
+    .btn-success { background: #28a745; }
+    .btn-success:hover { background: #218838; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e9ecef; }
+    .tab-btn { padding: 0.75rem 1.5rem; background: none; border: none; cursor: pointer; border-bottom: 3px solid transparent; font-size: 0.95rem; color: #666; }
+    .tab-btn.active { color: #007bff; border-bottom-color: #007bff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .filter-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem; }
+    .filter-group { display: flex; flex-direction: column; flex: 1; min-width: 140px; }
+    .filter-group label { font-size: 0.8rem; color: #666; margin-bottom: 0.25rem; }
+    .filter-group input, .filter-group select { padding: 0.45rem 0.7rem; border: 1px solid #ccc; border-radius: 3px; font-size: 0.85rem; }
+    .completed-list { list-style: none; padding: 0; }
+    .completed-item { background: #f0f0f0; padding: 0.75rem; border-radius: 4px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+    .completed-item .case-info { margin: 0; }
+    .completed-item .status-badge { background: #28a745; color: white; padding: 0.25rem 0.75rem; border-radius: 3px; font-size: 0.75rem; white-space: nowrap; }
+    .summary-box { background: #f8f9fa; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border-left: 4px solid #007bff; }
+    .summary-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+    .empty-state { text-align: center; padding: 2rem; color: #999; }
+    .empty-state-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .refer-type-toggle { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+    .refer-type-btn { padding: 0.4rem 0.9rem; border: 1px solid #ccc; background: #f8f9fa; border-radius: 3px; cursor: pointer; font-size: 0.85rem; }
+    .refer-type-btn.active { background: #007bff; color: white; border-color: #007bff; }
+    .stats-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .stat-box { background: #f8f9fa; border-radius: 4px; padding: 0.65rem 1rem; flex: 1; min-width: 110px; border-left: 3px solid #007bff; }
+    .stat-box .val { font-size: 1.2rem; font-weight: 700; color: #007bff; }
+    .stat-box .lbl { font-size: 0.75rem; color: #666; margin-top: 2px; }
+    .pagination { display: flex; gap: 0.4rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap; }
+    .pagination button { padding: 0.38rem 0.65rem; border: 1px solid #ccc; background: white; cursor: pointer; border-radius: 3px; font-size: 0.82rem; }
+    .pagination button.active { background: #007bff; color: white; border-color: #007bff; }
+    .divider { border: none; border-top: 1px solid #e9ecef; margin: 0.75rem 0; }
+
+    /* ── Cancelled list styles ── */
+    .cancelled-item { background: #fff5f5; padding: 0.75rem; border-radius: 4px; margin-bottom: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; border-left: 3px solid #dc3545; font-size: 0.9rem; }
+    .cancelled-badge { background: #dc3545; color: white; padding: 0.25rem 0.75rem; border-radius: 3px; font-size: 0.75rem; white-space: nowrap; }
+    .cancel-remark-box { background: #fff0f0; border: 1px solid #f5c6cb; border-radius: 3px; padding: 0.4rem 0.7rem; font-size: 0.82rem; color: #721c24; margin-top: 0.15rem; }
+
+    /* ── Modal Popup Styles ── */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: white; padding: 1.5rem; border-radius: 6px; width: 100%; max-width: 550px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e9ecef; padding-bottom: 0.5rem; }
+    .modal-header h3 { margin: 0; font-size: 1.2rem; color: #333; }
+    .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
+    .modal-close:hover { color: #333; }
+
+    /* ── Searchable Refer Autocomplete ── */
+    .refer-ac-wrap { position: relative; }
+    .refer-ac-input { width: 100%; box-sizing: border-box; padding: 0.5rem 2rem 0.5rem 0.6rem; border: 1px solid #ccc; border-radius: 3px; font-size: 0.9rem; }
+    .refer-ac-input:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,.15); }
+    .refer-ac-clear { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: #999; line-height: 1; padding: 0; }
+    .refer-ac-clear:hover { color: #333; }
+    .refer-ac-dropdown { position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 4px; max-height: 220px; overflow-y: auto; z-index: 600; box-shadow: 0 4px 12px rgba(0,0,0,.12); display: none; }
+    .refer-ac-dropdown.open { display: block; }
+    .refer-ac-option { padding: 0.45rem 0.7rem; cursor: pointer; font-size: 0.85rem; border-bottom: 1px solid #f0f0f0; }
+    .refer-ac-option:last-child { border-bottom: none; }
+    .refer-ac-option:hover, .refer-ac-option.ac-active { background: #e8f0fe; }
+    .refer-ac-option mark { background: #fff176; border-radius: 2px; font-style: normal; }
+    .refer-ac-option .ac-sub { color: #888; font-size: 0.78rem; margin-top: 1px; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>🔗 OPD Refer & IPD Linker</h1>
+
+  <div class="page-card">
+    <p style="margin-bottom: 1rem; color: #555; font-size: 0.9rem;">
+      Link OPD cases to referrals, IPD admissions and case type. Complete each case before moving to next.
+    </p>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="pending">📋 Pending <span id="pendBadge" style="background:#dc3545;color:white;padding:1px 7px;border-radius:10px;font-size:.75rem;margin-left:.3rem"></span></button>
+      <button class="tab-btn" data-tab="completed">✅ Completed <span id="compBadge" style="background:#28a745;color:white;padding:1px 7px;border-radius:10px;font-size:.75rem;margin-left:.3rem"></span></button>
+      <button class="tab-btn" data-tab="cancelled">🚫 Cancelled <span id="cancBadge" style="background:#dc3545;color:white;padding:1px 7px;border-radius:10px;font-size:.75rem;margin-left:.3rem"></span></button>
+    </div>
+
+    <div class="tab-content active" id="pending-tab">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Search</label>
+          <input id="pendSearch" placeholder="Case no / patient…" oninput="filterAndRenderPending()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date From</label>
+          <input type="date" id="pendDateFrom" onchange="filterAndRenderPending()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date To</label>
+          <input type="date" id="pendDateTo" onchange="filterAndRenderPending()"/>
+        </div>
+      </div>
+      <div class="stats-row" id="pendStats"></div>
+      <div id="pendingCasesContainer">
+        <div class="empty-state"><div class="empty-state-icon">📭</div><p>Loading OPD cases…</p></div>
+      </div>
+      <div class="pagination" id="pendPager"></div>
+    </div>
+
+    <div class="tab-content" id="completed-tab">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Search</label>
+          <input id="compSearch" placeholder="Case no / patient / refer…" oninput="filterAndRenderCompleted()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date From</label>
+          <input type="date" id="compDateFrom" onchange="filterAndRenderCompleted()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date To</label>
+          <input type="date" id="compDateTo" onchange="filterAndRenderCompleted()"/>
+        </div>
+      </div>
+      <div class="summary-box">
+        <div class="summary-row"><span>Completed Cases:</span><strong id="completedCount">0</strong></div>
+      </div>
+      <ul class="completed-list" id="completedList">
+        <li style="text-align:center;color:#999;padding:2rem;">No completed cases yet</li>
+      </ul>
+      <div class="pagination" id="compPager"></div>
+    </div>
+
+    <div class="tab-content" id="cancelled-tab">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Search</label>
+          <input id="cancSearch" placeholder="Case no / patient / remark…" oninput="filterAndRenderCancelled()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date From</label>
+          <input type="date" id="cancDateFrom" onchange="filterAndRenderCancelled()"/>
+        </div>
+        <div class="filter-group">
+          <label>Date To</label>
+          <input type="date" id="cancDateTo" onchange="filterAndRenderCancelled()"/>
+        </div>
+      </div>
+      <div class="summary-box">
+        <div class="summary-row"><span>Cancelled Cases:</span><strong id="cancelledCount">0</strong></div>
+      </div>
+      <ul class="completed-list" id="cancelledList">
+        <li style="text-align:center;color:#999;padding:2rem;">No cancelled cases yet</li>
+      </ul>
+      <div class="pagination" id="cancPager"></div>
+    </div>
+
+    <p class="err" id="err"></p>
+    <p class="info" id="ok" style="display:none"></p>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="editModalTitle">✏️ Edit Linked Case</h3>
+      <button class="modal-close" onclick="closeEditModal()">&times;</button>
+    </div>
+    <form id="editCaseForm">
+      <div class="form-group">
+        <label>Refer <span style="color:red">*</span></label>
+        <div class="refer-type-toggle">
+          <button type="button" class="refer-type-btn modal-ref-btn" id="modal-ref-quack" data-type="quack"
+            onclick="switchModalReferType('quack')">👨‍⚕️ Refer</button>
+          <button type="button" class="refer-type-btn modal-ref-btn" id="modal-ref-none" data-type="none"
+            onclick="switchModalReferType('none')">🚫 Not Applicable</button>
+        </div>
+      </div>
+
+      <div class="form-group" id="modal-refer-quack-row">
+        <label>Select Refer Doctor</label>
+        <div class="refer-ac-wrap" id="modalReferWrap">
+          <input type="text" id="modalReferInput" class="refer-ac-input" placeholder="Type name, mobile or team…" autocomplete="off"
+            oninput="acOnInput('modal')" onfocus="acOnInput('modal')" onkeydown="acOnKeydown(event,'modal')"/>
+          <button type="button" class="refer-ac-clear" id="modalReferClear" onclick="acClear('modal')" style="display:none" title="Clear">✕</button>
+          <div class="refer-ac-dropdown" id="modalReferDropdown"></div>
+        </div>
+        <input type="hidden" name="quack_doctor" id="modalQuackSelect"/>
+        <div class="quack-display" id="modal-quack-display" style="display:none;margin-top:.5rem;"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Case Type <span style="color:red">*</span></label>
+          <select name="case_type" required>
+            <option value="">Choose Type…</option>
+            <option value="lab_sample">Lab Sample</option>
+            <option value="sport_sample">Sport Sample</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Linked to IPD Admission?</label>
+          <select name="ipd_link_yn" onchange="toggleModalIPDRow(this.value)">
+            <option value="no">No (Not Applicable)</option>
+            <option value="yes">Yes (Select Patient)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row" id="modal-ipd-patient-row" style="display:none;">
+        <div class="form-group">
+          <label>Select IPD Patient (Admission No)</label>
+          <select name="ipd_patient_id" id="modalIpdSelect">
+            <option value="">Choose IPD Patient…</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="case-actions" style="margin-top:1.5rem; justify-content: flex-end;">
+        <button type="button" class="btn-primary btn-sm" style="background:#6c757d;" onclick="closeEditModal()">Cancel</button>
+        <button type="submit" class="btn-primary btn-sm btn-success">💾 Update changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cancelModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="cancelModalTitle">🚫 Cancel Case</h3>
+      <button class="modal-close" onclick="closeCancelModal()">&times;</button>
+    </div>
+    <form id="cancelCaseForm">
+      <div class="form-group">
+        <label style="color:#dc3545;font-weight:600;">⚠️ You are about to cancel this case. This action will move it to the Cancelled list.</label>
+      </div>
+      <div class="form-group">
+        <label>Cancellation Remark <span style="color:red">*</span></label>
+        <textarea name="cancel_remark" id="cancelRemarkInput" rows="3" placeholder="Enter reason for cancellation…" required
+          style="width:100%;padding:.5rem;border:1px solid #ccc;border-radius:3px;font-size:.9rem;box-sizing:border-box;resize:vertical;"></textarea>
+        <small style="color:#999;font-size:.78rem;">Remark is mandatory to cancel a case.</small>
+      </div>
+      <div class="case-actions" style="margin-top:1.5rem; justify-content: flex-end;">
+        <button type="button" class="btn-primary btn-sm" style="background:#6c757d;" onclick="closeCancelModal()">Back</button>
+        <button type="submit" class="btn-primary btn-sm" style="background:#dc3545;">🚫 Confirm Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/menu.js"></script>
+<script src="../assets/page.js"></script>
+
+<script>
+  const accessPage = "pages/opd_refer_linker.html";
+  BNH_PAGE.requirePageAccess(accessPage);
+  const hasFullAccessFor = role => BNH_PAGE.getPageAccess(accessPage, role).mode === "full";
+  let currentUserRole        = null;
+
+  /* ── state ── */
+  let allCases      = [];   // all opd_case rows (pending = refer_enter_by IS NULL)
+  let testsByCase   = {};   // case_no → [test_name,…]
+  let cashByCase    = {};   // case_no → {paid, discount, due, status}
+  let ipdPatients   = [];
+  let quackDoctors  = [];
+
+  // pagination
+  let filteredPend = [], currentPendPage = 1;
+  let filteredComp = [], currentCompPage = 1;
+  let filteredCanc = [], currentCancPage = 1;
+  const PER = 15;
+
+  /* ── helpers ── */
+  function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmt(n){ return '₹'+(Number(n||0)).toLocaleString('en-IN'); }
+  function fmtD(d){ return d ? String(d).slice(0,10) : '—'; }
+  function showSpinner(v){ document.getElementById('spinner').classList.toggle('hidden',!v); }
+  function showOk(msg){ const o=document.getElementById('ok'); o.style.display='block'; o.textContent=msg; setTimeout(()=>o.style.display='none',3000); }
+  function showErr(msg){ const e=document.getElementById('err'); e.textContent=msg; setTimeout(()=>e.textContent='',6000); }
+
+
+  /* fetch every row (Supabase returns max 1000 per request) */
+  async function fetchAll(make, orderCol) {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      let q = make();
+      if (orderCol) q = q.order(orderCol, { ascending: true });
+      const { data, error } = await q.range(from, from + 999);
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    return out;
+  }
+  async function fetchAllSafe(make) {
+    try { return await fetchAll(make, 'id'); }
+    catch (e) { return await fetchAll(make, null); }
+  }
+
+  let billByCase = {};
+
+  /* ── load quack doctors ── */
+  async function loadQuackDoctors() {
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('gramin_doctor_visits')
+        .select('id,doctor_name,mobile,recorded_by_name').order('doctor_name');
+      if (!error && data) {
+        const seen = new Set();
+        quackDoctors = data.filter(d => {
+          const key = d.mobile || d.doctor_name;
+          if (seen.has(key)) return false;
+          seen.add(key); return true;
+        });
+      }
+    } catch(e){ console.error('loadQuackDoctors:', e); }
+  }
+
+  /* ── load IPD patients (current + recent — not yet discharged) ── */
+  async function loadIPDPatients() {
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
+        .select('id,admission_no,patient_name').eq('is_discharged', false);
+      if (!error && data) ipdPatients = data;
+    } catch(e){ console.error('loadIPDPatients:', e); }
+  }
+
+  /* ── load ALL opd_case rows ── */
+  async function loadCases() {
+    allCases = await fetchAll(() => BNH_PAGE.sb.from('opd_case')
+      .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,type,ipd_link,cancel_remark,cancelled_by,cancelled_at'), 'case_no');
+    allCases.sort((a,b)=>String(b.case_date||'').localeCompare(String(a.case_date||'')));
+  }
+
+  /* ── load tests for all cases ── */
+  async function loadTests() {
+    let rows;
+    try {
+      rows = await fetchAllSafe(() => BNH_PAGE.sb.from('opd_test').select('case_number,test_name,test_amount'));
+    } catch (e) { console.warn('opd_test load:', e.message); return; }
+    testsByCase = {}; billByCase = {};
+    rows.forEach(r => {
+      const cn = (r.case_number||'').trim();
+      if (!testsByCase[cn]) testsByCase[cn] = [];
+      if (r.test_name && !testsByCase[cn].includes(r.test_name)) testsByCase[cn].push(r.test_name);
+      billByCase[cn] = (billByCase[cn]||0) + Number(r.test_amount||0);
+    });
+  }
+
+  /* ── load cash register to compute paid/due per case ── */
+  async function loadCash() {
+    let rows;
+    try {
+      rows = await fetchAllSafe(() => BNH_PAGE.sb.from('opd_cash_register').select('case_no,income,discount'));
+    } catch (e) { console.warn('opd_cash_register load:', e.message); return; }
+    cashByCase = {};
+    rows.forEach(r => {
+      const cn = (r.case_no||'').trim();
+      if (!cashByCase[cn]) cashByCase[cn] = { paid: 0, discount: 0 };
+      cashByCase[cn].paid     += Number(r.income   || 0);
+      cashByCase[cn].discount += Number(r.discount || 0);
+    });
+    Object.keys(cashByCase).forEach(cn => {
+      const c   = cashByCase[cn];
+      const cas = allCases.find(x => (x.case_no||'').trim() === cn);
+      const bill = Number(cas?.total_amount || 0) || billByCase[cn] || 0;
+      c.due    = Math.max(0, bill - c.paid - c.discount);
+      c.status = c.due <= 0 ? 'paid' : (c.paid > 0 || c.discount > 0) ? 'partial' : 'due';
+    });
+  }
+
+  /* ── quack doctor options (kept for backward compat if needed) ── */
+  function quackOptions() { return ''; }
+
+  /* ── Searchable Refer Autocomplete Engine ──
+     Supports two contexts:
+       • 'modal'   → uses modalReferInput / modalReferDropdown / modalReferClear / modalQuackSelect
+       • caseNo    → uses acInput-{id} / acDd-{id} / acClearBtn-{id} / acVal-{id}
+  */
+  const acActiveIdx = {};
+
+  function acInputEl(ctx)   { return document.getElementById(ctx==='modal' ? 'modalReferInput'   : `acInput-${ctx}`); }
+  function acDdEl(ctx)      { return document.getElementById(ctx==='modal' ? 'modalReferDropdown' : `acDd-${ctx}`); }
+  function acClearEl(ctx)   { return document.getElementById(ctx==='modal' ? 'modalReferClear'    : `acClearBtn-${ctx}`); }
+  function acValEl(ctx)     { return document.getElementById(ctx==='modal' ? 'modalQuackSelect'   : `acVal-${ctx}`); }
+  function acDisplayEl(ctx) { return document.getElementById(ctx==='modal' ? 'modal-quack-display': `quack-display-${ctx}`); }
+
+  function acHighlight(text, q) {
+    if (!q) return esc(text);
+    const i = text.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return esc(text);
+    return esc(text.slice(0,i)) + '<mark>' + esc(text.slice(i,i+q.length)) + '</mark>' + esc(text.slice(i+q.length));
+  }
+
+  function acOnInput(ctx) {
+    const input = acInputEl(ctx);
+    const dd    = acDdEl(ctx);
+    if (!input || !dd) return;
+    const q = input.value.trim();
+    acClearEl(ctx).style.display = q ? '' : 'none';
+    // clear previous selection
+    const valEl = acValEl(ctx);
+    if (valEl) valEl.value = '';
+    const dispEl = acDisplayEl(ctx);
+    if (dispEl) dispEl.style.display = 'none';
+
+    const results = q
+      ? quackDoctors.filter(d =>
+          (d.doctor_name||'').toLowerCase().includes(q.toLowerCase()) ||
+          (d.mobile||'').includes(q) ||
+          (d.recorded_by_name||'').toLowerCase().includes(q.toLowerCase()))
+      : quackDoctors;
+
+    if (results.length === 0) {
+      dd.innerHTML = '<div class="refer-ac-option" style="color:#999;cursor:default;">No match found</div>';
+    } else {
+      dd.innerHTML = results.map((d, i) => {
+        const val   = `${d.doctor_name}|${d.mobile||''}|${d.recorded_by_name||''}`;
+        const nameH = acHighlight(d.doctor_name||'', q);
+        const mobH  = acHighlight(d.mobile||'—', q);
+        const teamH = acHighlight(d.recorded_by_name||'Unknown Team', q);
+        return `<div class="refer-ac-option" data-val="${val.replace(/"/g,'&quot;')}" data-name="${(d.doctor_name||'').replace(/"/g,'&quot;')}" data-idx="${i}">${nameH}<div class="ac-sub">📞 ${mobH} &nbsp;|&nbsp; 🏷️ ${teamH}</div></div>`;
+      }).join('');
+      dd.querySelectorAll('.refer-ac-option[data-val]').forEach(el => {
+        el.addEventListener('mousedown', function(ev) {
+          ev.preventDefault();
+          acSelect(ctx, this.dataset.val, this.dataset.name);
+        });
+      });
+    }
+    acActiveIdx[ctx] = -1;
+    dd.classList.add('open');
+  }
+
+  function acSelect(ctx, val, label) {
+    const input  = acInputEl(ctx);
+    const dd     = acDdEl(ctx);
+    const valEl  = acValEl(ctx);
+    const dispEl = acDisplayEl(ctx);
+    if (input)  input.value = label;
+    if (valEl)  valEl.value = val;
+    acClearEl(ctx).style.display = '';
+    if (dd) dd.classList.remove('open');
+    // show info
+    if (dispEl && val) {
+      const [name, mobile, team] = val.split('|');
+      dispEl.style.display = 'block';
+      dispEl.innerHTML = `<strong>👨‍⚕️ Refer Doctor</strong>
+        <span>Name: <b>${esc(name)}</b></span><br>
+        <span>📞 Mobile: <b>${esc(mobile||'—')}</b></span><br>
+        <span>🏷️ Team: <b>${esc(team||'N/A')}</b></span>`;
+    }
+  }
+
+  function acClear(ctx) {
+    const input  = acInputEl(ctx);
+    const dd     = acDdEl(ctx);
+    const valEl  = acValEl(ctx);
+    const dispEl = acDisplayEl(ctx);
+    if (input)  input.value = '';
+    if (valEl)  valEl.value = '';
+    acClearEl(ctx).style.display = 'none';
+    if (dd) dd.classList.remove('open');
+    if (dispEl) dispEl.style.display = 'none';
+  }
+
+  function acOnKeydown(e, ctx) {
+    const dd    = acDdEl(ctx);
+    const items = dd ? dd.querySelectorAll('.refer-ac-option[data-val]') : [];
+    if (!dd || !dd.classList.contains('open') || items.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      acActiveIdx[ctx] = Math.min((acActiveIdx[ctx]||0) + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      acActiveIdx[ctx] = Math.max((acActiveIdx[ctx]||0) - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const idx = acActiveIdx[ctx] || 0;
+      if (idx >= 0 && items[idx]) items[idx].dispatchEvent(new MouseEvent('mousedown'));
+      return;
+    } else if (e.key === 'Escape') {
+      dd.classList.remove('open'); return;
+    }
+    items.forEach((it, i) => it.classList.toggle('ac-active', i === (acActiveIdx[ctx]||0)));
+    if ((acActiveIdx[ctx]||0) >= 0 && items[acActiveIdx[ctx]||0])
+      items[acActiveIdx[ctx]||0].scrollIntoView({ block: 'nearest' });
+  }
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', function(e) {
+    document.querySelectorAll('.refer-ac-dropdown.open').forEach(dd => {
+      const wrap = dd.closest('.refer-ac-wrap');
+      if (wrap && !wrap.contains(e.target)) dd.classList.remove('open');
+    });
+  });
+
+  /* ── payment pill HTML ── */
+  function payPills(caseNo, billAmt) {
+    const key  = (caseNo||'').trim();
+    const c    = cashByCase[key];
+    const bill = Number(billAmt || 0) || billByCase[key] || 0;
+    const paid = c ? c.paid     : 0;
+    const disc = c ? c.discount : 0;
+    const due  = c ? c.due      : bill;
+    const cls  = due <= 0 ? 'paid' : (due < bill ? '' : 'due');
+    return `<div class="pay-summary">
+      <span class="pay-pill">💰 Bill: ${fmt(bill)}</span>
+      <span class="pay-pill paid">✓ Paid: ${fmt(paid)}</span>
+      ${disc>0?`<span class="pay-pill">🏷️ Disc: ${fmt(disc)}</span>`:''}
+      <span class="pay-pill ${cls}">⏳ Due: ${fmt(due)}</span>
+    </div>`;
+  }
+
+  /* ── filter helpers ── */
+  function applyFilter(src, searchId, dfId, dtId) {
+    const q  = (document.getElementById(searchId).value||'').toLowerCase();
+    const df = document.getElementById(dfId).value;
+    const dt = document.getElementById(dtId).value;
+    return src.filter(x => {
+      if (q && !(x.case_no||'').toLowerCase().includes(q) && !(x.patient_name||'').toLowerCase().includes(q) && !(x.refer_name||'').toLowerCase().includes(q)) return false;
+      const d = String(x.case_date||'').slice(0,10);
+      if (df && d < df) return false;
+      if (dt && d > dt) return false;
+      return true;
+    });
+  }
+
+  /* ── pending filter + render ── */
+  function filterAndRenderPending() {
+    const pending = allCases.filter(c => !c.refer_enter_by && !c.cancelled_by);
+    filteredPend  = applyFilter(pending, 'pendSearch', 'pendDateFrom', 'pendDateTo');
+    currentPendPage = 1;
+    renderPendStats(pending);
+    renderPendingPage();
+  }
+
+  function renderPendStats(pending) {
+    document.getElementById('pendStats').innerHTML = `
+      <div class="stat-box"><div class="val" style="color:#dc3545">${pending.length}</div><div class="lbl">Total Pending</div></div>
+      <div class="stat-box"><div class="val">${filteredPend.length}</div><div class="lbl">Showing (filtered)</div></div>`;
+  }
+
+  function renderPendingPage() {
+    const container = document.getElementById('pendingCasesContainer');
+    document.getElementById('pendBadge').textContent = allCases.filter(c=>!c.refer_enter_by).length;
+
+    if (filteredPend.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🎉</div><p>All OPD cases have been linked!</p></div>`;
+      document.getElementById('pendPager').innerHTML = '';
+      return;
+    }
+
+    const slice = filteredPend.slice((currentPendPage-1)*PER, currentPendPage*PER);
+
+    container.innerHTML = slice.map(c => {
+      const tests = (testsByCase[(c.case_no||'').trim()] || []).join(', ') || '—';
+      return `
+      <div class="case-card" id="case-${c.case_no}">
+        <div class="case-header">
+          <div class="case-info">
+            <div class="case-no">${esc(c.case_no)}</div>
+            <div class="case-detail">📅 ${fmtD(c.case_date)} &nbsp;|&nbsp; 👤 ${esc(c.patient_name)}</div>
+            ${payPills(c.case_no, c.total_amount)}
+          </div>
+        </div>
+
+        <div class="case-tests">
+          <strong style="display:block;margin-bottom:.25rem;">🧪 Tests:</strong>
+          ${esc(tests)}
+        </div>
+
+        <hr class="divider"/>
+
+        <form class="case-form" data-case-no="${esc(c.case_no)}" style="margin-top:.75rem;">
+
+          <div class="form-group">
+            <label>Refer <span style="color:red">*</span></label>
+            <div class="refer-type-toggle">
+              <button type="button" class="refer-type-btn active" data-type="quack"
+                onclick="switchReferType('${esc(c.case_no)}','quack')">👨‍⚕️ Refer</button>
+              <button type="button" class="refer-type-btn" data-type="none"
+                onclick="switchReferType('${esc(c.case_no)}','none')">🚫 Not Applicable</button>
+            </div>
+          </div>
+
+          <div class="form-group" id="refer-quack-${esc(c.case_no)}">
+            <label>Select Refer Doctor</label>
+            <div class="refer-ac-wrap" id="acWrap-${esc(c.case_no)}">
+              <input type="text" class="refer-ac-input" id="acInput-${esc(c.case_no)}"
+                placeholder="Type name, mobile or team…" autocomplete="off"
+                oninput="acOnInput('${esc(c.case_no)}')" onfocus="acOnInput('${esc(c.case_no)}')"
+                onkeydown="acOnKeydown(event,'${esc(c.case_no)}')"/>
+              <button type="button" class="refer-ac-clear" id="acClearBtn-${esc(c.case_no)}"
+                onclick="acClear('${esc(c.case_no)}')" style="display:none" title="Clear">✕</button>
+              <div class="refer-ac-dropdown" id="acDd-${esc(c.case_no)}"></div>
+            </div>
+            <input type="hidden" name="quack_doctor" id="acVal-${esc(c.case_no)}"/>
+            <div class="quack-display" id="quack-display-${esc(c.case_no)}" style="display:none;margin-top:.5rem;"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Case Type <span style="color:red">*</span></label>
+              <select name="case_type" required>
+                <option value="">Choose Type…</option>
+                <option value="lab_sample">Lab Sample</option>
+                <option value="sport_sample">Sport Sample</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Linked to IPD Admission?</label>
+              <select name="ipd_link_yn" onchange="toggleIPDRow('${esc(c.case_no)}', this.value)">
+                <option value="no">No (Not Applicable)</option>
+                <option value="yes">Yes (Select Patient)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" id="ipd-patient-row-${esc(c.case_no)}" style="display:none;">
+            <div class="form-group">
+              <label>Select IPD Patient (Admission No)</label>
+              <select name="ipd_patient_id">
+                <option value="">Choose IPD Patient…</option>
+                ${ipdPatients.map(p=>`<option value="${esc(p.admission_no)}">${esc(p.patient_name)} (${esc(p.admission_no)})</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          <div class="case-actions" style="margin-top:1rem;">
+            <button type="submit" class="btn-primary btn-sm btn-success">✅ Save & Complete</button>
+            <button type="button" class="btn-primary btn-sm" style="background:#6c757d;"
+              onclick="skipCase('${esc(c.case_no)}')">⏭ Skip</button>
+            <button type="button" class="btn-primary btn-sm" style="background:#dc3545;"
+              onclick="openCancelModal('${esc(c.case_no)}')">🚫 Cancel</button>
+          </div>
+        </form>
+      </div>`;
+    }).join('');
+
+    renderPager('pendPager', filteredPend.length, currentPendPage, 'pend');
+    attachFormListeners();
+  }
+
+  /* ── toggle IPD row ── */
+  function toggleIPDRow(caseNo, val) {
+    const row = document.getElementById(`ipd-patient-row-${caseNo}`);
+    const sel = row?.querySelector('[name="ipd_patient_id"]');
+    if (val === 'yes') { row.style.display = 'flex'; if(sel) sel.required = true; }
+    else               { row.style.display = 'none';  if(sel) sel.required = false; }
+  }
+
+  /* ── refer type switch ── */
+  function switchReferType(caseNo, type) {
+    const form = document.querySelector(`[data-case-no="${caseNo}"]`);
+    if (!form) return;
+    form.querySelectorAll('.refer-type-btn').forEach(btn =>
+      btn.classList.toggle('active', btn.dataset.type === type));
+    const panel = document.getElementById(`refer-quack-${caseNo}`);
+    if (panel) panel.style.display = type === 'quack' ? '' : 'none';
+    const qd = document.getElementById(`quack-display-${caseNo}`);
+    if (qd) qd.style.display = 'none';
+  }
+
+  /* ── showQuackInfo: legacy shim, not used (autocomplete handles display) ── */
+  function showQuackInfo(caseNo, val) { /* handled by acSelect */ }
+
+  /* ── skip a case from the rendered list ── */
+  function skipCase(caseNo) {
+    document.getElementById(`case-${caseNo}`)?.remove();
+  }
+
+  /* ── attach submit listeners to rendered forms ── */
+  function attachFormListeners() {
+    document.querySelectorAll('.case-form').forEach(form => {
+      form.addEventListener('submit', async e => {
+        e.preventDefault();
+        const caseNo   = form.dataset.caseNo;
+        const formData = new FormData(form);
+        const activeType = form.querySelector('.refer-type-btn.active')?.dataset.type || 'none';
+
+        let referName = null;
+        if (activeType === 'quack') {
+          const qval = formData.get('quack_doctor') || '';
+          if (qval) {
+            const [name, mobile, team] = qval.split('|');
+            referName = `${name} (${mobile||''}, Team: ${team||'N/A'})`;
+          }
+        }
+
+        const caseType  = formData.get('case_type');
+        if (!caseType) { showErr('⚠️ Please choose a Case Type.'); return; }
+
+        const ipdLinkYN = formData.get('ipd_link_yn');
+        const ipdLink   = ipdLinkYN === 'yes' ? (formData.get('ipd_patient_id') || null) : null;
+        if (ipdLinkYN === 'yes' && !ipdLink) { showErr('⚠️ Please select an IPD patient.'); return; }
+
+        const stamp = BNH_PAGE.stamp({});
+
+        showSpinner(true);
+        try {
+          const payload = {
+            refer_name:       referName,
+            refer_enter_by:   stamp.recorded_by     || null,
+            refer_enter_time: new Date().toISOString(),
+            type:             caseType,
+            ipd_link:         ipdLink,
+            updated_at:       new Date().toISOString()
+          };
+
+          const { error } = await BNH_PAGE.sb.from('opd_case')
+            .update(payload).eq('case_no', caseNo);
+          if (error) throw error;
+
+          // update local state
+          const idx = allCases.findIndex(c => c.case_no === caseNo);
+          if (idx >= 0) Object.assign(allCases[idx], payload);
+
+          document.getElementById(`case-${caseNo}`)?.remove();
+          filterAndRenderPending();
+          filterAndRenderCompleted();
+          showOk(`✅ Case ${caseNo} linked successfully!`);
+        } catch(err) {
+          showErr('Error: ' + err.message);
+        } finally {
+          showSpinner(false);
+        }
+      });
+    });
+  }
+
+  /* ── completed tab ── */
+  function filterAndRenderCompleted() {
+    const completed = allCases.filter(c => !!c.refer_enter_by && !c.cancelled_by);
+    filteredComp    = applyFilter(completed, 'compSearch', 'compDateFrom', 'compDateTo');
+    currentCompPage = 1;
+    document.getElementById('compBadge').textContent = completed.length;
+    renderCompletedPage();
+  }
+
+  function renderCompletedPage() {
+    const list = document.getElementById('completedList');
+    document.getElementById('completedCount').textContent = filteredComp.length;
+
+    if (filteredComp.length === 0) {
+      list.innerHTML = '<li style="text-align:center;color:#999;padding:2rem;">No completed cases.</li>';
+      document.getElementById('compPager').innerHTML = '';
+      return;
+    }
+
+    const slice = filteredComp.slice((currentCompPage-1)*PER, currentCompPage*PER);
+    const isFullAccess = hasFullAccessFor(currentUserRole);
+
+    list.innerHTML = slice.map(c => {
+      const tests = (testsByCase[(c.case_no||'').trim()] || []).join(', ') || '—';
+      
+      const actionButtons = isFullAccess ? `
+        <div style="margin-top: .6rem; display: flex; gap: .5rem;">
+          <button class="btn-primary btn-sm" style="background:#007bff;" onclick="editCompletedCase('${esc(c.case_no)}')">✏️ Edit</button>
+          <button class="btn-primary btn-sm" style="background:#dc3545;" onclick="deleteCompletedCase('${esc(c.case_no)}')">🗑️ Delete</button>
+        </div>
+      ` : '';
+
+      return `
+      <li class="completed-item" id="completed-${c.case_no}" style="flex-direction:column;align-items:flex-start;gap:.4rem;">
+        <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+          <div>
+            <div class="case-no">${esc(c.case_no)}</div>
+            <div class="case-detail">👤 ${esc(c.patient_name)} &nbsp;|&nbsp; 📅 ${fmtD(c.case_date)}</div>
+          </div>
+          <span class="status-badge">✓ Done</span>
+        </div>
+        ${payPills(c.case_no, c.total_amount)}
+        <div class="case-detail" style="margin-top:.25rem;">
+          <span title="Tests">🧪 ${esc(tests.substring(0,80))}${tests.length>80?'…':''}</span>
+        </div>
+        <div class="case-detail">
+          📌 Refer: <b>${esc(c.refer_name||'N/A')}</b>
+          &nbsp;|&nbsp; 📂 Type: <b>${esc(c.type||'—')}</b>
+          &nbsp;|&nbsp; 🏥 IPD: <b>${esc(c.ipd_link||'No')}</b>
+        </div>
+        <div class="case-detail" style="font-size:.78rem;color:#aaa;">
+          Entered: ${fmtD(c.refer_enter_time)} by ${esc(c.refer_enter_by||'—')}
+        </div>
+        ${actionButtons}
+      </li>`;
+    }).join('');
+
+    renderPager('compPager', filteredComp.length, currentCompPage, 'comp');
+  }
+
+  /* ── edit modal control helpers ── */
+  function switchModalReferType(type) {
+    document.querySelectorAll('.modal-ref-btn').forEach(btn => 
+      btn.classList.toggle('active', btn.dataset.type === type)
+    );
+    const row = document.getElementById('modal-refer-quack-row');
+    if (row) row.style.display = type === 'quack' ? '' : 'none';
+    if (type !== 'quack') document.getElementById('modal-quack-display').style.display = 'none';
+  }
+
+  function toggleModalIPDRow(val) {
+    const row = document.getElementById('modal-ipd-patient-row');
+    const sel = row?.querySelector('[name="ipd_patient_id"]');
+    if (val === 'yes') { row.style.display = 'flex'; if(sel) sel.required = true; }
+    else               { row.style.display = 'none';  if(sel) sel.required = false; }
+  }
+
+  function showModalQuackInfo(val) { acSelect('modal', val, val ? val.split('|')[0] : ''); }
+
+  function closeEditModal() {
+    document.getElementById('editModal').classList.remove('active');
+  }
+
+  /* ── open & configure edit completed case modal ── */
+  function editCompletedCase(caseNo) {
+    const c = allCases.find(x => x.case_no === caseNo);
+    if (!c) return;
+
+    const modal = document.getElementById('editModal');
+    const form  = document.getElementById('editCaseForm');
+    form.dataset.caseNo = caseNo;
+    document.getElementById('editModalTitle').textContent = `✏️ Edit Case Layout: ${caseNo}`;
+
+    // Set configuration values
+    form.elements['case_type'].value = c.type || '';
+
+    if (c.refer_name) {
+      switchModalReferType('quack');
+      const matchedDoc = quackDoctors.find(d => c.refer_name.startsWith(d.doctor_name));
+      if (matchedDoc) {
+        const optionVal = `${matchedDoc.doctor_name}|${matchedDoc.mobile||''}|${matchedDoc.recorded_by_name||''}`;
+        acSelect('modal', optionVal, matchedDoc.doctor_name);
+      } else {
+        acClear('modal');
+      }
+    } else {
+      switchModalReferType('none');
+      acClear('modal');
+    }
+
+    if (c.ipd_link) {
+      form.elements['ipd_link_yn'].value = 'yes';
+      toggleModalIPDRow('yes');
+      form.elements['ipd_patient_id'].value = c.ipd_link;
+    } else {
+      form.elements['ipd_link_yn'].value = 'no';
+      toggleModalIPDRow('no');
+      form.elements['ipd_patient_id'].value = '';
+    }
+
+    modal.classList.add('active');
+  }
+
+  // Setup handler for modal update submission
+  document.getElementById('editCaseForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form     = e.target;
+    const caseNo   = form.dataset.caseNo;
+    const formData = new FormData(form);
+    const activeType = form.querySelector('.modal-ref-btn.active')?.dataset.type || 'none';
+
+    let referName = null;
+    if (activeType === 'quack') {
+      const qval = formData.get('quack_doctor') || '';
+      if (qval) {
+        const [name, mobile, team] = qval.split('|');
+        referName = `${name} (${mobile||''}, Team: ${team||'N/A'})`;
+      }
+    }
+
+    const caseType = formData.get('case_type');
+    if (!caseType) { showErr('⚠️ Please choose a Case Type.'); return; }
+
+    const ipdLinkYN = formData.get('ipd_link_yn');
+    const ipdLink   = ipdLinkYN === 'yes' ? (formData.get('ipd_patient_id') || null) : null;
+    if (ipdLinkYN === 'yes' && !ipdLink) { showErr('⚠️ Please select an IPD patient.'); return; }
+
+    showSpinner(true);
+    try {
+      const payload = {
+        refer_name: referName,
+        type:       caseType,
+        ipd_link:   ipdLink,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no', caseNo);
+      if (error) throw error;
+
+      // sync matching profile in memory 
+      const idx = allCases.findIndex(c => c.case_no === caseNo);
+      if (idx >= 0) Object.assign(allCases[idx], payload);
+
+      closeEditModal();
+      filterAndRenderPending();
+      filterAndRenderCompleted();
+      showOk(`✅ Case ${caseNo} updated successfully!`);
+    } catch(err) {
+      showErr('Error: ' + err.message);
+    } finally {
+      showSpinner(false);
+    }
+  });
+
+  /* ── delete/reset completed case linkage (Full Access Only) ── */
+  async function deleteCompletedCase(caseNo) {
+    if (!confirm(`Are you sure you want to clear the linkage data for case ${caseNo}? This will move it back to Pending.`)) return;
+
+    showSpinner(true);
+    try {
+      const payload = {
+        refer_name: null,
+        refer_enter_by: null,
+        refer_enter_time: null,
+        type: null,
+        ipd_link: null,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no', caseNo);
+      if (error) throw error;
+
+      const idx = allCases.findIndex(c => c.case_no === caseNo);
+      if (idx >= 0) Object.assign(allCases[idx], payload);
+
+      filterAndRenderPending();
+      filterAndRenderCompleted();
+      showOk(`🗑️ Case ${caseNo} reference reset to pending.`);
+    } catch(err) {
+      showErr('Error: ' + err.message);
+    } finally {
+      showSpinner(false);
+    }
+  }
+
+  /* ── cancelled tab ── */
+  function filterAndRenderCancelled() {
+    const cancelled = allCases.filter(c => !!c.cancelled_by);
+    const q  = (document.getElementById('cancSearch').value||'').toLowerCase();
+    const df = document.getElementById('cancDateFrom').value;
+    const dt = document.getElementById('cancDateTo').value;
+    filteredCanc = cancelled.filter(x => {
+      if (q && !(x.case_no||'').toLowerCase().includes(q) &&
+               !(x.patient_name||'').toLowerCase().includes(q) &&
+               !(x.cancel_remark||'').toLowerCase().includes(q)) return false;
+      const d = String(x.case_date||'').slice(0,10);
+      if (df && d < df) return false;
+      if (dt && d > dt) return false;
+      return true;
+    });
+    currentCancPage = 1;
+    document.getElementById('cancBadge').textContent = cancelled.length;
+    renderCancelledPage();
+  }
+
+  function renderCancelledPage() {
+    const list = document.getElementById('cancelledList');
+    document.getElementById('cancelledCount').textContent = filteredCanc.length;
+
+    if (filteredCanc.length === 0) {
+      list.innerHTML = '<li style="text-align:center;color:#999;padding:2rem;">No cancelled cases.</li>';
+      document.getElementById('cancPager').innerHTML = '';
+      return;
+    }
+
+    const slice = filteredCanc.slice((currentCancPage-1)*PER, currentCancPage*PER);
+    const isFullAccess = hasFullAccessFor(currentUserRole);
+
+    list.innerHTML = slice.map(c => {
+      const tests = (testsByCase[(c.case_no||'').trim()] || []).join(', ') || '—';
+      const restoreBtn = isFullAccess
+        ? `<button class="btn-primary btn-sm" style="background:#007bff;margin-top:.5rem;" onclick="restoreCancelledCase('${esc(c.case_no)}')">↩️ Restore to Pending</button>`
+        : '';
+      return `
+      <li class="cancelled-item" id="cancelled-${esc(c.case_no)}">
+        <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+          <div>
+            <div class="case-no">${esc(c.case_no)}</div>
+            <div class="case-detail">👤 ${esc(c.patient_name)} &nbsp;|&nbsp; 📅 ${fmtD(c.case_date)}</div>
+          </div>
+          <span class="cancelled-badge">🚫 Cancelled</span>
+        </div>
+        ${payPills(c.case_no, c.total_amount)}
+        <div class="case-detail" style="margin-top:.25rem;">
+          <span title="Tests">🧪 ${esc(tests.substring(0,80))}${tests.length>80?'…':''}</span>
+        </div>
+        <div class="cancel-remark-box">
+          💬 Remark: <b>${esc(c.cancel_remark||'—')}</b>
+        </div>
+        <div class="case-detail" style="font-size:.78rem;color:#aaa;">
+          Cancelled: ${fmtD(c.cancelled_at)} by ${esc(c.cancelled_by||'—')}
+        </div>
+        ${restoreBtn}
+      </li>`;
+    }).join('');
+
+    renderPager('cancPager', filteredCanc.length, currentCancPage, 'canc');
+  }
+
+  /* ── cancel modal ── */
+  function openCancelModal(caseNo) {
+    const c = allCases.find(x => x.case_no === caseNo);
+    if (!c) return;
+    const form = document.getElementById('cancelCaseForm');
+    form.dataset.caseNo = caseNo;
+    document.getElementById('cancelModalTitle').textContent = `🚫 Cancel Case: ${caseNo} — ${c.patient_name||''}`;
+    document.getElementById('cancelRemarkInput').value = '';
+    document.getElementById('cancelModal').classList.add('active');
+  }
+
+  function closeCancelModal() {
+    document.getElementById('cancelModal').classList.remove('active');
+  }
+
+  document.getElementById('cancelCaseForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form   = e.target;
+    const caseNo = form.dataset.caseNo;
+    const remark = (form.elements['cancel_remark'].value || '').trim();
+    if (!remark) { showErr('⚠️ Cancellation remark is mandatory.'); return; }
+
+    const stamp = BNH_PAGE.stamp ? BNH_PAGE.stamp({}) : {};
+    const cancelledBy = stamp.recorded_by || BNH_PAGE.user?.name || 'Unknown';
+
+    showSpinner(true);
+    try {
+      const payload = {
+        cancel_remark: remark,
+        cancelled_by:  cancelledBy,
+        cancelled_at:  new Date().toISOString(),
+        updated_at:    new Date().toISOString()
+      };
+      const { error } = await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no', caseNo);
+      if (error) throw error;
+
+      const idx = allCases.findIndex(c => c.case_no === caseNo);
+      if (idx >= 0) Object.assign(allCases[idx], payload);
+
+      closeCancelModal();
+      filterAndRenderPending();
+      filterAndRenderCancelled();
+      showOk(`🚫 Case ${caseNo} has been cancelled.`);
+    } catch(err) {
+      showErr('Error: ' + err.message);
+    } finally {
+      showSpinner(false);
+    }
+  });
+
+  /* ── restore cancelled case back to pending (Full Access Only) ── */
+  async function restoreCancelledCase(caseNo) {
+    if (!confirm(`Restore case ${caseNo} back to Pending?`)) return;
+    showSpinner(true);
+    try {
+      const payload = {
+        cancel_remark: null,
+        cancelled_by:  null,
+        cancelled_at:  null,
+        updated_at:    new Date().toISOString()
+      };
+      const { error } = await BNH_PAGE.sb.from('opd_case').update(payload).eq('case_no', caseNo);
+      if (error) throw error;
+
+      const idx = allCases.findIndex(c => c.case_no === caseNo);
+      if (idx >= 0) Object.assign(allCases[idx], payload);
+
+      filterAndRenderPending();
+      filterAndRenderCancelled();
+      showOk(`↩️ Case ${caseNo} restored to pending.`);
+    } catch(err) {
+      showErr('Error: ' + err.message);
+    } finally {
+      showSpinner(false);
+    }
+  }
+
+  /* ── pagination ── */
+  function renderPager(pagerId, total, page, key) {
+    const tp = Math.ceil(total / PER);
+    const p  = document.getElementById(pagerId);
+    if (tp <= 1) { p.innerHTML = ''; return; }
+    let h = '';
+    if (page > 1) h += `<button onclick="goP('${key}',1)">«</button><button onclick="goP('${key}',${page-1})">‹</button>`;
+    for (let i = Math.max(1, page-2); i <= Math.min(tp, page+2); i++)
+      h += `<button ${i===page?'class="active"':''} onclick="goP('${key}',${i})">${i}</button>`;
+    if (page < tp) h += `<button onclick="goP('${key}',${page+1})">›</button><button onclick="goP('${key}',${tp})">»</button>`;
+    p.innerHTML = h;
+  }
+  function goP(key, page) {
+    if (key === 'pend') { currentPendPage = page; renderPendingPage(); }
+    else if (key === 'canc') { currentCancPage = page; renderCancelledPage(); }
+    else                { currentCompPage = page; renderCompletedPage(); }
+  }
+
+  /* ── tab switching ── */
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab + '-tab').classList.add('active');
+    });
+  });
+
+  /* ── init ── */
+  async function init() {
+    showSpinner(true);
+    try {
+      if (window.BNH_PAGE && typeof BNH_PAGE.getUserRole === 'function') {
+        currentUserRole = BNH_PAGE.getUserRole();
+      } else if (window.BNH_PAGE && BNH_PAGE.user) {
+        currentUserRole = BNH_PAGE.user.role;
+      }
+      
+      await loadQuackDoctors();
+      await loadIPDPatients();
+      
+      // Populate IPD patient select in modal
+      document.getElementById('modalIpdSelect').innerHTML = '<option value="">Choose IPD Patient…</option>' + ipdPatients.map(p=>`<option value="${esc(p.admission_no)}">${esc(p.patient_name)} (${esc(p.admission_no)})</option>`).join('');
+
+      await loadCases();
+      await loadTests();
+      await loadCash();
+      filterAndRenderPending();
+      filterAndRenderCompleted();
+      filterAndRenderCancelled();
+    } catch(e) {
+      showErr('Initialization error: ' + e.message);
+      console.error(e);
+    } finally {
+      showSpinner(false);
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

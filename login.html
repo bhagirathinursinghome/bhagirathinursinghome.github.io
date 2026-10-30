@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>লগইন | Nursing Home</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/auth.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="auth-body">
+
+  <div class="auth-container">
+    <a href="index.html" class="back-home">
+      <i class="fas fa-arrow-left"></i> হোমে ফিরুন
+    </a>
+    
+    <div class="auth-box">
+      <div class="auth-logo">
+        <i class="fas fa-hospital"></i>
+        <h2>Nursing Home</h2>
+      </div>
+
+      <!-- ===== Tab Switcher ===== -->
+      <div class="tab-switcher">
+        <button class="tab-btn active" onclick="switchTab('patient')">রোগী</button>
+        <button class="tab-btn" onclick="switchTab('staff')">স্টাফ</button>
+        <button class="tab-btn" onclick="switchTab('admin')">Admin</button>
+      </div>
+
+      <!-- ===== PATIENT LOGIN/SIGNUP ===== -->
+      <div id="patientSection" class="auth-section active">
+        <div class="sub-switcher">
+          <button class="sub-btn active" onclick="switchSub('login')">লগইন</button>
+          <button class="sub-btn" onclick="switchSub('signup')">সাইন আপ</button>
+        </div>
+
+        <!-- Patient Login -->
+        <form id="patientLoginForm" class="auth-form active">
+          <h3>রোগী লগইন</h3>
+          <div class="input-group">
+            <i class="fas fa-phone"></i>
+            <input type="tel" id="loginMobile" placeholder="মোবাইল নম্বর" required />
+          </div>
+          <div class="input-group">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="loginPassword" placeholder="পাসওয়ার্ড" required />
+          </div>
+          <button type="submit" class="auth-btn">লগইন করুন</button>
+          
+          <div class="divider"><span>অথবা</span></div>
+          
+          <button type="button" class="google-btn" onclick="googleLogin()">
+            <i class="fab fa-google"></i> Google দিয়ে লগইন
+          </button>
+        </form>
+
+        <!-- Patient Signup -->
+        <form id="patientSignupForm" class="auth-form">
+          <h3>নতুন একাউন্ট</h3>
+          <div class="input-group">
+            <i class="fas fa-user"></i>
+            <input type="text" id="signupName" placeholder="পুরো নাম" required />
+          </div>
+          <div class="input-group">
+            <i class="fas fa-phone"></i>
+            <input type="tel" id="signupMobile" placeholder="মোবাইল নম্বর" required />
+          </div>
+          <div class="input-group">
+            <i class="fas fa-notes-medical"></i>
+            <input type="text" id="signupIssue" placeholder="আপনার সমস্যা (ঐচ্ছিক)" />
+          </div>
+          <div class="input-group">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="signupPassword" placeholder="পাসওয়ার্ড" required minlength="6" />
+          </div>
+          <button type="submit" class="auth-btn">সাইন আপ</button>
+          
+          <div class="divider"><span>অথবা</span></div>
+          
+          <button type="button" class="google-btn" onclick="googleSignup()">
+            <i class="fab fa-google"></i> Google দিয়ে সাইন আপ
+          </button>
+        </form>
+      </div>
+
+      <!-- ===== STAFF LOGIN ===== -->
+      <div id="staffSection" class="auth-section">
+        <form id="staffLoginForm" class="auth-form active">
+          <h3>স্টাফ লগইন</h3>
+          <div class="input-group">
+            <i class="fas fa-envelope"></i>
+            <input type="email" id="staffEmail" placeholder="ইমেইল" required />
+          </div>
+          <div class="input-group">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="staffPassword" placeholder="পাসওয়ার্ড" required />
+          </div>
+          <button type="submit" class="auth-btn">লগইন করুন</button>
+          <p class="info-text">
+            <i class="fas fa-info-circle"></i> 
+            একাউন্ট Admin দ্বারা তৈরি করা হয়
+          </p>
+        </form>
+      </div>
+
+      <!-- ===== ADMIN LOGIN ===== -->
+      <div id="adminSection" class="auth-section">
+        <form id="adminLoginForm" class="auth-form active">
+          <h3><i class="fas fa-user-shield"></i> Admin Login</h3>
+          <div class="input-group">
+            <i class="fas fa-user"></i>
+            <input type="text" id="adminUsername" placeholder="Username" required />
+          </div>
+          <div class="input-group">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="adminPassword" placeholder="Password" required />
+          </div>
+          <button type="submit" class="auth-btn">লগইন</button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

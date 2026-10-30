@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Cash Receive & Discharge – IPD</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .form-row > * { flex:1; min-width:180px; }
+    .hidden { display:none!important; }
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; }
+    th { background:#f0f0f0; padding:7px 8px; text-align:left; font-size:.82rem; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; font-size:.82rem; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+    .patient-card { background:#f8f9ff; border:1px solid #c7d2fe; border-radius:8px;
+                    padding:.75rem 1rem; margin-bottom:.6rem; cursor:pointer; transition:all .2s; }
+    .patient-card:hover { background:#e0e7ff; border-color:#818cf8; }
+    .patient-card .pname { font-weight:600; color:#1e1b4b; }
+    .patient-card .pmeta { font-size:.82rem; color:#6b7280; margin-top:2px; }
+    .back-btn { background:none; border:none; color:#6366f1; font-weight:600;
+                cursor:pointer; font-size:.9rem; margin-bottom:1rem; padding:0; }
+    .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:.5rem .75rem;
+                 font-size:.85rem; margin-bottom:1rem; }
+    .info-grid .lbl { color:#6b7280; }
+    .info-grid .val { font-weight:600; }
+    .section-title { font-size:.9rem; font-weight:700; color:#312e81;
+                     margin:1rem 0 .5rem; padding-bottom:.3rem; border-bottom:1px solid #e0e7ff; }
+    .split-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .split-row > * { flex:1; min-width:130px; }
+    .mode-row { display:flex; gap:1rem; flex-wrap:wrap; margin-top:.5rem; }
+    .mode-row > * { flex:1; min-width:120px; }
+    .btn-discharge { background:#059669; color:#fff; border:none; border-radius:8px;
+                     padding:.6rem 1.4rem; font-weight:700; cursor:pointer; font-size:.9rem; }
+    .btn-discharge:disabled { background:#9ca3af; cursor:not-allowed; }
+    .summary-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+                   padding:.75rem; font-size:.85rem; margin-bottom:.75rem; }
+    .warn-box { background:#fff7ed; border:1px solid #fed7aa; border-radius:8px;
+                padding:.75rem; font-size:.85rem; margin-bottom:.75rem; color:#92400e; }
+    .date-filter { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1rem; }
+    .date-filter > * { flex:1; min-width:140px; }
+    .btn-cancel-case { background:#dc2626; color:#fff; border:none; border-radius:8px;
+                       padding:.6rem 1.4rem; font-weight:700; cursor:pointer; font-size:.9rem; margin-left:.75rem; }
+    .btn-cancel-case:hover { background:#b91c1c; }
+    .cancel-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
+                             z-index:2000; align-items:center; justify-content:center; padding:1rem; }
+    .cancel-modal-overlay.open { display:flex; }
+    .cancel-modal { background:#fff; border-radius:12px; width:min(480px,96vw);
+                    box-shadow:0 16px 60px rgba(0,0,0,.28); overflow:hidden; }
+    .cancel-modal-hdr { background:#dc2626; color:#fff; padding:1rem 1.3rem;
+                         display:flex; align-items:center; justify-content:space-between; }
+    .cancel-modal-hdr h3 { margin:0; font-size:1rem; }
+    .cancel-modal-body { padding:1.3rem 1.4rem; }
+    .cancel-modal-footer { display:flex; justify-content:flex-end; gap:.6rem;
+                           padding:.9rem 1.3rem; border-top:1px solid #eee; background:#fafafa; }
+    .addl-charge-box { background:#f0fdf4; border:1px solid #86efac; border-radius:8px;
+                       padding:.75rem 1rem; margin-top:.75rem; }
+    .addl-charge-box h4 { font-size:.88rem; color:#14532d; margin:0 0 .5rem; font-weight:700; }
+    .search-wrap { position:relative; margin-bottom:.85rem; }
+    .search-wrap input { width:100%; box-sizing:border-box; padding:.55rem .75rem .55rem 2.1rem;
+                          border:1px solid #d1d5db; border-radius:8px; font-size:.9rem; }
+    .search-wrap .s-ic { position:absolute; left:.65rem; top:50%; transform:translateY(-50%);
+                          color:#9ca3af; font-size:.95rem; pointer-events:none; }
+    .btn-pkg { background:#4338ca; color:#fff; border:none; border-radius:8px;
+               padding:.6rem 1.4rem; font-weight:700; cursor:pointer; font-size:.9rem; margin-left:.75rem; }
+    .btn-pkg:hover { background:#3730a3; }
+    .pkg-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
+                         z-index:2000; align-items:center; justify-content:center; padding:1rem; }
+    .pkg-modal-overlay.open { display:flex; }
+    .pkg-modal { background:#fff; border-radius:12px; width:min(420px,96vw);
+                box-shadow:0 16px 60px rgba(0,0,0,.28); overflow:hidden; }
+    .pkg-modal-hdr { background:#4338ca; color:#fff; padding:1rem 1.3rem;
+                     display:flex; align-items:center; justify-content:space-between; }
+    .pkg-modal-hdr h3 { margin:0; font-size:1rem; }
+    .pkg-modal-body { padding:1.3rem 1.4rem; }
+    .pkg-modal-footer { display:flex; justify-content:flex-end; gap:.6rem;
+                       padding:.9rem 1.3rem; border-top:1px solid #eee; background:#fafafa; }
+    .bulk-actions { display:flex; gap:.75rem; flex-wrap:wrap; }
+    .btn-bulk { border:none; border-radius:8px; padding:.6rem 1.1rem; font-weight:700;
+                cursor:pointer; font-size:.87rem; }
+    .btn-bulk-dl { background:#0f766e; color:#fff; }
+    .btn-bulk-dl:hover { background:#0d5f59; }
+    .btn-bulk-ul { background:#7c3aed; color:#fff; }
+    .btn-bulk-ul:hover { background:#6d28d9; }
+    .btn-bulk:disabled { background:#9ca3af; cursor:not-allowed; }
+    .bulk-result-row { display:flex; justify-content:space-between; gap:.5rem;
+                       padding:.3rem 0; border-bottom:1px solid #eee; font-size:.82rem; }
+    .bulk-result-row.ok  .brr-msg { color:#059669; }
+    .bulk-result-row.err .brr-msg { color:#dc2626; }
+    .btn-delete-rcpt { background:#dc2626; color:#fff; border:none; border-radius:5px;
+                       padding:.22rem .5rem; font-size:.72rem; font-weight:600; cursor:pointer; }
+    .btn-delete-rcpt:hover { background:#b91c1c; }
+    .btn-reverse { background:#d97706; color:#fff; border:none; border-radius:5px;
+                   padding:.3rem .65rem; font-size:.75rem; font-weight:700; cursor:pointer; }
+    .btn-reverse:hover { background:#b45309; }
+    .btn-bulk-pkg-dl { background:#0e7490; color:#fff; }
+    .btn-bulk-pkg-dl:hover { background:#155e75; }
+    .btn-bulk-pkg-ul { background:#a21caf; color:#fff; }
+    .btn-bulk-pkg-ul:hover { background:#86198f; }
+
+    .tab-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .tab-btn { background:#fff; border:1px solid #c7d2fe; color:#312e81; border-radius:8px;
+               padding:.5rem 1.1rem; font-weight:700; font-size:.88rem; cursor:pointer; }
+    .tab-btn:hover { background:#eef2ff; }
+    .tab-btn.active { background:#4338ca; color:#fff; border-color:#4338ca; }
+    .date-group-hdr { display:flex; justify-content:space-between; align-items:center;
+                      background:#eef2ff; color:#312e81; font-weight:700; font-size:.88rem;
+                      padding:.45rem .8rem; border-radius:8px; margin:1rem 0 .5rem; }
+    .date-group-hdr:first-child { margin-top:0; }
+    .date-group-hdr .cnt { background:#4338ca; color:#fff; border-radius:999px;
+                           padding:.1rem .6rem; font-size:.74rem; }
+    .reg-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:.5rem; margin:.75rem 0; }
+    .reg-stat { background:#f8f9ff; border:1px solid #c7d2fe; border-radius:8px; padding:.5rem .7rem; font-size:.78rem; color:#6b7280; }
+    .reg-stat strong { display:block; font-size:.95rem; color:#1e1b4b; margin-top:2px; }
+    .btn-edit-rcpt { background:#4338ca; color:#fff; border:none; border-radius:5px;
+                     padding:.22rem .5rem; font-size:.72rem; font-weight:600; cursor:pointer; margin-right:.25rem; }
+    .btn-edit-rcpt:hover { background:#3730a3; }
+    .tag { display:inline-block; border-radius:4px; padding:.05rem .4rem; font-size:.7rem; font-weight:700; }
+    .tag-dis { background:#dcfce7; color:#166534; }
+    .tag-can { background:#fee2e2; color:#991b1b; }
+    .tbl-scroll { overflow-x:auto; }
+    @media print { .no-print { display:none!important; } }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>💵 Cash Receive & Discharge – IPD</h1>
+
+  <!-- TABS -->
+  <div class="tab-bar no-print" id="tabBar">
+    <button class="tab-btn active" id="tabBtn-patients" onclick="showTab('patients')">🏥 Patients</button>
+    <button class="tab-btn" id="tabBtn-register" onclick="showTab('register')">💵 Cash Register</button>
+    <button class="tab-btn" id="tabBtn-cancelled" onclick="showTab('cancelled')">🚫 Cancelled Cases</button>
+    <button class="tab-btn" id="tabBtn-discharged" onclick="showTab('discharged')">✅ Discharged</button>
+  </div>
+
+  <!-- CASH REGISTER VIEW -->
+  <div id="registerView" class="hidden">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">💵 Cash Register – All IPD Receipts</h2>
+      <div class="date-filter no-print">
+        <div><label>From</label><input id="regFrom" type="date"/></div>
+        <div><label>To</label><input id="regTo" type="date"/></div>
+        <div style="display:flex;align-items:flex-end;gap:.5rem">
+          <button class="btn-primary" style="width:auto" onclick="loadRegister()">Show</button>
+          <button class="btn-bulk btn-bulk-dl" onclick="exportRegister()">⬇️ Excel</button>
+        </div>
+      </div>
+      <div class="search-wrap no-print">
+        <span class="s-ic">🔍</span>
+        <input id="regSearch" type="text" placeholder="Search by patient, admission no. or remark…" oninput="renderRegister()"/>
+      </div>
+      <div id="regStats" class="reg-stats"></div>
+      <div id="regList" class="tbl-scroll" style="font-size:.85rem;color:#555">Loading…</div>
+      <p class="err" id="regErr"></p>
+    </div>
+  </div>
+
+  <!-- CANCELLED CASES VIEW -->
+  <div id="cancelledView" class="hidden">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">🚫 Cancelled Cases</h2>
+      <div id="cancelledList" class="tbl-scroll" style="font-size:.85rem;color:#555">Loading…</div>
+    </div>
+  </div>
+
+  <!-- DISCHARGED VIEW -->
+  <div id="dischargedView" class="hidden">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">✅ Discharged Patients – Filter by Date</h2>
+      <div class="date-filter">
+        <div><label>From</label><input id="histFrom" type="date"/></div>
+        <div><label>To</label><input id="histTo" type="date"/></div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn-primary" style="width:auto" onclick="loadDischargedHistory()">Show</button>
+        </div>
+      </div>
+      <div id="histList" style="font-size:.85rem;color:#555">Select date range and click Show.</div>
+    </div>
+  </div>
+
+  <!-- LIST VIEW -->
+  <div id="listView">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">🏥 Active Patients</h2>
+      <div class="search-wrap no-print">
+        <span class="s-ic">🔍</span>
+        <input id="activeSearch" type="text" placeholder="Search by patient name, admission no., mode, type or refer…" oninput="filterActiveList()"/>
+      </div>
+      <div id="activeList">Loading…</div>
+    </div>
+    <div class="page-card no-print" style="margin-top:1.5rem">
+      <h2 style="font-size:1rem;margin-bottom:.5rem">📊 Bulk Payment via Excel</h2>
+      <p style="font-size:.82rem;color:#6b7280;margin:0 0 .85rem">
+        Download an Excel of all active due cases, fill in the <strong>Receipt Date</strong> and
+        payment amount columns, then upload it back to record all receipts in one go.
+      </p>
+      <div class="bulk-actions">
+        <button class="btn-bulk btn-bulk-dl" id="bulkDlBtn" onclick="downloadDueCasesExcel()">⬇️ Download Due Cases (Excel)</button>
+        <button class="btn-bulk btn-bulk-ul" id="bulkUlBtn" onclick="document.getElementById('bulkUploadInput').click()">⬆️ Upload Filled Excel</button>
+        <input type="file" id="bulkUploadInput" class="hidden" accept=".xlsx,.xls" onchange="handleBulkUpload(event)"/>
+      </div>
+      <p class="err" id="bulkErr" style="margin-top:.6rem"></p>
+      <div id="bulkResultBox" style="margin-top:.75rem"></div>
+    </div>
+    <div class="page-card no-print hidden" id="bulkPkgSection" style="margin-top:1.5rem">
+      <h2 style="font-size:1rem;margin-bottom:.5rem">📦 Bulk Package Update & Discharge (Excel) <span style="font-size:.72rem;font-weight:400;color:#a21caf">— Full Access</span></h2>
+      <p style="font-size:.82rem;color:#6b7280;margin:0 0 .85rem">
+        Download an Excel of all active cases with package amount, total received, and dues.
+        Optionally fill in a <strong>New Package Amount</strong> and/or set <strong>Discharge</strong> to
+        <code>TRUE</code>, then upload it back. Rows marked TRUE are only discharged if all dues are cleared.
+      </p>
+      <div class="bulk-actions">
+        <button class="btn-bulk btn-bulk-pkg-dl" id="bulkPkgDlBtn" onclick="downloadPkgDischargeExcel()">⬇️ Download Active Cases (Excel)</button>
+        <button class="btn-bulk btn-bulk-pkg-ul" id="bulkPkgUlBtn" onclick="document.getElementById('bulkPkgUploadInput').click()">⬆️ Upload Filled Excel</button>
+        <input type="file" id="bulkPkgUploadInput" class="hidden" accept=".xlsx,.xls" onchange="handlePkgDischargeUpload(event)"/>
+      </div>
+      <p class="err" id="bulkPkgErr" style="margin-top:.6rem"></p>
+      <div id="bulkPkgResultBox" style="margin-top:.75rem"></div>
+    </div>
+  </div>
+
+  <!-- DETAIL / PAYMENT VIEW -->
+  <div id="detailView" class="hidden">
+    <div class="page-card">
+      <button class="back-btn no-print" onclick="showList()">← Back to Patient List</button>
+      <h2 style="font-size:1rem;margin-bottom:.75rem" id="detailTitle">Patient Detail</h2>
+
+      <!-- Patient Info -->
+      <div class="info-grid" id="patientInfoGrid"></div>
+      <div class="no-print" style="margin-bottom:1rem">
+        <button class="btn-pkg" style="margin-left:0" onclick="openPkgModal()">✏️ Update Package Amount</button>
+      </div>
+
+      <!-- OPD Bills Summary -->
+      <div class="section-title">📄 OPD Bills</div>
+      <div id="opdSummary" style="font-size:.85rem;color:#555">Loading…</div>
+
+      <!-- Additional Income (from Amount Entry) -->
+      <div class="section-title">💰 Additional Charges (from Amount Entry)</div>
+      <div id="addlIncomeSummary" style="font-size:.85rem;color:#555">Loading…</div>
+
+      <!-- Cash Receipt History -->
+      <div class="section-title">💵 Cash Receipt History</div>
+      <div id="receiptHistory" style="font-size:.85rem;color:#555">Loading…</div>
+
+      <!-- Payment Summary -->
+      <div id="paymentSummary"></div>
+
+      <!-- Add Cash Receipt Form -->
+      <div id="receiptFormWrap">
+        <div class="section-title no-print">➕ Add Receipt</div>
+        <form id="receiptForm" class="no-print">
+          <div class="form-row">
+            <div>
+              <label>Receipt Date <span style="color:red">*</span></label>
+              <input id="rcptDate" type="date" required/>
+            </div>
+            <div>
+              <label>Amount <span style="color:red">*</span></label>
+              <input id="rcptAmount" type="number" min="0" step="0.01" required placeholder="0.00"/>
+            </div>
+            <div>
+              <label>Discount</label>
+              <input id="rcptDiscount" type="number" min="0" step="0.01" value="0" placeholder="0.00"/>
+            </div>
+          </div>
+          <div class="section-title no-print" style="font-size:.82rem">Payment Mode Split</div>
+          <div class="mode-row">
+            <div><label>Cash (₹)</label><input id="rcptCash" type="number" min="0" step="0.01" value="0"/></div>
+            <div><label>Bank (₹)</label><input id="rcptBank" type="number" min="0" step="0.01" value="0"/></div>
+            <div><label>PhonePe (₹)</label><input id="rcptPhonePe" type="number" min="0" step="0.01" value="0"/></div>
+          </div>
+          <label>Remark</label>
+          <textarea id="rcptRemark" rows="2" placeholder="Optional…"></textarea>
+          <div style="margin-top:.75rem">
+            <button type="submit" class="btn-primary" style="width:auto">💾 Save Receipt</button>
+          </div>
+          <p class="err" id="rcptErr"></p>
+        </form>
+      </div>
+
+      <!-- Discharge Button -->
+      <div class="section-title no-print">🏁 Discharge / Cancel</div>
+      <div id="dischargeInfo" class="warn-box no-print"></div>
+      <div class="no-print" style="margin-bottom:.75rem;max-width:220px">
+        <label style="font-size:.85rem;font-weight:600;color:#374151">Discharge Date</label>
+        <input id="dischargeDate" type="date"/>
+      </div>
+      <button id="dischargeBtn" class="btn-discharge no-print" onclick="discharge()" disabled>
+        🏁 Discharge Patient
+      </button>
+      <button id="cancelCaseBtn" class="btn-cancel-case no-print" onclick="openCancelModal()">
+        ❌ Cancel Case
+      </button>
+      <p class="err" id="dischargeErr"></p>
+      <input type="hidden" id="currentAdmId"/>
+      <input type="hidden" id="currentAdmNo"/>
+      <input type="hidden" id="currentCaseMode"/>
+      <input type="hidden" id="currentCaseType"/>
+      <input type="hidden" id="currentAmtEntryId"/>
+      <input type="hidden" id="currentPatientName"/>
+    </div>
+  </div>
+</div>
+
+<!-- CANCEL CASE MODAL -->
+<div class="cancel-modal-overlay" id="cancelModal">
+  <div class="cancel-modal">
+    <div class="cancel-modal-hdr">
+      <h3>❌ Cancel Case</h3>
+      <button onclick="closeCancelModal()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div class="cancel-modal-body">
+      <p style="color:#7f1d1d;font-size:.88rem;margin:0 0 1rem">
+        ⚠ Cancelling a case is permanent. The patient will be hidden from all active IPD modules
+        and marked as <strong>Cancelled</strong> in reports.
+      </p>
+      <label style="font-size:.85rem;font-weight:600;color:#374151">
+        Reason for Cancellation <span style="color:red">*</span>
+      </label>
+      <textarea id="cancelReason" rows="4" placeholder="Enter the reason for cancelling this case…"
+        style="width:100%;box-sizing:border-box;margin-top:.4rem;padding:.5rem .75rem;
+               border:1px solid #ccc;border-radius:6px;font-size:.86rem;resize:vertical"></textarea>
+      <p class="err" id="cancelErr" style="margin-top:.5rem"></p>
+    </div>
+    <div class="cancel-modal-footer">
+      <button onclick="closeCancelModal()"
+        style="padding:.42rem 1rem;border:1px solid #ccc;background:#fff;border-radius:5px;cursor:pointer;font-size:.85rem">
+        Close
+      </button>
+      <button onclick="confirmCancelCase()"
+        style="padding:.42rem 1.2rem;background:#dc2626;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:.85rem;font-weight:700">
+        ❌ Confirm Cancel
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT RECEIPT MODAL -->
+<div class="pkg-modal-overlay" id="editRcptModal">
+  <div class="pkg-modal" style="width:min(520px,96vw)">
+    <div class="pkg-modal-hdr">
+      <h3>✏️ Edit Cash Receipt</h3>
+      <button onclick="closeEditReceipt()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div class="pkg-modal-body">
+      <p id="editRcptWho" style="font-size:.85rem;font-weight:600;margin:0 0 .75rem"></p>
+      <input type="hidden" id="editRcptId"/><input type="hidden" id="editRcptAdmId"/>
+      <div class="form-row">
+        <div><label>Receipt Date *</label><input id="editRcptDate" type="date"/></div>
+        <div><label>Amount *</label><input id="editRcptAmount" type="number" min="0" step="0.01"/></div>
+        <div><label>Discount</label><input id="editRcptDiscount" type="number" min="0" step="0.01"/></div>
+      </div>
+      <div class="mode-row">
+        <div><label>Cash (₹)</label><input id="editRcptCash" type="number" min="0" step="0.01"/></div>
+        <div><label>Bank (₹)</label><input id="editRcptBank" type="number" min="0" step="0.01"/></div>
+        <div><label>PhonePe (₹)</label><input id="editRcptPhonePe" type="number" min="0" step="0.01"/></div>
+      </div>
+      <label style="margin-top:.5rem;display:block">Remark</label>
+      <textarea id="editRcptRemark" rows="2"></textarea>
+      <p class="err" id="editRcptErr" style="margin-top:.5rem"></p>
+    </div>
+    <div class="pkg-modal-footer">
+      <button onclick="closeEditReceipt()" style="padding:.42rem 1rem;border:1px solid #ccc;background:#fff;border-radius:5px;cursor:pointer;font-size:.85rem">Cancel</button>
+      <button onclick="saveEditReceipt()" style="padding:.42rem 1.2rem;background:#4338ca;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:.85rem;font-weight:700">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- UPDATE PACKAGE AMOUNT MODAL -->
+<div class="pkg-modal-overlay" id="pkgModal">
+  <div class="pkg-modal">
+    <div class="pkg-modal-hdr">
+      <h3>✏️ Update Package Amount</h3>
+      <button onclick="closePkgModal()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div class="pkg-modal-body">
+      <label style="font-size:.85rem;font-weight:600;color:#374151">
+        Package Amount (₹) <span style="color:red">*</span>
+      </label>
+      <input id="pkgAmountInput" type="number" min="0" step="0.01" placeholder="0.00"
+        style="width:100%;box-sizing:border-box;margin-top:.4rem;padding:.5rem .75rem;
+               border:1px solid #ccc;border-radius:6px;font-size:.9rem"/>
+      <p class="err" id="pkgErr" style="margin-top:.5rem"></p>
+    </div>
+    <div class="pkg-modal-footer">
+      <button onclick="closePkgModal()"
+        style="padding:.42rem 1rem;border:1px solid #ccc;background:#fff;border-radius:5px;cursor:pointer;font-size:.85rem">
+        Cancel
+      </button>
+      <button onclick="savePkgAmount()"
+        style="padding:.42rem 1.2rem;background:#4338ca;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:.85rem;font-weight:700">
+        💾 Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/menu.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  const accessMode = BNH_PAGE.requirePageAccess("pages/ipd-cash-discharge.html");
+  const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+  const fullAccess = accessMode === 'full';
+  if (fullAccess) document.getElementById('bulkPkgSection').classList.remove('hidden');
+  // Admin-only actions (edit/delete receipts, reverse cancel/discharge)
+  const isAdmin = BNH_PAGE.user.role === 'admin';
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtDate(d) {
+    if (!d) return '-';
+    const [y,m,dd] = String(d).slice(0,10).split('-');
+    const wd = new Date(+y, +m-1, +dd).toLocaleDateString('en-IN',{weekday:'short'});
+    return `${dd}-${MONTHS[+m-1]}-${y} (${wd})`;
+  }
+  async function fetchAll(makeQuery) {
+    let all = [], from = 0; const step = 1000;
+    while (true) {
+      const { data, error } = await makeQuery().range(from, from + step - 1);
+      if (error) throw error;
+      all = all.concat(data || []);
+      if (!data || data.length < step) break;
+      from += step;
+    }
+    return all;
+  }
+
+
+  let activePatients = [];
+  let currentPkgAmt = 0;
+  let detailReceipts = [];
+  let regRows = [];
+  let currentTab = 'patients';
+
+  async function loadActive() {
+    const div = document.getElementById('activeList');
+    const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
+      .select('*').eq('is_discharged', false).eq('is_cancelled', false).order('admission_date');
+    if (error || !data || data.length === 0) { activePatients = []; div.textContent = 'No active patients.'; return; }
+    activePatients = data;
+    renderActiveList(activePatients);
+  }
+  loadActive();
+
+  function renderActiveList(list) {
+    const div = document.getElementById('activeList');
+    if (!list || list.length === 0) { div.innerHTML = '<span style="color:#6b7280">No matching patients.</span>'; return; }
+    // group by admission date (newest date first)
+    const groups = {};
+    list.forEach(r => { (groups[r.admission_date] = groups[r.admission_date] || []).push(r); });
+    const dates = Object.keys(groups).sort((a,b) => b.localeCompare(a));
+    div.innerHTML = dates.map(d => `
+      <div class="date-group-hdr"><span>📅 ${fmtDate(d)}</span><span class="cnt">${groups[d].length} patient${groups[d].length>1?'s':''}</span></div>
+      ${groups[d].sort((a,b)=>String(a.admission_no).localeCompare(String(b.admission_no),undefined,{numeric:true})).map(r => `
+      <div class="patient-card" onclick="openDetail('${r.id}')">
+        <div class="pname">${r.patient_name}</div>
+        <div class="pmeta">${r.admission_no} &nbsp;|&nbsp;
+          Mode: ${r.case_mode} &nbsp;|&nbsp; Type: ${r.case_type}
+          ${r.refer_name ? ' &nbsp;|&nbsp; Refer: '+r.refer_name : ''}</div>
+      </div>`).join('')}`).join('');
+  }
+
+  function filterActiveList() {
+    const q = document.getElementById('activeSearch').value.trim().toLowerCase();
+    if (!q) { renderActiveList(activePatients); return; }
+    const filtered = activePatients.filter(r =>
+      (r.patient_name||'').toLowerCase().includes(q) ||
+      (r.admission_no||'').toLowerCase().includes(q) ||
+      (r.case_mode||'').toLowerCase().includes(q) ||
+      (r.case_type||'').toLowerCase().includes(q) ||
+      (r.refer_name||'').toLowerCase().includes(q)
+    );
+    renderActiveList(filtered);
+  }
+
+  async function fetchActiveDuesData() {
+    const { data: admissions } = await BNH_PAGE.sb.from('ipd_admissions')
+      .select('*').eq('is_discharged', false).eq('is_cancelled', false).order('admission_date');
+    if (!admissions || admissions.length === 0) return [];
+    const admIds = admissions.map(a => a.id);
+    const admNos = admissions.map(a => a.admission_no);
+
+    const [
+      { data: amtEntries },
+      { data: receipts },
+      { data: allOpdCases }
+    ] = await Promise.all([
+      BNH_PAGE.sb.from('ipd_amount_entries').select('*').in('admission_id', admIds),
+      BNH_PAGE.sb.from('ipd_cash_receipts').select('*').in('admission_id', admIds),
+      BNH_PAGE.sb.from('opd_case').select('*')
+    ]);
+
+    const amtByAdm = {};
+    (amtEntries||[]).forEach(e => { amtByAdm[e.admission_id] = e; });
+
+    const amtEntryIds = (amtEntries||[]).map(e => e.id);
+    let addlIncomeRows = [];
+    if (amtEntryIds.length > 0) {
+      const { data: addlData } = await BNH_PAGE.sb.from('ipd_additional_income_expense')
+        .select('*').in('amount_entry_id', amtEntryIds).eq('type','income');
+      addlIncomeRows = addlData || [];
+    }
+    const addlByEntry = {};
+    addlIncomeRows.forEach(r => {
+      if (!addlByEntry[r.amount_entry_id]) addlByEntry[r.amount_entry_id] = [];
+      addlByEntry[r.amount_entry_id].push(r);
+    });
+
+    const rcptByAdm = {};
+    (receipts||[]).forEach(r => {
+      if (!rcptByAdm[r.admission_id]) rcptByAdm[r.admission_id] = [];
+      rcptByAdm[r.admission_id].push(r);
+    });
+
+    const opdByAdmNo = {};
+    (allOpdCases||[]).forEach(b => {
+      if (admNos.includes(b.ipd_link)) {
+        if (!opdByAdmNo[b.ipd_link]) opdByAdmNo[b.ipd_link] = [];
+        opdByAdmNo[b.ipd_link].push(b);
+      }
+    });
+    const allCaseNos = (allOpdCases||[]).filter(b => admNos.includes(b.ipd_link)).map(b => b.case_no).filter(Boolean);
+    let opdCashRows = [];
+    if (allCaseNos.length > 0) {
+      const { data: crData } = await BNH_PAGE.sb.from('opd_cash_register').select('case_no,income,discount').in('case_no', allCaseNos);
+      opdCashRows = crData || [];
+    }
+    const opdCashByCase = {};
+    opdCashRows.forEach(r => {
+      if (!opdCashByCase[r.case_no]) opdCashByCase[r.case_no] = { paid:0, discount:0 };
+      opdCashByCase[r.case_no].paid     += parseFloat(r.income   || 0);
+      opdCashByCase[r.case_no].discount += parseFloat(r.discount || 0);
+    });
+
+    return admissions.map(adm => {
+      const amtEntry = amtByAdm[adm.id] || null;
+      const pkgAmt = parseFloat(amtEntry?.package_amount||0);
+      const addlRows = amtEntry ? (addlByEntry[amtEntry.id]||[]) : [];
+      const totalAddlIncome = addlRows.reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const totalReceivable = pkgAmt + totalAddlIncome;
+      const admReceipts = rcptByAdm[adm.id] || [];
+      const totalRcpt = admReceipts.reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const totalDisc = admReceipts.reduce((a,r)=>a+parseFloat(r.discount||0),0);
+      const balance = totalReceivable - totalRcpt - totalDisc;
+      const opdBills = opdByAdmNo[adm.admission_no] || [];
+      const totalOpd = opdBills.reduce((a,b)=>a+parseFloat(b.total_amount||0),0);
+      const paidOpd  = opdBills.reduce((a,b)=>a+(opdCashByCase[b.case_no]?.paid||0),0);
+      const discOpd  = opdBills.reduce((a,b)=>a+(opdCashByCase[b.case_no]?.discount||0),0);
+      const opdDue   = totalOpd - paidOpd - discOpd;
+      const isCashless = ['Swastha Swasthy','Ayusman Bharat'].includes(adm.case_mode);
+      return { adm, amtEntry, pkgAmt, totalAddlIncome, totalReceivable, totalRcpt, totalDisc, balance, opdDue, isCashless };
+    });
+  }
+
+  async function downloadDueCasesExcel() {
+    const err = document.getElementById('bulkErr');
+    err.textContent = '';
+    document.getElementById('bulkResultBox').innerHTML = '';
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const rows = await fetchActiveDuesData();
+      const dueRows = rows.filter(r => !r.isCashless && r.balance > 0.01);
+      if (dueRows.length === 0) {
+        err.textContent = 'No active cases with pending dues found.';
+        return;
+      }
+      const sheetData = dueRows.map(r => ({
+        'Admission No': r.adm.admission_no,
+        'Patient Name': r.adm.patient_name,
+        'Admission Date': r.adm.admission_date,
+        'Case Mode': r.adm.case_mode,
+        'Case Type': r.adm.case_type,
+        'Package Amount': r.pkgAmt,
+        'Additional Charges': r.totalAddlIncome,
+        'Total Receivable': r.totalReceivable,
+        'Total Received': r.totalRcpt,
+        'Total Discount': r.totalDisc,
+        'Balance Due': Math.round(r.balance*100)/100,
+        'Receipt Date (YYYY-MM-DD)': '',
+        'Cash Amount': '',
+        'Bank Amount': '',
+        'PhonePe Amount': '',
+        'Discount': '',
+        'Remark': ''
+      }));
+      const ws = XLSX.utils.json_to_sheet(sheetData);
+      ws['!cols'] = [
+        {wch:14},{wch:22},{wch:13},{wch:14},{wch:12},
+        {wch:14},{wch:16},{wch:14},{wch:14},{wch:12},
+        {wch:12},{wch:22},{wch:12},{wch:12},{wch:14},{wch:12},{wch:20}
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Due Cases');
+      const today = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `IPD_Due_Cases_${today}.xlsx`);
+    } catch(ex) {
+      err.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function normalizeExcelDate(val) {
+    if (val instanceof Date && !isNaN(val)) return val.toISOString().slice(0,10);
+    if (typeof val === 'number') {
+      if (window.XLSX && XLSX.SSF) {
+        const d = XLSX.SSF.parse_date_code(val);
+        if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+      }
+      return null;
+    }
+    const s = String(val||'').trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    return null;
+  }
+
+  async function handleBulkUpload(event) {
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    const err = document.getElementById('bulkErr');
+    const resultBox = document.getElementById('bulkResultBox');
+    err.textContent = '';
+    resultBox.innerHTML = '';
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:'array', cellDates:false });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval:'' });
+      if (!rows || rows.length === 0) {
+        err.textContent = 'No rows found in the uploaded file.';
+        return;
+      }
+
+      const { data: admissions } = await BNH_PAGE.sb.from('ipd_admissions')
+        .select('id,admission_no,patient_name').eq('is_discharged',false).eq('is_cancelled',false);
+      const admByNo = {};
+      (admissions||[]).forEach(a => { admByNo[String(a.admission_no).trim()] = a; });
+
+      const results = [];
+      for (const row of rows) {
+        const admNo = String(row['Admission No']||'').trim();
+        if (!admNo) continue;
+
+        const cash     = parseFloat(row['Cash Amount']||0)     || 0;
+        const bank     = parseFloat(row['Bank Amount']||0)     || 0;
+        const phonepe  = parseFloat(row['PhonePe Amount']||0)  || 0;
+        const discount = parseFloat(row['Discount']||0)        || 0;
+        const rcptDateRaw = row['Receipt Date (YYYY-MM-DD)'];
+        const total = cash + bank + phonepe;
+
+        if (total <= 0 && discount <= 0) continue; // untouched row
+
+        const adm = admByNo[admNo];
+        if (!adm) {
+          results.push({ admNo, ok:false, msg:'Admission not found or no longer active — skipped.' });
+          continue;
+        }
+        const rcptDate = normalizeExcelDate(rcptDateRaw);
+        if (!rcptDate) {
+          results.push({ admNo, ok:false, msg:'Receipt Date is missing or invalid — skipped.' });
+          continue;
+        }
+
+        try {
+          const payload = BNH_PAGE.stamp({
+            admission_id:   adm.id,
+            admission_no:   adm.admission_no,
+            receipt_date:   rcptDate,
+            amount:         total,
+            discount,
+            cash_amount:    cash,
+            bank_amount:    bank,
+            phonepe_amount: phonepe,
+            remark: (row['Remark']||'').toString().trim() || null
+          });
+          const { error } = await BNH_PAGE.sb.from('ipd_cash_receipts').insert(payload);
+          if (error) throw error;
+          results.push({ admNo, ok:true, msg:`Receipt of ${fmt(total)}${discount>0?` (disc ${fmt(discount)})`:''} saved.` });
+        } catch(ex) {
+          results.push({ admNo, ok:false, msg: ex.message });
+        }
+      }
+
+      if (results.length === 0) {
+        err.textContent = 'No fillable rows found — fill Cash/Bank/PhonePe and Receipt Date for the rows you want to post.';
+        return;
+      }
+
+      const okCount = results.filter(r=>r.ok).length;
+      const errCount = results.length - okCount;
+      resultBox.innerHTML = `
+        <div class="${errCount===0?'summary-box':'warn-box'}">
+          ✅ ${okCount} receipt(s) saved${errCount>0?` &nbsp;|&nbsp; ⚠ ${errCount} row(s) skipped/failed`:''}.
+        </div>
+        ${results.map(r => `
+          <div class="bulk-result-row ${r.ok?'ok':'err'}">
+            <span>${r.admNo}</span><span class="brr-msg">${r.msg}</span>
+          </div>`).join('')}
+      `;
+      loadActive();
+    } catch(ex) {
+      err.textContent = 'Failed to read file: ' + ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function parseBoolFlag(val) {
+    const s = String(val==null?'':val).trim().toLowerCase();
+    return s === 'true' || s === 'yes' || s === 'y' || s === '1';
+  }
+
+  async function downloadPkgDischargeExcel() {
+    if (!isAdmin) return;
+    const err = document.getElementById('bulkPkgErr');
+    err.textContent = '';
+    document.getElementById('bulkPkgResultBox').innerHTML = '';
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const rows = await fetchActiveDuesData();
+      if (rows.length === 0) {
+        err.textContent = 'No active cases found.';
+        return;
+      }
+      const sheetData = rows.map(r => ({
+        'Admission No': r.adm.admission_no,
+        'Patient Name': r.adm.patient_name,
+        'Admission Date': r.adm.admission_date,
+        'Case Mode': r.adm.case_mode,
+        'Case Type': r.adm.case_type,
+        'Current Package Amount': r.pkgAmt,
+        'Additional Charges': r.totalAddlIncome,
+        'Total Received': r.totalRcpt,
+        'Total Discount': r.totalDisc,
+        'OPD Due': Math.round(r.opdDue*100)/100,
+        'Balance Due': Math.round(r.balance*100)/100,
+        'New Package Amount (leave blank to keep same)': '',
+        'Discharge (TRUE/FALSE)': 'FALSE'
+      }));
+      const ws = XLSX.utils.json_to_sheet(sheetData);
+      ws['!cols'] = [
+        {wch:14},{wch:22},{wch:13},{wch:14},{wch:12},
+        {wch:16},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12},
+        {wch:30},{wch:16}
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Active Cases');
+      const today = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `IPD_Package_Discharge_${today}.xlsx`);
+    } catch(ex) {
+      err.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  async function handlePkgDischargeUpload(event) {
+    if (!isAdmin) { event.target.value = ''; return; }
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    const err = document.getElementById('bulkPkgErr');
+    const resultBox = document.getElementById('bulkPkgResultBox');
+    err.textContent = '';
+    resultBox.innerHTML = '';
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:'array', cellDates:false });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const excelRows = XLSX.utils.sheet_to_json(sheet, { defval:'' });
+      if (!excelRows || excelRows.length === 0) {
+        err.textContent = 'No rows found in the uploaded file.';
+        return;
+      }
+
+      const duesRows = await fetchActiveDuesData();
+      const duesByAdmNo = {};
+      duesRows.forEach(r => { duesByAdmNo[String(r.adm.admission_no).trim()] = r; });
+
+      const today = new Date().toISOString().slice(0,10);
+      const results = [];
+
+      for (const row of excelRows) {
+        const admNo = String(row['Admission No']||'').trim();
+        if (!admNo) continue;
+
+        const dr = duesByAdmNo[admNo];
+        if (!dr) {
+          results.push({ admNo, ok:false, msg:'Admission not found or no longer active — skipped.' });
+          continue;
+        }
+
+        const newPkgRaw = row['New Package Amount (leave blank to keep same)'];
+        const wantDischarge = parseBoolFlag(row['Discharge (TRUE/FALSE)']);
+        let newPkgVal = null;
+        if (newPkgRaw !== '' && newPkgRaw !== null && newPkgRaw !== undefined) {
+          const parsed = parseFloat(newPkgRaw);
+          if (isNaN(parsed) || parsed < 0) {
+            results.push({ admNo, ok:false, msg:'Invalid New Package Amount — skipped.' });
+            continue;
+          }
+          newPkgVal = parsed;
+        }
+
+        if (newPkgVal === null && !wantDischarge) continue; // untouched row
+
+        const messages = [];
+        let effectivePkg = dr.pkgAmt;
+        let hadError = false;
+
+        if (newPkgVal !== null) {
+          try {
+            if (dr.amtEntry) {
+              const { error } = await BNH_PAGE.sb.from('ipd_amount_entries')
+                .update({ package_amount: newPkgVal }).eq('id', dr.amtEntry.id);
+              if (error) throw error;
+            } else {
+              const payload = BNH_PAGE.stamp({
+                admission_id: dr.adm.id,
+                admission_no: dr.adm.admission_no,
+                patient_name: dr.adm.patient_name,
+                package_amount: newPkgVal
+              });
+              const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(payload);
+              if (error) throw error;
+            }
+            effectivePkg = newPkgVal;
+            messages.push(`Package updated to ${fmt(newPkgVal)}`);
+          } catch(ex) {
+            results.push({ admNo, ok:false, msg:'Package update failed: ' + ex.message });
+            hadError = true;
+          }
+        }
+
+        if (hadError) continue;
+
+        if (wantDischarge) {
+          const hasAmtEntry = !!dr.amtEntry || newPkgVal !== null;
+          const totalReceivable = effectivePkg + dr.totalAddlIncome;
+          const balance = totalReceivable - dr.totalRcpt - dr.totalDisc;
+          const reasons = [];
+          if (!dr.isCashless && balance > 0.01) reasons.push(`payment due ${fmt(balance)}`);
+          if (dr.opdDue > 0.01) reasons.push(`OPD due ${fmt(dr.opdDue)}`);
+          if (!hasAmtEntry) reasons.push('amount entry not done');
+
+          if (reasons.length > 0) {
+            results.push({ admNo, ok:false, msg: (messages.length?messages.join('; ')+'; ':'') + 'Cannot discharge — ' + reasons.join(', ') + '.' });
+            continue;
+          }
+          try {
+            const { error } = await BNH_PAGE.sb.from('ipd_admissions').update({
+              is_discharged: true,
+              discharge_date: today
+            }).eq('id', dr.adm.id);
+            if (error) throw error;
+            messages.push('Discharged');
+          } catch(ex) {
+            results.push({ admNo, ok:false, msg: (messages.length?messages.join('; ')+'; ':'') + 'Discharge failed: ' + ex.message });
+            continue;
+          }
+        }
+
+        results.push({ admNo, ok:true, msg: messages.join('; ') || 'No changes.' });
+      }
+
+      if (results.length === 0) {
+        err.textContent = 'No fillable rows found — set New Package Amount and/or Discharge=TRUE for the rows you want to update.';
+        return;
+      }
+
+      const okCount = results.filter(r=>r.ok).length;
+      const errCount = results.length - okCount;
+      resultBox.innerHTML = `
+        <div class="${errCount===0?'summary-box':'warn-box'}">
+          ✅ ${okCount} row(s) processed${errCount>0?` &nbsp;|&nbsp; ⚠ ${errCount} row(s) skipped/failed`:''}.
+        </div>
+        ${results.map(r => `
+          <div class="bulk-result-row ${r.ok?'ok':'err'}">
+            <span>${r.admNo}</span><span class="brr-msg">${r.msg}</span>
+          </div>`).join('')}
+      `;
+      loadActive();
+    } catch(ex) {
+      err.textContent = 'Failed to read file: ' + ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  async function openDetail(admId) {
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { data: admArr } = await BNH_PAGE.sb.from('ipd_admissions').select('*').eq('id',admId);
+      const adm = admArr && admArr.length > 0 ? admArr[0] : null;
+      if (!adm) throw new Error('Admission not found');
+
+      const { data: amtArr } = await BNH_PAGE.sb.from('ipd_amount_entries').select('*').eq('admission_id',admId);
+      const amtEntry = amtArr && amtArr.length > 0 ? amtArr[0] : null;
+
+      // Fetch additional income from amount entry (type='income')
+      let addlIncomeRows = [];
+      if (amtEntry) {
+        const { data: addlData } = await BNH_PAGE.sb.from('ipd_additional_income_expense')
+          .select('*').eq('amount_entry_id', amtEntry.id).eq('type','income');
+        addlIncomeRows = addlData || [];
+      }
+
+      const [
+        { data: receipts },
+        { data: indens },
+        { data: allOpdCases }
+      ] = await Promise.all([
+        BNH_PAGE.sb.from('ipd_cash_receipts').select('*').eq('admission_id',admId).order('receipt_date'),
+        BNH_PAGE.sb.from('ipd_medicine_indens').select('*').eq('admission_id',admId),
+        // Fetch ALL opd_case rows then filter in JS — same method as ipd-reports summary.
+        // Direct .eq('ipd_link', ...) causes 400 because admission_no contains '/' which breaks the REST URL.
+        BNH_PAGE.sb.from('opd_case').select('*')
+      ]);
+      const opdBills = (allOpdCases||[]).filter(b => b.ipd_link === adm.admission_no);
+
+      // Fetch opd_cash_register for all linked OPD cases — this is where real paid/discount lives
+      const opdCaseNos = opdBills.map(b => b.case_no).filter(Boolean);
+      let opdCashRows = [];
+      if (opdCaseNos.length > 0) {
+        const { data: crData } = await BNH_PAGE.sb.from('opd_cash_register').select('case_no,income,discount').in('case_no', opdCaseNos);
+        opdCashRows = crData || [];
+      }
+      // Build cashByCase: case_no → { paid, discount }
+      const opdCashByCase = {};
+      opdCashRows.forEach(r => {
+        if (!opdCashByCase[r.case_no]) opdCashByCase[r.case_no] = { paid: 0, discount: 0 };
+        opdCashByCase[r.case_no].paid     += parseFloat(r.income   || 0);
+        opdCashByCase[r.case_no].discount += parseFloat(r.discount || 0);
+      });
+
+      ['listView','registerView','cancelledView','dischargedView','tabBar'].forEach(i => document.getElementById(i).classList.add('hidden'));
+      document.getElementById('detailView').classList.remove('hidden');
+      document.getElementById('currentAdmId').value    = admId;
+      document.getElementById('currentAdmNo').value    = adm.admission_no;
+      document.getElementById('currentCaseMode').value = adm.case_mode;
+      document.getElementById('currentCaseType').value = adm.case_type;
+      document.getElementById('currentAmtEntryId').value = amtEntry ? amtEntry.id : '';
+      document.getElementById('currentPatientName').value = adm.patient_name || '';
+      document.getElementById('detailTitle').textContent = `${adm.patient_name} – ${adm.admission_no}`;
+      document.getElementById('rcptDate').value  = new Date().toISOString().slice(0,10);
+      document.getElementById('dischargeDate').value = new Date().toISOString().slice(0,10);
+      document.getElementById('rcptErr').textContent = '';
+      document.getElementById('dischargeErr').textContent = '';
+      document.getElementById('cancelCaseBtn').classList.remove('hidden');
+
+      const pkgAmt    = parseFloat(amtEntry?.package_amount||0);
+      const totalAddlIncome = addlIncomeRows.reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      currentPkgAmt = pkgAmt;
+
+      // Patient Info Grid
+      document.getElementById('patientInfoGrid').innerHTML = [
+        ['Patient', adm.patient_name], ['Adm No.', adm.admission_no],
+        ['Adm Date', adm.admission_date], ['Case Mode', adm.case_mode],
+        ['Case Type', adm.case_type], ['Refer', adm.refer_name||'N/A'],
+        ['Package Amt', amtEntry ? fmt(pkgAmt) : 'Not entered'],
+        ['Additional Charges', addlIncomeRows.length > 0 ? fmt(totalAddlIncome) : '₹0.00'],
+        ['Refer Amt', amtEntry && amtEntry.refer_amount!=null ? fmt(amtEntry.refer_amount) : 'N/A']
+      ].map(([l,v])=>`<div class="lbl">${l}</div><div class="val">${v}</div>`).join('');
+
+      // OPD Bills
+      const totalOpd  = (opdBills||[]).reduce((a,b)=>a+parseFloat(b.total_amount||0),0);
+      const paidOpd   = (opdBills||[]).reduce((a,b)=>a+(opdCashByCase[b.case_no]?.paid||0),0);
+      const discOpd   = (opdBills||[]).reduce((a,b)=>a+(opdCashByCase[b.case_no]?.discount||0),0);
+      const opdDue    = totalOpd - paidOpd - discOpd;
+      if (opdBills && opdBills.length > 0) {
+        document.getElementById('opdSummary').innerHTML =
+          `<table><thead><tr>
+             <th>Case No.</th><th>Date</th><th>Patient</th>
+             <th>Type</th><th>Refer</th><th class="r">Bill</th><th class="r">Paid</th><th class="r">Disc</th><th class="r">Due</th>
+           </tr></thead>
+           <tbody>${opdBills.map(b => {
+             const _cr  = opdCashByCase[b.case_no]||{paid:0,discount:0};
+             const due  = parseFloat(b.total_amount||0) - _cr.paid - _cr.discount;
+             const caseUrl = `../opd/opd-bill.html?case_no=${encodeURIComponent(b.case_no||'')}`;
+             return `<tr>
+               <td><a href="${caseUrl}" target="_blank" style="color:#6366f1;text-decoration:underline">${b.case_no||'-'}</a></td><td>${b.case_date||'-'}</td><td>${b.patient_name||'-'}</td>
+               <td>${b.type||'-'}</td><td>${b.refer_name||'N/A'}</td>
+               <td class="r">${fmt(b.total_amount)}</td><td class="r">${fmt(_cr.paid)}</td>
+               <td class="r">${fmt(b.discount)}</td>
+               <td class="r" style="color:${due>0?'#dc2626':'#059669'}">${fmt(due)}</td>
+             </tr>`;
+           }).join('')}</tbody>
+           <tfoot><tr><td colspan="5">Total</td>
+             <td class="r">${fmt(totalOpd)}</td><td class="r">${fmt(paidOpd)}</td>
+             <td class="r">${fmt(discOpd)}</td><td class="r" style="color:${opdDue>0?'#dc2626':'#059669'}">${fmt(opdDue)}</td>
+           </tr></tfoot></table>`;
+      } else {
+        document.getElementById('opdSummary').innerHTML = '<span style="color:#6b7280">No OPD cases linked.</span>';
+      }
+
+      // Additional Income from Amount Entry
+      if (addlIncomeRows.length > 0) {
+        document.getElementById('addlIncomeSummary').innerHTML =
+          `<div class="addl-charge-box">
+            <h4>💰 Charges from Amount Entry</h4>
+            <table><thead><tr><th>Charge</th><th class="r">Amount</th></tr></thead>
+            <tbody>${addlIncomeRows.map(r=>`<tr>
+              <td>${r.label}</td><td class="r">${fmt(r.amount)}</td>
+            </tr>`).join('')}</tbody>
+            <tfoot><tr><td>Total Additional Charges</td>
+              <td class="r">${fmt(totalAddlIncome)}</td>
+            </tr></tfoot></table>
+          </div>`;
+      } else {
+        document.getElementById('addlIncomeSummary').innerHTML = '<span style="color:#6b7280">No additional charges entered in amount entry.</span>';
+      }
+
+      detailReceipts = receipts || [];
+      // Receipt History
+      const totalRcpt = (receipts||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+      const totalDisc = (receipts||[]).reduce((a,r)=>a+parseFloat(r.discount||0),0);
+      const indenAmt  = (indens||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
+      document.getElementById('receiptHistory').innerHTML = (receipts && receipts.length > 0)
+        ? `<table><thead><tr><th>Date</th><th class="r">Amt</th><th class="r">Disc</th>
+            <th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th><th>Remark</th>${isAdmin ? '<th class="no-print"></th>' : ''}</tr></thead>
+           <tbody>${receipts.map(r=>`<tr>
+            <td>${r.receipt_date}</td>
+            <td class="r">${fmt(r.amount)}</td><td class="r">${fmt(r.discount)}</td>
+            <td class="r">${fmt(r.cash_amount)}</td><td class="r">${fmt(r.bank_amount)}</td>
+            <td class="r">${fmt(r.phonepe_amount)}</td><td>${r.remark||'-'}</td>
+            ${isAdmin ? `<td class="no-print" style="white-space:nowrap"><button class="btn-edit-rcpt" onclick="openEditReceipt('${r.id}')">✏️ Edit</button><button class="btn-delete-rcpt" onclick="deleteReceipt('${r.id}','${admId}')">🗑️ Delete</button></td>` : ''}
+           </tr>`).join('')}</tbody>
+           <tfoot><tr><td>Total</td><td class="r">${fmt(totalRcpt)}</td><td class="r">${fmt(totalDisc)}</td>
+             <td colspan="${isAdmin ? 5 : 4}"></td></tr></tfoot></table>`
+        : '<span style="color:#6b7280">No receipts yet.</span>';
+
+      // Payment Summary — package + additional charges = total receivable
+      const totalReceivable = pkgAmt + totalAddlIncome;
+      const balance = totalReceivable - totalRcpt - totalDisc;
+      document.getElementById('paymentSummary').innerHTML = `
+        <div class="summary-box">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.5rem .75rem;font-size:.85rem">
+            <div>Package/NH: <strong>${fmt(pkgAmt)}</strong></div>
+            <div>Additional Charges: <strong>${fmt(totalAddlIncome)}</strong></div>
+            <div>Total Receivable: <strong>${fmt(totalReceivable)}</strong></div>
+            <div>Total Received: <strong>${fmt(totalRcpt)}</strong></div>
+            <div>Total Discount: <strong>${fmt(totalDisc)}</strong></div>
+            <div>Balance Due: <strong style="color:${balance>0?'#dc2626':'#059669'}">${fmt(balance)}</strong></div>
+            ${indenAmt>0?`<div>Medicine Inden: <strong>${fmt(indenAmt)}</strong></div>`:''}
+            ${opdDue>0?`<div>OPD Due: <strong style="color:#dc2626">${fmt(opdDue)}</strong></div>`:''}
+          </div>
+        </div>`;
+
+      // Hide receipt form for cashless schemes, unless additional charges exist (then money can be received)
+      const isCashless = ['Swastha Swasthy','Ayusman Bharat'].includes(adm.case_mode);
+      document.getElementById('receiptFormWrap').style.display = (isCashless && totalAddlIncome <= 0) ? 'none' : '';
+
+      // Discharge eligibility check
+      checkDischarge(adm, amtEntry, receipts, opdBills, addlIncomeRows, opdCashByCase);
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function checkDischarge(adm, amtEntry, receipts, opdBills, addlIncomeRows, opdCashByCase) {
+    opdCashByCase = opdCashByCase || {};
+    const isCashless = ['Swastha Swasthy','Ayusman Bharat'].includes(adm.case_mode);
+    const pkgAmt      = parseFloat(amtEntry?.package_amount||0);
+    const totalAddlIncome = (addlIncomeRows||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const totalReceivable = pkgAmt + totalAddlIncome;
+    const totalRcpt   = (receipts||[]).reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const totalDisc   = (receipts||[]).reduce((a,r)=>a+parseFloat(r.discount||0),0);
+
+    // OPD dues (excluding indens)
+    const opdBillArr  = opdBills||[];
+    const totalOpd    = opdBillArr.reduce((a,b)=>a+parseFloat(b.total_amount||0),0);
+    const paidOpd     = opdBillArr.reduce((a,b)=>a+(opdCashByCase[b.case_no]?.paid||0),0);
+    const discOpd     = opdBillArr.reduce((a,b)=>a+(opdCashByCase[b.case_no]?.discount||0),0);
+    const opdDue      = totalOpd - paidOpd - discOpd;
+
+    let reasons = [];
+
+    if (!isCashless) {
+      const balance = totalReceivable - totalRcpt - totalDisc;
+      if (balance > 0.01) {
+        reasons.push(`Package + Additional Charges payment pending: ${fmt(balance)} remaining`);
+      }
+    } else if (totalAddlIncome > 0) {
+      // Cashless: scheme covers the package, patient pays only additional charges
+      const addlBalance = totalAddlIncome - totalRcpt - totalDisc;
+      if (addlBalance > 0.01) {
+        reasons.push(`Additional Charges payment pending: ${fmt(addlBalance)} remaining`);
+      }
+    }
+
+    if (opdDue > 0.01) {
+      reasons.push(`OPD bill due: ${fmt(opdDue)} remaining`);
+    }
+
+    if (!amtEntry) {
+      reasons.push('Amount entry not done yet');
+    }
+
+    const btn  = document.getElementById('dischargeBtn');
+    const info = document.getElementById('dischargeInfo');
+    if (reasons.length === 0) {
+      btn.disabled = false;
+      info.className = 'summary-box no-print';
+      info.textContent = '✅ All dues cleared. Patient can be discharged.';
+    } else {
+      btn.disabled = true;
+      info.className = 'warn-box no-print';
+      info.innerHTML = '⚠ Cannot discharge:<br>• ' + reasons.join('<br>• ');
+    }
+  }
+
+  async function discharge() {
+    if (!confirm('Confirm discharge for this patient?')) return;
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const admId = document.getElementById('currentAdmId').value;
+      const dDate = document.getElementById('dischargeDate').value || new Date().toISOString().slice(0,10);
+      const { error } = await BNH_PAGE.sb.from('ipd_admissions').update({
+        is_discharged: true,
+        discharge_date: dDate
+      }).eq('id', admId);
+      if (error) throw error;
+      showList();
+      loadActive();
+    } catch(ex) {
+      document.getElementById('dischargeErr').textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  (function initHistDates() {
+    const today = new Date();
+    const iso = d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    document.getElementById('histTo').value = iso(today);
+    document.getElementById('histFrom').value = iso(new Date(today.getTime() - 30*86400000));
+  })();
+
+  async function loadDischargedHistory() {
+    const from = document.getElementById('histFrom').value;
+    const to   = document.getElementById('histTo').value;
+    if (!from || !to) return;
+    const div = document.getElementById('histList');
+    div.textContent = 'Loading…';
+    const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
+      .select('*').eq('is_discharged',true)
+      .gte('discharge_date',from).lte('discharge_date',to)
+      .order('discharge_date',{ascending:false});
+    if (error||!data||data.length===0){div.textContent='No discharges in this range.';return;}
+    div.innerHTML=`<table><thead><tr>
+      <th>Adm Date</th><th>Discharge</th><th>Adm No.</th><th>Patient</th><th>Mode</th><th>Type</th>
+      ${isAdmin ? '<th>Action</th>' : ''}
+    </tr></thead><tbody>${data.map(r=>`<tr>
+      <td>${r.admission_date}</td><td>${r.discharge_date}</td>
+      <td>${r.admission_no}</td><td>${r.patient_name}</td>
+      <td>${r.case_mode}</td><td>${r.case_type}</td>
+      ${isAdmin ? `<td><button class="btn-reverse" onclick="reverseDischarge('${r.id}','${(r.patient_name||'').replace(/'/g,"\\'")}')">↩️ Reverse Discharge</button></td>` : ''}
+    </tr>`).join('')}</tbody></table>`;
+  }
+
+  async function reverseDischarge(admId, patientName) {
+    if (!isAdmin) return;
+    if (!confirm(`Reverse discharge for ${patientName}? This will move the case back to Active Patients.`)) return;
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { error } = await BNH_PAGE.sb.from('ipd_admissions').update({
+        is_discharged: false,
+        discharge_date: null
+      }).eq('id', admId);
+      if (error) throw error;
+      loadDischargedHistory();
+      loadActive();
+    } catch(ex) {
+      alert('Failed to reverse discharge: ' + ex.message);
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function showList() {
+    document.getElementById('detailView').classList.add('hidden');
+    document.getElementById('tabBar').classList.remove('hidden');
+    showTab(currentTab);
+  }
+
+  function showTab(tab) {
+    currentTab = tab;
+    document.getElementById('listView').classList.toggle('hidden', tab !== 'patients');
+    document.getElementById('registerView').classList.toggle('hidden', tab !== 'register');
+    document.getElementById('cancelledView').classList.toggle('hidden', tab !== 'cancelled');
+    document.getElementById('dischargedView').classList.toggle('hidden', tab !== 'discharged');
+    ['patients','register','cancelled','discharged'].forEach(t =>
+      document.getElementById('tabBtn-' + t).classList.toggle('active', t === tab));
+    if (tab === 'register') loadRegister();
+    if (tab === 'cancelled') loadCancelled();
+    if (tab === 'discharged') loadDischargedHistory();
+  }
+
+  // ---------- CASH REGISTER ----------
+  (function initRegDates() {
+    const today = new Date();
+    const iso = d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    document.getElementById('regTo').value = iso(today);
+    document.getElementById('regFrom').value = iso(new Date(today.getFullYear(), today.getMonth(), 1));
+  })();
+
+  async function loadRegister() {
+    const from = document.getElementById('regFrom').value;
+    const to   = document.getElementById('regTo').value;
+    const err  = document.getElementById('regErr');
+    err.textContent = '';
+    if (!from || !to) { err.textContent = 'Select From and To dates.'; return; }
+    document.getElementById('regList').textContent = 'Loading…';
+    try {
+      const [rcpts, adms] = await Promise.all([
+        fetchAll(() => BNH_PAGE.sb.from('ipd_cash_receipts').select('*')
+          .gte('receipt_date', from).lte('receipt_date', to)
+          .order('receipt_date', { ascending:false }).order('id')),
+        fetchAll(() => BNH_PAGE.sb.from('ipd_admissions')
+          .select('id,admission_no,patient_name,is_discharged,is_cancelled').order('id'))
+      ]);
+      const admById = {};
+      adms.forEach(a => { admById[a.id] = a; });
+      regRows = rcpts.map(r => ({ ...r, _adm: admById[r.admission_id] || null }));
+      renderRegister();
+    } catch(ex) {
+      document.getElementById('regList').textContent = '';
+      err.textContent = 'Failed to load: ' + ex.message;
+    }
+  }
+
+  function regFiltered() {
+    const q = document.getElementById('regSearch').value.trim().toLowerCase();
+    if (!q) return regRows;
+    return regRows.filter(r =>
+      ((r._adm && r._adm.patient_name) || '').toLowerCase().includes(q) ||
+      (r.admission_no || '').toLowerCase().includes(q) ||
+      (r.remark || '').toLowerCase().includes(q));
+  }
+
+  function renderRegister() {
+    const rows = regFiltered();
+    const sum = k => rows.reduce((a,r) => a + parseFloat(r[k]||0), 0);
+    document.getElementById('regStats').innerHTML = [
+      ['Receipts', rows.length], ['Total Amount', fmt(sum('amount'))], ['Discount', fmt(sum('discount'))],
+      ['Cash', fmt(sum('cash_amount'))], ['Bank', fmt(sum('bank_amount'))], ['PhonePe', fmt(sum('phonepe_amount'))]
+    ].map(([l,v]) => `<div class="reg-stat">${l}<strong>${v}</strong></div>`).join('');
+    const box = document.getElementById('regList');
+    if (rows.length === 0) { box.innerHTML = '<span style="color:#6b7280">No receipts found.</span>'; return; }
+    box.innerHTML = `<table><thead><tr>
+        <th>Date</th><th>Adm No.</th><th>Patient</th>
+        <th class="r">Amount</th><th class="r">Disc</th><th class="r">Cash</th><th class="r">Bank</th><th class="r">PhonePe</th>
+        <th>Remark</th>${isAdmin ? '<th class="no-print">Action</th>' : ''}
+      </tr></thead><tbody>${rows.map(r => {
+        const a = r._adm;
+        const tag = a ? (a.is_cancelled ? ' <span class="tag tag-can">Cancelled</span>' : (a.is_discharged ? ' <span class="tag tag-dis">Discharged</span>' : '')) : '';
+        return `<tr>
+          <td>${r.receipt_date}</td><td>${r.admission_no || (a && a.admission_no) || '-'}</td>
+          <td>${a ? a.patient_name : '<em>unknown</em>'}${tag}</td>
+          <td class="r">${fmt(r.amount)}</td><td class="r">${fmt(r.discount)}</td>
+          <td class="r">${fmt(r.cash_amount)}</td><td class="r">${fmt(r.bank_amount)}</td><td class="r">${fmt(r.phonepe_amount)}</td>
+          <td>${r.remark || '-'}</td>
+          ${isAdmin ? `<td class="no-print" style="white-space:nowrap">
+            <button class="btn-edit-rcpt" onclick="openEditReceipt('${r.id}')">✏️ Edit</button>
+            <button class="btn-delete-rcpt" onclick="deleteReceipt('${r.id}','${r.admission_id}')">🗑️ Delete</button></td>` : ''}
+        </tr>`; }).join('')}</tbody>
+      <tfoot><tr><td colspan="3">Total (${rows.length})</td>
+        <td class="r">${fmt(sum('amount'))}</td><td class="r">${fmt(sum('discount'))}</td>
+        <td class="r">${fmt(sum('cash_amount'))}</td><td class="r">${fmt(sum('bank_amount'))}</td>
+        <td class="r">${fmt(sum('phonepe_amount'))}</td><td colspan="${isAdmin ? 2 : 1}"></td></tr></tfoot></table>`;
+  }
+
+  function exportRegister() {
+    const rows = regFiltered();
+    if (rows.length === 0) { alert('Nothing to export.'); return; }
+    const data = rows.map(r => ({
+      'Receipt Date': r.receipt_date, 'Admission No': r.admission_no || (r._adm && r._adm.admission_no) || '',
+      'Patient': r._adm ? r._adm.patient_name : '', 'Amount': parseFloat(r.amount||0),
+      'Discount': parseFloat(r.discount||0), 'Cash': parseFloat(r.cash_amount||0),
+      'Bank': parseFloat(r.bank_amount||0), 'PhonePe': parseFloat(r.phonepe_amount||0), 'Remark': r.remark || ''
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Cash Register');
+    XLSX.writeFile(wb, `ipd-cash-register_${document.getElementById('regFrom').value}_to_${document.getElementById('regTo').value}.xlsx`);
+  }
+
+  // ---------- EDIT RECEIPT (admin) ----------
+  function openEditReceipt(id) {
+    if (!isAdmin) return;
+    const r = regRows.find(x => x.id === id) || detailReceipts.find(x => x.id === id);
+    if (!r) return;
+    const name = (r._adm && r._adm.patient_name) || document.getElementById('currentPatientName').value || '';
+    document.getElementById('editRcptWho').textContent = `${name} – ${r.admission_no || ''}`;
+    document.getElementById('editRcptId').value = r.id;
+    document.getElementById('editRcptAdmId').value = r.admission_id;
+    document.getElementById('editRcptDate').value = r.receipt_date || '';
+    document.getElementById('editRcptAmount').value = r.amount ?? 0;
+    document.getElementById('editRcptDiscount').value = r.discount ?? 0;
+    document.getElementById('editRcptCash').value = r.cash_amount ?? 0;
+    document.getElementById('editRcptBank').value = r.bank_amount ?? 0;
+    document.getElementById('editRcptPhonePe').value = r.phonepe_amount ?? 0;
+    document.getElementById('editRcptRemark').value = r.remark || '';
+    document.getElementById('editRcptErr').textContent = '';
+    document.getElementById('editRcptModal').classList.add('open');
+  }
+  function closeEditReceipt() { document.getElementById('editRcptModal').classList.remove('open'); }
+
+  async function saveEditReceipt() {
+    if (!isAdmin) return;
+    const err = document.getElementById('editRcptErr');
+    err.textContent = '';
+    const v = id => parseFloat(document.getElementById(id).value || 0);
+    const amount = v('editRcptAmount'), cash = v('editRcptCash'), bank = v('editRcptBank'), phonepe = v('editRcptPhonePe');
+    const date = document.getElementById('editRcptDate').value;
+    if (!date) { err.textContent = 'Receipt date is required.'; return; }
+    if (Math.abs((cash + bank + phonepe) - amount) > 0.01) { err.textContent = 'Mode split total must equal receipt amount.'; return; }
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const id = document.getElementById('editRcptId').value;
+      const admId = document.getElementById('editRcptAdmId').value;
+      const { error } = await BNH_PAGE.sb.from('ipd_cash_receipts').update({
+        receipt_date: date, amount, discount: v('editRcptDiscount'),
+        cash_amount: cash, bank_amount: bank, phonepe_amount: phonepe,
+        remark: document.getElementById('editRcptRemark').value.trim() || null
+      }).eq('id', id);
+      if (error) throw error;
+      closeEditReceipt();
+      refreshAfterReceiptChange(admId);
+    } catch(ex) {
+      err.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function refreshAfterReceiptChange(admId) {
+    if (!document.getElementById('detailView').classList.contains('hidden')) openDetail(admId);
+    else loadRegister();
+  }
+
+  // ---------- CANCELLED CASES (admin can reverse) ----------
+  async function loadCancelled() {
+    const box = document.getElementById('cancelledList');
+    box.textContent = 'Loading…';
+    try {
+      const data = await fetchAll(() => BNH_PAGE.sb.from('ipd_admissions').select('*')
+        .eq('is_cancelled', true).order('cancel_date', { ascending:false }).order('id'));
+      if (data.length === 0) { box.innerHTML = '<span style="color:#6b7280">No cancelled cases.</span>'; return; }
+      box.innerHTML = `<table><thead><tr>
+        <th>Adm Date</th><th>Cancelled On</th><th>Adm No.</th><th>Patient</th><th>Mode</th><th>Type</th><th>Reason</th>
+        ${isAdmin ? '<th>Action</th>' : ''}</tr></thead><tbody>${data.map(r => `<tr>
+        <td>${r.admission_date}</td><td>${r.cancel_date || '-'}</td><td>${r.admission_no}</td>
+        <td>${r.patient_name}</td><td>${r.case_mode}</td><td>${r.case_type}</td><td>${r.cancel_reason || '-'}</td>
+        ${isAdmin ? `<td><button class="btn-reverse" onclick="reverseCancel('${r.id}','${(r.patient_name||'').replace(/'/g,"\\'")}')">↩️ Reverse Cancel</button></td>` : ''}
+      </tr>`).join('')}</tbody></table>`;
+    } catch(ex) {
+      box.textContent = 'Failed to load: ' + ex.message;
+    }
+  }
+
+  async function reverseCancel(admId, patientName) {
+    if (!isAdmin) return;
+    if (!confirm(`Reverse cancellation for ${patientName}? The case will return to Active Patients.`)) return;
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { error } = await BNH_PAGE.sb.from('ipd_admissions').update({
+        is_cancelled: false, cancel_reason: null, cancel_date: null
+      }).eq('id', admId);
+      if (error) throw error;
+      loadCancelled();
+      loadActive();
+    } catch(ex) {
+      alert('Failed to reverse cancellation: ' + ex.message);
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  async function deleteReceipt(receiptId, admId) {
+    if (!isAdmin) return;
+    if (!confirm('Delete this cash receipt? This cannot be undone.')) return;
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const { error } = await BNH_PAGE.sb.from('ipd_cash_receipts').delete().eq('id', receiptId);
+      if (error) throw error;
+      refreshAfterReceiptChange(admId);
+    } catch(ex) {
+      alert('Failed to delete receipt: ' + ex.message);
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function openCancelModal() {
+    document.getElementById('cancelReason').value = '';
+    document.getElementById('cancelErr').textContent = '';
+    document.getElementById('cancelModal').classList.add('open');
+  }
+
+  function closeCancelModal() {
+    document.getElementById('cancelModal').classList.remove('open');
+  }
+
+  async function confirmCancelCase() {
+    const reason = document.getElementById('cancelReason').value.trim();
+    if (!reason) {
+      document.getElementById('cancelErr').textContent = 'Please enter a reason for cancellation.';
+      return;
+    }
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const admId = document.getElementById('currentAdmId').value;
+      const { error } = await BNH_PAGE.sb.from('ipd_admissions').update({
+        is_cancelled: true,
+        cancel_reason: reason,
+        cancel_date: new Date().toISOString().slice(0,10)
+      }).eq('id', admId);
+      if (error) throw error;
+      closeCancelModal();
+      showList();
+      loadActive();
+    } catch(ex) {
+      document.getElementById('cancelErr').textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  function openPkgModal() {
+    document.getElementById('pkgAmountInput').value = currentPkgAmt || '';
+    document.getElementById('pkgErr').textContent = '';
+    document.getElementById('pkgModal').classList.add('open');
+  }
+
+  function closePkgModal() {
+    document.getElementById('pkgModal').classList.remove('open');
+  }
+
+  async function savePkgAmount() {
+    const errEl = document.getElementById('pkgErr');
+    errEl.textContent = '';
+    const val = document.getElementById('pkgAmountInput').value;
+    if (val === '' || val === null || isNaN(parseFloat(val)) || parseFloat(val) < 0) {
+      errEl.textContent = 'Please enter a valid package amount.'; return;
+    }
+    const newAmt = parseFloat(val);
+    const spinner = document.getElementById('spinner');
+    spinner.classList.remove('hidden');
+    try {
+      const admId    = document.getElementById('currentAdmId').value;
+      const admNo    = document.getElementById('currentAdmNo').value;
+      const patientName = document.getElementById('currentPatientName').value;
+      const amtEntryId = document.getElementById('currentAmtEntryId').value;
+
+      if (amtEntryId) {
+        const { error } = await BNH_PAGE.sb.from('ipd_amount_entries')
+          .update({ package_amount: newAmt }).eq('id', amtEntryId);
+        if (error) throw error;
+      } else {
+        const payload = BNH_PAGE.stamp({
+          admission_id: admId,
+          admission_no: admNo,
+          patient_name: patientName,
+          package_amount: newAmt
+        });
+        const { error } = await BNH_PAGE.sb.from('ipd_amount_entries').insert(payload);
+        if (error) throw error;
+      }
+      closePkgModal();
+      openDetail(admId);
+    } catch(ex) {
+      errEl.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  }
+
+  document.getElementById('receiptForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const spinner = document.getElementById('spinner');
+    const err = document.getElementById('rcptErr');
+    err.textContent = '';
+    const amount  = parseFloat(document.getElementById('rcptAmount').value||0);
+    const cash    = parseFloat(document.getElementById('rcptCash').value||0);
+    const bank    = parseFloat(document.getElementById('rcptBank').value||0);
+    const phonepe = parseFloat(document.getElementById('rcptPhonePe').value||0);
+    if (Math.abs((cash+bank+phonepe) - amount) > 0.01) {
+      err.textContent = 'Mode split total must equal receipt amount.'; return;
+    }
+    spinner.classList.remove('hidden');
+    try {
+      const admId = document.getElementById('currentAdmId').value;
+      const admNo = document.getElementById('currentAdmNo').value;
+      const payload = BNH_PAGE.stamp({
+        admission_id:    admId,
+        admission_no:    admNo,
+        receipt_date:    document.getElementById('rcptDate').value,
+        amount,
+        discount:        parseFloat(document.getElementById('rcptDiscount').value||0),
+        cash_amount:     cash,
+        bank_amount:     bank,
+        phonepe_amount:  phonepe,
+        remark:          document.getElementById('rcptRemark').value.trim()||null
+      });
+      const { error } = await BNH_PAGE.sb.from('ipd_cash_receipts').insert(payload);
+      if (error) throw error;
+      document.getElementById('receiptForm').reset();
+      document.getElementById('rcptDate').value = new Date().toISOString().slice(0,10);
+      openDetail(admId);
+    } catch(ex) {
+      err.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>OPD Records</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .role-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:600;margin-left:.5rem;vertical-align:middle}
+    .role-full{background:#d1e7dd;color:#0a3622}.role-limited{background:#fff3cd;color:#856404}
+    .tabs{display:flex;gap:0;margin-bottom:1.2rem;border-bottom:2px solid #e9ecef;overflow-x:auto}
+    .tab-btn{padding:.65rem 1.2rem;background:none;border:none;cursor:pointer;border-bottom:3px solid transparent;font-size:.9rem;color:#666;white-space:nowrap}
+    .tab-btn.active{color:#007bff;border-bottom-color:#007bff;font-weight:600}
+    .tab-content{display:none}.tab-content.active{display:block}
+    .filter-bar{display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem}
+    .filter-group{display:flex;flex-direction:column;flex:1;min-width:140px}
+    .filter-group label{font-size:.8rem;color:#666;margin-bottom:.25rem}
+    .filter-group input,.filter-group select{padding:.45rem .7rem;border:1px solid #ccc;border-radius:3px;font-size:.85rem}
+    .stats-row{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem}
+    .stat-box{background:#f8f9fa;border-radius:4px;padding:.65rem 1rem;flex:1;min-width:110px;border-left:3px solid #007bff}
+    .stat-box .val{font-size:1.2rem;font-weight:700;color:#007bff}.stat-box .lbl{font-size:.75rem;color:#666;margin-top:2px}
+    .records-table-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:.85rem}
+    th{background:#f0f0f0;padding:8px 10px;text-align:left;font-weight:500;border-bottom:2px solid #ddd;white-space:nowrap}
+    td{padding:8px 10px;border-bottom:1px solid #eee;vertical-align:middle}
+    tbody tr{cursor:pointer}tbody tr:hover td{background:#f5f9ff}
+    .case-no{color:#007bff;font-weight:700}
+    .badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:.75rem;font-weight:600}
+    .badge-paid,.badge-completed{background:#d1e7dd;color:#0a3622}
+    .badge-due,.badge-pending{background:#f8d7da;color:#721c24}
+    .badge-partial{background:#fff3cd;color:#856404}
+    .action-btns{display:flex;gap:.35rem}
+    .btn-edit{background:#007bff;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:.78rem}
+    .btn-del{background:#dc3545;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:.78rem}
+    .btn-edit:hover{background:#0056b3}.btn-del:hover{background:#a71d2a}
+    .btn-view{background:#6c757d;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:.78rem}
+    .btn-view:hover{background:#495057}
+    .pagination{display:flex;gap:.4rem;justify-content:center;margin-top:1.2rem;flex-wrap:wrap}
+    .pagination button{padding:.4rem .7rem;border:1px solid #ccc;background:white;cursor:pointer;border-radius:3px;font-size:.83rem}
+    .pagination button.active{background:#007bff;color:white;border-color:#007bff}
+    /* Cash register totals banner */
+    .cash-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:1rem;background:#f0fff4;border:1px solid #b7e4c7;border-radius:6px;padding:.85rem 1rem}
+    .cash-total-item .ct-label{font-size:.72rem;color:#666;text-transform:uppercase}
+    .cash-total-item .ct-val{font-size:1.15rem;font-weight:700;color:#28a745;margin-top:.15rem}
+    .cash-total-item .ct-val.red{color:#dc3545}.cash-total-item .ct-val.blue{color:#007bff}.cash-total-item .ct-val.muted{color:#6c757d}
+    /* Detail modal */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem}
+    .modal-overlay.hidden{display:none!important}
+    .modal-box{background:white;border-radius:8px;width:min(96vw,700px);max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+    .modal-header{padding:1.2rem 1.5rem;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:white;z-index:2}
+    .modal-header h2{margin:0;font-size:1.1rem}
+    .modal-close{font-size:1.5rem;cursor:pointer;color:#999;line-height:1;border:none;background:none}
+    .modal-close:hover{color:#333}
+    .modal-body{padding:1.5rem}
+    .modal-footer-sticky{padding:1rem 1.5rem;border-top:1px solid #eee;display:flex;gap:.6rem;flex-wrap:wrap;background:#fafafa;position:sticky;bottom:0;border-radius:0 0 8px 8px}
+    .detail-section{margin-bottom:1.4rem}
+    .detail-section h3{font-size:.95rem;color:#007bff;margin:0 0 .75rem 0;border-bottom:1px solid #eee;padding-bottom:.4rem}
+    .detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.85rem}
+    .detail-label{font-size:.75rem;color:#999;text-transform:uppercase}
+    .detail-value{font-size:.92rem;color:#333;font-weight:500;margin-top:.2rem}
+    .amount-summary{background:#f8f9fa;padding:1rem;border-radius:4px;border-left:4px solid #007bff;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.85rem}
+    .amount-label{font-size:.72rem;color:#666;text-transform:uppercase}
+    .amount-value{font-size:1.1rem;font-weight:700;color:#007bff;margin-top:.2rem}
+    .refer-box{background:#e7f3ff;padding:1rem;border-radius:4px;border-left:3px solid #007bff;margin-bottom:.75rem}
+    .refer-box h4{margin:0 0 .35rem 0;color:#007bff;font-size:.95rem}
+    .cash-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.5rem}
+    .cash-table th{background:#f0f0f0;padding:6px 8px;text-align:left}
+    .cash-table td{padding:6px 8px;border-bottom:1px solid #f0f0f0}
+    /* Edit modal */
+    .edit-modal-box{background:white;border-radius:6px;padding:1.5rem;width:min(95vw,560px);max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+    .edit-modal-title{font-size:1.1rem;font-weight:700;margin-bottom:1.1rem;padding-bottom:.6rem;border-bottom:1px solid #eee}
+    .edit-modal-footer{display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.2rem;padding-top:.8rem;border-top:1px solid #eee}
+    .form-row{display:flex;gap:1rem;flex-wrap:wrap}.form-row>*{flex:1;min-width:160px}
+    .form-group{margin-bottom:.9rem}
+    .form-group label{display:block;margin-bottom:.3rem;font-weight:500;font-size:.85rem}
+    .form-group input,.form-group select,.form-group textarea{width:100%;padding:.42rem .65rem;border:1px solid #ccc;border-radius:3px;font-size:.85rem;box-sizing:border-box}
+    .hidden{display:none!important}
+    .empty-state{text-align:center;padding:2.5rem;color:#aaa}
+    .info-note{background:#e7f3ff;border:1px solid #b8daff;border-radius:4px;padding:.6rem .9rem;font-size:.83rem;color:#004085;margin-top:.5rem}
+    /* Cancelled case row */
+    tbody tr.row-cancelled td { background:#fff0f0!important; color:#a00!important; }
+    tbody tr.row-cancelled:hover td { background:#ffe0e0!important; }
+    tbody tr.row-cancelled .case-no { color:#c0392b!important; }
+    .badge-cancelled { background:#f8d7da; color:#721c24; }
+    .cancel-info-box { background:#fff0f0; border:1px solid #f5c6cb; border-radius:4px; padding:.75rem 1rem; margin-bottom:.75rem; border-left:3px solid #dc3545; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>📋 OPD Records <span id="roleBadge" class="role-badge"></span></h1>
+  <div class="page-card">
+    <div class="tabs" id="mainTabs">
+      <button class="tab-btn active" data-tab="all">📋 All Records</button>
+      <button class="tab-btn" data-tab="completed">✅ Completed (Reception)</button>
+      <button class="tab-btn" data-tab="cash">🧾 Cash Register</button>
+      <button class="tab-btn admin-only" data-tab="uploads">📁 Uploaded Records</button>
+      <button class="tab-btn admin-only" data-tab="payments">💰 OPD Payments</button>
+    </div>
+
+    <!-- ═══ ALL RECORDS ═══════════════════════════════════════════════════ -->
+    <div class="tab-content active" id="tab-all">
+      <div class="stats-row" id="statsAll"></div>
+      <div class="filter-bar">
+        <div class="filter-group"><label>Search</label><input id="allSearch" placeholder="Patient name or Case No…" oninput="filterAll()"/></div>
+        <div class="filter-group"><label>Date From</label><input type="date" id="allDateFrom" onchange="filterAll()"/></div>
+        <div class="filter-group"><label>Date To</label><input type="date" id="allDateTo" onchange="filterAll()"/></div>
+        <div class="filter-group"><label>Payment Status</label>
+          <select id="allPayStatus" onchange="filterAll()">
+            <option value="">All</option><option value="paid">Paid</option>
+            <option value="partial">Partial</option><option value="due">Due</option>
+          </select>
+        </div>
+        <div class="filter-group"><label>Refer</label>
+          <select id="allReferFilter" onchange="filterAll()">
+            <option value="">All</option><option value="yes">With Refer</option><option value="no">No Refer</option>
+          </select>
+        </div>
+        <div class="filter-group"><label>Cancel Status</label>
+          <select id="allCancelFilter" onchange="filterAll()">
+            <option value="">All</option><option value="active">Active Only</option><option value="cancelled">Cancelled Only</option>
+          </select>
+        </div>
+      </div>
+      <div class="records-table-wrap"><div id="allTable"><div class="empty-state">Loading…</div></div></div>
+      <div class="pagination" id="allPager"></div>
+    </div>
+
+    <!-- ═══ COMPLETED ════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-completed">
+      <div class="filter-bar">
+        <div class="filter-group"><label>Search</label><input id="compSearch" placeholder="Patient name or Case No…" oninput="filterCompleted()"/></div>
+        <div class="filter-group"><label>Date From</label><input type="date" id="compDateFrom" onchange="filterCompleted()"/></div>
+        <div class="filter-group"><label>Date To</label><input type="date" id="compDateTo" onchange="filterCompleted()"/></div>
+        <div class="filter-group"><label>Payment Status</label>
+          <select id="compPayStatus" onchange="filterCompleted()">
+            <option value="">All</option><option value="paid">Paid</option>
+            <option value="partial">Partial</option><option value="due">Due</option>
+          </select>
+        </div>
+      </div>
+      <div class="records-table-wrap"><div id="completedTable"><div class="empty-state">Loading…</div></div></div>
+      <div class="pagination" id="compPager"></div>
+    </div>
+
+    <!-- ═══ CASH REGISTER ════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-cash">
+      <div class="filter-bar">
+        <div class="filter-group"><label>Search</label><input id="cashSearch" placeholder="Case no, patient, trans no…" oninput="filterCash()"/></div>
+        <div class="filter-group"><label>Transaction Date From</label><input type="date" id="cashDateFrom" onchange="filterCash()"/></div>
+        <div class="filter-group"><label>Transaction Date To</label><input type="date" id="cashDateTo" onchange="filterCash()"/></div>
+        <div class="filter-group"><label>Entry By</label>
+          <select id="cashEntryByFilter" onchange="filterCash()">
+            <option value="">All Staff</option>
+          </select>
+        </div>
+      </div>
+      <!-- Totals banner -->
+      <div class="cash-totals" id="cashTotals">
+        <div class="cash-total-item"><div class="ct-label">Transactions</div><div class="ct-val blue" id="ct-count">—</div></div>
+        <div class="cash-total-item"><div class="ct-label">Total Income</div><div class="ct-val" id="ct-income">—</div></div>
+        <div class="cash-total-item"><div class="ct-label">Total Discount</div><div class="ct-val muted" id="ct-discount">—</div></div>
+        <div class="cash-total-item"><div class="ct-label">Net Collected</div><div class="ct-val" id="ct-net">—</div></div>
+        <div class="cash-total-item"><div class="ct-label">Cases Covered</div><div class="ct-val blue" id="ct-cases">—</div></div>
+      </div>
+      <div class="records-table-wrap"><div id="cashTable"><div class="empty-state">Loading…</div></div></div>
+      <div class="pagination" id="cashPager"></div>
+    </div>
+
+    <!-- ═══ UPLOADS (admin only) ════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-uploads">
+      <div class="filter-bar">
+        <div class="filter-group"><label>Search</label><input id="dueSearch" placeholder="Case no, patient…" oninput="filterUploads()"/></div>
+        <div class="filter-group"><label>Status</label>
+          <select id="dueStatusFilter" onchange="filterUploads()">
+            <option value="">All Status</option><option value="pending">Pending</option>
+            <option value="cleared">Cleared</option><option value="partial">Partial</option>
+          </select>
+        </div>
+      </div>
+      <div class="records-table-wrap"><div id="uploadsTable"><div class="empty-state">Loading…</div></div></div>
+    </div>
+
+    <!-- ═══ PAYMENTS (admin only) ════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-payments">
+      <div class="filter-bar">
+        <div class="filter-group"><label>Search</label><input id="paySearch" placeholder="Case no, patient…" oninput="filterPayments()"/></div>
+        <div class="filter-group"><label>Date From</label><input type="date" id="payDateFrom" onchange="filterPayments()"/></div>
+        <div class="filter-group"><label>Date To</label><input type="date" id="payDateTo" onchange="filterPayments()"/></div>
+      </div>
+      <div class="records-table-wrap"><div id="paymentsTable"><div class="empty-state">Loading…</div></div></div>
+    </div>
+
+    <p class="err" id="err"></p>
+    <p class="info" id="ok" style="display:none"></p>
+  </div>
+</div>
+
+<!-- ═══ DETAIL MODAL ═════════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="detailModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="detailTitle">OPD Case Details</h2>
+      <button class="modal-close" onclick="closeDetail()">×</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer-sticky" id="detailFooter"></div>
+  </div>
+</div>
+
+<!-- ═══ EDIT MODAL (admin only) ══════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="editModal">
+  <div class="edit-modal-box">
+    <div class="edit-modal-title" id="editModalTitle">Edit Record</div>
+    <div id="editModalBody"></div>
+    <div class="edit-modal-footer">
+      <button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeEdit()">Cancel</button>
+      <button class="btn-primary" style="width:auto" id="editSaveBtn" onclick="saveEdit()">💾 Save Changes</button>
+    </div>
+    <p class="err" id="editErr"></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/menu.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  const accessMode = BNH_PAGE.requirePageAccess("pages/opd_records.html");
+  const isFullAccess = accessMode === "full";
+
+  const rb = document.getElementById('roleBadge');
+  rb.textContent = isFullAccess ? '🔓 Full Access' : '👁 View Only';
+  rb.className   = 'role-badge '+(isFullAccess?'role-full':'role-limited');
+
+  if (!isFullAccess) document.querySelectorAll('.admin-only').forEach(el=>el.classList.add('hidden'));
+
+  // ── Data stores ──────────────────────────────────────────────────────────
+  let allCases=[];          // opd_case rows
+  let allTests=[];          // opd_test rows
+  let allCashRows=[];       // opd_cash_register rows
+  let allUploads=[];
+  let allPayments=[];
+  let allReferPayments=[];
+  let cashByCase={};        // case_no → {paid, discount, due, status, rows[]}
+  let testsByCase={};       // case_no → [test_name,…]
+
+  // filtered + pagination
+  let filteredAll=[], currentPageAll=1;
+  let filteredComp=[], currentPageComp=1;
+  let filteredCash=[], currentPageCash=1;
+  let filteredUploads=[], filteredPayments=[];
+  let editMode=null, editRecordId=null;
+  const IPP=20;
+
+
+  /* fetch every row (Supabase returns max 1000 per request) */
+  async function fetchAll(make, orderCol) {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      let q = make();
+      if (orderCol) q = q.order(orderCol, { ascending: true });
+      const { data, error } = await q.range(from, from + 999);
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    return out;
+  }
+  async function fetchAllSafe(make) {
+    try { return await fetchAll(make, 'id'); }
+    catch (e) { return await fetchAll(make, null); }
+  }
+
+  let billByCase={};
+  let testRowsByCase={};
+  function discPct(disc,bill){disc=Number(disc||0);bill=Number(bill||0);return(disc>0&&bill>0)?(Math.round(disc/bill*1000)/10)+'%':'';}
+  function recomputeDue(){
+    Object.keys(cashByCase).forEach(cn=>{
+      const cas=allCases.find(x=>(x.case_no||'').trim()===cn);
+      const bill=Number(cas?.total_amount||0)||billByCase[cn]||0;
+      cashByCase[cn].due=Math.max(0,bill-cashByCase[cn].paid-cashByCase[cn].discount);
+    });
+    allCases.forEach(c=>{ if(!Number(c.total_amount||0)&&billByCase[(c.case_no||'').trim()]) c.total_amount=billByCase[(c.case_no||'').trim()]; });
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function fmt(n){return n!=null&&n!==''?'₹'+Number(n).toLocaleString('en-IN'):'—';}
+  function fmtDate(d){return d?String(d).slice(0,10):'—';}
+  function showSpinner(v){document.getElementById('spinner').classList.toggle('hidden',!v);}
+  function showErr(msg){const e=document.getElementById('err');e.textContent=msg;setTimeout(()=>e.textContent='',5000);}
+  function showOk(msg){const o=document.getElementById('ok');o.style.display='block';o.textContent=msg;setTimeout(()=>o.style.display='none',3000);}
+
+  // Payment status from cashByCase lookup
+  function gps(caseNo, totalAmount){
+    const bill=Number(totalAmount||0);
+    const c=cashByCase[caseNo];
+    if(!c||bill===0) return{s:'due',t:'⏳ Due',col:'badge-due'};
+    if(c.due<=0)     return{s:'paid',t:'✅ Paid',col:'badge-paid'};
+    if(c.paid>0)     return{s:'partial',t:'⚠️ Partial',col:'badge-partial'};
+    return               {s:'due',t:'⏳ Due',col:'badge-due'};
+  }
+
+  // ── Tabs ─────────────────────────────────────────────────────────────────
+  document.querySelectorAll('#mainTabs .tab-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      if(btn.classList.contains('hidden'))return;
+      document.querySelectorAll('#mainTabs .tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Load data ─────────────────────────────────────────────────────────────
+  async function loadAllCases(){
+    try{
+      allCases=await fetchAll(()=>BNH_PAGE.sb.from('opd_case')
+        .select('case_no,case_date,patient_name,total_amount,refer_name,refer_enter_by,refer_enter_time,refer_amount,refer_payment_status,refer_payment_id,type,ipd_link,created_at,updated_at,cancel_remark,cancelled_by,cancelled_at'),'case_no');
+    }catch(error){showErr('Load cases: '+error.message);return;}
+    allCases.sort((a,b)=>String(b.case_date||'').localeCompare(String(a.case_date||'')));
+  }
+
+  async function loadTests(){
+    try{
+      allTests=await fetchAllSafe(()=>BNH_PAGE.sb.from('opd_test')
+        .select('case_number,test_name,test_amount,case_date,patient_name,created_by_name'));
+    }catch(e){console.warn('opd_test:',e.message);return;}
+    testsByCase={};billByCase={};testRowsByCase={};
+    allTests.forEach(r=>{
+      const cn=(r.case_number||'').trim();
+      if(!testRowsByCase[cn])testRowsByCase[cn]=[];
+      testRowsByCase[cn].push({name:r.test_name||'—',amount:Number(r.test_amount||0)});
+      if(!testsByCase[cn])testsByCase[cn]=[];
+      if(r.test_name&&!testsByCase[cn].includes(r.test_name))testsByCase[cn].push(r.test_name);
+      billByCase[cn]=(billByCase[cn]||0)+Number(r.test_amount||0);
+    });
+  }
+
+  async function loadCashRegister(){
+    try{
+      allCashRows=await fetchAllSafe(()=>BNH_PAGE.sb.from('opd_cash_register').select('*'));
+    }catch(e){console.warn('opd_cash_register:',e.message);return;}
+    allCashRows.sort((a,b)=>String(b.transaction_date||'').localeCompare(String(a.transaction_date||'')));
+
+    // Build cashByCase index
+    cashByCase={};
+    allCashRows.forEach(r=>{
+      const cn=(r.case_no||'').trim();
+      if(!cashByCase[cn])cashByCase[cn]={paid:0,discount:0,due:0,rows:[]};
+      cashByCase[cn].paid     +=Number(r.income||0);
+      cashByCase[cn].discount +=Number(r.discount||0);
+      cashByCase[cn].rows.push(r);
+    });
+
+    buildCashEntryByFilter();
+    filterCash();
+  }
+
+  async function loadReferPayments(){
+    // New table: opd_refer_payment (singular), ordered by created_at
+    const{data,error}=await BNH_PAGE.sb.from('opd_refer_payment').select('*').order('created_at',{ascending:false});
+    if(error){console.warn('opd_refer_payment:',error.message);allReferPayments=[];return;}
+    allReferPayments=data||[];
+  }
+
+  async function loadUploads(){
+    const{data,error}=await BNH_PAGE.sb.from('opd_old_dues').select('*').order('trans_date',{ascending:false});
+    if(error){showErr('Load uploads: '+error.message);return;}
+    allUploads=data||[];filterUploads();
+  }
+
+  async function loadPaymentsData(){
+    const{data,error}=await BNH_PAGE.sb.from('opd_payments').select('*').order('payment_date',{ascending:false});
+    if(error){console.warn('opd_payments (legacy): '+error.message);allPayments=[];if(isFullAccess)filterPayments();return;}
+    allPayments=data||[];
+    if(isFullAccess)filterPayments();
+  }
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  function renderCaseStats(){
+    const t=allCases.length;
+    const cancelled=allCases.filter(c=>!!c.cancelled_by).length;
+    const completed=allCases.filter(c=>!!c.refer_enter_by&&!c.cancelled_by).length;
+    const pending=t-completed-cancelled;
+    const tBill=allCases.reduce((s,c)=>s+Number(c.total_amount||0),0);
+    const tPaid=Object.values(cashByCase).reduce((s,c)=>s+c.paid,0);
+    const tDisc=Object.values(cashByCase).reduce((s,c)=>s+c.discount,0);
+    const html=`
+      <div class="stat-box"><div class="val">${t}</div><div class="lbl">Total Cases</div></div>
+      <div class="stat-box"><div class="val" style="color:#dc3545">${pending}</div><div class="lbl">Pending Refer</div></div>
+      <div class="stat-box"><div class="val" style="color:#28a745">${completed}</div><div class="lbl">Completed</div></div>
+      <div class="stat-box"><div class="val" style="color:#dc3545">${cancelled}</div><div class="lbl">Cancelled</div></div>
+      <div class="stat-box"><div class="val">${fmt(tBill)}</div><div class="lbl">Total Bill</div></div>
+      <div class="stat-box"><div class="val" style="color:#6c757d">${fmt(tDisc)}</div><div class="lbl">Discount${discPct(tDisc,tBill)?' ('+discPct(tDisc,tBill)+')':''}</div></div>
+      <div class="stat-box"><div class="val" style="color:#28a745">${fmt(tPaid)}</div><div class="lbl">Total Paid</div></div>
+      <div class="stat-box"><div class="val" style="color:#dc3545">${fmt(tBill-tPaid-tDisc)}</div><div class="lbl">Total Due</div></div>`;
+    document.getElementById('statsAll').innerHTML=html;
+  }
+
+  // ── Shared table renderer for All / Completed ─────────────────────────────
+  function renderRecordsTable(tableId,records,page,pagerId,listKey){
+    const div=document.getElementById(tableId);
+    if(!records.length){div.innerHTML='<div class="empty-state">No records found.</div>';document.getElementById(pagerId).innerHTML='';return;}
+    const rows=records.slice((page-1)*IPP,page*IPP);
+    div.innerHTML=`<table>
+      <thead><tr>
+        <th>Case No</th><th>Date</th><th>Patient</th><th>Bill</th><th>Paid</th><th>Discount</th><th>Disc %</th><th>Due</th>
+        <th>Type</th><th>Refer</th><th>IPD Link</th><th>Pay Status</th><th>Refer Pay</th><th>Status</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>{
+        const isCancelled=!!r.cancelled_by;
+        const ps=gps(r.case_no,r.total_amount);
+        const c=cashByCase[r.case_no]||{paid:0,discount:0,due:Number(r.total_amount||0)};
+        const referAmt=r.refer_amount?fmt(r.refer_amount):(r.refer_name?'<span style="color:#aaa;font-size:.78rem">Not set</span>':'—');
+        const referPay=r.refer_name
+          ?(r.refer_payment_status==='paid'
+              ?'<span class="badge badge-paid">✅ Paid</span>'
+              :(r.refer_amount&&Number(r.refer_amount)>0
+                  ?'<span class="badge badge-due">⏳ Pending</span>'
+                  :'<span class="badge badge-partial" style="font-size:.72rem">Amt Not Set</span>'))
+          :'<span style="color:#ccc">—</span>';
+        const statusBadge=isCancelled
+          ?'<span class="badge badge-cancelled">🚫 Cancelled</span>'
+          :'<span class="badge badge-completed">✓ Active</span>';
+        return`<tr class="${isCancelled?'row-cancelled':''}" onclick="openDetail('${esc(r.case_no)}')">
+          <td class="case-no">${esc(r.case_no)}</td>
+          <td>${fmtDate(r.case_date)}</td>
+          <td>${esc(r.patient_name)}</td>
+          <td>${fmt(r.total_amount)}</td>
+          <td style="color:#28a745">${fmt(c.paid)}</td>
+          <td style="color:#6c757d">${c.discount>0?fmt(c.discount):'—'}</td>
+          <td style="color:#6c757d">${discPct(c.discount,r.total_amount)||'—'}</td>
+          <td style="color:${c.due>0?'#dc3545':'#28a745'}">${fmt(c.due)}</td>
+          <td><span style="font-size:.78rem;color:#555">${esc(r.type||'—')}</span></td>
+          <td>${esc(r.refer_name||'—')}</td>
+          <td style="font-size:.78rem">${esc(r.ipd_link||'—')}</td>
+          <td><span class="badge ${ps.col}">${ps.t}</span></td>
+          <td>${referPay}</td>
+          <td>${statusBadge}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+    renderPagination(pagerId,records.length,page,listKey);
+  }
+
+  function renderPagination(pagerId,total,page,listKey){
+    const tp=Math.ceil(total/IPP);
+    const pager=document.getElementById(pagerId);
+    if(tp<=1){pager.innerHTML='';return;}
+    let h='';
+    if(page>1)h+=`<button onclick="goPage('${listKey}',1)">« First</button><button onclick="goPage('${listKey}',${page-1})">‹ Prev</button>`;
+    for(let i=Math.max(1,page-2);i<=Math.min(tp,page+2);i++)
+      h+=`<button ${i===page?'class="active"':''} onclick="goPage('${listKey}',${i})">${i}</button>`;
+    if(page<tp)h+=`<button onclick="goPage('${listKey}',${page+1})">Next ›</button><button onclick="goPage('${listKey}',${tp})">Last »</button>`;
+    pager.innerHTML=h;
+  }
+
+  function goPage(listKey,page){
+    if(listKey==='all'){currentPageAll=page;renderRecordsTable('allTable',filteredAll,page,'allPager','all');}
+    else if(listKey==='comp'){currentPageComp=page;renderRecordsTable('completedTable',filteredComp,page,'compPager','comp');}
+    else if(listKey==='cash'){currentPageCash=page;renderCashTable();}
+  }
+
+  // ── Filter All Records ─────────────────────────────────────────────────────
+  function filterAll(){
+    const q=(document.getElementById('allSearch').value||'').toLowerCase();
+    const df=document.getElementById('allDateFrom').value,dt=document.getElementById('allDateTo').value;
+    const ps=document.getElementById('allPayStatus').value,rf=document.getElementById('allReferFilter').value;
+    const cf=document.getElementById('allCancelFilter').value;
+    filteredAll=allCases.filter(r=>{
+      if(q&&!(r.case_no||'').toLowerCase().includes(q)&&!(r.patient_name||'').toLowerCase().includes(q))return false;
+      if(df&&r.case_date<df)return false;if(dt&&r.case_date>dt)return false;
+      if(ps&&gps(r.case_no,r.total_amount).s!==ps)return false;
+      if(rf==='yes'&&!r.refer_name)return false;if(rf==='no'&&r.refer_name)return false;
+      if(cf==='active'&&!!r.cancelled_by)return false;
+      if(cf==='cancelled'&&!r.cancelled_by)return false;
+      return true;
+    });
+    currentPageAll=1;renderRecordsTable('allTable',filteredAll,1,'allPager','all');
+  }
+
+  // ── Filter Completed ──────────────────────────────────────────────────────
+  function filterCompleted(){
+    const q=(document.getElementById('compSearch').value||'').toLowerCase();
+    const df=document.getElementById('compDateFrom').value,dt=document.getElementById('compDateTo').value;
+    const ps=document.getElementById('compPayStatus').value;
+    filteredComp=allCases.filter(r=>{
+      if(!r.refer_enter_by)return false;
+      if(q&&!(r.case_no||'').toLowerCase().includes(q)&&!(r.patient_name||'').toLowerCase().includes(q))return false;
+      if(df&&r.case_date<df)return false;if(dt&&r.case_date>dt)return false;
+      if(ps&&gps(r.case_no,r.total_amount).s!==ps)return false;
+      return true;
+    });
+    currentPageComp=1;renderRecordsTable('completedTable',filteredComp,1,'compPager','comp');
+  }
+
+  // ── Cash Register ─────────────────────────────────────────────────────────
+  function buildCashEntryByFilter(){
+    const sel=document.getElementById('cashEntryByFilter');
+    const current=sel.value;
+    const names=[...new Set(allCashRows.map(r=>r.entry_by||r.created_by_name).filter(Boolean))].sort();
+    sel.innerHTML='<option value="">All Staff</option>'+
+      names.map(n=>`<option value="${esc(n)}" ${current===n?'selected':''}>${esc(n)}</option>`).join('');
+  }
+
+  function filterCash(){
+    const q=(document.getElementById('cashSearch').value||'').toLowerCase();
+    const df=document.getElementById('cashDateFrom').value;
+    const dt=document.getElementById('cashDateTo').value;
+    const eb=document.getElementById('cashEntryByFilter').value;
+    filteredCash=allCashRows.filter(r=>{
+      const d=String(r.transaction_date||r.case_date||'').slice(0,10);
+      if(q&&!(r.case_no||'').toLowerCase().includes(q)&&
+           !(r.patient_name||'').toLowerCase().includes(q)&&
+           !(r.transaction_no||'').toLowerCase().includes(q))return false;
+      if(df&&d<df)return false;
+      if(dt&&d>dt)return false;
+      if(eb&&(r.entry_by||r.created_by_name)!==eb)return false;
+      return true;
+    });
+    currentPageCash=1;
+    updateCashTotals();
+    renderCashTable();
+  }
+
+  function updateCashTotals(){
+    const income   = filteredCash.reduce((s,r)=>s+Number(r.income||0),0);
+    const discount = filteredCash.reduce((s,r)=>s+Number(r.discount||0),0);
+    const net      = income - discount;
+    const cases    = new Set(filteredCash.map(r=>r.case_no).filter(Boolean)).size;
+    document.getElementById('ct-count').textContent   = filteredCash.length;
+    document.getElementById('ct-income').textContent  = fmt(income);
+    document.getElementById('ct-discount').textContent= fmt(discount);
+    document.getElementById('ct-net').textContent     = fmt(net);
+    document.getElementById('ct-cases').textContent   = cases;
+  }
+
+  function renderCashTable(){
+    const div=document.getElementById('cashTable');
+    if(!filteredCash.length){
+      div.innerHTML='<div class="empty-state">No cash register entries found.</div>';
+      document.getElementById('cashPager').innerHTML='';
+      return;
+    }
+    const rows=filteredCash.slice((currentPageCash-1)*IPP,currentPageCash*IPP);
+    div.innerHTML=`<table>
+      <thead><tr>
+        <th>Trans No</th><th>Trans Date</th><th>Case No</th><th>Case Date</th>
+        <th>Patient</th><th>Income</th><th>Discount</th><th>Net</th><th>Entry By</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>{
+        const income  =Number(r.income||0);
+        const discount=Number(r.discount||0);
+        const net=income-discount;
+        return`<tr onclick="openDetail('${esc(r.case_no)}')">
+          <td style="font-size:.8rem;color:#555">${esc(r.transaction_no||'—')}</td>
+          <td>${fmtDate(r.transaction_date)}</td>
+          <td class="case-no">${esc(r.case_no||'—')}</td>
+          <td>${fmtDate(r.case_date)}</td>
+          <td>${esc(r.patient_name||'—')}</td>
+          <td style="color:#28a745;font-weight:600">${fmt(income)}</td>
+          <td style="color:#6c757d">${discount>0?fmt(discount):'—'}</td>
+          <td style="font-weight:700">${fmt(net)}</td>
+          <td style="font-size:.8rem;color:#666">${esc(r.entry_by||r.created_by_name||'—')}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+    renderPagination('cashPager',filteredCash.length,currentPageCash,'cash');
+  }
+
+  // ── Detail popup ───────────────────────────────────────────────────────────
+  async function openDetail(caseNo){
+    if(!caseNo||caseNo==='—')return;
+    showSpinner(true);
+    try{
+      const r=allCases.find(x=>x.case_no===caseNo);
+      if(!r){showErr('Case not found: '+caseNo);return;}
+
+      const c=cashByCase[caseNo]||{paid:0,discount:0,due:Number(r.total_amount||0),rows:[]};
+      const ps=gps(caseNo,r.total_amount);
+      const tests=(testsByCase[caseNo]||[]);
+
+      // Tests section
+      const trows=testRowsByCase[caseNo]||[];
+      const testsTotal=trows.reduce((a,t)=>a+t.amount,0);
+      const testsHTML=`<div class="detail-section"><h3>🧪 Tests Performed</h3>
+        ${trows.length?`<table class="cash-table">
+          <thead><tr><th>#</th><th>Test</th><th style="text-align:right">Amount</th></tr></thead>
+          <tbody>${trows.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(t.name)}</td><td style="text-align:right">${fmt(t.amount)}</td></tr>`).join('')}</tbody>
+          <tfoot><tr><td></td><td style="font-weight:700">Total Amount</td><td style="text-align:right;font-weight:700">${fmt(testsTotal)}</td></tr></tfoot>
+        </table>`:'<span style="color:#aaa;font-size:.88rem">No test records found.</span>'}
+      </div>`;
+
+      // Cash register for this case
+      let cashHTML='';
+      const casePayments=c.rows||[];
+      if(casePayments.length){
+        cashHTML=`<div class="detail-section"><h3>💵 Cash Register Entries</h3>
+          <table class="cash-table">
+            <thead><tr><th>Trans Date</th><th>Trans No</th><th>Income</th><th>Discount</th><th>Disc %</th><th>Net</th><th>Entry By</th></tr></thead>
+            <tbody>${casePayments.map(p=>`<tr>
+              <td>${fmtDate(p.transaction_date)}</td>
+              <td style="font-size:.8rem">${esc(p.transaction_no||'—')}</td>
+              <td style="color:#28a745;font-weight:600">${fmt(p.income)}</td>
+              <td style="color:#6c757d">${Number(p.discount||0)>0?fmt(p.discount):'—'}</td>
+              <td style="color:#6c757d">${discPct(p.discount,r.total_amount)||'—'}</td>
+              <td style="font-weight:700">${fmt(Number(p.income||0)-Number(p.discount||0))}</td>
+              <td style="font-size:.8rem;color:#666">${esc(p.entry_by||p.created_by_name||'—')}</td>
+            </tr>`).join('')}</tbody>
+          </table></div>`;
+      }else{
+        cashHTML=`<div class="detail-section"><h3>💵 Cash Register Entries</h3>
+          <div class="info-note">ℹ️ ${c.due<=0?'Payment collected at registration — no itemised cash register records.':'No cash register entries recorded for this case.'}</div></div>`;
+      }
+
+      // Refer section — opd_case fields + opd_refer_payment lookup
+      let referHTML='';
+      if(r.refer_name){
+        // Find latest payment record from opd_refer_payment (new table)
+        const rp=allReferPayments.find(x=>x.case_no===caseNo);
+        const isPaid=r.refer_payment_status==='paid';
+        const raDisplay=r.refer_amount?fmt(r.refer_amount):'<span style="color:#999">Not yet set</span>';
+        const rpStatus=isPaid
+          ?'<span style="color:#28a745;font-weight:600">✅ Paid</span>'
+          :(r.refer_amount&&Number(r.refer_amount)>0
+              ?'<span style="color:#dc3545;font-weight:600">⏳ Pending</span>'
+              :'<span style="color:#999">Amount not set</span>');
+        let rpDetail='';
+        if(isPaid&&rp){
+          const netPaid=Number(r.refer_amount||0)-Number(rp.discount||0);
+          rpDetail=`<div class="detail-grid" style="margin-top:.6rem">
+            <div><div class="detail-label">Voucher No</div><div class="detail-value">${esc(rp.voucher_no||'—')}</div></div>
+            <div><div class="detail-label">Payment Date</div><div class="detail-value">${fmtDate(rp.payment_date)}</div></div>
+            <div><div class="detail-label">Mode</div><div class="detail-value">${esc(rp.mode||'—')}</div></div>
+            <div><div class="detail-label">Discount</div><div class="detail-value">${Number(rp.discount||0)>0?fmt(rp.discount):'—'}</div></div>
+            <div><div class="detail-label">Net Paid</div><div class="detail-value" style="color:#28a745;font-weight:700">${fmt(netPaid)}</div></div>
+            <div><div class="detail-label">Payment To</div><div class="detail-value">${esc(rp.payment_to||'—')}</div></div>
+            <div><div class="detail-label">Paid By</div><div class="detail-value">${esc(rp.created_by_name||rp.created_by||'—')}</div></div>
+            ${rp.remarks?`<div style="grid-column:1/-1"><div class="detail-label">Remarks</div><div class="detail-value">${esc(rp.remarks)}</div></div>`:''}
+          </div>`;
+        }
+        referHTML=`<div class="detail-section"><h3>👥 Referral Information</h3>
+          <div class="refer-box">
+            <h4>${esc(r.refer_name)}</h4>
+            <div class="detail-grid" style="margin-top:.5rem">
+              <div><div class="detail-label">Case Type</div><div class="detail-value">${esc(r.type||'—')}</div></div>
+              <div><div class="detail-label">IPD Link</div><div class="detail-value">${esc(r.ipd_link||'N/A')}</div></div>
+              <div><div class="detail-label">Refer Amount</div><div class="detail-value">${raDisplay}</div></div>
+              <div><div class="detail-label">Refer Pay Status</div><div class="detail-value">${rpStatus}</div></div>
+              <div><div class="detail-label">Refer Entered By</div><div class="detail-value">${esc(r.refer_enter_by||'—')}</div></div>
+              <div><div class="detail-label">Refer Entered On</div><div class="detail-value">${fmtDate(r.refer_enter_time)}</div></div>
+            </div>
+            ${rpDetail}
+          </div></div>`;
+      }
+
+      document.getElementById('detailTitle').textContent=`Case ${r.case_no} — ${r.patient_name}`;
+      document.getElementById('detailBody').innerHTML=`
+        ${r.cancelled_by?`<div class="cancel-info-box">
+          <strong style="color:#dc3545">🚫 This case has been cancelled</strong><br>
+          <span style="font-size:.85rem">💬 Remark: <b>${esc(r.cancel_remark||'—')}</b></span><br>
+          <span style="font-size:.8rem;color:#999">Cancelled by ${esc(r.cancelled_by)} on ${fmtDate(r.cancelled_at)}</span>
+        </div>`:''}
+        <div class="detail-section"><h3>📝 Patient & Case Information</h3>
+          <div class="detail-grid">
+            <div><div class="detail-label">Case No</div><div class="detail-value">${esc(r.case_no)}</div></div>
+            <div><div class="detail-label">Case Date</div><div class="detail-value">${fmtDate(r.case_date)}</div></div>
+            <div><div class="detail-label">Patient Name</div><div class="detail-value">${esc(r.patient_name)}</div></div>
+            <div><div class="detail-label">Case Type</div><div class="detail-value">${esc(r.type||'—')}</div></div>
+            <div><div class="detail-label">IPD Link (Admission No)</div><div class="detail-value">${esc(r.ipd_link||'—')}</div></div>
+            <div><div class="detail-label">Refer Status</div><div class="detail-value">
+              <span class="badge ${r.refer_enter_by?'badge-completed':'badge-pending'}">${r.refer_enter_by?'✓ Linked':'⏳ Pending'}</span>
+            </div></div>
+          </div>
+        </div>
+        ${testsHTML}
+        <div class="detail-section"><h3>💰 Payment Summary</h3>
+          <div class="amount-summary">
+            <div><div class="amount-label">Bill Amount</div><div class="amount-value">${fmt(r.total_amount)}</div></div>
+            <div><div class="amount-label">Total Paid</div><div class="amount-value" style="color:#28a745">${fmt(c.paid)}</div></div>
+            <div><div class="amount-label">Discount</div><div class="amount-value" style="color:#6c757d">${fmt(c.discount)}</div></div>
+            <div><div class="amount-label">Discount %</div><div class="amount-value" style="color:#6c757d">${discPct(c.discount,r.total_amount)||'0%'}</div></div>
+            <div><div class="amount-label">Due Amount</div><div class="amount-value" style="color:${c.due>0?'#dc3545':'#28a745'}">${fmt(c.due)}</div></div>
+            <div><div class="amount-label">Status</div><div class="amount-value" style="font-size:.9rem;color:${ps.s==='paid'?'#28a745':ps.s==='due'?'#dc3545':'#ff9800'}">${ps.t}</div></div>
+          </div>
+        </div>
+        ${referHTML}
+        ${cashHTML}
+        <div style="border-top:1px solid #eee;padding-top:.75rem;margin-top:.5rem;font-size:.8rem;color:#aaa">
+          📅 Created: ${fmtDate(r.created_at)} | Updated: ${fmtDate(r.updated_at)}
+        </div>`;
+
+      const footer=document.getElementById('detailFooter');
+      if(isFullAccess){
+        footer.innerHTML=`
+          <button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeDetail()">Close</button>
+          <button class="btn-del" onclick="closeDetail();delCase('${esc(r.case_no)}')">🗑️ Delete Case</button>`;
+      }else{
+        footer.innerHTML=`<button class="btn-primary" style="background:#6c757d;width:auto" onclick="closeDetail()">Close</button>`;
+      }
+
+      document.getElementById('detailModal').classList.remove('hidden');
+    }catch(e){showErr('Detail error: '+e.message);}
+    finally{showSpinner(false);}
+  }
+
+  function closeDetail(){document.getElementById('detailModal').classList.add('hidden');}
+  document.getElementById('detailModal').addEventListener('click',e=>{if(e.target===document.getElementById('detailModal'))closeDetail();});
+
+  // ── Uploads (admin) ───────────────────────────────────────────────────────
+  function filterUploads(){
+    const q=(document.getElementById('dueSearch').value||'').toLowerCase();
+    const st=document.getElementById('dueStatusFilter').value;
+    filteredUploads=allUploads.filter(r=>{
+      if(q&&!(r.case_no||'').toLowerCase().includes(q)&&!(r.patient_name||'').toLowerCase().includes(q))return false;
+      if(st&&r.payment_status!==st)return false;return true;
+    });
+    renderUploadsTable();
+  }
+
+  function renderUploadsTable(){
+    const div=document.getElementById('uploadsTable');
+    if(!filteredUploads.length){div.innerHTML='<div class="empty-state">No uploaded records.</div>';return;}
+    div.innerHTML=`<table>
+      <thead><tr><th>Case No</th><th>Date</th><th>Patient</th><th>Income</th><th>Discount</th><th>Cleared</th><th>Status</th><th>Remark</th><th>Actions</th></tr></thead>
+      <tbody>${filteredUploads.map(r=>`<tr>
+        <td class="case-no">${esc(r.case_no)}</td><td>${fmtDate(r.trans_date)}</td><td>${esc(r.patient_name||'—')}</td>
+        <td>${fmt(r.income_amount)}</td><td>${fmt(r.discount)}</td><td>${fmt(r.amount_cleared)}</td>
+        <td><span class="badge ${r.payment_status==='cleared'?'badge-paid':r.payment_status==='partial'?'badge-partial':'badge-pending'}">${esc(r.payment_status||'—')}</span></td>
+        <td style="font-size:.78rem;color:#666">${esc(r.remarks||'—')}</td>
+        <td onclick="event.stopPropagation()">
+          <div class="action-btns">
+            <button class="btn-del" onclick="delRecord('opd_old_dues','${r.id}','uploads')">🗑</button>
+          </div>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  // ── Payments (admin) ──────────────────────────────────────────────────────
+  function filterPayments(){
+    const q=(document.getElementById('paySearch').value||'').toLowerCase();
+    const df=document.getElementById('payDateFrom').value,dt=document.getElementById('payDateTo').value;
+    filteredPayments=allPayments.filter(r=>{
+      if(q&&!(r.case_no||'').toLowerCase().includes(q)&&!(r.remark||'').toLowerCase().includes(q))return false;
+      if(df&&(r.payment_date||'')< df)return false;if(dt&&(r.payment_date||'')>dt)return false;return true;
+    });
+    renderPaymentsTable();
+  }
+
+  function renderPaymentsTable(){
+    const div=document.getElementById('paymentsTable');
+    if(!filteredPayments.length){div.innerHTML='<div class="empty-state">No payment records.</div>';return;}
+    div.innerHTML=`<table>
+      <thead><tr><th>Case No</th><th>Date</th><th>Amount</th><th>Mode</th><th>Receipt/Trans No</th><th>Remark</th><th>By</th><th>Actions</th></tr></thead>
+      <tbody>${filteredPayments.map(r=>`<tr>
+        <td class="case-no">${esc(r.case_no)}</td><td>${fmtDate(r.payment_date)}</td><td>${fmt(r.amount)}</td>
+        <td>${esc(r.mode||'—')}</td><td>${esc(r.receipt_no||'—')}</td>
+        <td style="font-size:.78rem">${esc(r.remark||'—')}</td>
+        <td style="font-size:.78rem;color:#666">${esc(r.recorded_by_name||'—')}</td>
+        <td onclick="event.stopPropagation()">
+          <div class="action-btns">
+            <button class="btn-del" onclick="delRecord('opd_payments','${r.id}','payments')">🗑</button>
+          </div>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  // ── Delete (admin only) ───────────────────────────────────────────────────
+  async function delCase(caseNo){
+    if(!isFullAccess)return;
+    if(!confirm('⚠️ Delete case '+caseNo+'?\n\nThis will also delete associated tests and cash register entries. This action CANNOT be undone.'))return;
+    showSpinner(true);
+    try{
+      // Delete child rows first to avoid FK issues
+      await BNH_PAGE.sb.from('opd_test').delete().eq('case_number',caseNo);
+      await BNH_PAGE.sb.from('opd_cash_register').delete().eq('case_no',caseNo);
+      const{error}=await BNH_PAGE.sb.from('opd_case').delete().eq('case_no',caseNo);
+      if(error)throw error;
+      showOk('🗑 Case deleted.');
+      await reloadAll();
+    }catch(e){showErr('Delete error: '+e.message);}
+    finally{showSpinner(false);}
+  }
+
+  async function delRecord(tableName,id,section){
+    if(!isFullAccess)return;
+    if(!confirm('⚠️ Delete this record?\n\nThis action CANNOT be undone.'))return;
+    showSpinner(true);
+    try{
+      const{error}=await BNH_PAGE.sb.from(tableName).delete().eq('id',id);
+      if(error)throw error;
+      showOk('🗑 Record deleted.');
+      if(section==='uploads')await loadUploads();
+      else if(section==='payments')await loadPaymentsData();
+    }catch(e){showErr('Delete error: '+e.message);}
+    finally{showSpinner(false);}
+  }
+
+  // ── Edit / save (admin only) ──────────────────────────────────────────────
+  // Kept minimal — case editing now handles new schema fields
+  function closeEdit(){document.getElementById('editModal').classList.add('hidden');editMode=null;editRecordId=null;}
+  document.getElementById('editModal').addEventListener('click',e=>{if(e.target===document.getElementById('editModal'))closeEdit();});
+
+  async function saveEdit(){
+    if(!isFullAccess)return;
+    document.getElementById('editErr').textContent='';
+    showSpinner(true);
+    try{
+      if(editMode==='upload'){
+        const payload={
+          case_no:document.getElementById('mu_case_no').value.trim(),
+          trans_date:document.getElementById('mu_trans_date').value,
+          trans_no:document.getElementById('mu_trans_no').value.trim()||null,
+          patient_name:document.getElementById('mu_patient_name').value.trim()||null,
+          income_amount:parseFloat(document.getElementById('mu_income').value)||0,
+          discount:parseFloat(document.getElementById('mu_discount').value)||0,
+          amount_cleared:parseFloat(document.getElementById('mu_cleared').value)||0,
+          payment_status:document.getElementById('mu_status').value,
+          cleared_date:document.getElementById('mu_cleared_date').value||null,
+          remarks:document.getElementById('mu_remarks').value.trim()||null,
+          updated_at:new Date().toISOString()
+        };
+        const{error}=await BNH_PAGE.sb.from('opd_old_dues').update(payload).eq('id',editRecordId);
+        if(error)throw error;
+        await loadUploads();
+      }else if(editMode==='payment'){
+        const payload={
+          case_no:document.getElementById('mp_case_no').value.trim(),
+          payment_date:document.getElementById('mp_payment_date').value,
+          amount:parseFloat(document.getElementById('mp_amount').value)||0,
+          mode:document.getElementById('mp_mode').value,
+          receipt_no:document.getElementById('mp_receipt_no').value.trim()||null,
+          remark:document.getElementById('mp_remark').value.trim()||null
+        };
+        const{error}=await BNH_PAGE.sb.from('opd_payments').update(payload).eq('id',editRecordId);
+        if(error)throw error;
+        await loadPaymentsData();
+      }
+      showOk('✅ Record updated successfully!');
+      closeEdit();
+    }catch(e){document.getElementById('editErr').textContent='Error: '+e.message;}
+    finally{showSpinner(false);}
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  async function reloadAll(){
+    await loadAllCases();
+    await loadTests();
+    await loadCashRegister();
+  }
+
+  async function init(){
+    showSpinner(true);
+    try{
+      const tasks=[loadAllCases(), loadTests(), loadCashRegister(), loadReferPayments()];
+      if(isFullAccess)tasks.push(loadUploads(), loadPaymentsData());
+      await Promise.all(tasks);
+      recomputeDue();
+      // Re-run stats after cash is loaded (cashByCase now populated)
+      renderCaseStats();
+      filterAll();
+      filterCompleted();
+    }catch(e){showErr('Init error: '+e.message);}
+    finally{showSpinner(false);}
+  }
+
+  init();
+</script>
+</body>
+</html>

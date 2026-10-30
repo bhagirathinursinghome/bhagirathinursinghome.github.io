@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bhagirathy Nursing Home — Login</title>
+<link rel="stylesheet" href="assets/style.css" />
+  <!-- ===== PWA / Favicon — add inside <head> of every HTML page ===== -->
+
+<!-- Favicon -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+
+<!-- Apple / iOS -->
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Bhagirathi HC" />
+
+<!-- Android / Chrome theme -->
+<meta name="theme-color" content="#3889b8" />
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="/manifest.json" />
+
+<!-- Service Worker registration — place just before </body> instead if preferred -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => {
+          console.log('SW registered:', reg.scope);
+ 
+          // Poll for updates every 60 seconds (catches cases where SW
+          // update check didn't fire automatically)
+          setInterval(() => reg.update(), 60 * 1000);
+        })
+        .catch(err => console.error('SW registration failed:', err));
+ 
+      // ✅ Listen for SW_UPDATED message → reload this tab automatically
+      navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data && event.data.type === 'SW_UPDATED') {
+          console.log('[App] New version available — reloading...');
+          // Small delay so all tabs don't hammer the server simultaneously
+          setTimeout(() => window.location.reload(), Math.random() * 2000);
+        }
+      });
+    });
+  }
+</script>
+
+<!-- ===== END PWA tags ===== -->
+
+</head>
+<body class="auth-body">
+  <button type="button" class="btn-ghost theme-toggle auth-theme-toggle" data-theme-toggle aria-pressed="false">🌙 Dark</button>
+  <div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+  <div class="auth-wrap">
+    <div class="brand">
+      <div class="logo-circle">B</div>
+      <h1>Bhagirathy Nursing Home</h1>
+      <p class="tag">Staff Portal</p>
+    </div>
+
+    <div class="card" id="loginCard">
+      <h2>Sign in</h2>
+      <form id="loginForm">
+        <label>User ID</label>
+        <input type="text" id="loginUser" autocomplete="username" required />
+        <label>Password</label>
+        <input type="password" id="loginPass" autocomplete="current-password" required />
+        <button type="submit" class="btn-primary">Login</button>
+      </form>
+      <p class="muted">No account? <a href="#" id="goReg">Register</a></p>
+      <p class="err" id="loginErr"></p>
+    </div>
+
+    <div class="card hidden" id="regCard">
+      <h2>Register</h2>
+      <form id="regForm">
+        <label>Full Name</label>
+        <input type="text" id="regName" required />
+        <label>Mobile</label>
+        <input type="tel" id="regMobile" pattern="[0-9]{10}" maxlength="10" required />
+        <label>User ID</label>
+        <input type="text" id="regUser" required />
+        <label>Password</label>
+        <input type="password" id="regPass" minlength="6" required />
+        <button type="submit" class="btn-primary">Create account</button>
+      </form>
+      <p class="muted">Have an account? <a href="#" id="goLogin">Login</a></p>
+      <p class="info">Your profile will be activated after admin approval.</p>
+      <p class="err" id="regErr"></p>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/theme.js"></script>
+<script>
+  document.querySelector('[data-theme-toggle]').onclick = () => BNH_THEME.toggle();
+  const spinner = document.getElementById('spinner');
+  const show = el => el.classList.remove('hidden');
+  const hide = el => el.classList.add('hidden');
+
+  document.getElementById('goReg').onclick = e => { e.preventDefault(); hide(loginCard); show(regCard); };
+  document.getElementById('goLogin').onclick = e => { e.preventDefault(); hide(regCard); show(loginCard); };
+
+  // Auto-redirect if already logged in
+  const cur = BNH.getCurrentUser();
+  if (cur) location.href = 'app.html';
+
+  document.getElementById('loginForm').onsubmit = async e => {
+    e.preventDefault();
+    document.getElementById('loginErr').textContent = '';
+    show(spinner);
+    try {
+      const u = document.getElementById('loginUser').value.trim();
+      const p = document.getElementById('loginPass').value;
+      await BNH.login(u, p);
+      location.href = 'app.html';
+    } catch (err) {
+      document.getElementById('loginErr').textContent = err.message;
+    } finally { hide(spinner); }
+  };
+
+  document.getElementById('regForm').onsubmit = async e => {
+    e.preventDefault();
+    document.getElementById('regErr').textContent = '';
+    show(spinner);
+    try {
+      await BNH.register({
+        name: document.getElementById('regName').value.trim(),
+        mobile: document.getElementById('regMobile').value.trim(),
+        username: document.getElementById('regUser').value.trim(),
+        password: document.getElementById('regPass').value,
+      });
+      alert('Registration submitted. Wait for admin approval.');
+      hide(regCard); show(loginCard);
+    } catch (err) {
+      document.getElementById('regErr').textContent = err.message;
+    } finally { hide(spinner); }
+  };
+</script>
+</body>
+</html>

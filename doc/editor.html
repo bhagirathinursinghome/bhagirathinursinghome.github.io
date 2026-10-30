@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocVault — Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="layout.js"></script>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="hamburger-btn" onclick="toggleSidebar()" title="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="topbar-title" id="topbar-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Browse Documents
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="openUploadModal()">+ <span class="btn-label-hide">Upload Document</span></button>
+      </div>
+    </header>
+    <main class="page-content" id="page-content">
+      <div class="empty-state"><div class="spinner-ring" style="margin:0 auto"></div></div>
+    </main>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<!-- Upload Modal -->
+<div class="modal-overlay" id="upload-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="upload-modal-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload Document
+      </div>
+      <button class="modal-close" onclick="closeModal('upload-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="upload-form-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('upload-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitDocument()">Save Document</button>
+    </div>
+  </div>
+</div>
+
+<!-- History Modal -->
+<div class="modal-overlay" id="history-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/></svg>
+        Version History
+      </div>
+      <button class="modal-close" onclick="closeModal('history-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="history-body"></div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="global-spinner"></div>
+
+<script>
+let allDocs = [], editingDocId = null, renewParentId = null, isRenewal = false;
+
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('active');
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const session = Auth.requireAuth(['editor']);
+  if (!session) return;
+  renderSidebar('editor', 'browse');
+
+  document.querySelectorAll('.modal-overlay').forEach(o => {
+    o.addEventListener('click', e => { if(e.target===o) closeModal(o.id); });
+  });
+
+  await loadDocs();
+});
+
+async function loadDocs() {
+  UI.showSpinner('Loading documents…');
+  try {
+    const { data } = await db().from('dv_documents').select('*, dv_categories(name,color)').eq('is_latest_version', true).order('created_at', { ascending: false });
+    allDocs = data || [];
+    renderPage();
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+function renderPage() {
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div id="filter-bar"></div>
+      <div id="doc-table-wrap"></div>
+    </div>`;
+  buildFilters('filter-bar', renderFilteredDocs);
+  renderFilteredDocs();
+}
+
+function renderFilteredDocs() {
+  const filtered = applyLocalFilters(allDocs);
+  document.getElementById('doc-table-wrap').innerHTML = renderDocTable(filtered, { canEdit: true, showVersion: true });
+}
+
+async function openUploadModal(docId = null, renewId = null) {
+  editingDocId = docId;
+  renewParentId = renewId;
+  isRenewal = !!renewId;
+  const categories = await DocHelpers.getCategories();
+
+  let doc = null;
+  if (renewId) { const { data } = await db().from('dv_documents').select('*').eq('id', renewId).single(); doc = data; }
+
+  document.getElementById('upload-modal-title').innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    ${isRenewal ? 'Renew Document' : 'Upload New Document'}`;
+
+  const catOptions = categories.map(c => `<option value="${c.id}" ${doc?.category_id===c.id?'selected':''}>${escHtml(c.name)}</option>`).join('');
+
+  document.getElementById('upload-form-body').innerHTML = `
+    ${isRenewal ? `<div style="background:var(--amber-bg);border:1px solid rgba(232,160,64,0.3);border-radius:10px;padding:12px 16px;font-size:0.875rem;color:var(--amber)">
+      🔄 Renewing: <strong>${escHtml(doc?.document_name)}</strong></div>` : ''}
+    ${!isRenewal ? `<div class="form-group"><label class="form-label">Document Name *</label><input type="text" class="form-input" id="doc-name" placeholder="e.g. Trade License"></div>` : ''}
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Category</label>
+        <select class="form-select" id="doc-cat"><option value="">— None —</option>${catOptions}</select></div>
+      <div class="form-group"><label class="form-label">Document Number</label>
+        <input type="text" class="form-input" id="doc-number" placeholder="Reference" value="${escHtml(doc?.document_number||'')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Expiry Date</label><input type="date" class="form-input" id="doc-expiry" value="${doc?.expiry_date||''}"></div>
+      <div class="form-group"><label class="form-label">Physical Store</label><input type="text" class="form-input" id="doc-physical" value="${escHtml(doc?.physical_store_name||'')}"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="doc-desc">${escHtml(doc?.description||'')}</textarea></div>
+    <div class="form-group"><label class="form-label">PDF File *</label>
+      <div class="file-drop-zone"><input type="file" id="doc-file" accept=".pdf,application/pdf" onchange="document.getElementById('file-name-display').textContent='✓ '+this.files[0].name">
+        <div class="file-drop-icon">📄</div><p>Click to select or drag & drop PDF</p>
+        <div class="file-name-display" id="file-name-display"></div>
+      </div>
+    </div>`;
+  openModal('upload-modal');
+}
+
+async function submitDocument() {
+  const session = Auth.getSession();
+  const name = isRenewal ? null : document.getElementById('doc-name')?.value.trim();
+  const catId = document.getElementById('doc-cat').value || null;
+  const number = document.getElementById('doc-number').value.trim() || null;
+  const expiry = document.getElementById('doc-expiry').value || null;
+  const physical = document.getElementById('doc-physical').value.trim() || null;
+  const desc = document.getElementById('doc-desc').value.trim() || null;
+  const file = document.getElementById('doc-file').files[0] || null;
+
+  if (!isRenewal && !name) { UI.toast('Document name is required', 'error'); return; }
+  if (!file) { UI.toast('Please select a PDF file', 'error'); return; }
+
+  UI.showSpinner(isRenewal ? 'Creating new version…' : 'Uploading…');
+  try {
+    if (isRenewal) {
+      const { data: parent } = await db().from('dv_documents').select('*').eq('id', renewParentId).single();
+      const newId = crypto.randomUUID();
+      const filePath = await DocHelpers.uploadPDF(file, newId);
+      await db().from('dv_documents').update({ is_latest_version: false }).eq('id', renewParentId);
+      await db().from('dv_documents').insert({
+        id: newId, document_name: parent.document_name, category_id: catId||parent.category_id,
+        document_number: number||parent.document_number, expiry_date: expiry, description: desc||parent.description,
+        physical_store_name: physical||parent.physical_store_name, version: (parent.version||1)+1,
+        parent_document_id: parent.parent_document_id||parent.id, is_latest_version: true,
+        notification_stopped: false, file_path: filePath, file_name: file.name, file_size: file.size,
+        file_type: file.type, uploaded_by: session.user.id
+      });
+      UI.toast('Document renewed!', 'success');
+    } else {
+      const newId = crypto.randomUUID();
+      const filePath = await DocHelpers.uploadPDF(file, newId);
+      await db().from('dv_documents').insert({
+        id: newId, document_name: name, category_id: catId, document_number: number,
+        expiry_date: expiry, description: desc, physical_store_name: physical,
+        version: 1, is_latest_version: true, notification_stopped: false,
+        file_path: filePath, file_name: file.name, file_size: file.size, file_type: file.type,
+        uploaded_by: session.user.id
+      });
+      UI.toast('Document uploaded!', 'success');
+    }
+    closeModal('upload-modal');
+    await loadDocs();
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+
+async function renewDoc(id) { await openUploadModal(null, id); }
+async function editDoc(id) {
+  // Editors can open the upload form as renewal only
+  await openUploadModal(null, id);
+}
+
+async function viewHistory(parentId) {
+  UI.showSpinner('Loading…');
+  try {
+    const { data } = await db().from('dv_documents').select('*, dv_categories(name,color)').or(`id.eq.${parentId},parent_document_id.eq.${parentId}`).order('version', { ascending: false });
+    document.getElementById('history-body').innerHTML = renderDocTable(data||[], { showVersion: true });
+    openModal('history-modal');
+  } catch(e) { UI.toast('Error: ' + e.message, 'error'); }
+  finally { UI.hideSpinner(); }
+}
+</script>
+</body>
+</html>

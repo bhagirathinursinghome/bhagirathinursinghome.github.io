@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bhagirathy Nursing Home</title>
+<link rel="stylesheet" href="assets/style.css" />
+  <!-- ===== PWA / Favicon — add inside <head> of every HTML page ===== -->
+
+<!-- Favicon -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+
+<!-- Apple / iOS -->
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Bhagirathi HC" />
+
+<!-- Android / Chrome theme -->
+<meta name="theme-color" content="#3889b8" />
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="/manifest.json" />
+
+<!-- Service Worker registration — place just before </body> instead if preferred -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => {
+          console.log('SW registered:', reg.scope);
+ 
+          // Poll for updates every 60 seconds (catches cases where SW
+          // update check didn't fire automatically)
+          setInterval(() => reg.update(), 60 * 1000);
+        })
+        .catch(err => console.error('SW registration failed:', err));
+ 
+      // ✅ Listen for SW_UPDATED message → reload this tab automatically
+      navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data && event.data.type === 'SW_UPDATED') {
+          console.log('[App] New version available — reloading...');
+          // Small delay so all tabs don't hammer the server simultaneously
+          setTimeout(() => window.location.reload(), Math.random() * 2000);
+        }
+      });
+    });
+  }
+</script>
+
+<!-- ===== END PWA tags ===== -->
+
+</head>
+<body class="app-shell">
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<header class="topbar">
+  <button class="hamburger" id="hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="brand-row">
+    <div class="logo-circle small">B</div>
+    <div>
+      <div class="brand-title">Bhagirathy Nursing Home</div>
+      <div class="brand-sub" id="pageTitle">Dashboard</div>
+    </div>
+  </div>
+  <div class="profile-control" id="profileControl">
+    <button class="profile-trigger" id="profileTrigger" type="button"
+      aria-label="Open profile menu" aria-expanded="false" aria-controls="profileMenu">
+      <span class="profile-avatar" id="profileAvatar">U</span>
+      <span class="profile-chevron" aria-hidden="true">⌄</span>
+    </button>
+    <div class="profile-menu hidden" id="profileMenu" role="menu" aria-label="Profile options">
+      <div class="profile-summary">
+        <span class="profile-avatar profile-avatar-large" id="profileMenuAvatar">U</span>
+        <span class="profile-identity">
+          <strong id="uChipName"></strong>
+          <span class="role-badge" id="uChipRole"></span>
+        </span>
+      </div>
+      <div class="profile-menu-divider"></div>
+      <button class="profile-menu-item" id="themeToggle" data-theme-toggle type="button" role="menuitem" aria-pressed="false">🌙 Dark mode</button>
+      <button class="profile-menu-item" id="btnPwd" type="button" role="menuitem">🔑 Change password</button>
+      <button class="profile-menu-item" id="btnPublish" type="button" role="menuitem" style="display:none">🚀 Publish update</button>
+      <div class="profile-menu-divider"></div>
+      <button class="profile-menu-item profile-menu-logout" id="btnLogout" type="button" role="menuitem">↪ Log out</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-user">
+      <div class="avatar" id="avatar">U</div>
+      <div>
+        <div class="side-name" id="sideName"></div>
+        <div class="side-role" id="sideRole"></div>
+      </div>
+    </div>
+    <nav id="menu"></nav>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+  <main class="content">
+    <iframe id="frame" src="pages/home.html" title="content"></iframe>
+  </main>
+</div>
+
+<!-- Password modal -->
+<div class="modal hidden" id="pwdModal">
+  <div class="modal-card">
+    <h3>Change Password</h3>
+    <form id="pwdForm">
+      <label>Current Password</label>
+      <input type="password" id="pwdCur" required />
+      <label>New Password</label>
+      <input type="password" id="pwdNew" minlength="6" required />
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="pwdCancel">Cancel</button>
+        <button type="submit" class="btn-primary">Update</button>
+      </div>
+      <p class="err" id="pwdErr"></p>
+    </form>
+  </div>
+</div>
+
+<!-- Notification permission popup (shown on every app open until enabled) -->
+<div class="modal hidden" id="notifModal">
+  <div class="modal-card" style="text-align:center">
+    <div style="font-size:2.5rem">🔔</div>
+    <h3>Turn on notifications</h3>
+    <p id="notifText">Allow notifications so you get important updates from Bhagirathy Nursing Home on your phone, even when the app is closed.</p>
+    <p class="err" id="notifErr"></p>
+    <div class="modal-actions" style="justify-content:center">
+      <button type="button" class="btn-ghost" id="notifLater">Not now</button>
+      <button type="button" class="btn-primary" id="notifEnable">Enable Notifications</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/config.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/menu.js"></script>
+<script src="assets/theme.js"></script>
+<script src="assets/updater.js"></script>
+<script>
+  const profileControl = document.getElementById('profileControl');
+  const profileTrigger = document.getElementById('profileTrigger');
+  const profileMenu = document.getElementById('profileMenu');
+  const closeProfileMenu = () => {
+    profileMenu.classList.add('hidden');
+    profileTrigger.setAttribute('aria-expanded', 'false');
+  };
+  profileTrigger.onclick = () => {
+    const isOpen = !profileMenu.classList.contains('hidden');
+    profileMenu.classList.toggle('hidden', isOpen);
+    profileTrigger.setAttribute('aria-expanded', String(!isOpen));
+  };
+  document.addEventListener('click', event => {
+    if (!profileControl.contains(event.target)) closeProfileMenu();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      closeProfileMenu();
+      profileTrigger.focus();
+    }
+  });
+  document.getElementById('themeToggle').onclick = () => BNH_THEME.toggle();
+  const spinner = document.getElementById('spinner');
+  const show = el => el.classList.remove('hidden');
+  const hide = el => el.classList.add('hidden');
+
+  const user = BNH.getCurrentUser();
+  if (!user) { location.href = 'index.html'; }
+
+  // Header user
+  document.getElementById('uChipName').textContent = user.name;
+  document.getElementById('uChipRole').textContent = user.role;
+  document.getElementById('profileAvatar').textContent = (user.name || 'U').charAt(0).toUpperCase();
+  document.getElementById('profileMenuAvatar').textContent = (user.name || 'U').charAt(0).toUpperCase();
+  document.getElementById('sideName').textContent = user.name;
+  document.getElementById('sideRole').textContent = user.role;
+  document.getElementById('avatar').textContent = (user.name || 'U').charAt(0).toUpperCase();
+
+  // Build menu
+  BNH_MENU.render(user.role, document.getElementById('menu'), (item) => {
+    document.getElementById('frame').src = item.page;
+    document.getElementById('pageTitle').textContent = item.label;
+    closeSidebar();
+  });
+
+  // Hamburger
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('backdrop');
+  const openSidebar = () => { sidebar.classList.add('open'); backdrop.classList.add('show'); };
+  const closeSidebar = () => { sidebar.classList.remove('open'); backdrop.classList.remove('show'); };
+  document.getElementById('hamburger').onclick = () => sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+  backdrop.onclick = closeSidebar;
+
+  // Logout
+  document.getElementById('btnLogout').onclick = () => {
+    BNH.logout();
+    location.href = 'index.html';
+  };
+
+  // Password modal
+  const pwdModal = document.getElementById('pwdModal');
+  document.getElementById('btnPwd').onclick = () => { closeProfileMenu(); show(pwdModal); };
+  document.getElementById('pwdCancel').onclick = () => hide(pwdModal);
+  document.getElementById('pwdForm').onsubmit = async e => {
+    e.preventDefault();
+    document.getElementById('pwdErr').textContent = '';
+    show(spinner);
+    try {
+      await BNH.changePassword(
+        document.getElementById('pwdCur').value,
+        document.getElementById('pwdNew').value
+      );
+      alert('Password updated.');
+      hide(pwdModal);
+      document.getElementById('pwdForm').reset();
+    } catch (err) {
+      document.getElementById('pwdErr').textContent = err.message;
+    } finally { hide(spinner); }
+  };
+
+  // Publish Update (admin only) ----------------------------------------------------------------
+const btnPublish = document.getElementById('btnPublish');
+if (user.role === 'admin') btnPublish.style.display = '';
+btnPublish.onclick = async () => {
+  if (!confirm('Push update popup to ALL users now?')) return;
+  const note = prompt('What changed? (shown to users, optional)', 'New update is ready.');
+  if (note === null) return;
+  show(spinner);
+  try {
+    await BNH_UPDATER.publish(note);
+    alert('Update published. Users will see the popup within a minute.');
+  } catch (err) { alert('Failed: ' + err.message); }
+  finally { hide(spinner); }
+};
+
+  // Push notifications ---------------------------------------------------------------------------
+  // Loaded on its own and wrapped in try/catch, so it can never break the rest of the app.
+  (function setupPush() {
+    const loadScript = src => new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src));
+      document.head.appendChild(s);
+    });
+    (async () => {
+      try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+        await loadScript('assets/page.js');
+        await loadScript('assets/push.js');
+        const sb = BNH_PAGE.sb;
+        const modal = document.getElementById('notifModal');
+        const text = document.getElementById('notifText');
+        const err = document.getElementById('notifErr');
+        const enableBtn = document.getElementById('notifEnable');
+        document.getElementById('notifLater').onclick = () => hide(modal);
+
+        if (Notification.permission === 'granted') {
+          await BNH_PUSH.sync(sb, user);            // keep this device registered
+        } else {
+          // Not enabled yet → show the popup on EVERY app open until the user allows.
+          // One tap on the button asks the browser for permission and registers the device.
+          enableBtn.onclick = async () => {
+            err.textContent = '';
+            try {
+              await BNH_PUSH.enable(sb, user);
+              hide(modal);
+            } catch (e) {
+              // Only reached if the browser refused (user chose Block, or it was blocked earlier)
+              err.textContent = Notification.permission === 'denied'
+                ? 'Notifications are blocked on this phone. Open phone Settings → Apps → Bhagirathy → Notifications → Allow (or Chrome → Site settings → Notifications → Allow), then tap Enable again.'
+                : e.message;
+            }
+          };
+          show(modal);
+        }
+      } catch (e) { console.warn('[Push] setup skipped:', e); }
+    })();
+  })();
+</script>
+</body>
+</html>

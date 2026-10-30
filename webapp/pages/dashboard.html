@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .toolbar{display:flex;align-items:flex-end;gap:.75rem;flex-wrap:wrap}
+    .toolbar>div{min-width:170px}
+    .dashboard-section{margin-top:1.2rem}
+    .dashboard-section h2{font-size:1rem;margin:0 0 .75rem}
+    .balance-grid,.due-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.75rem}
+    .balance-card,.due-card{border:1px solid #e5e7eb;border-radius:12px;padding:.9rem 1rem;background:#fff}
+    .balance-card{background:#ecfdf5;border-color:#a7f3d0}
+    .balance-card .label,.due-card .label{font-size:.76rem;color:#64748b;font-weight:700;text-transform:uppercase}
+    .balance-card .amount,.due-card .amount{font-size:1.25rem;font-weight:800;margin-top:.25rem;color:#0f172a}
+    .balance-card .opening{font-size:.78rem;color:#64748b;margin-top:.35rem}
+    .cash-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.75rem;margin-top:.75rem}
+    .cash-summary-card{border:1px solid #fed7aa;border-radius:12px;padding:.9rem 1rem;background:#fff7ed}
+    .cash-summary-card.net{background:#ecfdf5;border-color:#a7f3d0}
+    .cash-summary-card .label{font-size:.76rem;color:#64748b;font-weight:700;text-transform:uppercase}
+    .cash-summary-card .amount{font-size:1.25rem;font-weight:800;margin-top:.25rem;color:#0f172a}
+    .cash-summary-card.net .amount{color:#047857}
+    .due-card{background:#f8fafc}
+    .due-card .amount{color:#0f766e}
+    .section-note{font-size:.78rem;color:#64748b;margin:.55rem 0 0}
+    .error-box{color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:.75rem}
+    @media(max-width:480px){.balance-grid,.due-grid{grid-template-columns:1fr 1fr}.balance-card,.due-card{padding:.75rem}}
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1>📊 Dashboard</h1>
+  <div class="page-card">
+    <div class="toolbar">
+      <div><label for="reportDate">Balance as of</label><input id="reportDate" type="date"/></div>
+      <button class="btn-primary" style="width:auto" onclick="loadDashboard()">Refresh</button>
+    </div>
+    <p id="status" class="section-note" aria-live="polite"></p>
+    <div id="dashboardError" class="error-box hidden" role="alert"></div>
+  </div>
+
+  <div id="dashboardContent" class="hidden">
+    <section class="page-card dashboard-section">
+      <h2>🏥 Nursing Home Closing Balance</h2>
+      <div id="nursingBalances" class="balance-grid"></div>
+      <div id="nursingCashSummary" class="cash-summary"></div>
+      <p class="section-note">Net cash is gross cash less the unpaid extra-out balance through the selected date, matching the outstanding balances on the Extra Out report.</p>
+    </section>
+
+    <section class="page-card dashboard-section">
+      <h2>💊 Pharmacy Closing Balance (Dispensary)</h2>
+      <div id="pharmacyBalances" class="balance-grid"></div>
+      <p class="section-note">Includes dispensary sales, dispensary supplier payments, pharmacy vouchers, and fund transfers. IPD sales and IPD supplier payments are excluded.</p>
+    </section>
+
+    <section class="page-card dashboard-section">
+      <h2>📌 Total Outstanding Due</h2>
+      <div id="dueTotals" class="due-grid"></div>
+      <p class="section-note">Medicine supplier dues are shown as category totals only; supplier details are not listed here.</p>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+BNH_PAGE.requireRole(["admin","accountant","manager"]);
+
+const sb = BNH_PAGE.sb;
+const $ = id => document.getElementById(id);
+const MODES = ['cash','bank','phonepe'];
+const MODE_LABELS = {cash:'Cash',bank:'Bank',phonepe:'PhonePe'};
+const num = value => Number(value) || 0;
+const fmt = value => '₹' + num(value).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const localISO = () => {
+  const date = new Date();
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0,10);
+};
+const normalizeMode = value => {
+  const mode = String(value || '').trim().toLowerCase().replace(/\s+/g,'');
+  return MODES.includes(mode) ? mode : null;
+};
+
+async function fetchRows(table, columns, filters, orderColumn = 'id') {
+  const rows = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    let query = sb.from(table).select(columns);
+    (filters || []).forEach(([operator, column, value]) => {
+      query = query[operator](column, value);
+    });
+    const {data, error} = await query.order(orderColumn).range(from, from + pageSize - 1);
+    if (error) throw new Error(`${table}: ${error.message}`);
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) return rows;
+  }
+}
+
+function sum(rows, field) {
+  return (rows || []).reduce((total, row) => total + num(row[field]), 0);
+}
+
+function renderBalances(target, balances, cashLabel = 'Cash') {
+  $(target).innerHTML = MODES.map(mode => `
+    <div class="balance-card">
+      <div class="label">${mode === 'cash' ? cashLabel : MODE_LABELS[mode] + ' Closing'}</div>
+      <div class="amount">${fmt(balances[mode].closing)}</div>
+      <div class="opening">Opening: ${fmt(balances[mode].opening)}</div>
+    </div>`).join('');
+}
+
+function renderDueTotals(totals) {
+  const items = [
+    ['Doctor Due', totals.doctor],
+    ['Creditor Due', totals.creditor],
+    ['IPD Medicine Supplier Due', totals.ipdSupplier],
+    ['Dispensary Medicine Supplier Due', totals.dispensarySupplier]
+  ];
+  $('dueTotals').innerHTML = items.map(([label, amount]) => `
+    <div class="due-card"><div class="label">${label}</div><div class="amount">${fmt(amount)}</div></div>`).join('');
+}
+
+async function loadDashboard() {
+  const date = $('reportDate').value;
+  if (!date) {
+    $('dashboardContent').classList.add('hidden');
+    $('dashboardError').textContent = 'Select a date to load the dashboard.';
+    $('dashboardError').classList.remove('hidden');
+    return;
+  }
+  $('dashboardError').classList.add('hidden');
+  $('dashboardContent').classList.add('hidden');
+  $('status').textContent = 'Loading dashboard…';
+
+  try {
+    const [setupResult, savedSheetResult] = await Promise.all([
+      sb.from('pharmacy_setup').select('opening_cash,opening_bank,opening_phonepe').eq('id',1).maybeSingle(),
+      sb.from('daily_sheet').select('sheet_date,closing_cash,closing_bank,closing_phonepe')
+        .lte('sheet_date',date).order('sheet_date',{ascending:false}).limit(1)
+    ]);
+    if (setupResult.error) throw new Error(`pharmacy_setup: ${setupResult.error.message}`);
+    if (savedSheetResult.error) throw new Error(`daily_sheet: ${savedSheetResult.error.message}`);
+
+    const savedSheet = savedSheetResult.data && savedSheetResult.data[0];
+    const nursingDateFilters = savedSheet
+      ? [['gt','date',savedSheet.sheet_date],['lte','date',date]]
+      : [['eq','date',date]];
+    const voucherDateFilters = savedSheet
+      ? [['gt','payment_date',savedSheet.sheet_date],['lte','payment_date',date],['eq','status','filled']]
+      : [['eq','payment_date',date],['eq','status','filled']];
+    const pharmacyDateFilters = [['lte','sale_date',date],['eq','sale_type','Dispensary']];
+    const [
+      dayWorkResult,
+      ipdReceipts, opdReceipts, otherReceipts, nursingVouchers, nursingCashTx, nursingTransfers,
+      extraOutRows, extraOutRepayments,
+      pharmacySales, pharmacyPayments, pharmacyVouchers, pharmacyTransfers,
+      pharmacySuppliers, pharmacyPurchases, pharmacyOtherPurchases,
+      ipdIndens, ipdReceiptsFromHospital,
+      doctors, doctorPayments, amountEntries, admissions, otEntries,
+      creditors, creditorEntries
+    ] = await Promise.all([
+      sb.from('day_work').select('phonepe_received,bank_received').eq('work_date',date).limit(1),
+      fetchRows('ipd_cash_receipts','amount',[['eq','receipt_date',date]]),
+      fetchRows('opd_cash_register','income',[['eq','transaction_date',date]]),
+      fetchRows('cash_receipts','received_amount',[['eq','receipt_date',date]]),
+      fetchRows('payment_vouchers','voucher_no,mode,amount',voucherDateFilters,'voucher_no'),
+      fetchRows('cash_transactions','mode,direction,amount',nursingDateFilters),
+      fetchRows('cash_transfers','from_mode,to_mode,amount',nursingDateFilters),
+      fetchRows('extra_out','date,amount',[['lte','date',date]]),
+      fetchRows('extra_out_repayment','date,amount,mode',[['lte','date',date]]),
+      fetchRows('pharmacy_sales','sale_date,sale_type,mode_cash,mode_bank,mode_phonepe',pharmacyDateFilters),
+      fetchRows('pharmacy_supplier_payments','supplier_name,category,pay_date,amount,mode',[]),
+      fetchRows('pharmacy_vouchers','voucher_date,amount,mode',[['lte','voucher_date',date]]),
+      fetchRows('pharmacy_fund_transfers','transfer_date,amount,from_account,to_account',[['lte','transfer_date',date]]),
+      fetchRows('pharmacy_suppliers','supplier_name,opening_balance,opening_balance_dispensary,opening_balance_ipd',[]),
+      fetchRows('pharmacy_purchases','supplier_name,purchase_type,purchase_date,amount',[]),
+      fetchRows('pharmacy_other_purchases','supplier_name,category,purchase_date,amount',[]),
+      fetchRows('ipd_medicine_indens','amount',[]),
+      fetchRows('ipd_transactions','amount',[['eq','txn_type','Receive']]),
+      fetchRows('ipd_doctors','id,doctor_type,opening_balance',[]),
+      fetchRows('ipd_doctor_payments','doctor_id,amount,payment_date',[['lte','payment_date',date]]),
+      fetchRows('ipd_amount_entries','admission_id,surgent_fees,anaesthesia_fees,nh_fees',[]),
+      fetchRows('ipd_admissions','id,is_cancelled',[]),
+      fetchRows('ipd_ot_entries','admission_id,surgent_id,anaesthesia_id,ot_date',[['lte','ot_date',date]]),
+      fetchRows('creditors','id,opening_balance',[]),
+      fetchRows('credit_entries','creditor_id,amount,entry_type,entry_date',[['lte','entry_date',date]])
+    ]);
+
+    if (dayWorkResult.error) throw new Error(`day_work: ${dayWorkResult.error.message}`);
+
+    const opening = savedSheet ? {
+      cash:num(savedSheet.closing_cash), bank:num(savedSheet.closing_bank), phonepe:num(savedSheet.closing_phonepe)
+    } : {
+      cash:0, bank:0, phonepe:0
+    };
+    const work = (dayWorkResult.data && dayWorkResult.data[0]) || {};
+    const receive = {cash:0,bank:0,phonepe:0};
+    if (!savedSheet) {
+      const totalReceived = sum(ipdReceipts,'amount') + sum(opdReceipts,'income') + sum(otherReceipts,'received_amount');
+      receive.phonepe = num(work.phonepe_received);
+      receive.bank = num(work.bank_received);
+      receive.cash = totalReceived - receive.phonepe - receive.bank;
+    }
+
+    const nursingVoucherOut = {cash:0,bank:0,phonepe:0};
+    nursingVouchers.forEach(row => {
+      const mode = normalizeMode(row.mode);
+      if (mode) nursingVoucherOut[mode] += num(row.amount);
+    });
+    const nursingFlow = {cash:0,bank:0,phonepe:0};
+    nursingCashTx.forEach(row => {
+      const mode = normalizeMode(row.mode);
+      if (mode) nursingFlow[mode] += (row.direction === 'in' ? 1 : -1) * num(row.amount);
+    });
+    nursingTransfers.forEach(row => {
+      const from = normalizeMode(row.from_mode), to = normalizeMode(row.to_mode);
+      if (from) nursingFlow[from] -= num(row.amount);
+      if (to) nursingFlow[to] += num(row.amount);
+    });
+    const nursingBalances = {};
+    MODES.forEach(mode => {
+      nursingBalances[mode] = {
+        opening:opening[mode],
+        closing:opening[mode] + receive[mode] - nursingVoucherOut[mode] + nursingFlow[mode]
+      };
+    });
+    const extraOutBalances = new Map();
+    extraOutRows.forEach(row => {
+      const balance = extraOutBalances.get(row.name) || {given:0,repaid:0};
+      balance.given += num(row.amount);
+      extraOutBalances.set(row.name,balance);
+    });
+    extraOutRepayments.forEach(row => {
+      const balance = extraOutBalances.get(row.name) || {given:0,repaid:0};
+      balance.repaid += num(row.amount);
+      extraOutBalances.set(row.name,balance);
+    });
+    const totalOutstandingExtraOut = [...extraOutBalances.values()]
+      .reduce((total,balance) => total + Math.max(0,balance.given - balance.repaid),0);
+    const netNursingCash = nursingBalances.cash.closing - totalOutstandingExtraOut;
+
+    const pharmacySetup = setupResult.data || {};
+    const pharmacyOpening = {
+      cash:num(pharmacySetup.opening_cash),
+      bank:num(pharmacySetup.opening_bank),
+      phonepe:num(pharmacySetup.opening_phonepe)
+    };
+    const pharmacyBalances = {};
+    MODES.forEach(mode => {
+      const field = `mode_${mode}`;
+      const sales = pharmacySales.filter(row => row.sale_type === 'Dispensary').reduce((total,row) => total + num(row[field]),0);
+      const payments = pharmacyPayments.filter(row => row.category !== 'IPD' && normalizeMode(row.mode) === mode)
+        .reduce((total,row) => total + num(row.amount),0);
+      const vouchers = pharmacyVouchers.filter(row => normalizeMode(row.mode) === mode)
+        .reduce((total,row) => total + num(row.amount),0);
+      const transfersIn = pharmacyTransfers.filter(row => normalizeMode(row.to_account) === mode)
+        .reduce((total,row) => total + num(row.amount),0);
+      const transfersOut = pharmacyTransfers.filter(row => normalizeMode(row.from_account) === mode)
+        .reduce((total,row) => total + num(row.amount),0);
+      pharmacyBalances[mode] = {
+        opening:pharmacyOpening[mode],
+        closing:pharmacyOpening[mode] + sales - payments - vouchers + transfersIn - transfersOut
+      };
+    });
+
+    const amountByAdmission = new Map(amountEntries.map(row => [row.admission_id,row]));
+    const cancelledAdmissions = new Set(admissions.filter(row => row.is_cancelled).map(row => row.id));
+    const doctorDue = doctors.reduce((total,doctor) => {
+      let fees = 0, nhAdjustment = 0;
+      otEntries.filter(row => !cancelledAdmissions.has(row.admission_id)).forEach(ot => {
+        const amounts = amountByAdmission.get(ot.admission_id);
+        if (!amounts) return;
+        if (doctor.doctor_type === 'Surgent' && ot.surgent_id === doctor.id) {
+          fees += num(amounts.surgent_fees);
+          nhAdjustment += num(amounts.nh_fees);
+        } else if (doctor.doctor_type === 'Anaesthesia' && ot.anaesthesia_id === doctor.id) {
+          fees += num(amounts.anaesthesia_fees);
+        }
+      });
+      const paid = doctorPayments.filter(payment => payment.doctor_id === doctor.id)
+        .reduce((sumPaid,payment) => sumPaid + num(payment.amount),0);
+      return total + num(doctor.opening_balance) + fees - nhAdjustment - paid;
+    },0);
+
+    const creditorTotals = new Map();
+    creditorEntries.forEach(entry => {
+      if (!creditorTotals.has(entry.creditor_id)) creditorTotals.set(entry.creditor_id,{credit:0,payment:0});
+      const balance = creditorTotals.get(entry.creditor_id);
+      if (entry.entry_type === 'credit') balance.credit += num(entry.amount);
+      if (entry.entry_type === 'payment') balance.payment += num(entry.amount);
+    });
+    const creditorDue = creditors.reduce((total,creditor) => {
+      const balance = creditorTotals.get(creditor.id) || {credit:0,payment:0};
+      return total + num(creditor.opening_balance) + balance.credit - balance.payment;
+    },0);
+
+    const supplierDue = {Dispensary:0,IPD:0};
+    pharmacySuppliers.forEach(supplier => {
+      const legacyOpening = supplier.opening_balance_dispensary == null && supplier.opening_balance_ipd == null;
+      const openingDispensary = legacyOpening ? num(supplier.opening_balance) : num(supplier.opening_balance_dispensary);
+      const openingIpd = num(supplier.opening_balance_ipd);
+      const openingByCategory = {Dispensary:openingDispensary,IPD:openingIpd};
+      const purchases = pharmacyPurchases.filter(row => row.supplier_name === supplier.supplier_name);
+      const otherPurchases = pharmacyOtherPurchases.filter(row => row.supplier_name === supplier.supplier_name);
+      const payments = pharmacyPayments.filter(row => row.supplier_name === supplier.supplier_name);
+      const categoryTotal = {Dispensary:openingByCategory.Dispensary,IPD:openingByCategory.IPD};
+      purchases.forEach(row => {
+        categoryTotal[row.purchase_type === 'IPD' ? 'IPD' : 'Dispensary'] += num(row.amount);
+      });
+      otherPurchases.forEach(row => {
+        categoryTotal[row.category === 'IPD' ? 'IPD' : 'Dispensary'] += num(row.amount);
+      });
+      payments.forEach(row => {
+        categoryTotal[row.category === 'IPD' ? 'IPD' : 'Dispensary'] -= num(row.amount);
+      });
+      supplierDue.Dispensary += categoryTotal.Dispensary;
+      supplierDue.IPD += categoryTotal.IPD;
+    });
+    const bhagirathiDue = sum(ipdIndens,'amount') - sum(ipdReceiptsFromHospital,'amount');
+
+    renderBalances('nursingBalances',nursingBalances,'Gross Cash');
+    $('nursingCashSummary').innerHTML = `
+      <div class="cash-summary-card">
+        <div class="label">Total Outstanding Extra Out</div>
+        <div class="amount">${fmt(totalOutstandingExtraOut)}</div>
+      </div>
+      <div class="cash-summary-card net">
+        <div class="label">Net Cash</div>
+        <div class="amount">${fmt(netNursingCash)}</div>
+      </div>`;
+    renderBalances('pharmacyBalances',pharmacyBalances);
+    renderDueTotals({
+      doctor:doctorDue,
+      creditor:creditorDue,
+      bhagirathi:bhagirathiDue,
+      ipdSupplier:supplierDue.IPD,
+      dispensarySupplier:supplierDue.Dispensary
+    });
+    $('dashboardContent').classList.remove('hidden');
+    $('status').textContent = `Balances and dues as of ${date}.`;
+  } catch (error) {
+    $('dashboardError').textContent = `Dashboard could not be loaded: ${error.message}`;
+    $('dashboardError').classList.remove('hidden');
+    $('status').textContent = '';
+  }
+}
+
+$('reportDate').value = localISO();
+$('reportDate').addEventListener('change',loadDashboard);
+loadDashboard();
+</script>
+</body>
+</html>

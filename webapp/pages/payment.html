@@ -1,0 +1,1885 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Payment-</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .tab-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+    .tab-btn { padding:.5rem 1.1rem; border:2px solid #6366f1; border-radius:8px; background:#fff;
+               color:#6366f1; font-weight:600; cursor:pointer; transition:all .2s; }
+    .tab-btn.active { background:#6366f1; color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    /* type selector cards */
+    .type-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:.85rem; margin-bottom:1.5rem; }
+    .type-card { background:#fff; border:2px solid #e2e8f0; border-radius:12px; padding:1.1rem .9rem;
+                 text-align:center; cursor:pointer; transition:all .15s; }
+    .type-card:hover { border-color:#a5b4fc; transform:translateY(-2px); }
+    .type-card.active { border-color:#6366f1; background:#eef2ff; }
+    .type-card .ti { font-size:1.7rem; display:block; margin-bottom:.4rem; }
+    .type-card .tl { font-size:.85rem; font-weight:700; color:#1e293b; }
+
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; }
+    .form-row > * { flex:1; min-width:180px; }
+    .form-row label { display:block; font-size:.8rem; font-weight:600; color:#475569; margin-bottom:.3rem; }
+    .form-row input, .form-row select {
+      width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:6px;
+      padding:.5rem .65rem; font-size:.88rem;
+    }
+    .form-row input:focus, .form-row select:focus { outline:none; border-color:#6366f1; }
+    .req { color:#dc2626; }
+
+    .mode-chips { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.3rem; }
+    .mode-chip { border:2px solid #c7d2fe; border-radius:8px; padding:.35rem .9rem; cursor:pointer;
+                 font-size:.85rem; font-weight:600; color:#4338ca; background:#fff; transition:all .18s; }
+    .mode-chip.active { background:#6366f1; color:#fff; border-color:#6366f1; }
+
+
+    /* voucher no. with auto-prefix */
+    .vno-wrap { display:flex; align-items:stretch; }
+    .vno-pfx { display:flex; align-items:center; padding:0 .7rem; background:#e0e7ff; color:#3730a3;
+               font-weight:800; border:1px solid #cbd5e1; border-right:none; border-radius:6px 0 0 6px; }
+    .vno-pfx.off { background:#f1f5f9; color:#94a3b8; text-decoration:line-through; }
+    .vno-wrap input { flex:1; min-width:0; border-radius:0 6px 6px 0 !important; }
+    .vno-auto { display:flex !important; align-items:center; gap:.4rem; font-weight:500 !important;
+                font-size:.8rem !important; margin:.35rem 0 0 !important; cursor:pointer; color:#475569 !important; }
+    .vno-auto input { width:auto !important; margin:0; padding:0 !important; }
+
+    /* PhonePe screenshot (optional) */
+    .shot-box { display:none; margin-top:.6rem; padding:.55rem .7rem; background:#f5f3ff; border:1px dashed #a5b4fc; border-radius:8px; }
+    .shot-box.on { display:block; }
+    .shot-box label { margin-bottom:.35rem !important; font-size:.8rem !important; }
+    .shot-box input[type=file] { padding:.35rem !important; font-size:.8rem !important; background:#fff; }
+    .shot-prev { display:none; max-width:140px; max-height:180px; margin-top:.5rem; border:1px solid #cbd5e1; border-radius:6px; }
+    .shot-prev.on { display:block; }
+    .voucher-badge { font-size:.8rem; margin-top:.35rem; min-height:1.1em; }
+    .due-box { background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:.6rem .9rem;
+               margin:.6rem 0; font-size:.86rem; }
+    .due-box .dv { font-weight:800; font-size:1.1rem; color:#c2410c; }
+
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; font-size:.82rem; }
+    th { background:#f0f0f0; padding:7px 8px; text-align:left; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; vertical-align:middle; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+    tr.row-blank td { background:#fef2f2; }
+    tr.row-filled td { background:#f0fdf4; }
+
+    .section-title { font-size:.9rem; font-weight:700; color:#312e81; margin:1.2rem 0 .5rem;
+                      padding-bottom:.3rem; border-bottom:1px solid #e0e7ff; }
+    .form-card { background:#f8f9ff; border:1px solid #c7d2fe; border-radius:10px; padding:1rem 1.1rem; margin-top:.75rem; }
+    .info { color:#15803d; font-size:.85rem; margin-top:.5rem; }
+    .err  { color:#dc2626; font-size:.85rem; margin-top:.5rem; white-space:pre-wrap; }
+    .hidden { display:none!important; }
+    .pill { display:inline-block; padding:2px 9px; border-radius:12px; font-size:.75rem; font-weight:700; }
+    .pill-blank  { background:#fee2e2; color:#991b1b; }
+    .pill-filled { background:#d1fae5; color:#065f46; }
+    .chk-row td { cursor:pointer; }
+    .upload-status-ok  { color:#059669; font-weight:600; }
+    .upload-status-bad { color:#dc2626; font-weight:600; }
+
+    /* role-gated entry actions (Voucher Tracker) */
+    .btn-small { padding:.35rem .7rem; font-size:.8rem; border-radius:6px; border:none; cursor:pointer; font-weight:600; }
+    .btn-secondary { background:#e2e8f0; color:#334155; }
+    .btn-danger { background:#dc2626; color:#fff; }
+    .view-only-tag { color:#94a3b8; font-size:.78rem; }
+
+    /* pm- prefixed to avoid clashing with any shared modal CSS elsewhere */
+    .pm-modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,.55);
+      display:flex; align-items:center; justify-content:center; z-index:9999; }
+    .pm-modal-box { background:#fff; border-radius:12px; padding:1.25rem 1.4rem; max-width:640px;
+      width:92%; max-height:85vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); position:relative; }
+    .pm-modal-box h3 { margin:0 0 .85rem; font-size:1.05rem; color:#1e293b; padding-right:1.5rem; }
+    .pm-close-btn { position:absolute; top:1rem; right:1.1rem; cursor:pointer; font-size:1.1rem;
+      color:#64748b; background:none; border:none; line-height:1; }
+    .pm-row { border:1px solid #e2e8f0; border-radius:8px; padding:.75rem .85rem; margin-bottom:.65rem; background:#f8fafc; }
+    .pm-row-label { font-size:.82rem; font-weight:700; color:#334155; margin-bottom:.5rem; }
+    .pm-row .form-row { margin-bottom:0; }
+    .pm-row-actions { display:flex; justify-content:flex-end; gap:.5rem; margin-top:.65rem; }
+
+    /* voucher register */
+    .btn-outline { background:#fff; color:#334155; border:1px solid #cbd5e1; }
+    .summary-bar { display:flex; gap:1.5rem; flex-wrap:wrap; align-items:center; margin:.75rem 0; }
+    .summary-chip { background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:.5rem .9rem; font-size:.85rem; }
+    .summary-chip b { color:#312e81; }
+    .export-bar { display:flex; gap:.6rem; flex-wrap:wrap; }
+    .hint { font-size:.78rem; color:#888; margin-top:.3rem; }
+    #mtRegister tr.row-filled td { background:#fff; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div id="pmModalOverlay" class="pm-modal-overlay hidden">
+  <div class="pm-modal-box" id="pmModalBox"></div>
+</div>
+<div class="page">
+  <h1>💳 Payment</h1>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchMainTab('mtNew',this)">➕ New Payment</button>
+    <button class="tab-btn" onclick="switchMainTab('mtRange',this)">🎫 Voucher Range</button>
+    <button class="tab-btn" onclick="switchMainTab('mtTrack',this)">📋 Voucher Tracker</button>
+    <button class="tab-btn" onclick="switchMainTab('mtRegister',this)">🧾 Voucher Register</button>
+    <button class="tab-btn" onclick="switchMainTab('mtUpload',this)">📤 Excel Upload</button>
+  </div>
+
+  <!-- ══════════════════ TAB: NEW PAYMENT ══════════════════ -->
+  <div id="mtNew" class="tab-panel active">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">Select Payment Type</h2>
+      <div class="type-grid" id="typeGrid"></div>
+      <div id="formContainer"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ TAB: VOUCHER RANGE ══════════════════ -->
+  <div id="mtRange" class="tab-panel">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">🎫 Generate Voucher Range</h2>
+      <p style="font-size:.85rem;color:#666;margin-bottom:.75rem">
+        Creates one blank row per voucher number. Every payment entry (from any type, or Excel upload)
+        must use a voucher number that already exists here — this is what lets you spot a missed voucher
+        (a blank row) and stops the same voucher number being reused for two different parties.
+      </p>
+      <p style="font-size:.82rem;color:#4338ca;margin-bottom:.75rem">
+        Prefix is optional. e.g. Prefix <b>D</b>, 1 → 500 creates D1…D500 (doctor payments).
+        Leave prefix blank for plain numbers.
+      </p>
+      <div class="form-row" style="max-width:640px">
+        <div style="flex:0 0 110px;min-width:90px"><label>Prefix</label><input id="rangePrefix" maxlength="5" placeholder="D / B" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')"/></div>
+        <div><label>Start No. <span class="req">*</span></label><input id="rangeStart" type="number"/></div>
+        <div><label>End No. <span class="req">*</span></label><input id="rangeEnd" type="number"/></div>
+        <div style="flex:0"><button class="btn-primary" style="width:auto;white-space:nowrap" onclick="generateRange()">Generate</button></div>
+      </div>
+      <p class="err" id="rangeErr"></p>
+      <p class="info" id="rangeOk"></p>
+
+      <div class="section-title">Recent Ranges</div>
+      <div id="rangeHist">Loading…</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ TAB: VOUCHER TRACKER ══════════════════ -->
+  <div id="mtTrack" class="tab-panel">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">📋 Voucher Tracker</h2>
+      <div class="form-row" style="margin-bottom:.75rem">
+        <div style="flex:0 0 110px;min-width:90px"><label>Prefix</label><input id="trackPrefix" maxlength="5" placeholder="all" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')"/></div>
+        <div><label>From No.</label><input id="trackFrom" type="number"/></div>
+        <div><label>To No.</label><input id="trackTo" type="number"/></div>
+        <div>
+          <label>Status</label>
+          <select id="trackStatus">
+            <option value="">All</option>
+            <option value="blank">Blank (missed) only</option>
+            <option value="filled">Filled only</option>
+          </select>
+        </div>
+        <div style="flex:0"><button class="btn-primary" style="width:auto" onclick="loadTracker()">Show</button></div>
+        <div style="flex:0"><button class="btn-primary" style="width:auto;white-space:nowrap;background:#059669" onclick="downloadTrackerExcel()">⬇️ Excel</button></div>
+      </div>
+      <div id="trackOut">Enter a range and click Show.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ TAB: VOUCHER REGISTER ══════════════════ -->
+  <div id="mtRegister" class="tab-panel">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.5rem">🧾 Voucher Register</h2>
+      <p style="font-size:.85rem;color:#666;margin-bottom:1rem">
+        Every voucher recorded from Payment (any type) or Excel Upload shows up here. Search, edit or delete a
+        voucher — changes apply to whichever underlying table it belongs to. Export the current list or search
+        result to Excel or PDF.
+      </p>
+
+      <div class="form-card" style="margin-top:0">
+        <div class="section-title" style="margin-top:0">Search / Filter</div>
+        <div class="form-row">
+          <div><label>Date From</label><input id="fDateFrom" type="date"/></div>
+          <div><label>Date To</label><input id="fDateTo" type="date"/></div>
+          <div>
+            <label>Category</label>
+            <select id="fType"><option value="">All categories</option></select>
+          </div>
+          <div>
+            <label>Status</label>
+            <select id="fStatus">
+              <option value="filled" selected>Filled (has a payment)</option>
+              <option value="">All</option>
+              <option value="blank">Blank (missed) only</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:.75rem">
+          <div style="flex:2">
+            <label>Search — name, voucher no., or keyword</label>
+            <input id="fKeyword" placeholder="e.g. Rahim Sk, 5206, office supplies…" onkeydown="if(event.key==='Enter')runSearch()"/>
+            <p class="hint">Matches voucher no., party/payee name and description.</p>
+          </div>
+          <div><label>Voucher No From</label><input id="fVFrom" type="number"/></div>
+          <div><label>Voucher No To</label><input id="fVTo" type="number"/></div>
+          <div>
+            <label>Rows to load</label>
+            <select id="fLimit">
+              <option value="200" selected>200</option>
+              <option value="500">500</option>
+              <option value="1000">1000</option>
+              <option value="5000">5000 (may be slow)</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:.85rem;display:flex;gap:.6rem">
+          <button class="btn-primary" style="width:auto" onclick="runSearch()">🔎 Search</button>
+          <button class="btn-small btn-outline" onclick="clearFilters()">✖ Clear</button>
+        </div>
+      </div>
+
+      <div class="summary-bar" id="summaryBar"></div>
+      <div class="export-bar" id="exportBar"></div>
+      <p class="err" id="listErr"></p>
+      <div id="listOut">Set your filters (or leave them blank) and click Search.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ TAB: EXCEL UPLOAD ══════════════════ -->
+  <div id="mtUpload" class="tab-panel">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.75rem">📤 Excel Upload</h2>
+      <div class="type-grid" id="uploadTypeGrid"></div>
+
+      <div id="uploadArea" class="hidden">
+        <div class="form-card">
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
+            <button class="btn-primary" style="width:auto;background:#059669" onclick="downloadSample()">⬇ Download Sample Excel</button>
+            <input type="file" id="uploadFile" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)"/>
+          </div>
+          <p style="font-size:.8rem;color:#666;margin-top:.5rem" id="uploadColsHint"></p>
+        </div>
+        <div id="uploadPreview" style="margin-top:1rem"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/menu.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+const pageAccess = BNH_PAGE.requirePageAccess("pages/payment.html");
+const sb = BNH_PAGE.sb;
+
+// ════════════════════════════════════════════════════════════
+// ACCESS LEVEL — two tiers within the page
+//   full    → add, view, edit, delete, export
+//   limited → add, view, export only (no edit/delete of existing entries)
+// Role assignments are centralized in assets/menu.js.
+// ════════════════════════════════════════════════════════════
+function hasFullAccess(){
+  return pageAccess === "full";
+}
+const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const todayISO = () => new Date().toISOString().slice(0,10);
+function spin(on){ document.getElementById('spinner').classList.toggle('hidden', !on); }
+
+// ════════════════════════════════════════════════════════════
+// PAYMENT TYPE CONFIG (shared by New Payment + Excel Upload)
+// ════════════════════════════════════════════════════════════
+const TYPES = {
+  doctor:     { label:'Doctor Payment',     icon:'👨‍⚕️', multi:false },
+  lab_agent:  { label:'Lab Agent Payment',  icon:'🧪' , multi:false },
+  salary:     { label:'Salary Payment',     icon:'💵' , multi:false },
+  creditor:   { label:'Creditor Payment',   icon:'🏦' , multi:false },
+  cash:       { label:'Cash Voucher',       icon:'💰' , multi:false },
+  ipd_medicine: { label:'IPD Medicine Payment', icon:'💊', multi:false }
+};
+// IPD / OPD Refer payments can no longer be created from this page, but vouchers
+// recorded earlier still exist — these labels keep them readable (and editable /
+// deletable) in the Voucher Tracker and Voucher Register.
+const LEGACY_TYPES = {
+  ipd_refer:  { label:'IPD Refer Payment',  icon:'🏥' },
+  opd_refer:  { label:'OPD Refer Payment',  icon:'🚑' }
+};
+const TYPE_LABELS = { ...TYPES, ...LEGACY_TYPES };
+TYPE_LABELS.cash_voucher = TYPE_LABELS.cash;   // DB may store cash entries as "cash_voucher"
+
+// Per-type table + column mapping, used by Edit/Delete in the Voucher Tracker and
+// Voucher Register (full access only). ipd_refer / opd_refer are kept here only so
+// old vouchers can still be edited or deleted.
+function buildIpdReferRemark(r){
+  const details = [];
+  if (r && r.patient_name) details.push(`Patient: ${r.patient_name}`);
+  if (r && r.admission_no) details.push(`Admission No: ${r.admission_no}`);
+  if (r && r.remark) details.push(String(r.remark).trim());
+  return details.join(' | ');
+}
+const TYPE_META = {
+  ipd_refer: { table:'ipd_refer_payments', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remark',
+    label:r=>`${r.patient_name||''} (${r.admission_no||''}) — Refer: ${r.refer_name||''}` },
+  opd_refer: { table:'opd_refer_payment', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remarks',
+    label:r=>`Case ${r.case_no||''} — ${r.payment_to||''}` },
+  doctor: { table:'ipd_doctor_payments', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remark',
+    label:r=>`${r.doctor_name||''} (${r.doctor_type||''})` },
+  lab_agent: { table:'lab_agent_payment', dateCol:'payment_date', amountCol:'amount_paid', modeCol:'payment_mode', remarkCol:'remarks',
+    label:r=>r.agent_name_snapshot||'' },
+  salary: { table:'salary_payments', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remarks',
+    label:r=>`${r.employee_name||''} — ${(typeof MONTHS!=='undefined'&&MONTHS[r.month])||r.month||''} ${r.year||''}` },
+  creditor: { table:'credit_entries', dateCol:'entry_date', amountCol:'amount', modeCol:'mode', remarkCol:'note',
+    label:r=>`${r.creditor_name||''} (${r.category_name||''})` },
+  cash: { table:'cash_vouchers', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remark',
+    label:r=>r.party_name||'' },
+  ipd_medicine: { table:'pharmacy_supplier_payments', dateCol:'pay_date', amountCol:'amount', modeCol:'mode', remarkCol:'remark',
+    label:r=>`${r.supplier_name||''} (${r.category||'IPD'} Medicine)` }
+};
+// DB writes payment_vouchers.type as "cash_voucher" for cash entries; point both
+// spellings at the same config.
+TYPE_META.cash_voucher = TYPE_META.cash;
+
+// payment_vouchers.type is written by the database and can differ slightly from the
+// TYPE_META keys (spaces/dashes, table name, trailing "payments"). normalizeType()
+// maps those variants back so Edit/Delete still appear.
+function normalizeType(raw){
+  if (!raw) return raw;
+  let t = String(raw).trim().toLowerCase().replace(/[\s-]+/g,'_');
+  if (TYPE_META[t]) return t;
+  const byTable = Object.entries(TYPE_META).find(([,m]) => m.table.toLowerCase() === t);
+  if (byTable) return byTable[0];
+  const stripped = t.replace(/_?payments?$/,'');
+  if (TYPE_META[stripped]) return stripped;
+  return t;
+}
+
+document.getElementById('typeGrid').innerHTML = Object.entries(TYPES).map(([k,t])=>
+  `<div class="type-card" id="tcard-${k}" onclick="selectType('${k}')">
+     <span class="ti">${t.icon}</span><span class="tl">${esc(t.label)}</span>
+   </div>`).join('');
+document.getElementById('uploadTypeGrid').innerHTML = Object.entries(TYPES).map(([k,t])=>
+  `<div class="type-card" id="ucard-${k}" onclick="selectUploadType('${k}')">
+     <span class="ti">${t.icon}</span><span class="tl">${esc(t.label)}</span>
+   </div>`).join('');
+
+function switchMainTab(id, btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-bar .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id==='mtRange') loadRangeHistory();
+}
+
+// ── shared mode-chip helper ──────────────────────────────────
+
+// ── PhonePe screenshot (optional) ────────────────────────────
+const SHOT_BUCKET = 'payment-screenshots';
+function shotBoxHtml(p){
+  return `<div class="shot-box" id="${p}ShotBox">
+    <label>📸 PhonePe screenshot <span style="font-weight:400">(optional)</span></label>
+    <input type="file" id="${p}Shot" accept="image/*" onchange="shotPreview('${p}')"/>
+    <img id="${p}ShotPrev" class="shot-prev" alt="preview"/></div>`;
+}
+function shotToggle(p, val){
+  const box = document.getElementById(p+'ShotBox'); if (!box) return;
+  box.classList.toggle('on', val === 'PhonePe');
+  if (val !== 'PhonePe') shotClear(p);
+}
+function shotClear(p){
+  const f = document.getElementById(p+'Shot'), im = document.getElementById(p+'ShotPrev');
+  if (f) f.value=''; if (im){ im.classList.remove('on'); im.removeAttribute('src'); }
+}
+function shotPreview(p){
+  const f = document.getElementById(p+'Shot'), im = document.getElementById(p+'ShotPrev');
+  const file = f.files && f.files[0];
+  if (!file) { shotClear(p); return; }
+  if (!file.type.startsWith('image/')) { alert('Please choose an image file (JPG / PNG).'); shotClear(p); return; }
+  if (file.size > 15*1024*1024) { alert('Image is larger than 15 MB.'); shotClear(p); return; }
+  im.src = URL.createObjectURL(file); im.classList.add('on');
+}
+// shrink phone screenshots before upload (max 1400px, JPEG) so uploads stay fast on slow networks
+function shotCompress(file){
+  return new Promise((res, rej)=>{
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = ()=>{
+      const sc = Math.min(1, 1400/Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b=>{ URL.revokeObjectURL(url); b ? res(b) : rej(new Error('Could not process image')); }, 'image/jpeg', 0.8);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); rej(new Error('Not a valid image')); };
+    img.src = url;
+  });
+}
+// call AFTER the payment rows are saved. Never throws — a failed upload only adds a warning.
+async function saveShot(p, voucher, okEl){
+  const f = document.getElementById(p+'Shot'), mode = document.getElementById(p+'Mode').value;
+  if (!f || !f.files || !f.files[0] || mode !== 'PhonePe') return;
+  try{
+    const blob = await shotCompress(f.files[0]);
+    const path = `${String(voucher).replace(/[^A-Za-z0-9_-]/g,'_')}/${Date.now()}.jpg`;
+    const up = await sb.storage.from(SHOT_BUCKET).upload(path, blob, { contentType:'image/jpeg' });
+    if (up.error) throw up.error;
+    const { data: old } = await sb.from('voucher_screenshots').select('file_path').eq('voucher_no', voucher).maybeSingle();
+    const { error } = await sb.from('voucher_screenshots').upsert({
+      voucher_no: voucher, file_path: path,
+      uploaded_by: BNH_PAGE.user.username, uploaded_by_name: BNH_PAGE.user.name, uploaded_at: new Date().toISOString()
+    }, { onConflict:'voucher_no' });
+    if (error) throw error;
+    if (old && old.file_path && old.file_path !== path) await sb.storage.from(SHOT_BUCKET).remove([old.file_path]);
+    shotClear(p);
+    if (okEl) okEl.textContent += ' 📸 Screenshot attached.';
+  } catch(ex){
+    if (okEl) okEl.textContent += ' ⚠️ Payment saved, but the screenshot could not be uploaded: ' + ex.message;
+  }
+}
+
+function modeChipsHtml(prefix){
+  return `<div class="mode-chips">
+      <div class="mode-chip" onclick="selectMode(this,'${prefix}','Cash')">💵 Cash</div>
+      <div class="mode-chip" onclick="selectMode(this,'${prefix}','Bank')">🏦 Bank</div>
+      <div class="mode-chip" onclick="selectMode(this,'${prefix}','PhonePe')">📱 PhonePe</div>
+    </div><input type="hidden" id="${prefix}Mode"/>${shotBoxHtml(prefix)}`;
+}
+function selectMode(el, prefix, val){
+  el.parentElement.querySelectorAll('.mode-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(prefix+'Mode').value = val;
+  shotToggle(prefix, val);
+}
+
+
+// ── voucher prefix helpers ───────────────────────────────────
+// Auto-prefix: a purely numeric voucher no. gets the prefix put in front (e.g. 15 -> D15).
+// Untick "Auto prefix" to use the number exactly as typed. Anything with letters is kept as typed.
+function vnoResolve(inputId, cbId, pfx){
+  const inp = document.getElementById(inputId);
+  let v = ((inp && inp.value) || '').trim().toUpperCase().replace(/\s+/g,'');
+  const cb = document.getElementById(cbId);
+  if (v && cb && cb.checked && /^\d+$/.test(v)) v = pfx + v;
+  return v;
+}
+function vnoFieldHtml(inputId, cbId, pfxId, pfx, onblurJs){
+  return `<div class="vno-wrap"><span class="vno-pfx" id="${pfxId}">${pfx}</span>
+      <input id="${inputId}" autocomplete="off" onblur="${onblurJs}" oninput="this.value=this.value.toUpperCase()"/></div>
+    <label class="vno-auto"><input type="checkbox" id="${cbId}" checked
+      onchange="vnoToggle('${cbId}','${pfxId}');${onblurJs}"/> Auto prefix "${pfx}"</label>`;
+}
+function vnoToggle(cbId, pfxId){
+  const on = document.getElementById(cbId).checked;
+  document.getElementById(pfxId).classList.toggle('off', !on);
+}
+function vnoParse(v){
+  const m = /^([A-Za-z]*)(\d+)$/.exec(String(v||'').trim());
+  return m ? { p: m[1].toUpperCase(), n: parseInt(m[2],10) } : { p: String(v||''), n: NaN };
+}
+function vnoCompare(a, b){
+  const x = vnoParse(a), y = vnoParse(b);
+  if (x.p !== y.p) return x.p < y.p ? -1 : 1;
+  return (x.n||0) - (y.n||0);
+}
+
+// Which forms auto-prefix, and with what.  (form id-prefix -> letter)
+const VOUCHER_AUTO_PREFIX = { dc:'D' };
+const voucherOf = fp => vnoResolve(fp+'Voucher', fp+'AutoPfx', VOUCHER_AUTO_PREFIX[fp]||'');
+const voucherField = fp => VOUCHER_AUTO_PREFIX[fp]
+  ? vnoFieldHtml(fp+'Voucher', fp+'AutoPfx', fp+'PfxBox', VOUCHER_AUTO_PREFIX[fp], `checkVoucher('${fp}')`)
+  : `<input id="${fp}Voucher" onblur="checkVoucher('${fp}')"/>`;
+
+// ── voucher-number live check ────────────────────────────────
+async function checkVoucher(prefix){
+  const badge = document.getElementById(prefix+'VStatus');
+  const vNoEl = document.getElementById(prefix+'Voucher');
+  if (!badge || !vNoEl) return null;
+  const vNo = voucherOf(prefix);
+  if (!vNo) { badge.innerHTML=''; return null; }
+  const { data } = await sb.from('payment_vouchers').select('*').eq('voucher_no', vNo).maybeSingle();
+  if (!data) {
+    badge.innerHTML = '<span style="color:#dc2626">❌ Not generated yet — create this voucher range first (Voucher Range tab).</span>';
+    return { ok:false };
+  }
+  if (data.status === 'blank') {
+    badge.innerHTML = '<span style="color:#059669">✅ Available.</span>';
+    return { ok:true, existing:null };
+  }
+  badge.innerHTML = `<span style="color:#d97706">⚠️ Already used — ${esc(data.party_name)} (${esc(data.type)}), ₹${fmt(data.amount)} recorded so far.
+    Additional entries on this voucher number are only allowed for the <b>same party</b> in the <b>same type</b>.</span>`;
+  return { ok:true, existing:data };
+}
+
+// ════════════════════════════════════════════════════════════
+// TYPE SELECTION → FORM RENDERING
+// ════════════════════════════════════════════════════════════
+let currentType = null;
+function selectType(key){
+  currentType = key;
+  document.querySelectorAll('.type-card').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tcard-'+key).classList.add('active');
+  const c = document.getElementById('formContainer');
+  const renderers = {
+    doctor: formDoctor, lab_agent: formLabAgent, salary: formSalary,
+    creditor: formCreditor, cash: formCash, ipd_medicine: formIpdMedicine
+  };
+  c.innerHTML = renderers[key]();
+  const initters = {
+    doctor: initDoctorForm, lab_agent: initLabAgentForm, salary: initSalaryForm,
+    creditor: initCreditorForm, cash: initCashForm, ipd_medicine: initIpdMedicineForm
+  };
+  initters[key]();
+}
+
+// ────────────────────────────────────────────────────────────
+// 1. DOCTOR PAYMENT
+// ────────────────────────────────────────────────────────────
+function formDoctor(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">👨‍⚕️ Doctor Payment</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        ${voucherField('dc')}
+        <div class="voucher-badge" id="dcVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="dcDate" type="date" value="${todayISO()}"/></div>
+      <div><label>Doctor <span class="req">*</span></label><select id="dcDoctor" onchange="onDoctorSelect()"><option value="">— select —</option></select></div>
+    </div>
+    <div class="due-box hidden" id="dcDueBox">Current Due: <span class="dv" id="dcDueVal">—</span></div>
+    <div class="form-row">
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="dcAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('dc')}</div>
+      <div><label>Remark (optional)</label><input id="dcRemark"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveDoctorPayment()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="dcErr"></p>
+    <p class="info" id="dcOk" style="display:none"></p>
+  </div>`;
+}
+let dcDoctors = [];
+async function initDoctorForm(){
+  const { data } = await sb.from('ipd_doctors').select('id,doctor_name,doctor_type,opening_balance').order('doctor_name');
+  dcDoctors = data||[];
+  document.getElementById('dcDoctor').innerHTML = '<option value="">— select —</option>' +
+    dcDoctors.map(d=>`<option value="${d.id}">${esc(d.doctor_name)} (${esc(d.doctor_type)})</option>`).join('');
+}
+async function onDoctorSelect(){
+  const id = document.getElementById('dcDoctor').value;
+  const box = document.getElementById('dcDueBox');
+  if (!id) { box.classList.add('hidden'); return; }
+  spin(true);
+  try{
+    const { due } = await getDoctorDue(id);
+    box.classList.remove('hidden');
+    document.getElementById('dcDueVal').textContent = fmt(due);
+  } finally { spin(false); }
+}
+async function getDoctorDue(doctorId){
+  const { data: doc } = await sb.from('ipd_doctors').select('*').eq('id',doctorId).single();
+  const { data: otEntries } = await sb.from('ipd_ot_entries').select('surgent_id,anaesthesia_id,admission_id')
+    .or(`surgent_id.eq.${doctorId},anaesthesia_id.eq.${doctorId}`);
+  const admIds = (otEntries||[]).map(o=>o.admission_id);
+  let amtMap = {};
+  if (admIds.length){
+    const { data: amts } = await sb.from('ipd_amount_entries').select('*').in('admission_id',admIds);
+    (amts||[]).forEach(a=>amtMap[a.admission_id]=a);
+  }
+  let otFees=0, nhAdj=0;
+  (otEntries||[]).forEach(ot=>{
+    const amt = amtMap[ot.admission_id]; if (!amt) return;
+    if (doc.doctor_type==='Surgent' && ot.surgent_id===doctorId){ otFees+=parseFloat(amt.surgent_fees||0); nhAdj+=parseFloat(amt.nh_fees||0); }
+    else if (doc.doctor_type==='Anaesthesia' && ot.anaesthesia_id===doctorId){ otFees+=parseFloat(amt.anaesthesia_fees||0); }
+  });
+  const { data: pays } = await sb.from('ipd_doctor_payments').select('amount').eq('doctor_id',doctorId);
+  const paid = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount||0),0);
+  const opBal = parseFloat(doc.opening_balance||0);
+  const due = doc.doctor_type==='Surgent' ? opBal+otFees-nhAdj-paid : opBal+otFees-paid;
+  return { doc, due };
+}
+async function saveDoctorPayment(){
+  const err = document.getElementById('dcErr'), ok = document.getElementById('dcOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = voucherOf('dc');
+  const date = document.getElementById('dcDate').value;
+  const docId = document.getElementById('dcDoctor').value;
+  const amount = parseFloat(document.getElementById('dcAmount').value||0);
+  const mode = document.getElementById('dcMode').value;
+  const remark = document.getElementById('dcRemark').value.trim() || null;
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!docId) { err.textContent='Select a doctor.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+
+  const vcheck = await checkVoucher('dc');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  const doc = dcDoctors.find(d=>d.id===docId);
+  spin(true);
+  try{
+    const payload = BNH_PAGE.stamp({
+      doctor_id: docId, doctor_name: doc.doctor_name, doctor_type: doc.doctor_type,
+      payment_date: date, voucher_no: voucher, amount, mode, remark,
+      description: `Doctor Payment - ${doc.doctor_name} (${doc.doctor_type})`
+    });
+    const { error } = await sb.from('ipd_doctor_payments').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = '✅ Doctor payment saved.';
+    await saveShot('dc', voucher, ok);
+    document.getElementById('dcAmount').value=''; document.getElementById('dcRemark').value='';
+    await onDoctorSelect();
+    await checkVoucher('dc');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 2. LAB AGENT PAYMENT
+// ────────────────────────────────────────────────────────────
+function formLabAgent(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">🧪 Lab Agent Payment</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        ${voucherField('la')}
+        <div class="voucher-badge" id="laVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="laDate" type="date" value="${todayISO()}"/></div>
+      <div><label>Agent <span class="req">*</span></label><select id="laAgent" onchange="onAgentSelect()"><option value="">— select —</option></select></div>
+    </div>
+    <div class="due-box hidden" id="laDueBox">Current Due: <span class="dv" id="laDueVal">—</span></div>
+    <div class="form-row">
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="laAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('la')}</div>
+      <div><label>Remark (optional)</label><input id="laRemark"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveLabAgentPayment()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="laErr"></p>
+    <p class="info" id="laOk" style="display:none"></p>
+  </div>`;
+}
+let laAgents = [];
+async function initLabAgentForm(){
+  const { data } = await sb.from('lab_sample_agent').select('id,agent_name,mobile_no,opening_balance').order('agent_name');
+  laAgents = data||[];
+  document.getElementById('laAgent').innerHTML = '<option value="">— select —</option>' +
+    laAgents.map(a=>`<option value="${a.id}">${esc(a.agent_name)}</option>`).join('');
+}
+async function onAgentSelect(){
+  const id = document.getElementById('laAgent').value;
+  const box = document.getElementById('laDueBox');
+  if (!id) { box.classList.add('hidden'); return; }
+  spin(true);
+  try{
+    const { due } = await getAgentDue(id);
+    box.classList.remove('hidden');
+    document.getElementById('laDueVal').textContent = fmt(due);
+  } finally { spin(false); }
+}
+async function getAgentDue(agentId){
+  const { data: agent } = await sb.from('lab_sample_agent').select('*').eq('id',agentId).single();
+  const { data: work } = await sb.from('lab_work_entry').select('agent_amount').eq('agent_id',agentId).eq('is_cancelled',false);
+  const { data: pays } = await sb.from('lab_agent_payment').select('amount_paid').eq('agent_id',agentId);
+  const earned = (work||[]).reduce((a,w)=>a+parseFloat(w.agent_amount||0),0);
+  const paid = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount_paid||0),0);
+  const due = parseFloat(agent.opening_balance||0) + earned - paid;
+  return { agent, due };
+}
+async function saveLabAgentPayment(){
+  const err = document.getElementById('laErr'), ok = document.getElementById('laOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = voucherOf('la');
+  const date = document.getElementById('laDate').value;
+  const agentId = document.getElementById('laAgent').value;
+  const amount = parseFloat(document.getElementById('laAmount').value||0);
+  const mode = document.getElementById('laMode').value;
+  const remark = document.getElementById('laRemark').value.trim() || null;
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!agentId) { err.textContent='Select an agent.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+
+  const vcheck = await checkVoucher('la');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  const agent = laAgents.find(a=>a.id===agentId);
+  spin(true);
+  try{
+    const payload = BNH_PAGE.stamp({
+      agent_id: agentId, agent_name_snapshot: agent.agent_name,
+      payment_date: date, voucher_no: voucher, amount_paid: amount, payment_mode: mode, remarks: remark,
+      description: `Lab Agent Payment - ${agent.agent_name}`
+    });
+    const { error } = await sb.from('lab_agent_payment').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = '✅ Lab agent payment saved.';
+    await saveShot('la', voucher, ok);
+    document.getElementById('laAmount').value=''; document.getElementById('laRemark').value='';
+    await onAgentSelect();
+    await checkVoucher('la');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 3. SALARY PAYMENT
+// ────────────────────────────────────────────────────────────
+const MONTHS = ['', 'January','February','March','April','May','June','July','August','September','October','November','December'];
+function formSalary(){
+  const now = new Date();
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">💵 Salary Payment</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        ${voucherField('sy')}
+        <div class="voucher-badge" id="syVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="syDate" type="date" value="${todayISO()}"/></div>
+      <div><label>Employee <span class="req">*</span></label><select id="syEmp" onchange="onEmpSelect()"><option value="">— select —</option></select></div>
+    </div>
+    <div class="form-row">
+      <div><label>Month <span class="req">*</span></label>
+        <select id="syMonth" onchange="onEmpSelect()">${MONTHS.slice(1).map((m,i)=>`<option value="${i+1}" ${i+1===now.getMonth()+1?'selected':''}>${m}</option>`).join('')}</select>
+      </div>
+      <div><label>Year <span class="req">*</span></label><input id="syYear" type="number" value="${now.getFullYear()}" onchange="onEmpSelect()"/></div>
+    </div>
+    <div class="due-box hidden" id="syDueBox">Net Payable this month: <span class="dv" id="syDueVal">—</span> &nbsp;|&nbsp; Collected: <span id="syCollVal">—</span></div>
+    <div class="form-row">
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="syAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('sy')}</div>
+      <div><label>Remark (optional)</label><input id="syRemark"/></div>
+    </div>
+    <p style="font-size:.78rem;color:#666;margin-top:.4rem">Description auto-fills as "Salary for &lt;Month&gt; &lt;Year&gt;".</p>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveSalaryPayment()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="syErr"></p>
+    <p class="info" id="syOk" style="display:none"></p>
+  </div>`;
+}
+let syEmployees = [];
+async function initSalaryForm(){
+  const { data } = await sb.from('employees').select('id,name,salary').order('name');
+  syEmployees = data||[];
+  document.getElementById('syEmp').innerHTML = '<option value="">— select —</option>' +
+    syEmployees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+}
+async function getSalaryDue(empId, month, year){
+  const { data: emp } = await sb.from('employees').select('*').eq('id',empId).single();
+  const { data: bonus } = await sb.from('salary_bonuses').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
+  const { data: absent } = await sb.from('salary_absent').select('absent_days').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
+  const { data: extraDeduction } = await sb.from('salary_extra_deductions').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
+  const gross = parseFloat(emp.salary||0);
+  const absentDays = absent?.absent_days || 0;
+  const deductDays = Math.max(0, absentDays - 4);
+  const deduction = Math.round(((gross/26)*deductDays)/10)*10;
+  const totalDeduction = deduction + (extraDeduction?.amount || 0);
+  const net = gross - totalDeduction + (bonus?.amount||0);
+  const { data: pays } = await sb.from('salary_payments').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year);
+  const collected = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount||0),0);
+  return { emp, net, collected, due: Math.max(0, net-collected) };
+}
+async function onEmpSelect(){
+  const id = document.getElementById('syEmp').value;
+  const box = document.getElementById('syDueBox');
+  const month = parseInt(document.getElementById('syMonth').value), year = parseInt(document.getElementById('syYear').value);
+  if (!id || !month || !year) { box.classList.add('hidden'); return; }
+  spin(true);
+  try{
+    const { due, collected } = await getSalaryDue(id, month, year);
+    box.classList.remove('hidden');
+    document.getElementById('syDueVal').textContent = fmt(due);
+    document.getElementById('syCollVal').textContent = fmt(collected);
+  } finally { spin(false); }
+}
+async function saveSalaryPayment(){
+  const err = document.getElementById('syErr'), ok = document.getElementById('syOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = voucherOf('sy');
+  const date = document.getElementById('syDate').value;
+  const empId = document.getElementById('syEmp').value;
+  const month = parseInt(document.getElementById('syMonth').value);
+  const year = parseInt(document.getElementById('syYear').value);
+  const amount = parseFloat(document.getElementById('syAmount').value||0);
+  const mode = document.getElementById('syMode').value;
+  const remark = document.getElementById('syRemark').value.trim() || null;
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!empId) { err.textContent='Select an employee.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+
+  const vcheck = await checkVoucher('sy');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  const emp = syEmployees.find(e=>e.id===empId);
+  spin(true);
+  try{
+    const payload = BNH_PAGE.stamp({
+      employee_id: empId, employee_name: emp.name, month, year,
+      payment_date: date, voucher_no: voucher, amount, mode, remarks: remark,
+      description: `Salary for ${MONTHS[month]} ${year}`
+    });
+    const { error } = await sb.from('salary_payments').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = '✅ Salary payment saved.';
+    await saveShot('sy', voucher, ok);
+    document.getElementById('syAmount').value=''; document.getElementById('syRemark').value='';
+    await onEmpSelect();
+    await checkVoucher('sy');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 4. CREDITOR PAYMENT
+// ────────────────────────────────────────────────────────────
+function formCreditor(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">🏦 Creditor Payment</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        ${voucherField('cr')}
+        <div class="voucher-badge" id="crVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="crDate" type="date" value="${todayISO()}"/></div>
+    </div>
+    <div class="form-row">
+      <div><label>Category <span class="req">*</span></label><select id="crCategory" onchange="onCreditorCatChange()"><option value="">— select —</option></select></div>
+      <div><label>Creditor <span class="req">*</span></label><select id="crCreditor" onchange="onCreditorSelect()"><option value="">— select category first —</option></select></div>
+    </div>
+    <div class="due-box hidden" id="crDueBox">Current Balance Due: <span class="dv" id="crDueVal">—</span></div>
+    <div class="form-row">
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="crAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('cr')}</div>
+    </div>
+    <div class="form-row">
+      <div><label>Description <span class="req">*</span> (manual, mandatory)</label><input id="crDesc" placeholder="Invoice no., what this payment covers…"/></div>
+      <div><label>Remark (optional)</label><input id="crRemark"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveCreditorPayment()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="crErr"></p>
+    <p class="info" id="crOk" style="display:none"></p>
+  </div>`;
+}
+let crCategories = [], crCreditors = [];
+async function initCreditorForm(){
+  const [{data:cats},{data:creds}] = await Promise.all([
+    sb.from('credit_categories').select('*').order('name'),
+    sb.from('creditors').select('*').order('name')
+  ]);
+  crCategories = cats||[]; crCreditors = creds||[];
+  document.getElementById('crCategory').innerHTML = '<option value="">— select —</option>' +
+    crCategories.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+}
+function onCreditorCatChange(){
+  const catId = document.getElementById('crCategory').value;
+  const sel = document.getElementById('crCreditor');
+  document.getElementById('crDueBox').classList.add('hidden');
+  if (!catId) { sel.innerHTML = '<option value="">— select category first —</option>'; return; }
+  const list = crCreditors.filter(c=>c.category_id===catId);
+  sel.innerHTML = '<option value="">— select —</option>' + list.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+}
+async function getCreditorDue(creditorId){
+  const { data: cred } = await sb.from('creditors').select('*').eq('id',creditorId).single();
+  const { data: entries } = await sb.from('credit_entries').select('amount,entry_type').eq('creditor_id',creditorId);
+  let credit=0, payment=0;
+  (entries||[]).forEach(e=>{
+    if (e.entry_type==='credit') credit += parseFloat(e.amount||0);
+    if (e.entry_type==='payment') payment += parseFloat(e.amount||0);
+  });
+  const bal = parseFloat(cred.opening_balance||0) + credit - payment;
+  return { cred, bal };
+}
+async function onCreditorSelect(){
+  const id = document.getElementById('crCreditor').value;
+  const box = document.getElementById('crDueBox');
+  if (!id) { box.classList.add('hidden'); return; }
+  spin(true);
+  try{
+    const { bal } = await getCreditorDue(id);
+    box.classList.remove('hidden');
+    document.getElementById('crDueVal').textContent = fmt(bal);
+  } finally { spin(false); }
+}
+async function saveCreditorPayment(){
+  const err = document.getElementById('crErr'), ok = document.getElementById('crOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = voucherOf('cr');
+  const date = document.getElementById('crDate').value;
+  const catId = document.getElementById('crCategory').value;
+  const credId = document.getElementById('crCreditor').value;
+  const amount = parseFloat(document.getElementById('crAmount').value||0);
+  const mode = document.getElementById('crMode').value;
+  const desc = document.getElementById('crDesc').value.trim();
+  const remark = document.getElementById('crRemark').value.trim() || null;
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!catId) { err.textContent='Select a category.'; return; }
+  if (!credId) { err.textContent='Select a creditor.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+  if (!desc) { err.textContent='Description is mandatory for creditor payments.'; return; }
+
+  const vcheck = await checkVoucher('cr');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  const cat = crCategories.find(c=>c.id===catId);
+  const cred = crCreditors.find(c=>c.id===credId);
+  spin(true);
+  try{
+    const payload = BNH_PAGE.stamp({
+      creditor_id: credId, creditor_name: cred.name, category_id: catId, category_name: cat.name,
+      entry_date: date, amount, note: desc, description: desc, entry_type: 'payment',
+      voucher_no: voucher, mode
+    });
+    const { error } = await sb.from('credit_entries').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = '✅ Creditor payment saved.';
+    await saveShot('cr', voucher, ok);
+    document.getElementById('crAmount').value=''; document.getElementById('crDesc').value=''; document.getElementById('crRemark').value='';
+    await onCreditorSelect();
+    await checkVoucher('cr');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 5. CASH VOUCHER  (no creditor involved)
+// ────────────────────────────────────────────────────────────
+function formCash(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">💰 Cash Voucher</div>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        ${voucherField('cv')}
+        <div class="voucher-badge" id="cvVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="cvDate" type="date" value="${todayISO()}"/></div>
+      <div><label>Category</label><select id="cvCategory"><option value="">— none / general —</option></select></div>
+    </div>
+    <div class="form-row">
+      <div><label>To Whom Paying <span class="req">*</span></label><input id="cvParty" placeholder="Name of recipient"/></div>
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="cvAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('cv')}</div>
+    </div>
+    <div class="form-row">
+      <div><label>Description <span class="req">*</span> (manual, mandatory)</label><input id="cvDesc" placeholder="Purpose of this payment…"/></div>
+      <div><label>Remark (optional)</label><input id="cvRemark"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveCashVoucher()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="cvErr"></p>
+    <p class="info" id="cvOk" style="display:none"></p>
+  </div>`;
+}
+async function initCashForm(){
+  const { data } = await sb.from('credit_categories').select('*').order('name');
+  document.getElementById('cvCategory').innerHTML = '<option value="">— none / general —</option>' +
+    (data||[]).map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+}
+async function saveCashVoucher(){
+  const err = document.getElementById('cvErr'), ok = document.getElementById('cvOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = voucherOf('cv');
+  const date = document.getElementById('cvDate').value;
+  const category = document.getElementById('cvCategory').value || null;
+  const party = document.getElementById('cvParty').value.trim();
+  const amount = parseFloat(document.getElementById('cvAmount').value||0);
+  const mode = document.getElementById('cvMode').value;
+  const desc = document.getElementById('cvDesc').value.trim();
+  const remark = document.getElementById('cvRemark').value.trim() || null;
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!party) { err.textContent='"To Whom Paying" is required.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+  if (!desc) { err.textContent='Description is mandatory for cash vouchers.'; return; }
+
+  const vcheck = await checkVoucher('cv');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  spin(true);
+  try{
+    const payload = BNH_PAGE.stamp({ voucher_no: voucher, category, party_name: party, amount, mode, description: desc, remark, payment_date: date });
+    const { error } = await sb.from('cash_vouchers').insert(payload);
+    if (error) throw error;
+    ok.style.display='block'; ok.textContent = '✅ Cash voucher saved.';
+    await saveShot('cv', voucher, ok);
+    document.getElementById('cvParty').value=''; document.getElementById('cvAmount').value='';
+    document.getElementById('cvDesc').value=''; document.getElementById('cvRemark').value='';
+    await checkVoucher('cv');
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 6. IPD MEDICINE PAYMENT (Pharmacy Supplier IPD Payment via BHC)
+// ────────────────────────────────────────────────────────────
+function formIpdMedicine(){
+  return `
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">💊 IPD Medicine Payment</div>
+    <p style="font-size:.82rem;color:#4338ca;margin-bottom:.75rem">
+      Records payment to pharmacy suppliers for IPD medicines. Adds to Voucher General Register and reduces supplier due in Pharmacy without reducing Pharmacy cash balance.
+    </p>
+    <div class="form-row">
+      <div><label>Voucher No <span class="req">*</span></label>
+        ${voucherField('im')}
+        <div class="voucher-badge" id="imVStatus"></div>
+      </div>
+      <div><label>Payment Date <span class="req">*</span></label><input id="imDate" type="date" value="${todayISO()}"/></div>
+    </div>
+    <div class="form-row">
+      <div><label>Supplier <span class="req">*</span></label><select id="imSupplier" onchange="onIpdMedicineSupplierChange()"><option value="">— select supplier —</option></select></div>
+      <div><label>Category <span class="req">*</span></label>
+        <select id="imCategory" onchange="onIpdMedicineSupplierChange()">
+          <option value="IPD" selected>IPD</option>
+          <option value="Dispensary">Dispensary</option>
+        </select>
+      </div>
+    </div>
+    <div class="due-box hidden" id="imDueBox">
+      Current <span id="imDueCatLabel">IPD</span> Due: <span class="dv" id="imDueVal">—</span>
+      <span style="font-size:.8rem;color:#6b7280;margin-left:.75rem" id="imTotalDueVal"></span>
+    </div>
+    <div class="form-row">
+      <div><label>Amount (₹) <span class="req">*</span></label><input id="imAmount" type="number" min="0.01" step="0.01"/></div>
+      <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('im')}</div>
+    </div>
+    <div class="form-row">
+      <div><label>Description <span class="req">*</span> (mandatory)</label><input id="imDesc" placeholder="e.g. IPD medicine bill payment…"/></div>
+      <div><label>Remark (optional)</label><input id="imRemark" placeholder="e.g. Invoice no, reference…"/></div>
+    </div>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" onclick="saveIpdMedicinePayment()">💾 Save Payment</button>
+    </div>
+    <p class="err" id="imErr"></p>
+    <p class="info" id="imOk" style="display:none"></p>
+  </div>`;
+}
+
+let imSuppliers = [];
+async function initIpdMedicineForm(){
+  spin(true);
+  try{
+    const { data, error } = await sb.from('pharmacy_suppliers').select('*').order('supplier_name');
+    if (error) throw error;
+    imSuppliers = data || [];
+    const active = imSuppliers.filter(s => s.is_active !== false);
+    document.getElementById('imSupplier').innerHTML = '<option value="">— select supplier —</option>' +
+      active.map(s=>`<option value="${esc(s.supplier_name)}">${esc(s.supplier_name)}</option>`).join('');
+  } catch(ex){
+    alert('Failed to load pharmacy suppliers: ' + ex.message);
+  } finally {
+    spin(false);
+  }
+}
+
+async function onIpdMedicineSupplierChange(){
+  const supName = document.getElementById('imSupplier').value;
+  const cat = document.getElementById('imCategory').value || 'IPD';
+  const box = document.getElementById('imDueBox');
+  if (!supName) { box.classList.add('hidden'); return; }
+  spin(true);
+  try{
+    const sup = imSuppliers.find(s=>s.supplier_name === supName) || {};
+    const [purRes, payRes, othRes] = await Promise.all([
+      sb.from('pharmacy_purchases').select('amount,purchase_type').eq('supplier_name', supName),
+      sb.from('pharmacy_supplier_payments').select('amount,category').eq('supplier_name', supName),
+      sb.from('pharmacy_other_purchases').select('amount,category').eq('supplier_name', supName)
+    ]);
+    const purs = purRes.data || [], pays = payRes.data || [], oths = othRes.data || [];
+
+    const opDisp = parseFloat(sup.opening_balance_dispensary || (sup.opening_balance_ipd ? 0 : sup.opening_balance) || 0);
+    const opIpd = parseFloat(sup.opening_balance_ipd || 0);
+    const op = cat === 'IPD' ? opIpd : opDisp;
+
+    const purCat = r => (r.purchase_type === 'Dispensary' || r.purchase_type === 'IPD') ? r.purchase_type : 'Dispensary';
+    const othCat = r => (r.category === 'Dispensary' || r.category === 'IPD') ? r.category : 'Dispensary';
+    const payCat = r => (r.category === 'Dispensary' || r.category === 'IPD') ? r.category : 'Dispensary';
+
+    const catPurs = purs.filter(r=>purCat(r) === cat).reduce((s,r)=>s+parseFloat(r.amount||0), 0);
+    const catOths = oths.filter(r=>othCat(r) === cat).reduce((s,r)=>s+parseFloat(r.amount||0), 0);
+    const catPays = pays.filter(r=>payCat(r) === cat).reduce((s,r)=>s+parseFloat(r.amount||0), 0);
+    const catDue = op + catPurs + catOths - catPays;
+
+    const totPurs = purs.reduce((s,r)=>s+parseFloat(r.amount||0), 0);
+    const totOths = oths.reduce((s,r)=>s+parseFloat(r.amount||0), 0);
+    const totPays = pays.reduce((s,r)=>s+parseFloat(r.amount||0), 0);
+    const totDue = (opDisp + opIpd) + totPurs + totOths - totPays;
+
+    box.classList.remove('hidden');
+    document.getElementById('imDueCatLabel').textContent = cat;
+    document.getElementById('imDueVal').textContent = fmt(catDue);
+    document.getElementById('imTotalDueVal').textContent = `(Total all categories: ${fmt(totDue)})`;
+  } catch(ex){
+    console.error(ex);
+  } finally {
+    spin(false);
+  }
+}
+
+async function saveIpdMedicinePayment(){
+  const err = document.getElementById('imErr'), ok = document.getElementById('imOk');
+  err.textContent=''; ok.style.display='none';
+  const voucher = voucherOf('im');
+  const date = document.getElementById('imDate').value;
+  const supplierName = document.getElementById('imSupplier').value;
+  const category = document.getElementById('imCategory').value || 'IPD';
+  const amount = parseFloat(document.getElementById('imAmount').value||0);
+  const mode = document.getElementById('imMode').value;
+  const desc = document.getElementById('imDesc').value.trim();
+  const remark = document.getElementById('imRemark').value.trim() || null;
+
+  if (!voucher) { err.textContent='Voucher No is required.'; return; }
+  if (!date) { err.textContent='Payment date is required.'; return; }
+  if (!supplierName) { err.textContent='Select a supplier.'; return; }
+  if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
+  if (!mode) { err.textContent='Select a payment mode.'; return; }
+  if (!desc) { err.textContent='Description is mandatory for IPD medicine payments.'; return; }
+
+  const vcheck = await checkVoucher('im');
+  if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
+
+  spin(true);
+  try{
+    const fullRemark = `[V.No ${voucher}] ${remark ? remark + ' — ' : ''}${desc}`.trim();
+    const pharmPayload = BNH_PAGE.stamp({
+      pay_date: date,
+      supplier_name: supplierName,
+      category: category,
+      amount: amount,
+      mode: mode,
+      remark: fullRemark
+    });
+    const { error: pErr } = await sb.from('pharmacy_supplier_payments').insert(pharmPayload);
+    if (pErr) throw pErr;
+
+    const { error: vErr } = await sb.from('payment_vouchers').update({
+      status: 'filled',
+      type: 'ipd_medicine',
+      party_name: `${supplierName} (${category})`,
+      amount: amount,
+      mode: mode,
+      payment_date: date,
+      description: desc + (remark ? ` (${remark})` : '')
+    }).eq('voucher_no', voucher);
+    if (vErr) console.warn('Voucher register update notice:', vErr.message);
+
+    ok.style.display='block';
+    ok.textContent = `✅ IPD Medicine payment of ${fmt(amount)} recorded under Voucher ${voucher}. Supplier due reduced.`;
+    await saveShot('im', voucher, ok);
+
+    document.getElementById('imAmount').value = '';
+    document.getElementById('imDesc').value = '';
+    document.getElementById('imRemark').value = '';
+    await onIpdMedicineSupplierChange();
+    await checkVoucher('im');
+  } catch(ex){
+    err.textContent = ex.message;
+  } finally {
+    spin(false);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// VOUCHER RANGE TAB
+// ════════════════════════════════════════════════════════════
+async function generateRange(){
+  const err = document.getElementById('rangeErr'), ok = document.getElementById('rangeOk');
+  err.textContent=''; ok.textContent='';
+  const pfx = (document.getElementById('rangePrefix').value||'').trim().toUpperCase();
+  const start = parseInt(document.getElementById('rangeStart').value);
+  const end = parseInt(document.getElementById('rangeEnd').value);
+  if (pfx && !/^[A-Z]{1,5}$/.test(pfx)) { err.textContent='Prefix must be 1–5 letters (e.g. D or B).'; return; }
+  if (!start || !end) { err.textContent='Enter both start and end numbers.'; return; }
+  if (end < start) { err.textContent='End must be greater than or equal to start.'; return; }
+  spin(true);
+  try{
+    const args = { p_start: start, p_end: end, p_by: BNH_PAGE.user.username, p_by_name: BNH_PAGE.user.name };
+    // plain-number ranges keep using the original function; prefixed ranges use the new one
+    const { data, error } = pfx
+      ? await sb.rpc('generate_voucher_range_prefixed', { p_prefix: pfx, ...args })
+      : await sb.rpc('generate_voucher_range', args);
+    if (error) throw error;
+    ok.textContent = `✅ Generated voucher numbers ${pfx}${start} to ${pfx}${end} (${data} new row(s) created).`;
+    document.getElementById('rangeStart').value=''; document.getElementById('rangeEnd').value='';
+    document.getElementById('rangePrefix').value='';
+    await loadRangeHistory();
+  } catch(ex){ err.textContent = ex.message; }
+  finally { spin(false); }
+}
+async function loadRangeHistory(){
+  const box = document.getElementById('rangeHist');
+  const { data, error } = await sb.from('voucher_ranges').select('*').order('created_at',{ascending:false}).limit(20);
+  if (error || !data || !data.length) { box.textContent = 'No ranges generated yet.'; return; }
+  box.innerHTML = `<table><thead><tr><th>Prefix</th><th>Start</th><th>End</th><th>New Rows</th><th>By</th><th>When</th></tr></thead>
+    <tbody>${data.map(r=>`<tr><td><b>${esc(r.range_prefix||'—')}</b></td><td>${r.range_start}</td><td>${r.range_end}</td><td>${r.rows_created}</td>
+      <td>${esc(r.created_by_name||r.created_by||'')}</td><td>${new Date(r.created_at).toLocaleString('en-IN')}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// VOUCHER TRACKER TAB
+// ════════════════════════════════════════════════════════════
+let trackerShown = [], trackerShots = {};
+async function viewShot(voucherNo){
+  const path = trackerShots[voucherNo]; if (!path) return;
+  spin(true);
+  const { data, error } = await sb.storage.from(SHOT_BUCKET).createSignedUrl(path, 3600);
+  spin(false);
+  if (error) { alert('Could not open screenshot: ' + error.message); return; }
+  document.getElementById('pmModalBox').innerHTML = `
+    <button class="pm-close-btn" onclick="closeEditModal()">✕</button>
+    <h3>📸 PhonePe screenshot — Voucher ${esc(voucherNo)}</h3>
+    <div style="text-align:center"><img src="${data.signedUrl}" alt="screenshot" style="max-width:100%;max-height:70vh;border:1px solid #e2e8f0;border-radius:8px"/></div>
+    <p style="text-align:center;margin-top:.6rem"><a href="${data.signedUrl}" target="_blank" rel="noopener">Open full size ↗</a></p>`;
+  document.getElementById('pmModalOverlay').classList.remove('hidden');
+}
+function downloadTrackerExcel(){
+  if (!trackerShown.length) { alert('Click Show first — there are no vouchers on screen to download.'); return; }
+  const data = trackerShown.map(r=>({
+    'Voucher No': r.voucher_no, 'Status': r.status, 'Type': r.type||'', 'Party': r.party_name||'',
+    'Amount': r.amount ? parseFloat(r.amount) : '', 'Mode': r.mode||'', 'Payment Date': r.payment_date||'',
+    'Description': r.description||'', 'Screenshot': trackerShots[r.voucher_no] ? 'Yes' : (r.mode==='PhonePe' ? 'No' : '')
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [{wch:12},{wch:9},{wch:14},{wch:26},{wch:12},{wch:10},{wch:13},{wch:40},{wch:11}];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Vouchers');
+  const pfx = (document.getElementById('trackPrefix').value||'').trim().toUpperCase();
+  XLSX.writeFile(wb, `Vouchers${pfx?'_'+pfx:''}_${todayISO()}.xlsx`);
+}
+async function enrichIpdReferDisplayRows(rows){
+  const voucherNos = rows.filter(r => normalizeType(r.type) === 'ipd_refer').map(r => r.voucher_no).filter(Boolean);
+  if (!voucherNos.length) return rows;
+  const { data } = await sb.from('ipd_refer_payments').select('voucher_no,patient_name,admission_no,refer_name,remark').in('voucher_no', voucherNos);
+  const byVoucher = {};
+  (data || []).forEach(r => {
+    if (!byVoucher[r.voucher_no]) byVoucher[r.voucher_no] = [];
+    byVoucher[r.voucher_no].push(r);
+  });
+  return rows.map(r => {
+    if (normalizeType(r.type) !== 'ipd_refer') return r;
+    const first = (byVoucher[r.voucher_no] || [])[0];
+    if (!first) return r;
+    const detailText = [first.patient_name ? `Patient: ${first.patient_name}` : '', first.admission_no ? `Admission No: ${first.admission_no}` : '', first.remark].filter(Boolean).join(' | ');
+    return {
+      ...r,
+      party_name: `${first.patient_name || ''} (${first.admission_no || ''}) — Refer: ${first.refer_name || ''}`.replace(/\s*\(\)\s*—\s*Refer:/, '').replace(/\s+$/,'') || r.party_name || '',
+      description: detailText || r.description || null
+    };
+  });
+}
+async function loadTracker(){
+  const from = document.getElementById('trackFrom').value;
+  const to = document.getElementById('trackTo').value;
+  const status = document.getElementById('trackStatus').value;
+  const out = document.getElementById('trackOut');
+  out.textContent = 'Loading…';
+  const tPfx = (document.getElementById('trackPrefix').value||'').trim().toUpperCase();
+  // fetch in pages of 1000 (Supabase default cap), filter prefix/number range client-side
+  let data = [], error = null;
+  for (let off = 0; ; off += 1000){
+    let q = sb.from('payment_vouchers').select('*').order('voucher_no').range(off, off+999);
+    if (tPfx) q = q.like('voucher_no', tPfx + '%');
+    if (status) q = q.eq('status', status);
+    const res = await q;
+    if (res.error) { error = res.error; break; }
+    data = data.concat(res.data||[]);
+    if (!res.data || res.data.length < 1000) break;
+  }
+  if (error) { out.innerHTML = `<p class="err">${esc(error.message)}</p>`; return; }
+  trackerLoaded = true;
+  data.forEach(r => { if (r.type) r.type = normalizeType(r.type); });
+  const fromN = from ? parseInt(from,10) : null, toN = to ? parseInt(to,10) : null;
+  const rows = data.filter(r=>{
+    const v = vnoParse(r.voucher_no);
+    if (tPfx && v.p !== tPfx) return false;       // 'D' must not also match 'DX12'
+    if (fromN!=null && !(v.n >= fromN)) return false;
+    if (toN!=null && !(v.n <= toN)) return false;
+    return true;
+  }).sort((a,b)=>vnoCompare(a.voucher_no,b.voucher_no));
+  const enrichedRows = await enrichIpdReferDisplayRows(rows);
+  if (!rows.length) { out.textContent = 'No vouchers found for this filter.'; return; }
+  trackerShown = enrichedRows;
+  trackerShots = {};
+  for (let off = 0; ; off += 1000){
+    const res = await sb.from('voucher_screenshots').select('voucher_no,file_path').order('voucher_no').range(off, off+999);
+    if (res.error || !res.data) break;               // screenshots table missing → just show no screenshots
+    res.data.forEach(x=>{ trackerShots[x.voucher_no] = x.file_path; });
+    if (res.data.length < 1000) break;
+  }
+  const blankCount = enrichedRows.filter(r=>r.status==='blank').length;
+  const fullAccess = hasFullAccess();
+  out.innerHTML = `
+    <p style="font-size:.85rem;margin-bottom:.5rem">
+      ${enrichedRows.length} voucher(s) shown — <b style="color:${blankCount?'#dc2626':'#059669'}">${blankCount} blank (missed)</b>, ${enrichedRows.length-blankCount} filled.
+    </p>
+    <table>
+      <thead><tr><th>Voucher No</th><th>Status</th><th>Type</th><th>Party</th><th class="r">Amount</th><th>Mode</th><th>Screenshot</th><th>Date</th><th>Description</th><th>Actions</th></tr></thead>
+      <tbody>${enrichedRows.map(r=>`<tr class="${r.status==='blank'?'row-blank':'row-filled'}">
+        <td><b>${r.voucher_no}</b></td>
+        <td><span class="pill ${r.status==='blank'?'pill-blank':'pill-filled'}">${r.status}</span></td>
+        <td>${esc(TYPE_LABELS[r.type]?.label || r.type || '-')}</td><td>${esc(r.party_name||'-')}</td>
+        <td class="r">${r.amount?fmt(r.amount):'-'}</td><td>${esc(r.mode||'-')}</td>
+        <td>${trackerShots[r.voucher_no] ? `<button class="btn-small btn-secondary" onclick="viewShot('${esc(r.voucher_no)}')">🖼️ View</button>` : '-'}</td>
+        <td>${r.payment_date||'-'}</td><td style="max-width:280px">${esc(r.description||'-')}</td>
+        <td>${voucherActionsCell(r, fullAccess)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// SHARED ACTIONS CELL + EDIT / DELETE (full access only)
+// Used by both the Voucher Tracker and the Voucher Register. Edits go to the
+// underlying type table, then the voucher's row in payment_vouchers is re-synced
+// so every view stays consistent.
+// ════════════════════════════════════════════════════════════
+let trackerLoaded = false, registerLoaded = false;
+async function refreshVoucherViews(){
+  if (trackerLoaded) await loadTracker();
+  if (registerLoaded) await runSearch();
+}
+function voucherActionsCell(r, fullAccess){
+  if (r.status !== 'filled') return '-';
+  if (!TYPE_META[r.type]) return '<span class="view-only-tag">-</span>';
+  if (!fullAccess) return '<span class="view-only-tag">view only</span>';
+  return `<button class="btn-small btn-secondary" onclick="openEditModal('${esc(r.voucher_no)}','${esc(r.type)}')">✏️ Edit</button>
+    <button class="btn-small btn-danger" onclick="deleteVoucherEntries('${esc(r.voucher_no)}','${esc(r.type)}')">🗑️ Delete</button>`;
+}
+async function openEditModal(voucherNo, type){
+  if (!hasFullAccess()) return; // safety net, buttons are already hidden for limited access
+  const meta = TYPE_META[type];
+  if (!meta) { alert('Unknown entry type: ' + type); return; }
+  spin(true);
+  let rows;
+  try{
+    const { data, error } = await sb.from(meta.table).select('*').eq('voucher_no', voucherNo);
+    if (error) throw error;
+    rows = data || [];
+  } catch(ex){ spin(false); alert('Failed to load entries: ' + ex.message); return; }
+  spin(false);
+  if (!rows.length) { alert('No entries found for this voucher.'); return; }
+  renderEditModal(type, meta, rows);
+}
+function renderEditModal(type, meta, rows){
+  const box = document.getElementById('pmModalBox');
+  box.innerHTML = `
+    <button class="pm-close-btn" onclick="closeEditModal()">✕</button>
+    <h3>Edit / Delete — Voucher ${esc(rows[0].voucher_no)}</h3>
+    <div id="pmRows">${rows.map(r=>renderEditRow(type, meta, r)).join('')}</div>`;
+  document.getElementById('pmModalOverlay').classList.remove('hidden');
+}
+function renderEditRow(type, meta, r){
+  const rowRemark = type === 'ipd_refer' ? (r[meta.remarkCol] || buildIpdReferRemark(r)) : (r[meta.remarkCol] || '');
+  return `
+  <div class="pm-row" id="pmRow-${r.id}">
+    <div class="pm-row-label">${esc(meta.label(r))}</div>
+    <div class="form-row">
+      <div><label>Date</label><input type="date" id="pmDate-${r.id}" value="${r[meta.dateCol]||''}"/></div>
+      <div><label>Amount (₹)</label><input type="number" step="0.01" min="0.01" id="pmAmount-${r.id}" value="${r[meta.amountCol]||0}"/></div>
+      <div><label>Mode</label>
+        <select id="pmMode-${r.id}">${['Cash','Bank','PhonePe'].map(m=>`<option value="${m}" ${r[meta.modeCol]===m?'selected':''}>${m}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:.5rem">
+      <div style="flex:2"><label>Remark / Note</label><input id="pmRemark-${r.id}" value="${esc(rowRemark)}"/></div>
+    </div>
+    <div class="pm-row-actions">
+      <button class="btn-danger btn-small" onclick="deleteEntryRow('${type}','${r.id}','${esc(r.voucher_no)}')">🗑️ Delete this entry</button>
+      <button class="btn-primary btn-small" style="width:auto" onclick="saveEntryRow('${type}','${r.id}','${esc(r.voucher_no)}')">💾 Save</button>
+    </div>
+    <p class="err" id="pmErr-${r.id}" style="margin-top:.4rem"></p>
+  </div>`;
+}
+function closeEditModal(){ document.getElementById('pmModalOverlay').classList.add('hidden'); }
+
+// Re-derive a voucher's payment_vouchers row from whatever is left in its type
+// table. With no entries left it is reset to 'blank' so it shows up again as a
+// missed voucher instead of a ghost "filled" one.
+async function syncVoucherRow(voucherNo, type){
+  const meta = TYPE_META[type];
+  if (!meta) return;
+  try{
+    const { data: rows, error } = await sb.from(meta.table).select('*').eq('voucher_no', voucherNo);
+    if (error) throw error;
+    if (!rows || !rows.length){
+      const { error: e2 } = await sb.from('payment_vouchers').update({
+        status: 'blank', type: null, party_name: null, amount: null,
+        mode: null, payment_date: null, description: null
+      }).eq('voucher_no', voucherNo);
+      if (e2) throw e2;
+      return;
+    }
+    const total = rows.reduce((a,r)=>a + parseFloat(r[meta.amountCol]||0), 0);
+    const first = rows[0];
+    const effectiveDescription = type === 'ipd_refer' ? (buildIpdReferRemark(first) || first[meta.remarkCol] || null) : (first[meta.remarkCol] || null);
+    const { error: e3 } = await sb.from('payment_vouchers').update({
+      status: 'filled',
+      type: type,
+      party_name: meta.label(first),
+      amount: total,
+      mode: first[meta.modeCol] || null,
+      payment_date: first[meta.dateCol] || null,
+      description: effectiveDescription
+    }).eq('voucher_no', voucherNo);
+    if (e3) throw e3;
+  } catch(ex){
+    // Non-fatal: the type-table write already succeeded.
+    alert('The entry was saved/deleted, but the voucher summary could not be re-synced automatically: ' + ex.message + '\nPlease refresh and check voucher ' + voucherNo + '.');
+  }
+}
+async function saveEntryRow(type, id, voucherNo){
+  if (!hasFullAccess()) return;
+  const meta = TYPE_META[type];
+  if (!meta) return;
+  const errEl = document.getElementById('pmErr-'+id);
+  errEl.style.color = '#dc2626'; errEl.textContent = '';
+  const date = document.getElementById('pmDate-'+id).value;
+  const amount = parseFloat(document.getElementById('pmAmount-'+id).value || 0);
+  const mode = document.getElementById('pmMode-'+id).value;
+  const remark = document.getElementById('pmRemark-'+id).value.trim() || null;
+  if (!date) { errEl.textContent = 'Date is required.'; return; }
+  if (!amount || amount <= 0) { errEl.textContent = 'Enter a valid amount.'; return; }
+  const patch = { [meta.dateCol]: date, [meta.amountCol]: amount, [meta.modeCol]: mode, [meta.remarkCol]: remark };
+  spin(true);
+  try{
+    const { error } = await sb.from(meta.table).update(patch).eq('id', id);
+    if (error) throw error;
+    if (type === 'opd_refer'){
+      const { data: row } = await sb.from(meta.table).select('case_no').eq('id', id).maybeSingle();
+      if (row) await recomputeOpdReferStatus(row.case_no);
+    }
+    await syncVoucherRow(voucherNo, type);
+    errEl.style.color = '#059669'; errEl.textContent = '✅ Saved.';
+    await refreshVoucherViews();
+  } catch(ex){ errEl.textContent = ex.message; }
+  finally { spin(false); }
+}
+async function deleteEntryRow(type, id, voucherNo){
+  if (!hasFullAccess()) return;
+  if (!confirm('Delete this entry? This cannot be undone.')) return;
+  const meta = TYPE_META[type];
+  if (!meta) return;
+  spin(true);
+  try{
+    let caseNo = null;
+    if (type === 'opd_refer'){
+      const { data: row } = await sb.from(meta.table).select('case_no').eq('id', id).maybeSingle();
+      caseNo = row?.case_no || null;
+    }
+    const { error } = await sb.from(meta.table).delete().eq('id', id);
+    if (error) throw error;
+    if (caseNo) await recomputeOpdReferStatus(caseNo);
+    await syncVoucherRow(voucherNo, type);
+    document.getElementById('pmRow-'+id)?.remove();
+    if (!document.querySelectorAll('#pmRows .pm-row').length) closeEditModal();
+    await refreshVoucherViews();
+  } catch(ex){ alert('Delete failed: ' + ex.message); }
+  finally { spin(false); }
+}
+async function deleteVoucherEntries(voucherNo, type){
+  if (!hasFullAccess()) return;
+  const meta = TYPE_META[type];
+  if (!meta) return;
+  if (!confirm(`Delete ALL entries recorded under Voucher ${voucherNo}? This cannot be undone.`)) return;
+  spin(true);
+  try{
+    let caseNos = [];
+    if (type === 'opd_refer'){
+      const { data: rows } = await sb.from(meta.table).select('case_no').eq('voucher_no', voucherNo);
+      caseNos = [...new Set((rows||[]).map(r=>r.case_no))];
+    }
+    const { error } = await sb.from(meta.table).delete().eq('voucher_no', voucherNo);
+    if (error) throw error;
+    for (const c of caseNos) await recomputeOpdReferStatus(c);
+    await syncVoucherRow(voucherNo, type);
+    await refreshVoucherViews();
+  } catch(ex){ alert('Delete failed: ' + ex.message); }
+  finally { spin(false); }
+}
+// Best-effort recompute of an OPD case's refer_payment_status after an old
+// opd_refer_payment row is edited or deleted.
+async function recomputeOpdReferStatus(caseNo){
+  try{
+    const { data: c } = await sb.from('opd_case').select('case_no,refer_amount').eq('case_no', caseNo).maybeSingle();
+    if (!c) return;
+    const { data: pays } = await sb.from('opd_refer_payment').select('amount').eq('case_no', caseNo);
+    const paid = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount||0),0);
+    const status = (paid > 0 && paid >= parseFloat(c.refer_amount||0) - 0.01) ? 'paid' : null;
+    await sb.from('opd_case').update({ refer_payment_status: status }).eq('case_no', caseNo);
+  } catch(ex){ /* non-critical; ignore */ }
+}
+
+// ════════════════════════════════════════════════════════════
+// VOUCHER REGISTER TAB — search / filter / export
+// Reads the central payment_vouchers table (one row per voucher).
+// ════════════════════════════════════════════════════════════
+document.getElementById('fType').insertAdjacentHTML('beforeend',
+  Object.entries(TYPE_LABELS).filter(([k])=>k!=='cash_voucher')
+    .map(([k,t])=>`<option value="${k}">${t.icon} ${esc(t.label)}</option>`).join(''));
+
+function clearFilters(){
+  ['fDateFrom','fDateTo','fKeyword','fVFrom','fVTo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fType').value = '';
+  document.getElementById('fStatus').value = 'filled';
+  document.getElementById('fLimit').value = '200';
+}
+let lastRows = [];
+async function runSearch(){
+  const err = document.getElementById('listErr'), out = document.getElementById('listOut');
+  err.textContent = '';
+  out.textContent = 'Loading…';
+  document.getElementById('summaryBar').innerHTML = '';
+  document.getElementById('exportBar').innerHTML = '';
+
+  const dateFrom = document.getElementById('fDateFrom').value;
+  const dateTo   = document.getElementById('fDateTo').value;
+  const type     = document.getElementById('fType').value;
+  const status   = document.getElementById('fStatus').value;
+  const keyword  = document.getElementById('fKeyword').value.trim();
+  const vFrom    = document.getElementById('fVFrom').value.trim();
+  const vTo      = document.getElementById('fVTo').value.trim();
+  const limit    = parseInt(document.getElementById('fLimit').value);
+
+  let q = sb.from('payment_vouchers').select('*');
+  if (dateFrom) q = q.gte('payment_date', dateFrom);
+  if (dateTo)   q = q.lte('payment_date', dateTo);
+  if (type === 'cash') q = q.or('type.ilike.cash,type.ilike.cash_voucher');   // DB may store either spelling
+  else if (type)       q = q.ilike('type', type);                              // case-insensitive
+  if (status)   q = q.eq('status', status);
+  if (vFrom)    q = q.gte('voucher_no', vFrom);
+  if (vTo)      q = q.lte('voucher_no', vTo);
+  if (keyword){
+    const k = keyword.replace(/[%,]/g,' ').trim();
+    q = q.or(`voucher_no.ilike.%${k}%,party_name.ilike.%${k}%,description.ilike.%${k}%`);
+  }
+  q = q.order('payment_date', { ascending:false }).limit(limit);
+
+  spin(true);
+  const { data, error } = await q;
+  spin(false);
+  if (error) { err.textContent = error.message; out.innerHTML = ''; return; }
+  registerLoaded = true;
+
+  (data||[]).forEach(r => { if (r.type) r.type = normalizeType(r.type); });
+  lastRows = (data||[]).slice().sort((a,b)=>{
+    const d = (b.payment_date||'').localeCompare(a.payment_date||'');
+    return d !== 0 ? d : (parseInt(b.voucher_no)||0) - (parseInt(a.voucher_no)||0);
+  });
+  lastRows = await enrichIpdReferDisplayRows(lastRows);
+  renderList();
+}
+function renderList(){
+  const out = document.getElementById('listOut');
+  const summary = document.getElementById('summaryBar');
+  const exportBar = document.getElementById('exportBar');
+  if (!lastRows.length){ out.textContent = 'No vouchers found for this filter.'; return; }
+
+  const total = lastRows.reduce((a,r)=>a + (r.status==='filled' ? parseFloat(r.amount||0) : 0), 0);
+  const blankCount = lastRows.filter(r=>r.status==='blank').length;
+  summary.innerHTML = `
+    <div class="summary-chip"><b>${lastRows.length}</b> voucher(s) loaded</div>
+    <div class="summary-chip"><b>${lastRows.length-blankCount}</b> filled, <b>${blankCount}</b> blank</div>
+    <div class="summary-chip">Total amount: <b>${fmt(total)}</b></div>`;
+  exportBar.innerHTML = `
+    <button class="btn-small btn-outline" onclick="exportExcel()">⬇ Export Excel</button>
+    <button class="btn-small btn-outline" onclick="exportPDF()">⬇ Export PDF</button>`;
+
+  const fullAccess = hasFullAccess();
+  out.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Voucher No</th><th>Status</th><th>Category</th><th>Party / Payee</th>
+        <th class="r">Amount</th><th>Mode</th><th>Date</th><th>Description</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${lastRows.map(r=>`<tr class="${r.status==='blank'?'row-blank':'row-filled'}">
+        <td><b>${esc(r.voucher_no)}</b></td>
+        <td><span class="pill ${r.status==='blank'?'pill-blank':'pill-filled'}">${esc(r.status)}</span></td>
+        <td>${esc(TYPE_LABELS[r.type]?.label || r.type || '-')}</td>
+        <td>${esc(r.party_name||'-')}</td>
+        <td class="r">${r.amount?fmt(r.amount):'-'}</td>
+        <td>${esc(r.mode||'-')}</td>
+        <td>${r.payment_date||'-'}</td>
+        <td style="max-width:280px">${esc(r.description||'-')}</td>
+        <td>${voucherActionsCell(r, fullAccess)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+function exportRowsPlain(){
+  return lastRows.map(r=>({
+    'Voucher No': r.voucher_no,
+    'Status': r.status,
+    'Category': TYPE_LABELS[r.type]?.label || r.type || '',
+    'Party / Payee': r.party_name || '',
+    'Amount': r.amount ? parseFloat(r.amount) : '',
+    'Mode': r.mode || '',
+    'Date': r.payment_date || '',
+    'Description': r.description || ''
+  }));
+}
+function exportExcel(){
+  if (!lastRows.length) return;
+  const rows = exportRowsPlain();
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:12},{wch:9},{wch:20},{wch:24},{wch:13},{wch:9},{wch:12},{wch:40}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Vouchers');
+  XLSX.writeFile(wb, `voucher_register_${todayISO()}.xlsx`);
+}
+function exportPDF(){
+  if (!lastRows.length) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'landscape', unit:'pt' });
+  doc.setFontSize(13);
+  doc.text('Voucher Register', 40, 32);
+  doc.setFontSize(9);
+  doc.text(`Generated ${new Date().toLocaleString('en-IN')} — ${lastRows.length} voucher(s)`, 40, 48);
+  const rows = exportRowsPlain();
+  doc.autoTable({
+    startY: 62,
+    head: [Object.keys(rows[0])],
+    body: rows.map(r=>Object.values(r).map(v=>v==null?'':String(v))),
+    styles: { fontSize:7.5, cellPadding:3 },
+    headStyles: { fillColor:[99,102,241] },
+    margin: { left:40, right:40 }
+  });
+  doc.save(`voucher_register_${todayISO()}.pdf`);
+}
+
+// ════════════════════════════════════════════════════════════
+// EXCEL UPLOAD TAB
+// ════════════════════════════════════════════════════════════
+const UPLOAD_CONFIG = {
+  doctor: {
+    cols: ['voucher_no','payment_date','doctor_name','amount','mode','remark'],
+    sampleRow: ['5203','2026-07-01','Dr. A Sharma','8000','Cash',''],
+    table: 'ipd_doctor_payments',
+    async build(row, ctx){
+      const name = String(row.doctor_name||'').trim();
+      if (!name) return { error:'doctor_name is required' };
+      if (!ctx.docMap){
+        const { data } = await sb.from('ipd_doctors').select('id,doctor_name,doctor_type');
+        ctx.docMap = {}; (data||[]).forEach(d=>ctx.docMap[d.doctor_name.trim().toLowerCase()]=d);
+      }
+      const doc = ctx.docMap[name.toLowerCase()];
+      if (!doc) return { error:`Doctor "${name}" not found` };
+      return { payload: BNH_PAGE.stamp({
+        doctor_id: doc.id, doctor_name: doc.doctor_name, doctor_type: doc.doctor_type,
+        payment_date: row.payment_date, voucher_no: String(row.voucher_no).trim(),
+        amount: parseFloat(row.amount), mode: row.mode, remark: row.remark||null,
+        description: `Doctor Payment - ${doc.doctor_name} (${doc.doctor_type})`
+      })};
+    }
+  },
+  lab_agent: {
+    cols: ['voucher_no','payment_date','agent_name','amount','mode','remark'],
+    sampleRow: ['5204','2026-07-01','ABC Diagnostics','2500','PhonePe',''],
+    table: 'lab_agent_payment',
+    async build(row, ctx){
+      const name = String(row.agent_name||'').trim();
+      if (!name) return { error:'agent_name is required' };
+      if (!ctx.agMap){
+        const { data } = await sb.from('lab_sample_agent').select('id,agent_name');
+        ctx.agMap = {}; (data||[]).forEach(a=>ctx.agMap[a.agent_name.trim().toLowerCase()]=a);
+      }
+      const ag = ctx.agMap[name.toLowerCase()];
+      if (!ag) return { error:`Agent "${name}" not found` };
+      return { payload: BNH_PAGE.stamp({
+        agent_id: ag.id, agent_name_snapshot: ag.agent_name,
+        payment_date: row.payment_date, voucher_no: String(row.voucher_no).trim(),
+        amount_paid: parseFloat(row.amount), payment_mode: row.mode, remarks: row.remark||null,
+        description: `Lab Agent Payment - ${ag.agent_name}`
+      })};
+    }
+  },
+  salary: {
+    cols: ['voucher_no','payment_date','employee_name','month','year','amount','mode','remark'],
+    sampleRow: ['5205','2026-07-01','Ramesh Das','6','2026','15000','Bank',''],
+    table: 'salary_payments',
+    async build(row, ctx){
+      const name = String(row.employee_name||'').trim();
+      if (!name) return { error:'employee_name is required' };
+      if (!row.month || !row.year) return { error:'month and year are required' };
+      if (!ctx.empMap){
+        const { data } = await sb.from('employees').select('id,name');
+        ctx.empMap = {}; (data||[]).forEach(e=>ctx.empMap[e.name.trim().toLowerCase()]=e);
+      }
+      const emp = ctx.empMap[name.toLowerCase()];
+      if (!emp) return { error:`Employee "${name}" not found` };
+      const month = parseInt(row.month), year = parseInt(row.year);
+      return { payload: BNH_PAGE.stamp({
+        employee_id: emp.id, employee_name: emp.name, month, year,
+        payment_date: row.payment_date, voucher_no: String(row.voucher_no).trim(),
+        amount: parseFloat(row.amount), mode: row.mode, remarks: row.remark||null,
+        description: `Salary for ${MONTHS[month]} ${year}`
+      })};
+    }
+  },
+  creditor: {
+    cols: ['voucher_no','payment_date','category','creditor_name','amount','mode','description','remark'],
+    sampleRow: ['5206','2026-07-01','Supplier','ABC Traders','10000','Bank','Invoice #221 part payment',''],
+    table: 'credit_entries',
+    async build(row, ctx){
+      const catName = String(row.category||'').trim();
+      const credName = String(row.creditor_name||'').trim();
+      const desc = String(row.description||'').trim();
+      if (!catName) return { error:'category is required' };
+      if (!credName) return { error:'creditor_name is required' };
+      if (!desc) return { error:'description is mandatory for creditor payments' };
+      if (!ctx.credMap){
+        const { data } = await sb.from('creditors').select('id,name,category_id,credit_categories(name)');
+        ctx.credMap = {}; (data||[]).forEach(c=>ctx.credMap[`${(c.credit_categories?.name||'').trim().toLowerCase()}|${c.name.trim().toLowerCase()}`]=c);
+      }
+      const cred = ctx.credMap[`${catName.toLowerCase()}|${credName.toLowerCase()}`];
+      if (!cred) return { error:`Creditor "${credName}" not found in category "${catName}"` };
+      return { payload: BNH_PAGE.stamp({
+        creditor_id: cred.id, creditor_name: cred.name, category_id: cred.category_id, category_name: catName,
+        entry_date: row.payment_date, amount: parseFloat(row.amount), note: desc, description: desc,
+        entry_type: 'payment', voucher_no: String(row.voucher_no).trim(), mode: row.mode
+      })};
+    }
+  },
+  cash: {
+    cols: ['voucher_no','payment_date','category','party_name','amount','mode','description','remark'],
+    sampleRow: ['5207','2026-07-01','Misc','Local Vendor','700','Cash','Office supplies purchase',''],
+    table: 'cash_vouchers',
+    async build(row){
+      const desc = String(row.description||'').trim();
+      const party = String(row.party_name||'').trim();
+      if (!party) return { error:'party_name is required' };
+      if (!desc) return { error:'description is mandatory for cash vouchers' };
+      return { payload: BNH_PAGE.stamp({
+        voucher_no: String(row.voucher_no).trim(), category: row.category||null, party_name: party,
+        amount: parseFloat(row.amount), mode: row.mode, description: desc, remark: row.remark||null,
+        payment_date: row.payment_date
+      })};
+    }
+  }
+};
+
+let uploadType = null, uploadRows = [];
+function selectUploadType(key){
+  uploadType = key;
+  document.querySelectorAll('#uploadTypeGrid .type-card').forEach(c=>c.classList.remove('active'));
+  document.getElementById('ucard-'+key).classList.add('active');
+  document.getElementById('uploadArea').classList.remove('hidden');
+  document.getElementById('uploadPreview').innerHTML = '';
+  document.getElementById('uploadFile').value = '';
+  document.getElementById('uploadColsHint').textContent =
+    'Required columns: ' + UPLOAD_CONFIG[key].cols.join(', ');
+}
+function downloadSample(){
+  if (!uploadType) return;
+  const cfg = UPLOAD_CONFIG[uploadType];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([cfg.cols, cfg.sampleRow]);
+  XLSX.utils.book_append_sheet(wb, ws, 'Sample');
+  XLSX.writeFile(wb, `${uploadType}_sample.xlsx`);
+}
+function handleFileSelect(e){
+  const file = e.target.files[0];
+  if (!file || !uploadType) return;
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    const wb = XLSX.read(ev.target.result, { type:'binary' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
+    await validateAndPreview(rows);
+  };
+  reader.readAsBinaryString(file);
+}
+async function validateAndPreview(rawRows){
+  const cfg = UPLOAD_CONFIG[uploadType];
+  const box = document.getElementById('uploadPreview');
+  box.innerHTML = 'Validating…';
+  spin(true);
+  const ctx = {};
+  const results = [];
+  try{
+    for (const raw of rawRows){
+      // normalize date if it came through as an Excel serial number
+      if (raw.payment_date && typeof raw.payment_date === 'number'){
+        const d = XLSX.SSF.parse_date_code(raw.payment_date);
+        raw.payment_date = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+      }
+      // plain-number voucher in the sheet -> add the auto prefix for this type (D doctor)
+      raw.voucher_no = String(raw.voucher_no==null?'':raw.voucher_no).trim().toUpperCase();
+      const upPfx = ({doctor:'D'})[uploadType];
+      if (upPfx && /^\d+$/.test(raw.voucher_no)) {
+        const { data: pv } = await sb.from('payment_vouchers').select('voucher_no').eq('voucher_no', upPfx + raw.voucher_no).maybeSingle();
+        if (pv) raw.voucher_no = upPfx + raw.voucher_no;   // else keep the plain number (old unprefixed range)
+      }
+      let error = null;
+      if (!raw.voucher_no) error = 'voucher_no is required';
+      else if (!raw.payment_date) error = 'payment_date is required';
+      else if (!raw.amount || isNaN(parseFloat(raw.amount)) || parseFloat(raw.amount)<=0) error = 'amount must be a positive number';
+      else if (!raw.mode || !['Cash','Bank','PhonePe'].includes(raw.mode)) error = 'mode must be Cash, Bank or PhonePe';
+
+      let payload = null, postInsert = null;
+      if (!error){
+        const built = await cfg.build(raw, ctx);
+        if (built.error) error = built.error;
+        else { payload = built.payload; postInsert = built.postInsert; }
+      }
+      if (!error){
+        const { data: vcheck } = await sb.from('payment_vouchers').select('*').eq('voucher_no', String(raw.voucher_no).trim()).maybeSingle();
+        if (!vcheck) error = `Voucher ${raw.voucher_no} not generated`;
+      }
+      results.push({ raw, error, payload, postInsert });
+    }
+  } finally { spin(false); }
+  uploadRows = results;
+  renderUploadPreview();
+}
+function renderUploadPreview(){
+  const box = document.getElementById('uploadPreview');
+  const okCount = uploadRows.filter(r=>!r.error).length;
+  box.innerHTML = `
+    <div class="section-title">Preview — ${uploadRows.length} row(s), ${okCount} valid, ${uploadRows.length-okCount} with errors</div>
+    <table><thead><tr><th>#</th><th>Voucher</th><th>Date</th><th>Amount</th><th>Mode</th><th>Status</th></tr></thead>
+    <tbody>${uploadRows.map((r,i)=>`<tr>
+      <td>${i+1}</td><td>${esc(r.raw.voucher_no)}</td><td>${esc(r.raw.payment_date)}</td>
+      <td class="r">${r.raw.amount?fmt(r.raw.amount):'-'}</td><td>${esc(r.raw.mode||'-')}</td>
+      <td class="${r.error?'upload-status-bad':'upload-status-ok'}">${r.error ? '❌ '+esc(r.error) : '✅ OK'}</td>
+    </tr>`).join('')}</tbody></table>
+    <div style="margin-top:.85rem">
+      <button class="btn-primary" style="width:auto" ${okCount===0?'disabled':''} onclick="doImport()">📥 Import ${okCount} Valid Row(s)</button>
+    </div>
+    <div id="uploadResult" style="margin-top:.75rem"></div>`;
+}
+async function doImport(){
+  const cfg = UPLOAD_CONFIG[uploadType];
+  const box = document.getElementById('uploadResult');
+  box.textContent = 'Importing…';
+  spin(true);
+  let ok=0, fail=0; const failMsgs=[];
+  try{
+    for (const r of uploadRows){
+      if (r.error) continue;
+      const { error } = await sb.from(cfg.table).insert(r.payload);
+      if (error){ fail++; failMsgs.push(`Voucher ${r.raw.voucher_no}: ${error.message}`); continue; }
+      if (r.postInsert) await r.postInsert();
+      ok++;
+    }
+  } finally { spin(false); }
+  box.innerHTML = `<p class="info">✅ Imported ${ok} row(s).</p>` +
+    (fail ? `<p class="err">${fail} row(s) failed:\n${failMsgs.map(esc).join('\n')}</p>` : '');
+}
+</script>
+</body>
+</html>

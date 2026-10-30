@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Pharmacy Daily Report</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#eef0f5;font-family:'Segoe UI',Arial,sans-serif;min-height:100vh}
+
+    /* ── Top bar ── */
+    .topbar{
+      background:#1e1b4b;color:#fff;
+      display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+      padding:.75rem 1.5rem;position:sticky;top:0;z-index:100;
+    }
+    .topbar h1{font-size:1rem;font-weight:800;letter-spacing:.02em;flex:1;min-width:160px;white-space:nowrap}
+    .topbar label{font-size:.78rem;opacity:.7;white-space:nowrap}
+    .topbar input[type=date]{
+      padding:.38rem .65rem;border:1.5px solid rgba(255,255,255,.25);border-radius:6px;
+      background:rgba(255,255,255,.12);color:#fff;font-size:.88rem;outline:none;width:145px;
+    }
+    .topbar input[type=date]:focus{border-color:#a5b4fc}
+    .topbar input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.7}
+    .btn-gen{
+      padding:.38rem 1.1rem;background:#6366f1;color:#fff;border:none;border-radius:6px;
+      font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap;
+    }
+    .btn-gen:hover{background:#4f46e5}
+    .btn-pdf{
+      padding:.38rem 1.1rem;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);
+      border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap;
+    }
+    .btn-pdf:hover{background:rgba(255,255,255,.25)}
+
+    /* ── Page wrapper ── */
+    .outer{padding:1.5rem;display:flex;justify-content:center}
+
+    /* ── A4 Sheet ── */
+    .a4{
+      width:210mm;min-height:297mm;background:#fff;
+      box-shadow:0 4px 32px rgba(0,0,0,.13);
+      padding:14mm 16mm 14mm;
+      display:none;flex-direction:column;gap:0;
+    }
+
+    /* ── Report header ── */
+    .rh{border-bottom:2.5px solid #1e1b4b;padding-bottom:6px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-end}
+    .rh-left .org{font-size:13pt;font-weight:900;color:#1e1b4b;letter-spacing:.02em}
+    .rh-left .sub{font-size:8pt;color:#6b7280;margin-top:1px;font-weight:500}
+    .rh-right{text-align:right}
+    .rh-right .rtitle{font-size:10pt;font-weight:800;color:#6366f1}
+    .rh-right .rdate{font-size:8pt;color:#6b7280;margin-top:2px}
+
+    /* ── Section ── */
+    .sec{margin-bottom:10px}
+    .sec-head{
+      font-size:7pt;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+      color:#fff;background:#1e1b4b;padding:4px 8px;border-radius:4px 4px 0 0;
+    }
+    .sec-body{border:1px solid #e5e7eb;border-top:none;border-radius:0 0 4px 4px;overflow:hidden}
+
+    /* ── Grid rows ── */
+    .grid{display:grid}
+    .g2{grid-template-columns:1fr 1fr}
+    .g3{grid-template-columns:1fr 1fr 1fr}
+    .g4{grid-template-columns:1fr 1fr 1fr 1fr}
+
+    /* Column dividers */
+    .col-div{border-right:1px solid #e5e7eb}
+    .col-div:last-child{border-right:none}
+
+    /* ── Mini label-value rows inside columns ── */
+    .kv{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;border-bottom:1px solid #f3f4f6}
+    .kv:last-child{border-bottom:none}
+    .kv .k{font-size:8pt;color:#6b7280}
+    .kv .v{font-size:8.5pt;font-weight:700;color:#111827;text-align:right}
+    .kv.bold .k{font-weight:700;color:#374151}
+    .kv.bold .v{color:#1e1b4b}
+    .kv.accent .k{font-weight:700;color:#374151}
+    .kv.accent .v{color:#059669;font-weight:800}
+    .kv.red .v{color:#dc2626;font-weight:800}
+    .kv.blue .v{color:#2563eb}
+    .kv.purple .v{color:#7c3aed}
+    .kv.sub .k{padding-left:14px;font-size:7.5pt;color:#9ca3af}
+    .kv.sub .v{font-size:7.5pt;color:#6b7280;font-weight:600}
+
+    /* ── Total bar ── */
+    .total-bar{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:6px 10px;background:#f0f9ff;border-top:1.5px solid #bae6fd;
+    }
+    .total-bar .tk{font-size:8pt;font-weight:700;color:#0c4a6e}
+    .total-bar .tv{font-size:9pt;font-weight:900;color:#0369a1}
+
+    /* ── Net result bar ── */
+    .net-bar{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:7px 10px;border-radius:0 0 4px 4px;
+    }
+    .net-bar.profit{background:#dcfce7;border-top:2px solid #86efac}
+    .net-bar.loss{background:#fee2e2;border-top:2px solid #fca5a5}
+    .net-bar .nk{font-size:8.5pt;font-weight:800}
+    .net-bar.profit .nk{color:#065f46}
+    .net-bar.loss .nk{color:#991b1b}
+    .net-bar .nv{font-size:11pt;font-weight:900}
+    .net-bar.profit .nv{color:#059669}
+    .net-bar.loss .nv{color:#dc2626}
+
+    /* ── Column header strip ── */
+    .col-hdr{font-size:7pt;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+      color:#4338ca;background:#eef2ff;padding:4px 10px;border-bottom:1px solid #e0e7ff;text-align:center}
+
+    /* ── Divider line ── */
+    .divline{border:none;border-top:1px solid #e5e7eb;margin:0}
+
+    /* ── Footer ── */
+    .rpt-footer{margin-top:auto;padding-top:8px;border-top:1px solid #e5e7eb;
+      display:flex;justify-content:space-between;align-items:center}
+    .rpt-footer span{font-size:6.5pt;color:#9ca3af}
+
+    /* ── Placeholder ── */
+    #placeholder{
+      padding:4rem 1rem;text-align:center;color:#9ca3af;
+    }
+    #placeholder .pi{font-size:3rem;margin-bottom:.75rem}
+    #placeholder p{font-size:.9rem;color:#6b7280}
+
+    /* ── Print ── */
+    @media print{
+      body{background:#fff}
+      .topbar{display:none!important}
+      .outer{padding:0}
+      .a4{box-shadow:none;display:flex!important;width:100%;min-height:auto}
+      #placeholder{display:none!important}
+    }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="topbar">
+  <h1>🏥 Pharmacy Daily Report</h1>
+  <label>Date</label>
+  <input type="date" id="rptDate"/>
+  <button class="btn-gen" onclick="generate()">Generate</button>
+  <button class="btn-pdf" onclick="dlPDF()">⬇ Download PDF</button>
+</div>
+
+<div class="outer">
+  <div id="placeholder">
+    <div class="pi">📋</div>
+    <p><strong>Select a date</strong> and click <strong>Generate</strong> to view the Daily Report.</p>
+  </div>
+
+  <!-- A4 Sheet -->
+  <div class="a4" id="a4">
+
+    <!-- Header -->
+    <div class="rh">
+      <div class="rh-left">
+        <div class="org">Bhagirathi Nursing Home — Pharmacy</div>
+        <div class="sub">Pharmacy Management System &nbsp;·&nbsp; Daily Summary Report</div>
+      </div>
+      <div class="rh-right">
+        <div class="rtitle">Daily Report</div>
+        <div class="rdate" id="dispDate">—</div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION 1: TRADING & P&L ══ -->
+    <div class="sec">
+      <div class="sec-head">📈 Trading &amp; Profit / Loss Account</div>
+      <div class="sec-body">
+        <div class="grid g2">
+          <!-- DR -->
+          <div class="col-div">
+            <div class="col-hdr">Dr — Cost &amp; Expenses</div>
+            <div class="kv bold"><span class="k">Opening Stock</span><span class="v" id="p_opStock">—</span></div>
+            <div class="kv"><span class="k">(+) Purchases</span><span class="v blue" id="p_purch">—</span></div>
+            <div class="kv bold" style="background:#f8faff"><span class="k">Goods Available</span><span class="v" id="p_goodsAvail">—</span></div>
+            <div class="kv"><span class="k">(−) Closing Stock</span><span class="v" id="p_clStock">—</span></div>
+            <div class="kv bold" style="border-top:1px solid #e5e7eb"><span class="k">Cost of Goods Sold</span><span class="v" id="p_cogs">—</span></div>
+            <div class="kv accent" id="gpCdRow"><span class="k">Gross Profit c/d</span><span class="v" id="p_gpCd">—</span></div>
+            <div class="kv red" id="glCdRow" style="display:none"><span class="k">Gross Loss c/d</span><span class="v" id="p_glCd">—</span></div>
+            <!-- Vouchers -->
+            <div id="vBlock">
+              <div style="background:#fffbeb;padding:3px 10px;border-top:1px solid #fde68a;font-size:7pt;font-weight:800;color:#92400e;letter-spacing:.05em;text-transform:uppercase">Expenses (Vouchers)</div>
+              <div class="kv sub"><span class="k">Cash Vouchers</span><span class="v" id="p_vcash">—</span></div>
+              <div class="kv sub"><span class="k">Bank Vouchers</span><span class="v" id="p_vbank">—</span></div>
+              <div class="kv sub"><span class="k">PhonePe Vouchers</span><span class="v" id="p_vpp">—</span></div>
+              <div class="kv bold"><span class="k">Total Vouchers</span><span class="v red" id="p_vtot">—</span></div>
+            </div>
+          </div>
+          <!-- CR -->
+          <div>
+            <div class="col-hdr">Cr — Revenue</div>
+            <div class="kv bold"><span class="k">Dispensary Sale</span><span class="v blue" id="p_dSale">—</span></div>
+            <div class="kv sub"><span class="k">Cash</span><span class="v" id="p_dCash">—</span></div>
+            <div class="kv sub"><span class="k">Bank</span><span class="v" id="p_dBank">—</span></div>
+            <div class="kv sub"><span class="k">PhonePe</span><span class="v" id="p_dPP">—</span></div>
+            <div class="kv bold" style="margin-top:2px"><span class="k">IPD Inden Sale</span><span class="v purple" id="p_ipdSale">—</span></div>
+            <div class="kv sub"><span class="k">At Cost = Sale (Bhagirathi)</span><span class="v" id="p_ipdCost">—</span></div>
+            <div class="kv accent" id="gpBdRow"><span class="k">Gross Profit b/d</span><span class="v" id="p_gpBd">—</span></div>
+            <div class="kv red" id="glBdRow" style="display:none"><span class="k">Gross Loss b/d</span><span class="v" id="p_glBd">—</span></div>
+          </div>
+        </div>
+        <!-- Net result -->
+        <div class="net-bar profit" id="netProfitBar">
+          <span class="nk">🏆 Net Profit for the Day</span>
+          <span class="nv" id="p_netProfit">—</span>
+        </div>
+        <div class="net-bar loss" id="netLossBar" style="display:none">
+          <span class="nk">⚠ Net Loss for the Day</span>
+          <span class="nv" id="p_netLoss">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION 2: CASH / BANK / PHONEPE ══ -->
+    <div class="sec">
+      <div class="sec-head">💵 Cash · Bank · PhonePe — Flow Statement</div>
+      <div class="sec-body">
+        <div class="grid g3">
+          <div class="col-div">
+            <div class="col-hdr">💵 Cash</div>
+            <div class="kv"><span class="k">Opening Balance</span><span class="v" id="cf_cashOp">—</span></div>
+            <div class="kv"><span class="k">(+) Dispensary Sale</span><span class="v blue" id="cf_cashSale">—</span></div>
+            <div class="kv"><span class="k">(+) Received from Bhagirathi</span><span class="v blue" id="cf_cashRcv">—</span></div>
+            <div class="kv"><span class="k">(−) Supplier Payment</span><span class="v red" id="cf_cashSup">—</span></div>
+            <div class="kv"><span class="k">(−) Vouchers</span><span class="v red" id="cf_cashVch">—</span></div>
+            <div class="kv accent"><span class="k">Closing Balance</span><span class="v" id="cf_cashCl">—</span></div>
+          </div>
+          <div class="col-div">
+            <div class="col-hdr">🏦 Bank</div>
+            <div class="kv"><span class="k">Opening Balance</span><span class="v" id="cf_bankOp">—</span></div>
+            <div class="kv"><span class="k">(+) Dispensary Sale</span><span class="v blue" id="cf_bankSale">—</span></div>
+            <div class="kv"><span class="k">(+) Received from Bhagirathi</span><span class="v" style="color:#9ca3af">₹0.00</span></div>
+            <div class="kv"><span class="k">(−) Supplier Payment</span><span class="v red" id="cf_bankSup">—</span></div>
+            <div class="kv"><span class="k">(−) Vouchers</span><span class="v red" id="cf_bankVch">—</span></div>
+            <div class="kv accent"><span class="k">Closing Balance</span><span class="v" id="cf_bankCl">—</span></div>
+          </div>
+          <div>
+            <div class="col-hdr">📱 PhonePe</div>
+            <div class="kv"><span class="k">Opening Balance</span><span class="v" id="cf_ppOp">—</span></div>
+            <div class="kv"><span class="k">(+) Dispensary Sale</span><span class="v blue" id="cf_ppSale">—</span></div>
+            <div class="kv"><span class="k">(+) Received from Bhagirathi</span><span class="v" style="color:#9ca3af">₹0.00</span></div>
+            <div class="kv"><span class="k">(−) Supplier Payment</span><span class="v red" id="cf_ppSup">—</span></div>
+            <div class="kv"><span class="k">(−) Vouchers</span><span class="v red" id="cf_ppVch">—</span></div>
+            <div class="kv accent"><span class="k">Closing Balance</span><span class="v" id="cf_ppCl">—</span></div>
+          </div>
+        </div>
+        <div class="grid g3" style="border-top:1.5px solid #e5e7eb;background:#1e1b4b">
+          <div style="padding:5px 10px;text-align:center;border-right:1px solid rgba(255,255,255,.1)">
+            <div style="font-size:6.5pt;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.05em;font-weight:700">Total Opening</div>
+            <div style="font-size:9pt;font-weight:900;color:#fff" id="cf_totOp">—</div>
+          </div>
+          <div style="padding:5px 10px;text-align:center;border-right:1px solid rgba(255,255,255,.1)">
+            <div style="font-size:6.5pt;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.05em;font-weight:700">Total Inflows</div>
+            <div style="font-size:9pt;font-weight:900;color:#86efac" id="cf_totIn">—</div>
+          </div>
+          <div style="padding:5px 10px;text-align:center">
+            <div style="font-size:6.5pt;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.05em;font-weight:700">Total Closing</div>
+            <div style="font-size:9pt;font-weight:900;color:#a5f3fc" id="cf_totCl">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION 3 & 4 side by side ══ -->
+    <div class="grid g2" style="gap:10px">
+
+      <!-- Supplier Balance -->
+      <div class="sec" style="margin-bottom:0">
+        <div class="sec-head">🏪 Supplier Balance (Aggregate)</div>
+        <div class="sec-body">
+          <div class="kv"><span class="k">Opening Due (All Suppliers)</span><span class="v" id="s_op">—</span></div>
+          <div class="kv"><span class="k">(+) Today's Purchases</span><span class="v blue" id="s_pur">—</span></div>
+          <div class="kv"><span class="k">(−) Today's Payments</span><span class="v red" id="s_pay">—</span></div>
+          <div class="kv accent"><span class="k">Closing Due (All Suppliers)</span><span class="v" id="s_cl">—</span></div>
+        </div>
+      </div>
+
+      <!-- Bhagirathi Due -->
+      <div class="sec" style="margin-bottom:0">
+        <div class="sec-head">🏥 Bhagirathi Nursing Home — Due</div>
+        <div class="sec-body">
+          <div class="kv"><span class="k">Opening Due (Balance b/f)</span><span class="v" id="b_op">—</span></div>
+          <div class="kv"><span class="k">(+) IPD Inden Today</span><span class="v purple" id="b_inden">—</span></div>
+          <div class="kv"><span class="k">(−) Cash Received Today</span><span class="v red" id="b_rcv">—</span></div>
+          <div class="kv accent"><span class="k">Closing Due (Bhagirathi Owes)</span><span class="v" id="b_cl">—</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="rpt-footer" style="margin-top:10px">
+      <span>Generated: <span id="genTime">—</span></span>
+      <span>Bhagirathi Nursing Home — Pharmacy Management System</span>
+    </div>
+
+  </div><!-- /a4 -->
+</div><!-- /outer -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+BNH_PAGE.requireRole(["admin","accountant","manager","pharmacy","viewer"]);
+
+const fmt  = n => '₹'+parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+const spin = v => document.getElementById('spinner').classList[v?'remove':'add']('hidden');
+const set  = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+const show = (id,v) => { const e=document.getElementById(id); if(e) e.style.display=v?'':'none'; };
+
+document.getElementById('rptDate').value = new Date().toISOString().slice(0,10);
+
+async function generate(){
+  const date = document.getElementById('rptDate').value;
+  if(!date){ alert('Please select a date.'); return; }
+  spin(true);
+  try {
+    // ── Fetch all data in one pass ──────────────────────
+    const [
+      { data: setup     },   // pharmacy_setup — opening values
+      { data: allPurch  },   // pharmacy_purchases (all-time)
+      { data: allSales  },   // pharmacy_sales (all-time, all types)
+      { data: allSupPay },   // pharmacy_supplier_payments (all-time)
+      { data: allVch    },   // pharmacy_vouchers (all-time)
+      { data: allIpdTxn },   // ipd_transactions (all-time)
+      { data: suppliers },   // pharmacy_suppliers (for opening_balance)
+    ] = await Promise.all([
+      BNH_PAGE.sb.from('pharmacy_setup').select('*').limit(1),
+      BNH_PAGE.sb.from('pharmacy_purchases').select('purchase_date,supplier_name,amount'),
+      BNH_PAGE.sb.from('pharmacy_sales').select('sale_date,sale_type,cost_price,sale_price,mode_cash,mode_bank,mode_phonepe,mode_of_payment'),
+      BNH_PAGE.sb.from('pharmacy_supplier_payments').select('pay_date,supplier_name,amount,mode'),
+      BNH_PAGE.sb.from('pharmacy_vouchers').select('voucher_date,amount,mode'),
+      BNH_PAGE.sb.from('ipd_transactions').select('txn_date,txn_type,amount,mode'),
+      BNH_PAGE.sb.from('pharmacy_suppliers').select('supplier_name,opening_balance'),
+    ]);
+
+    const s = (setup&&setup[0]) || {};
+    // Opening values from pharmacy_setup (correct, same as pharmacy-reports.html)
+    const opStock = parseFloat(s.opening_stock   ||0);
+    const opCash  = parseFloat(s.opening_cash    ||0);
+    const opBank  = parseFloat(s.opening_bank    ||0);
+    const opPP    = parseFloat(s.opening_phonepe ||0);
+    const opCred  = parseFloat(s.opening_creditor||0);
+
+    // ── Helpers ──────────────────────────────────────────
+    const sumF = (arr,f) => (arr||[]).reduce((a,r)=>a+parseFloat(r[f]||0),0);
+
+    // Filter by date
+    const before = (arr, df) => (arr||[]).filter(r => (r[df]||'') <  date);
+    const onDay  = (arr, df) => (arr||[]).filter(r => (r[df]||'') === date);
+
+    // All dispensary sales
+    const disSalesAll    = (allSales||[]).filter(r=>r.sale_type==='Dispensary');
+    const ipdSalesAll    = (allSales||[]).filter(r=>r.sale_type==='IPD');
+
+    // ── STOCK ─────────────────────────────────────────────
+    // Opening stock for the day:
+    // = setup.opening_stock + all purchases before date - all cost price sold before date
+    const purchBefore    = sumF(before(allPurch,'purchase_date'),    'amount');
+    const costSoldBefore = sumF(before(disSalesAll,'sale_date'),     'cost_price')
+                         + sumF(before(ipdSalesAll,'sale_date'),     'cost_price');
+    const openingStock   = opStock + purchBefore - costSoldBefore;
+
+    // Today
+    const todayPurch     = onDay(allPurch,'purchase_date');
+    const todayDisSales  = onDay(disSalesAll,'sale_date');
+    const todayIpdSales  = onDay(ipdSalesAll,'sale_date');
+    const todaySupPay    = onDay(allSupPay,'pay_date');
+    const todayVch       = onDay(allVch,'voucher_date');
+    const todayIpdTxn    = onDay(allIpdTxn,'txn_date');
+
+    const tPurch     = sumF(todayPurch,'amount');
+    const tDisSale   = sumF(todayDisSales,'sale_price');
+    const tDisCost   = sumF(todayDisSales,'cost_price');
+    const tDisCash   = sumF(todayDisSales,'mode_cash');
+    const tDisBank   = sumF(todayDisSales,'mode_bank');
+    const tDisPP     = sumF(todayDisSales,'mode_phonepe');
+    const tIpdSale   = sumF(todayIpdSales,'sale_price');  // cost=sale for IPD
+
+    const closingStock   = openingStock + tPurch - tDisCost - tIpdSale;
+    const cogs           = openingStock + tPurch - closingStock;
+    const grossProfit    = tDisSale - (tDisCost) + (tIpdSale - tIpdSale); // only dispensary profit, IPD nets to 0
+    // Correct: gross profit = dispensary sale - cost of dispensary sold
+    // IPD: cost=sale so contributes 0 to gross profit but reduces stock
+    const gp             = tDisSale - tDisCost;
+
+    const vCash  = (todayVch).filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const vBank  = (todayVch).filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const vPP    = (todayVch).filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const vTot   = vCash+vBank+vPP;
+    const hasVch = vTot > 0;
+
+    const netProfit = gp - vTot;
+
+    // ── CASH FLOW ─────────────────────────────────────────
+    // Opening balance for the day = opCash + all movements before date
+    const cashRcvBefore = sumF(before(allIpdTxn,'txn_date').filter(r=>r.txn_type==='Receive'),'amount');
+    const cashOpDay = opCash
+      + sumF(before(disSalesAll,'sale_date'),'mode_cash')
+      + cashRcvBefore
+      - before(allSupPay,'pay_date').filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0)
+      - before(allVch,'voucher_date').filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
+    const bankOpDay = opBank
+      + sumF(before(disSalesAll,'sale_date'),'mode_bank')
+      - before(allSupPay,'pay_date').filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0)
+      - before(allVch,'voucher_date').filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
+    const ppOpDay = opPP
+      + sumF(before(disSalesAll,'sale_date'),'mode_phonepe')
+      - before(allSupPay,'pay_date').filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0)
+      - before(allVch,'voucher_date').filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
+    const cashRcvToday = todayIpdTxn.filter(r=>r.txn_type==='Receive').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const supPayCash   = todaySupPay.filter(r=>r.mode==='Cash').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const supPayBank   = todaySupPay.filter(r=>r.mode==='Bank').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const supPayPP     = todaySupPay.filter(r=>r.mode==='PhonePe').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+
+    const cashCl = cashOpDay + tDisCash + cashRcvToday - supPayCash - vCash;
+    const bankCl = bankOpDay + tDisBank               - supPayBank  - vBank;
+    const ppCl   = ppOpDay   + tDisPP                 - supPayPP    - vPP;
+
+    // ── SUPPLIER BALANCE ──────────────────────────────────
+    // Opening due for day = opCred (from setup) + all purchases before - all payments before
+    const purchBeforeAmt = before(allPurch,'purchase_date').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const payBeforeAmt   = before(allSupPay,'pay_date').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const supOpDue       = opCred + purchBeforeAmt - payBeforeAmt;
+    const supTodayPurch  = tPurch;
+    const supTodayPay    = todaySupPay.reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const supClDue       = supOpDue + supTodayPurch - supTodayPay;
+
+    // ── BHAGIRATHI DUE ────────────────────────────────────
+    const indenBefore  = sumF(before(ipdSalesAll,'sale_date'),'sale_price');
+    const rcvBefore    = before(allIpdTxn,'txn_date').filter(r=>r.txn_type==='Receive').reduce((a,r)=>a+parseFloat(r.amount||0),0);
+    const bhOpDue      = indenBefore - rcvBefore;
+    const bhClDue      = bhOpDue + tIpdSale - cashRcvToday;
+
+    // ── RENDER ───────────────────────────────────────────
+    const d = new Date(date+'T00:00:00');
+    set('dispDate', d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}));
+    set('genTime',  new Date().toLocaleString('en-IN'));
+
+    // P&L
+    set('p_opStock',   fmt(openingStock));
+    set('p_purch',     fmt(tPurch));
+    set('p_goodsAvail',fmt(openingStock+tPurch));
+    set('p_clStock',   fmt(closingStock));
+    set('p_cogs',      fmt(cogs));
+    set('p_dSale',     fmt(tDisSale));
+    set('p_dCash',     fmt(tDisCash));
+    set('p_dBank',     fmt(tDisBank));
+    set('p_dPP',       fmt(tDisPP));
+    set('p_ipdSale',   fmt(tIpdSale));
+    set('p_ipdCost',   fmt(tIpdSale));
+
+    if(gp>=0){
+      set('p_gpCd', fmt(gp)); set('p_gpBd', fmt(gp));
+      show('gpCdRow',true); show('glCdRow',false);
+      show('gpBdRow',true); show('glBdRow',false);
+    } else {
+      set('p_glCd', fmt(Math.abs(gp))); set('p_glBd', fmt(Math.abs(gp)));
+      show('gpCdRow',false); show('glCdRow',true);
+      show('gpBdRow',false); show('glBdRow',true);
+    }
+
+    show('vBlock', hasVch);
+    if(hasVch){ set('p_vcash',fmt(vCash)); set('p_vbank',fmt(vBank)); set('p_vpp',fmt(vPP)); set('p_vtot',fmt(vTot)); }
+
+    if(netProfit>=0){
+      set('p_netProfit',fmt(netProfit));
+      show('netProfitBar',true); show('netLossBar',false);
+    } else {
+      set('p_netLoss',fmt(Math.abs(netProfit)));
+      show('netProfitBar',false); show('netLossBar',true);
+    }
+
+    // Cash flow
+    set('cf_cashOp',   fmt(cashOpDay));
+    set('cf_cashSale', fmt(tDisCash));
+    set('cf_cashRcv',  fmt(cashRcvToday));
+    set('cf_cashSup',  fmt(supPayCash));
+    set('cf_cashVch',  fmt(vCash));
+    set('cf_cashCl',   fmt(cashCl));
+    set('cf_bankOp',   fmt(bankOpDay));
+    set('cf_bankSale', fmt(tDisBank));
+    set('cf_bankSup',  fmt(supPayBank));
+    set('cf_bankVch',  fmt(vBank));
+    set('cf_bankCl',   fmt(bankCl));
+    set('cf_ppOp',     fmt(ppOpDay));
+    set('cf_ppSale',   fmt(tDisPP));
+    set('cf_ppSup',    fmt(supPayPP));
+    set('cf_ppVch',    fmt(vPP));
+    set('cf_ppCl',     fmt(ppCl));
+    set('cf_totOp',    fmt(cashOpDay+bankOpDay+ppOpDay));
+    set('cf_totIn',    fmt(tDisCash+tDisBank+tDisPP+cashRcvToday));
+    set('cf_totCl',    fmt(cashCl+bankCl+ppCl));
+
+    // Supplier
+    set('s_op',  fmt(supOpDue));
+    set('s_pur', fmt(supTodayPurch));
+    set('s_pay', fmt(supTodayPay));
+    set('s_cl',  fmt(supClDue));
+
+    // Bhagirathi
+    set('b_op',    fmt(bhOpDue));
+    set('b_inden', fmt(tIpdSale));
+    set('b_rcv',   fmt(cashRcvToday));
+    set('b_cl',    fmt(bhClDue));
+
+    // Show
+    document.getElementById('placeholder').style.display='none';
+    document.getElementById('a4').style.display='flex';
+
+  } catch(err){
+    alert('Error: '+err.message);
+    console.error(err);
+  } finally { spin(false); }
+}
+
+async function dlPDF(){
+  const a4 = document.getElementById('a4');
+  if(a4.style.display==='none'||!a4.style.display||a4.style.display===''){
+    alert('Please generate the report first.'); return;
+  }
+  spin(true);
+  try {
+    const canvas = await html2canvas(a4,{scale:3,useCORS:true,backgroundColor:'#fff',logging:false});
+    const {jsPDF} = window.jspdf;
+    const pdf = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const pw  = pdf.internal.pageSize.getWidth();
+    const ph  = pdf.internal.pageSize.getHeight();
+    const iw  = pw;
+    const ih  = (canvas.height*iw)/canvas.width;
+    // If content fits in one page
+    if(ih <= ph){
+      pdf.addImage(canvas.toDataURL('image/png'),'PNG',0,0,iw,ih);
+    } else {
+      // Multi-page fallback
+      let y=0;
+      while(y < canvas.height){
+        const sliceH = Math.min(canvas.height-y, Math.floor(canvas.width*(ph/pw)));
+        const c2 = document.createElement('canvas');
+        c2.width=canvas.width; c2.height=sliceH;
+        c2.getContext('2d').drawImage(canvas,0,y,canvas.width,sliceH,0,0,canvas.width,sliceH);
+        const sliceImgH = (sliceH*pw)/canvas.width;
+        if(y>0) pdf.addPage();
+        pdf.addImage(c2.toDataURL('image/png'),'PNG',0,0,pw,sliceImgH);
+        y+=sliceH;
+      }
+    }
+    const date = document.getElementById('rptDate').value;
+    pdf.save('Pharmacy_Report_'+date+'.pdf');
+  } catch(e){ alert('PDF error: '+e.message); }
+  finally { spin(false); }
+}
+</script>
+</body>
+</html>

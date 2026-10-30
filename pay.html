@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quick Pay</title>
+<style>
+  :root{
+    --purple:#5f259f;
+    --purple-dark:#3d1a66;
+    --bg:#f6f1fb;
+    --ink:#1c1330;
+    --muted:#7a6f92;
+    --error:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:linear-gradient(160deg,var(--bg),#eee6fb 60%,#f8f4ff);
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    color:var(--ink);
+    padding:24px;
+  }
+  .card{
+    width:100%;
+    max-width:380px;
+    background:#fff;
+    border-radius:20px;
+    padding:32px 28px;
+    box-shadow:0 20px 50px rgba(95,37,159,0.15);
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:24px;
+  }
+  .brand-dot{
+    width:34px;height:34px;border-radius:9px;
+    background:var(--purple);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:700;font-size:16px;
+  }
+  .brand-name{font-weight:700;font-size:18px;letter-spacing:.2px;}
+  .brand-sub{font-size:12px;color:var(--muted);}
+  label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    margin:18px 0 6px;
+  }
+  input{
+    width:100%;
+    padding:13px 14px;
+    border-radius:12px;
+    border:1.5px solid #e2d9f3;
+    font-size:16px;
+    outline:none;
+    transition:border-color .15s;
+    background:#fbf9ff;
+  }
+  input:focus{border-color:var(--purple);}
+  .amount-row{position:relative;}
+  .amount-row span{
+    position:absolute;left:14px;top:50%;transform:translateY(-50%);
+    color:var(--muted);font-size:16px;
+  }
+  .amount-row input{padding-left:28px;}
+  button{
+    margin-top:26px;
+    width:100%;
+    padding:15px;
+    border:none;
+    border-radius:12px;
+    background:var(--purple);
+    color:#fff;
+    font-size:16px;
+    font-weight:700;
+    cursor:pointer;
+    transition:background .15s, transform .1s;
+  }
+  button:hover{background:var(--purple-dark);}
+  button:active{transform:scale(0.98);}
+  .err{
+    color:var(--error);
+    font-size:13px;
+    margin-top:8px;
+    min-height:16px;
+  }
+  .hint{
+    margin-top:16px;
+    font-size:12px;
+    color:var(--muted);
+    text-align:center;
+    line-height:1.5;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="brand-dot">₹</div>
+      <div>
+        <div class="brand-name">Quick Pay</div>
+        <div class="brand-sub">Pay via PhonePe</div>
+      </div>
+    </div>
+
+    <label for="upi">UPI ID</label>
+    <input id="upi" type="text" placeholder="name@bank" autocomplete="off">
+
+    <label for="amount">Amount</label>
+    <div class="amount-row">
+      <span>₹</span>
+      <input id="amount" type="number" placeholder="0.00" min="1" step="0.01">
+    </div>
+
+    <div class="err" id="err"></div>
+
+    <button id="payBtn">Pay with PhonePe</button>
+
+    <div class="hint">Opens the PhonePe app on your phone.<br>If PhonePe isn't installed, your phone's UPI app chooser opens instead.</div>
+  </div>
+
+<script>
+  const upiInput = document.getElementById('upi');
+  const amountInput = document.getElementById('amount');
+  const errEl = document.getElementById('err');
+  const btn = document.getElementById('payBtn');
+
+  const upiPattern = /^[\w.\-]{2,}@[a-zA-Z]{2,}$/;
+
+  btn.addEventListener('click', () => {
+    errEl.textContent = '';
+    const upi = upiInput.value.trim();
+    const amount = amountInput.value.trim();
+
+    if (!upiPattern.test(upi)) {
+      errEl.textContent = 'Enter a valid UPI ID, like name@bank';
+      return;
+    }
+    const amt = parseFloat(amount);
+    if (!amount || isNaN(amt) || amt <= 0) {
+      errEl.textContent = 'Enter an amount greater than 0';
+      return;
+    }
+
+    const amtStr = amt.toFixed(2);
+    const params = `pa=${encodeURIComponent(upi)}&pn=${encodeURIComponent('Quick Pay')}&am=${amtStr}&cu=INR`;
+
+    // Try PhonePe's own deep link first
+    const phonepeLink = `phonepe://pay?${params}`;
+    // Generic UPI intent as fallback (opens app chooser incl. PhonePe)
+    const upiLink = `upi://pay?${params}`;
+
+    const fallbackTimer = setTimeout(() => {
+      window.location.href = upiLink;
+    }, 1200);
+
+    window.addEventListener('pagehide', () => clearTimeout(fallbackTimer), { once: true });
+    window.addEventListener('blur', () => clearTimeout(fallbackTimer), { once: true });
+
+    window.location.href = phonepeLink;
+  });
+
+  [upiInput, amountInput].forEach(el => {
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+  });
+</script>
+</body>
+</html>

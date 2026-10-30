@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Doctor Details – IPD</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .tab-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+    .tab-btn { padding:.5rem 1.1rem; border:2px solid #6366f1; border-radius:8px; background:#fff;
+               color:#6366f1; font-weight:600; cursor:pointer; transition:all .2s; }
+    .tab-btn.active { background:#6366f1; color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; }
+    .form-row > * { flex:1; min-width:160px; }
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; }
+    th { background:#f0f0f0; padding:7px 8px; text-align:left; font-size:.82rem; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; font-size:.82rem; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+    .due-pos { color:#dc2626; font-weight:700; }
+    .due-neg { color:#059669; font-weight:700; }
+    .doctor-ledger-link { border:0; padding:0; background:none; color:inherit; font:inherit;
+                         text-align:left; cursor:pointer; text-decoration:underline; text-decoration-color:#c7d2fe;
+                         text-underline-offset:2px; }
+    .doctor-ledger-link:hover { color:#4f46e5; }
+    .case-tag { display:inline-block; font-size:.72rem; font-weight:700; color:#c2410c;
+                background:#ffedd5; border:1px solid #fdba74; border-radius:4px; padding:1px 6px; margin-left:6px; }
+    tr.opbal-row td { background:#f0f4ff; font-weight:700; }
+    @media print { .tab-bar,.no-print { display:none!important; } }
+
+    /* ── report header ── */
+    .context-strip { font-size:.82rem; color:#374151; background:#f8fafc; border:1px solid #e5e7eb;
+                      border-radius:8px; padding:.55rem .8rem; margin-bottom:.75rem; line-height:1.7; }
+    .context-strip b { color:#1e1b4b; }
+
+    /* ── ledger row coloring ── */
+    tr.row-payment td { background:#86efac !important; }
+    tr.row-payment td:first-child { border-left:4px solid #16a34a; }
+    tr.row-unset td { background:#fca5a5 !important; }
+    tr.row-unset td:first-child { border-left:4px solid #dc2626; }
+    tr.case-row { cursor:pointer; }
+    tr.case-row:hover td { filter:brightness(.97); }
+    .unset-flag { display:inline-block; font-size:.7rem; font-weight:700; color:#b91c1c;
+                  background:#fee2e2; border:1px solid #fca5a5; border-radius:4px; padding:1px 6px; margin-left:6px; }
+    .case-mode-note { font-size:.72rem; color:#6b7280; margin-top:2px; }
+    .click-hint { font-size:.72rem; color:#9ca3af; font-weight:400; }
+
+    /* ── case popup ── */
+    .modal-bg { position:fixed; inset:0; background:rgba(15,23,42,.5);
+                display:flex; align-items:center; justify-content:center; z-index:1000; padding:1rem; }
+    #caseModalBg { z-index:1100; }
+    .modal-box { background:#fff; border-radius:14px; padding:1.5rem; width:100%; max-width:600px;
+                 max-height:90vh; overflow-y:auto; overscroll-behavior:contain;
+                 box-shadow:0 24px 60px rgba(0,0,0,.3); }
+    .ledger-modal-box { max-width:1150px; }
+    .ledger-modal-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+    .modal-box h3 { margin:0 0 1rem; font-size:1.05rem; color:#1e1b4b; }
+    .cm-grid { display:grid; grid-template-columns:1fr 1fr; gap:.7rem 1rem; margin-bottom:1rem; }
+    .cm-readonly label { display:block; font-size:.72rem; font-weight:700; color:#6b7280;
+                          text-transform:uppercase; letter-spacing:.02em; margin-bottom:2px; }
+    .cm-readonly .val { color:#111827; font-weight:600; font-size:.85rem; }
+    .cm-field label { display:block; font-size:.78rem; font-weight:600; color:#374151; margin-bottom:.2rem; }
+    .cm-field input { width:100%; padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:8px;
+                       font-size:.85rem; box-sizing:border-box; }
+    .cm-divider { border:none; border-top:1px solid #e5e7eb; margin:.9rem 0; }
+    .cm-actions { display:flex; gap:.6rem; justify-content:flex-end; margin-top:1.1rem; }
+    .btn-save { background:#6366f1; color:#fff; border:none; border-radius:8px;
+                padding:.55rem 1.3rem; font-weight:700; cursor:pointer; }
+    .btn-save:hover { background:#4f46e5; }
+    .btn-cancel { background:#f1f5f9; color:#374151; border:none; border-radius:8px;
+                  padding:.55rem 1.2rem; font-weight:600; cursor:pointer; }
+    .hidden { display:none!important; }
+    body.modal-open { overflow:hidden; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<!-- CASE DETAILS POPUP -->
+<div id="caseModalBg" class="modal-bg hidden">
+  <div class="modal-box">
+    <h3>🔎 Case Details</h3>
+    <div class="cm-grid">
+      <div class="cm-readonly"><label>Patient</label><span class="val" id="cmPatient">-</span></div>
+      <div class="cm-readonly"><label>Admission No.</label><span class="val" id="cmAdmNo">-</span></div>
+      <div class="cm-readonly"><label>Case Type</label><span class="val" id="cmCaseType">-</span></div>
+      <div class="cm-readonly"><label>Case Mode</label><span class="val" id="cmCaseMode">-</span></div>
+      <div class="cm-readonly"><label>Surgent</label><span class="val" id="cmSurgent">-</span></div>
+      <div class="cm-readonly"><label>Anaesthesia</label><span class="val" id="cmAnaesthesia">-</span></div>
+      <div class="cm-readonly"><label>Refer</label><span class="val" id="cmRefer">-</span></div>
+      <div class="cm-readonly" id="cmStatusWrap"><label>Status</label><span class="val" id="cmStatus">-</span></div>
+    </div>
+    <hr class="cm-divider">
+    <p style="font-size:.8rem;color:#6b7280;margin:0 0 .8rem">
+      Amounts below come from the case's Amount Entry. Edit any field, or set one that
+      hasn't been entered yet — this updates the ledger and dues immediately.
+    </p>
+    <div class="cm-grid">
+      <div class="cm-field"><label>Surgent Fees (₹)</label><input id="cmSurgentFees" type="number" step="0.01"/></div>
+      <div class="cm-field"><label>Anaesthesia Fees (₹)</label><input id="cmAnaesthesiaFees" type="number" step="0.01"/></div>
+      <div class="cm-field"><label>Package Amount (₹)</label><input id="cmPackage" type="number" step="0.01"/></div>
+      <div class="cm-field"><label>Refer Amount (₹)</label><input id="cmReferAmount" type="number" step="0.01"/></div>
+      <div class="cm-field"><label>NH Fees (₹)</label><input id="cmNhFees" type="number" step="0.01"/></div>
+    </div>
+    <p class="err" id="cmErr" style="color:#dc2626;font-size:.8rem;margin:0 0 .5rem"></p>
+    <div class="cm-actions">
+      <button class="btn-cancel" onclick="closeCaseModal()">Close</button>
+      <button class="btn-save" onclick="saveCaseAmount()">💾 Save Amount</button>
+    </div>
+  </div>
+</div>
+
+<div id="doctorLedgerModalBg" class="modal-bg hidden">
+  <div class="modal-box ledger-modal-box">
+    <div class="ledger-modal-header">
+      <h3 id="doctorLedgerTitle">Doctor Ledger — Last 3 Months</h3>
+      <button class="btn-cancel" onclick="closeDoctorLedgerModal()">Close</button>
+    </div>
+    <div id="doctorLedgerOut">Loading ledger…</div>
+  </div>
+</div>
+
+<div class="page">
+  <h1>👨‍⚕️ Doctor Details – IPD</h1>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('r1',this)">Doctor Dues</button>
+    <button class="tab-btn" onclick="switchTab('r2',this)">Doctor Ledger</button>
+  </div>
+
+  <!-- REPORT 1: DOCTOR DUES -->
+  <div id="r1" class="tab-panel active page-card">
+    <h2 style="font-size:1rem;margin-bottom:1rem">💳 Doctor Due Summary</h2>
+    <div class="no-print" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
+      <button class="btn-primary" style="width:auto" onclick="loadDoctorDues()">🔄 Refresh</button>
+      <button id="zeroDueToggle" class="btn-primary" style="width:auto;background:#64748b" onclick="toggleZeroDueDoctors()">Hide ₹0 Due Doctors</button>
+      <button class="btn-primary" style="width:auto;background:#059669" onclick="downloadPDF('duesTable','Doctor Due Report')">⬇ Download PDF</button>
+    </div>
+    <div id="duesOut">Click Refresh to load.</div>
+  </div>
+
+  <!-- REPORT 2: DOCTOR LEDGER -->
+  <div id="r2" class="tab-panel page-card">
+    <h2 style="font-size:1rem;margin-bottom:1rem">📒 Doctor Ledger</h2>
+    <div class="form-row no-print">
+      <div>
+        <label>Doctor</label>
+        <select id="ledgerDoc"><option value="">-- Select Doctor --</option></select>
+      </div>
+      <div>
+        <label>From Date</label>
+        <input id="ledgerFrom" type="date"/>
+      </div>
+      <div>
+        <label>To Date</label>
+        <input id="ledgerTo" type="date"/>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:.5rem">
+        <button class="btn-primary" style="width:auto" onclick="loadLedger()">Show</button>
+        <button class="btn-primary" style="width:auto;background:#059669" onclick="downloadPDF('ledgerWrap','Doctor Ledger')">⬇ PDF</button>
+      </div>
+    </div>
+    <div id="ledgerOut" style="margin-top:1rem">Select doctor and date range, then click Show.</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant","manager","viewer"]);
+
+  const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+  const dateToInputValue = date =>
+    `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  let doctorDueRows = [];
+  let hideZeroDueDoctors = false;
+  let currentLedgerOutputId = 'ledgerOut';
+
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  const today = dateToInputValue(new Date());
+  const monthStart = today.slice(0,7) + '-01';
+  document.getElementById('ledgerFrom').value = monthStart;
+  document.getElementById('ledgerTo').value   = today;
+
+  // Load doctors into ledger dropdown
+  async function initDropdowns() {
+    const { data } = await BNH_PAGE.sb.from('ipd_doctors')
+      .select('id,doctor_name,doctor_type').order('doctor_name');
+    const sel = document.getElementById('ledgerDoc');
+    (data||[]).forEach(d => {
+      if (Array.from(sel.options).some(option => option.value === d.id)) return;
+      const o = document.createElement('option');
+      o.value = d.id;
+      o.textContent = `${d.doctor_name} (${d.doctor_type})`;
+      o.dataset.type = d.doctor_type;
+      sel.appendChild(o);
+    });
+  }
+  initDropdowns();
+
+  // ── REPORT 1: DOCTOR DUES ──────────────────────────
+  async function loadDoctorDues() {
+    document.getElementById('spinner').classList.remove('hidden');
+    const [{ data: doctors }, { data: amtEntries }, { data: docPayments }, { data: admRows, error: admErr }] = await Promise.all([
+      BNH_PAGE.sb.from('ipd_doctors').select('*').order('doctor_type,doctor_name'),
+      BNH_PAGE.sb.from('ipd_amount_entries').select('surgent_fees,anaesthesia_fees,nh_fees,admission_id'),
+      BNH_PAGE.sb.from('ipd_doctor_payments').select('doctor_id,amount'),
+      BNH_PAGE.sb.from('ipd_admissions').select('id,is_cancelled')
+    ]);
+    if (admErr) console.error('Doctor Dues: failed to load admissions —', admErr.message);
+    // A case is "cancelled" when its ADMISSION is marked is_cancelled (set from the
+    // Cash Receive & Discharge page's "Cancel Case" action) — cancelled cases are
+    // excluded from OT Fees / NH Adj everywhere.
+    const cancelledAdmIds = new Set((admRows||[]).filter(a => a.is_cancelled).map(a => a.id));
+    const { data: otEntriesRaw, error: otErr } = await BNH_PAGE.sb.from('ipd_ot_entries').select('*');
+    if (otErr) console.error('Doctor Dues: failed to load OT entries —', otErr.message);
+    const otEntries = (otEntriesRaw||[]).filter(ot => !cancelledAdmIds.has(ot.admission_id));
+    // Get amount entries mapped by admission
+    const amtMap = {};
+    (amtEntries||[]).forEach(a => { amtMap[a.admission_id] = a; });
+
+    document.getElementById('spinner').classList.add('hidden');
+
+    const rows = (doctors||[]).map(doc => {
+      const opBal = parseFloat(doc.opening_balance||0);
+      // Find all OT entries where this doctor is surgent or anaesthesia
+      const myOTs = (otEntries||[]).filter(ot =>
+        ot.surgent_id === doc.id || ot.anaesthesia_id === doc.id
+      );
+      let otFees = 0, nhAdj = 0;
+      myOTs.forEach(ot => {
+        const amt = amtMap[ot.admission_id];
+        if (!amt) return;
+        if (doc.doctor_type === 'Surgent' && ot.surgent_id === doc.id) {
+          otFees += parseFloat(amt.surgent_fees||0);
+          nhAdj  += parseFloat(amt.nh_fees||0); // Doctor Case NH fee adjustment
+        } else if (doc.doctor_type === 'Anaesthesia' && ot.anaesthesia_id === doc.id) {
+          otFees += parseFloat(amt.anaesthesia_fees||0);
+        }
+      });
+      const paid = (docPayments||[]).filter(p=>p.doctor_id===doc.id).reduce((a,p)=>a+parseFloat(p.amount||0),0);
+      // Surgent: Opening + OT Fees - NH Fees (Doctor Case) - Payments = Due
+      // Anaesthesia: Opening + OT Fees - Payments = Due
+      const due = doc.doctor_type === 'Surgent'
+        ? opBal + otFees - nhAdj - paid
+        : opBal + otFees - paid;
+      return { doc, opBal, otFees, nhAdj, paid, due };
+    }).sort((a,b) => b.due - a.due || String(a.doc.doctor_name).localeCompare(String(b.doc.doctor_name)));
+
+    doctorDueRows = rows;
+    renderDoctorDues();
+  }
+
+  function toggleZeroDueDoctors() {
+    hideZeroDueDoctors = !hideZeroDueDoctors;
+    renderDoctorDues();
+  }
+
+  function renderDoctorDues() {
+    const rows = doctorDueRows;
+    const visibleRows = hideZeroDueDoctors
+      ? rows.filter(r => Math.round(r.due * 100) !== 0)
+      : rows;
+    document.getElementById('zeroDueToggle').textContent =
+      hideZeroDueDoctors ? 'Show ₹0 Due Doctors' : 'Hide ₹0 Due Doctors';
+    document.getElementById('duesOut').innerHTML = `
+      <table id="duesTable">
+        <thead><tr>
+          <th>#</th><th>Doctor</th><th>Type</th>
+          <th class="r">Op. Bal</th><th class="r">OT Fees</th>
+          <th class="r">NH Adj.</th><th class="r">Paid</th>
+          <th class="r">Due (Closing)</th>
+        </tr></thead>
+        <tbody>${visibleRows.map((r,i)=>`<tr>
+          <td>${i+1}</td>
+          <td><button type="button" class="doctor-ledger-link" data-doctor-id="${r.doc.id}">${r.doc.doctor_name}</button></td>
+          <td>${r.doc.doctor_type}</td>
+          <td class="r">${fmt(r.opBal)}</td>
+          <td class="r">${fmt(r.otFees)}</td>
+          <td class="r">${r.doc.doctor_type==='Surgent'?fmt(r.nhAdj):'-'}</td>
+          <td class="r">${fmt(r.paid)}</td>
+          <td class="r ${r.due>0?'due-pos':'due-neg'}">${fmt(r.due)}</td>
+        </tr>`).join('')}</tbody>
+        <tfoot><tr>
+          <td colspan="3">Total</td>
+          <td class="r">${fmt(rows.reduce((a,r)=>a+r.opBal,0))}</td>
+          <td class="r">${fmt(rows.reduce((a,r)=>a+r.otFees,0))}</td>
+          <td class="r">${fmt(rows.reduce((a,r)=>a+r.nhAdj,0))}</td>
+          <td class="r">${fmt(rows.reduce((a,r)=>a+r.paid,0))}</td>
+          <td class="r">${fmt(rows.reduce((a,r)=>a+r.due,0))}</td>
+        </tr></tfoot>
+      </table>
+      <p style="font-size:.78rem;color:#888;margin-top:.5rem">
+        * For Surgent: Due = Opening + OT Fees − NH Fees (Doctor Cases) − Payments<br>
+        * For Anaesthesia: Due = Opening + OT Fees − Payments<br>
+        * Cancelled cases are excluded from OT Fees.
+      </p>`;
+  }
+
+  document.getElementById('duesOut').addEventListener('click', function(e) {
+    const button = e.target.closest('.doctor-ledger-link');
+    if (button) openDoctorLedger(button.dataset.doctorId);
+  });
+
+  function openDoctorLedger(doctorId) {
+    const doctor = doctorDueRows.find(row => row.doc.id === doctorId)?.doc;
+    if (!doctor) return;
+    const select = document.getElementById('ledgerDoc');
+    let option = Array.from(select.options).find(item => item.value === doctorId);
+    if (!option) {
+      option = document.createElement('option');
+      option.value = doctor.id;
+      option.textContent = `${doctor.doctor_name} (${doctor.doctor_type})`;
+      option.dataset.type = doctor.doctor_type;
+      select.appendChild(option);
+    }
+    select.value = doctorId;
+    document.getElementById('doctorLedgerTitle').textContent =
+      `${doctor?.doctor_name || 'Doctor'} — Ledger for Last 3 Months`;
+
+    const todayDate = new Date();
+    const fromDate = new Date(todayDate);
+    const day = fromDate.getDate();
+    fromDate.setDate(1);
+    fromDate.setMonth(fromDate.getMonth() - 3);
+    fromDate.setDate(Math.min(day, new Date(fromDate.getFullYear(), fromDate.getMonth() + 1, 0).getDate()));
+    document.getElementById('ledgerFrom').value = dateToInputValue(fromDate);
+    document.getElementById('ledgerTo').value = dateToInputValue(todayDate);
+    document.getElementById('doctorLedgerOut').textContent = 'Loading ledger…';
+    document.getElementById('doctorLedgerModalBg').classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    loadLedger('doctorLedgerOut');
+  }
+
+  function closeDoctorLedgerModal() {
+    document.getElementById('doctorLedgerModalBg').classList.add('hidden');
+    if (document.getElementById('caseModalBg').classList.contains('hidden')) {
+      document.body.classList.remove('modal-open');
+      currentLedgerOutputId = 'ledgerOut';
+    }
+  }
+  document.getElementById('doctorLedgerModalBg').addEventListener('click', function(e) {
+    if (e.target === this) closeDoctorLedgerModal();
+  });
+
+  // Helper: compute net Dr (fees minus NH adjustment where applicable) for one OT entry
+  function computeFees(ot, amt, docType, docId) {
+    let fees = 0, nhAdj = 0, isDoctorCase = false, feeSet = false;
+    if (docType === 'Surgent' && ot.surgent_id === docId) {
+      fees  = parseFloat(amt?.surgent_fees||0);
+      nhAdj = parseFloat(amt?.nh_fees||0);
+      isDoctorCase = nhAdj > 0;
+      feeSet = amt && amt.surgent_fees !== null && amt.surgent_fees !== undefined;
+    } else if (docType === 'Anaesthesia' && ot.anaesthesia_id === docId) {
+      fees = parseFloat(amt?.anaesthesia_fees||0);
+      isDoctorCase = parseFloat(amt?.nh_fees||0) > 0;
+      feeSet = amt && amt.anaesthesia_fees !== null && amt.anaesthesia_fees !== undefined;
+    }
+    return { fees, nhAdj, isDoctorCase, feeSet };
+  }
+
+  // Effective case type / mode text (handles the "Other" free-text variants)
+  function effCaseType(adm) {
+    if (!adm) return '';
+    return adm.case_type === 'Other' ? (adm.case_type_other || 'Other') : (adm.case_type || '');
+  }
+  function effCaseMode(adm) {
+    if (!adm) return '';
+    return adm.case_mode === 'Other' ? (adm.case_mode_other || 'Other') : (adm.case_mode || '');
+  }
+  const isDoctorCaseType = t => /doctor\s*case/i.test(t || '');
+  // Anaesthesia "Amount not set" (red) is only relevant for scheme cases.
+  const isCashMode = m => /^\s*cash\s*$/i.test(m || '');
+  const isNHType   = t => /^\s*(nh|nursing\s*home)\s*$/i.test(t || '');
+
+  // Cache used by the case-details popup (built fresh each time the ledger loads)
+  let ledgerCaseCache = {};      // admission_id -> { admission, ot, amt }
+  let ledgerContext   = null;    // { docId, docType }
+
+  // ── REPORT 2: DOCTOR LEDGER ──────────────────────────
+  async function loadLedger(outputId = 'ledgerOut') {
+    const docId = document.getElementById('ledgerDoc').value;
+    const from  = document.getElementById('ledgerFrom').value;
+    const to    = document.getElementById('ledgerTo').value;
+    const out   = document.getElementById(outputId);
+    currentLedgerOutputId = outputId;
+    if (!docId) { out.textContent = 'Please select a doctor.'; return; }
+
+    const sel  = document.getElementById('ledgerDoc');
+    const opt  = sel.options[sel.selectedIndex];
+    const docType = opt.dataset.type;
+    ledgerContext = { docId, docType };
+
+    document.getElementById('spinner').classList.remove('hidden');
+
+    // Fetch doctor info, in-period transactions, AND all transactions dated before
+    // "from" (needed to roll the static opening_balance forward to the period start).
+    const [{ data: docInfoArr }, { data: otEntriesRaw }, { data: payments },
+           { data: priorOTRaw }, { data: priorPayments }] = await Promise.all([
+      BNH_PAGE.sb.from('ipd_doctors').select('*').eq('id',docId),
+      BNH_PAGE.sb.from('ipd_ot_entries').select('*')
+        .or(`surgent_id.eq.${docId},anaesthesia_id.eq.${docId}`)
+        .gte('ot_date', from).lte('ot_date', to).order('ot_date'),
+      BNH_PAGE.sb.from('ipd_doctor_payments').select('*')
+        .eq('doctor_id', docId).gte('payment_date', from).lte('payment_date', to).order('payment_date'),
+      BNH_PAGE.sb.from('ipd_ot_entries').select('*')
+        .or(`surgent_id.eq.${docId},anaesthesia_id.eq.${docId}`)
+        .lt('ot_date', from),
+      BNH_PAGE.sb.from('ipd_doctor_payments').select('*')
+        .eq('doctor_id', docId).lt('payment_date', from)
+    ]);
+
+    const docInfo = docInfoArr && docInfoArr.length > 0 ? docInfoArr[0] : null;
+
+    // Get amount entries + admission details for BOTH in-period and prior OT cases.
+    // Admission info also tells us which cases are cancelled (ipd_admissions.is_cancelled,
+    // set from the Cash Receive & Discharge page's "Cancel Case" action) — cancelled
+    // cases never appear in the ledger and never affect balances.
+    const allOTRaw = [...(priorOTRaw||[]), ...(otEntriesRaw||[])];
+    const admIds = [...new Set(allOTRaw.map(r=>r.admission_id).filter(Boolean))];
+    let amtMap = {}, admMap = {};
+    if (admIds.length > 0) {
+      const [{ data: amts }, { data: adms }] = await Promise.all([
+        BNH_PAGE.sb.from('ipd_amount_entries').select('*').in('admission_id', admIds),
+        BNH_PAGE.sb.from('ipd_admissions').select('*').in('id', admIds)
+      ]);
+      (amts||[]).forEach(a => { amtMap[a.admission_id] = a; });
+      (adms||[]).forEach(a => { admMap[a.id] = a; });
+    }
+    document.getElementById('spinner').classList.add('hidden');
+
+    const notCancelled = ot => !admMap[ot.admission_id]?.is_cancelled;
+    const otEntries = (otEntriesRaw||[]).filter(notCancelled);
+    const priorOT    = (priorOTRaw||[]).filter(notCancelled);
+
+    // Build the popup cache for every in-period case
+    ledgerCaseCache = {};
+    otEntries.forEach(ot => {
+      ledgerCaseCache[ot.admission_id] = {
+        ot, amt: amtMap[ot.admission_id] || null, admission: admMap[ot.admission_id] || null
+      };
+    });
+
+    const staticOpBal = parseFloat(docInfo?.opening_balance||0);
+
+    // 1) Roll the doctor's static opening balance forward to the start of the
+    //    selected period by applying every OT case fee and every payment dated
+    //    strictly before "from".
+    let periodOpBal = staticOpBal;
+    priorOT.forEach(ot => {
+      const amt = amtMap[ot.admission_id];
+      const { fees, nhAdj } = computeFees(ot, amt, docType, docId);
+      periodOpBal += (fees - nhAdj);
+    });
+    (priorPayments||[]).forEach(p => { periodOpBal -= parseFloat(p.amount||0); });
+
+    // 2) Build the in-period transaction rows
+    let rows = [];
+    otEntries.forEach(ot => {
+      const amt = amtMap[ot.admission_id];
+      const adm = admMap[ot.admission_id];
+      const { fees, nhAdj, isDoctorCase, feeSet } = computeFees(ot, amt, docType, docId);
+      // Raw "blank" checks (display only — do NOT feed into fees/nhAdj/balance math above).
+      const feeBlank = docType === 'Surgent'
+        ? (amt?.surgent_fees === null || amt?.surgent_fees === undefined)
+        : (amt?.anaesthesia_fees === null || amt?.anaesthesia_fees === undefined);
+      const nhBlank = (amt?.nh_fees === null || amt?.nh_fees === undefined);
+      const admIsDoctorCase = isDoctorCaseType(adm?.case_type) || isDoctorCaseType(adm?.case_type_other);
+      const modeText = effCaseMode(adm);
+      rows.push({
+        date: ot.ot_date, type: 'OT Case', admissionId: ot.admission_id,
+        patient: ot.patient_name, admissionNo: ot.admission_no,
+        caseDetail: ot.case_detail || '', caseMode: modeText, caseType: effCaseType(adm),
+        dr: fees, nhAdj, cr: 0, isDoctorCase: isDoctorCase || admIsDoctorCase, feeSet,
+        feeBlank, nhBlank, admIsDoctorCase
+      });
+    });
+    (payments||[]).forEach(p => {
+      rows.push({
+        date: p.payment_date, type: 'Payment', admissionId: null,
+        patient: '-', admissionNo: '', caseDetail: `Payment received — Mode: ${p.mode||'-'}`, caseMode:'', caseType:'',
+        dr: 0, nhAdj: 0, cr: parseFloat(p.amount||0), isDoctorCase: false, feeSet: true,
+        feeBlank: false, nhBlank: false, admIsDoctorCase: false
+      });
+    });
+    rows.sort((a,b) => a.date.localeCompare(b.date));
+
+    // 3) Walk forward from the calculated period opening balance
+    let bal = periodOpBal;
+    let totalDr = 0, totalNh = 0, totalCr = 0;
+    let tableRows = `<tr class="opbal-row">
+        <td>-</td><td>${from}</td><td>-</td>
+        <td>Opening Balance carried forward (as of ${from})</td>
+        <td class="r">-</td><td class="r">-</td><td class="r">-</td>
+        <td class="r">${fmt(periodOpBal)}</td>
+      </tr>`;
+    rows.forEach((r,i) => {
+      const netDr = r.dr - r.nhAdj;
+      bal += netDr - r.cr;
+      totalDr += r.dr; totalNh += (docType==='Surgent' ? r.nhAdj : 0); totalCr += r.cr;
+
+      const isPayment = r.type === 'Payment';
+      // Red highlight rule (display only):
+      //  - Doctor Case  -> only red when BOTH the OT fee and the NH fee are blank.
+      //  - Regular case -> red when this doctor's OT fee hasn't been entered yet.
+      let isUnset = !isPayment && (r.admIsDoctorCase ? (r.feeBlank && r.nhBlank) : r.feeBlank);
+      // Exception: Anaesthesia doctor + (Cash mode OR NH case type) -> never red.
+      if (docType === 'Anaesthesia' && (isCashMode(r.caseMode) || isNHType(r.caseType))) isUnset = false;
+      const rowClass = isPayment ? 'row-payment' : (isUnset ? 'row-unset case-row' : 'case-row');
+
+      // Case Details column: Admission No + Case Detail text + Case Mode, as requested.
+      const caseDetails = !isPayment
+        ? `${r.caseDetail ? r.caseDetail : (r.patient + (r.admissionNo ? ' (' + r.admissionNo + ')' : ''))}
+           <div class="case-mode-note">Adm No: ${r.admissionNo||'-'} &middot; Type: ${r.caseType||'-'}${r.caseMode ? ' &middot; Mode: ' + r.caseMode : ''}</div>
+           ${r.isDoctorCase ? '<span class="case-tag">Doctor Case</span>' : ''}
+           ${isUnset ? '<span class="unset-flag">Amount not set</span>' : ''}
+           <span class="click-hint"> — click for case details</span>`
+        : r.caseDetail;
+
+      const onclick = (!isPayment && r.admissionId) ? ` onclick="openCaseModal('${r.admissionId}')"` : '';
+
+      tableRows += `<tr class="${rowClass}"${onclick}>
+        <td>${i+1}</td><td>${r.date}</td>
+        <td>${isPayment ? '-' : (r.patient||'-')}</td>
+        <td>${caseDetails}</td>
+        <td class="r">${r.dr ? fmt(r.dr) : '-'}</td>
+        <td class="r">${docType==='Surgent' && r.nhAdj ? fmt(r.nhAdj) : '-'}</td>
+        <td class="r">${r.cr ? fmt(r.cr) : '-'}</td>
+        <td class="r" style="font-weight:600">${fmt(bal)}</td>
+      </tr>`;
+    });
+
+    out.innerHTML = `<div id="ledgerWrap">
+      <div class="context-strip">
+        <b>${docInfo?.doctor_name||'-'}</b> &nbsp;|&nbsp; ${docType} &nbsp;|&nbsp;
+        ${docInfo?.specialisation||''} &nbsp;|&nbsp; Mobile: ${docInfo?.mobile||'-'}<br>
+        Opening Balance (static, all-time): <b>${fmt(staticOpBal)}</b> &nbsp;|&nbsp;
+        Opening Balance as of ${from}: <b>${fmt(periodOpBal)}</b> &nbsp;|&nbsp; Period: ${from} to ${to}
+        ${'<br><span class="case-tag">Doctor Case</span> = case type is Doctor Case, or the case has an NH fee adjustment'}
+        <br><span class="unset-flag" style="margin-left:0">Amount not set</span> = fee not entered
+        (for Doctor Cases, both OT fee and NH fee must be blank; Anaesthesia cases with Cash mode or NH type are never red) &nbsp;|&nbsp;
+        Payment rows are highlighted <b style="color:#059669">green</b>. Cancelled cases are not shown.
+      </div>
+      <table id="ledgerTable">
+        <thead><tr>
+          <th>#</th><th>Date</th><th>Patient Name</th><th>Case Details</th>
+          <th class="r">Fees (Dr)</th>
+          <th class="r">NH Adj (Cr)</th>
+          <th class="r">Payment (Cr)</th>
+          <th class="r">Balance</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align:right">Period Totals</td>
+            <td class="r">${fmt(totalDr)}</td>
+            <td class="r">${fmt(totalNh)}</td>
+            <td class="r">${fmt(totalCr)}</td>
+            <td class="r">-</td>
+          </tr>
+          <tr><td colspan="7" style="text-align:right">Closing Balance (Due)</td>
+            <td class="r ${bal>0?'due-pos':'due-neg'}">${fmt(bal)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  }
+
+  // ── CASE DETAILS POPUP ───────────────────────────────
+  function openCaseModal(admissionId) {
+    const ctx = ledgerCaseCache[admissionId];
+    if (!ctx) return;
+    const { ot, amt, admission } = ctx;
+
+    document.getElementById('cmPatient').textContent      = ot.patient_name || admission?.patient_name || '-';
+    document.getElementById('cmAdmNo').textContent         = ot.admission_no || admission?.admission_no || '-';
+    document.getElementById('cmCaseType').textContent      = admission?.case_type === 'Other'
+      ? (admission?.case_type_other || 'Other') : (admission?.case_type || '-');
+    document.getElementById('cmCaseMode').textContent      = admission?.case_mode === 'Other'
+      ? (admission?.case_mode_other || 'Other') : (admission?.case_mode || '-');
+    document.getElementById('cmSurgent').textContent       = ot.surgent_name || '-';
+    document.getElementById('cmAnaesthesia').textContent   = ot.anaesthesia_name || '-';
+    document.getElementById('cmRefer').textContent         = admission?.refer_name || '-';
+    document.getElementById('cmStatus').textContent        = admission?.is_cancelled ? 'Cancelled' : 'Active';
+
+    document.getElementById('cmSurgentFees').value      = amt?.surgent_fees      ?? '';
+    document.getElementById('cmAnaesthesiaFees').value  = amt?.anaesthesia_fees  ?? '';
+    document.getElementById('cmPackage').value           = amt?.package_amount   ?? '';
+    document.getElementById('cmReferAmount').value       = amt?.refer_amount     ?? '';
+    document.getElementById('cmNhFees').value            = amt?.nh_fees          ?? '';
+
+    document.getElementById('cmErr').textContent = '';
+    document.getElementById('caseModalBg').dataset.admissionId = admissionId;
+    document.getElementById('caseModalBg').classList.remove('hidden');
+    // Lock background scrolling while the popup is open, so the mouse wheel /
+    // touch scroll always scrolls the popup itself, not the page behind it.
+    document.body.classList.add('modal-open');
+  }
+
+  function closeCaseModal() {
+    document.getElementById('caseModalBg').classList.add('hidden');
+    if (document.getElementById('doctorLedgerModalBg').classList.contains('hidden')) {
+      document.body.classList.remove('modal-open');
+    }
+  }
+  document.getElementById('caseModalBg').addEventListener('click', function(e){
+    if (e.target === this) closeCaseModal();
+  });
+
+  async function saveCaseAmount() {
+    const admissionId = document.getElementById('caseModalBg').dataset.admissionId;
+    if (!admissionId) return;
+    const err = document.getElementById('cmErr');
+    err.textContent = '';
+
+    const num = id => {
+      const v = document.getElementById(id).value;
+      return v === '' ? null : parseFloat(v);
+    };
+    const cached = ledgerCaseCache[admissionId] || {};
+    const admissionNo = cached.ot?.admission_no || cached.admission?.admission_no || null;
+    const patientName = cached.ot?.patient_name || cached.admission?.patient_name || null;
+    const payload = {
+      surgent_fees:     num('cmSurgentFees'),
+      anaesthesia_fees: num('cmAnaesthesiaFees'),
+      package_amount:   num('cmPackage'),
+      refer_amount:     num('cmReferAmount'),
+      nh_fees:          num('cmNhFees'),
+    };
+
+    document.getElementById('spinner').classList.remove('hidden');
+    try {
+      // Update if an amount-entry row already exists for this admission, else insert one.
+      const { data: existing, error: selErr } = await BNH_PAGE.sb
+        .from('ipd_amount_entries').select('admission_id').eq('admission_id', admissionId).limit(1);
+      if (selErr) throw selErr;
+      if (existing && existing.length > 0) {
+        const { error: updErr } = await BNH_PAGE.sb
+          .from('ipd_amount_entries').update(payload).eq('admission_id', admissionId);
+        if (updErr) throw updErr;
+      } else {
+        if (!admissionNo) throw new Error('Admission No not found for this case — cannot create amount entry.');
+        if (!patientName) throw new Error('Patient Name not found for this case — cannot create amount entry.');
+        const { error: insErr } = await BNH_PAGE.sb
+          .from('ipd_amount_entries').insert({ admission_id: admissionId, admission_no: admissionNo, patient_name: patientName, ...payload });
+        if (insErr) throw insErr;
+      }
+      closeCaseModal();
+      await loadLedger(currentLedgerOutputId); // refresh so the ledger, coloring and balances reflect the change
+    } catch(ex) {
+      err.textContent = ex.message;
+    } finally {
+      document.getElementById('spinner').classList.add('hidden');
+    }
+  }
+
+  // Builds a short context line for the PDF sub-header (doctor / period, when relevant).
+  function pdfContextLine(elementId) {
+    if (elementId !== 'ledgerWrap' || !ledgerContext) return '';
+    const sel = document.getElementById('ledgerDoc');
+    const opt = sel.options[sel.selectedIndex];
+    const name = opt ? opt.textContent : '';
+    const from = document.getElementById('ledgerFrom').value;
+    const to   = document.getElementById('ledgerTo').value;
+    return `Doctor: ${name}   |   Period: ${from} to ${to}`;
+  }
+
+  function downloadPDF(elementId, title) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const brand = [99,102,241]; // indigo, matches the on-screen theme
+
+    // ── Letterhead ──
+    doc.setFillColor(brand[0], brand[1], brand[2]);
+    doc.rect(0, 0, pageWidth, 24, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold'); doc.setFontSize(15);
+    doc.text('Bhagirathi Nursing Home', 15, 11);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.text('IPD Accounts — ' + title, 15, 18);
+
+    doc.setTextColor(30,30,30);
+    let y = 31;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    doc.text(title, 15, y);
+    y += 6;
+    const context = pdfContextLine(elementId);
+    if (context) {
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      doc.setTextColor(80,80,80);
+      doc.text(context, 15, y);
+      y += 5;
+    }
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    doc.setTextColor(120,120,120);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN'), 15, y);
+    doc.setDrawColor(brand[0],brand[1],brand[2]);
+    doc.setLineWidth(.4);
+    doc.line(15, y+3, pageWidth-15, y+3);
+    y += 8;
+
+    const tables = document.getElementById(elementId)?.querySelectorAll('table');
+    (tables||[]).forEach(tbl => {
+      // Read each body row's highlight class directly from the DOM (rather than
+      // relying on autotable's internal row-raw shape) so the PDF matches the
+      // on-screen green (payment) / red (unset amount) coding exactly.
+      const bodyRows = Array.from(tbl.querySelectorAll('tbody tr'));
+      const rowFill = bodyRows.map(tr => {
+        if (tr.classList.contains('row-payment')) return [134,239,172];
+        if (tr.classList.contains('row-unset'))   return [252,165,165];
+        if (tr.classList.contains('opbal-row'))   return [224,231,255];
+        return null;
+      });
+
+      doc.autoTable({
+        html: tbl, startY: y,
+        styles:{ fontSize:8, cellPadding:2.2, lineColor:[226,232,240], lineWidth:.1 },
+        headStyles:{ fillColor:brand, textColor:255, fontStyle:'bold', halign:'left' },
+        footStyles:{ fillColor:[241,245,249], textColor:[30,41,59], fontStyle:'bold' },
+        alternateRowStyles:{ fillColor:[249,250,251] },
+        margin:{ left:15, right:15 },
+        didParseCell: function(data) {
+          if (data.section === 'body') {
+            const fill = rowFill[data.row.index];
+            if (fill) data.cell.styles.fillColor = fill;
+          }
+        }
+      });
+      y = doc.lastAutoTable.finalY + 6;
+    });
+
+    // ── Footer: page numbers ──
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+      doc.setTextColor(140,140,140);
+      doc.text(`Page ${p} of ${pageCount}`, pageWidth-15, doc.internal.pageSize.getHeight()-8, { align:'right' });
+      doc.text('Bhagirathi Nursing Home — Confidential', 15, doc.internal.pageSize.getHeight()-8);
+    }
+
+    doc.save(title.replace(/\s+/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+  }
+</script>
+</body>
+</html>

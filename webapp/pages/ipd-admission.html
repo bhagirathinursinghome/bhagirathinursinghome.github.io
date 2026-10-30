@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Admission – IPD</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; }
+    .form-row > * { flex:1; min-width:200px; }
+    .hidden { display:none!important; }
+    table { width:100%; border-collapse:collapse; margin-top:.75rem; }
+    th { background:#f0f0f0; padding:7px 8px; text-align:left; font-size:.82rem; }
+    td { padding:7px 8px; border-bottom:1px solid #eee; font-size:.82rem; }
+    .refer-type-toggle { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.5rem; }
+    .refer-type-btn { padding:0.4rem 0.9rem; border:1px solid #ccc; background:#f8f9fa; border-radius:3px; cursor:pointer; font-size:0.85rem; }
+    .refer-type-btn.active { background:#007bff; color:white; border-color:#007bff; }
+    .quack-info-box { background:#fff3e0; padding:0.6rem 0.9rem; border-radius:3px; border-left:3px solid #ff9800; font-size:0.85rem; margin-top:0.5rem; }
+    .refer-select-row { display:flex; gap:0.5rem; align-items:center; }
+    .refer-select-row select { flex:1; }
+    .btn-add-refer { padding:0.45rem 0.85rem; background:#16a34a; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.82rem; white-space:nowrap; font-weight:600; }
+    .btn-add-refer:hover { background:#15803d; }
+
+    /* Searchable refer autocomplete */
+    .refer-search-wrap { position:relative; flex:1; }
+    .refer-search-input { width:100%; box-sizing:border-box; padding:0.42rem 2rem 0.42rem 0.6rem; border:1px solid #ccc; border-radius:4px; font-size:0.88rem; }
+    .refer-search-input:focus { outline:none; border-color:#007bff; box-shadow:0 0 0 2px rgba(0,123,255,.15); }
+    .refer-clear-btn { position:absolute; right:0.5rem; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1rem; color:#999; line-height:1; padding:0; }
+    .refer-clear-btn:hover { color:#333; }
+    .refer-dropdown { position:absolute; top:calc(100% + 3px); left:0; right:0; background:#fff; border:1px solid #ccc; border-radius:4px; max-height:220px; overflow-y:auto; z-index:500; box-shadow:0 4px 12px rgba(0,0,0,.12); display:none; }
+    .refer-dropdown.open { display:block; }
+    .refer-option { padding:0.45rem 0.7rem; cursor:pointer; font-size:0.85rem; border-bottom:1px solid #f0f0f0; }
+    .refer-option:last-child { border-bottom:none; }
+    .refer-option:hover, .refer-option.active { background:#e8f0fe; }
+    .refer-option mark { background:#fff176; border-radius:2px; font-style:normal; }
+    .refer-option .sub { color:#888; font-size:0.78rem; margin-top:1px; }
+
+    /* Modal */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; display:flex; align-items:center; justify-content:center; }
+    .modal-overlay.hidden { display:none!important; }
+    .modal-box { background:#fff; border-radius:10px; padding:1.5rem; width:min(96vw,460px); box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+    .modal-box h3 { margin:0 0 1rem; font-size:1rem; }
+    .modal-box label { display:block; font-size:0.83rem; font-weight:600; margin:0.7rem 0 0.25rem; }
+    .modal-box input { width:100%; box-sizing:border-box; padding:0.42rem 0.6rem; border:1px solid #ccc; border-radius:4px; font-size:0.9rem; }
+    .modal-footer { display:flex; gap:0.6rem; justify-content:flex-end; margin-top:1.2rem; }
+    .btn-cancel { padding:0.45rem 1rem; border:1px solid #ccc; background:#f8f9fa; border-radius:4px; cursor:pointer; font-size:0.85rem; }
+    .modal-err { color:#dc2626; font-size:0.82rem; margin-top:0.5rem; min-height:1.1em; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+<div class="page">
+  <h1>🏥 Patient Admission – IPD</h1>
+
+  <div class="page-card">
+    <form id="admForm">
+      <label>Recorded By</label>
+      <input id="recBy" readonly/>
+
+      <div class="form-row">
+        <div>
+          <label>Admission Date <span style="color:red">*</span></label>
+          <input id="admDate" type="date" required/>
+        </div>
+        <div>
+          <label>Admission No. <span style="color:red">*</span></label>
+          <input id="admNo" required placeholder="e.g. IPD-2024-001"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label>Patient Name <span style="color:red">*</span></label>
+          <input id="patientName" required placeholder="Full Name"/>
+        </div>
+        <div>
+          <label>Address</label>
+          <input id="address" placeholder="Optional"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label>Mobile No. <span style="color:red">*</span></label>
+          <input id="patientMobile" type="tel" placeholder="10-digit mobile number" maxlength="10" required/>
+        </div>
+        <div>
+          <label>Aadhaar No. <span style="color:#888;font-weight:400">(optional)</span></label>
+          <input id="patientAdhar" placeholder="12-digit Aadhaar number" maxlength="12"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label>Case Mode <span style="color:red">*</span></label>
+          <select id="caseMode" required>
+            <option value="">-- Select --</option>
+            <option value="Cash">Cash</option>
+            <option value="Swastha Swasthy">Swastha Swasthy</option>
+            <option value="Ayusman Bharat">Ayusman Bharat</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div id="caseModeOtherWrap" class="hidden">
+          <label>Case Mode – Specify <span style="color:red">*</span></label>
+          <input id="caseModeOther" placeholder="Please specify…"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label>Case Type <span style="color:red">*</span></label>
+          <select id="caseType" required>
+            <option value="">-- Select --</option>
+            <option value="NH">NH</option>
+            <option value="Doctor Case">Doctor Case</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div id="caseTypeOtherWrap" class="hidden">
+          <label>Case Type – Specify <span style="color:red">*</span></label>
+          <input id="caseTypeOther" placeholder="Please specify…"/>
+        </div>
+      </div>
+
+      <!-- Refer / Doctor Source -->
+      <label style="font-weight:600; margin-bottom:0.4rem; display:block;">Refer / Doctor Source</label>
+      <div class="refer-type-toggle" id="referTypeToggle">
+        <button type="button" class="refer-type-btn active" data-type="quack" onclick="switchAdmReferType('quack')">👨‍⚕️ Refer</button>
+        <button type="button" class="refer-type-btn" data-type="none" onclick="switchAdmReferType('none')">🚫 Not Applicable</button>
+      </div>
+
+      <!-- Quack Doctor (searchable autocomplete) -->
+      <div id="referQuackSection">
+        <label>Select Refer</label>
+        <div class="refer-select-row">
+          <div class="refer-search-wrap" id="referSearchWrap">
+            <input type="text" id="referSearchInput" class="refer-search-input" placeholder="Type name, mobile or team…" autocomplete="off"
+              oninput="onReferSearch()" onfocus="onReferSearch()" onkeydown="onReferKeydown(event)"/>
+            <button type="button" class="refer-clear-btn" id="referClearBtn" onclick="clearReferSearch()" style="display:none" title="Clear">✕</button>
+            <div class="refer-dropdown" id="referDropdown"></div>
+          </div>
+          <button type="button" class="btn-add-refer" onclick="openAddReferModal()">➕ Add New Refer</button>
+        </div>
+        <!-- hidden value holder -->
+        <input type="hidden" id="quackDoctor"/>
+        <div id="quackInfoBox" class="quack-info-box" style="display:none;"></div>
+      </div>
+
+      <label style="margin-top:1rem;">Remark</label>
+      <textarea id="remark" rows="2" placeholder="Optional…"></textarea>
+
+      <div style="margin-top:1rem">
+        <button type="submit" class="btn-primary" style="width:auto">💾 Save Admission</button>
+      </div>
+      <p class="err" id="err"></p>
+      <p class="info" id="ok" style="display:none"></p>
+    </form>
+  </div>
+
+  <div class="page-card" style="margin-top:1.5rem">
+    <h2 style="font-size:1rem;margin-bottom:.75rem">📋 Recent Admissions</h2>
+    <div id="admList" style="font-size:.85rem;color:#555">Loading…</div>
+  </div>
+</div>
+
+<!-- Add New Refer Modal -->
+<div class="modal-overlay hidden" id="addReferModal">
+  <div class="modal-box">
+    <h3>➕ Add New Refer Doctor</h3>
+
+    <label>Doctor Name <span style="color:red">*</span></label>
+    <input id="nr_name" placeholder="Dr. Ramesh Kumar"/>
+
+    <label>Address <span style="color:red">*</span></label>
+    <input id="nr_address" placeholder="Village, Block, District"/>
+
+    <label>Mobile <span style="color:red">*</span></label>
+    <input id="nr_mobile" type="tel" placeholder="10-digit mobile number" maxlength="10"/>
+
+    <p class="modal-err" id="modalErr"></p>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" onclick="closeAddReferModal()">Cancel</button>
+      <button type="button" class="btn-primary" style="width:auto;padding:0.45rem 1.2rem" id="saveReferBtn" onclick="saveNewRefer()">💾 Save &amp; Select</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  BNH_PAGE.requireRole(["admin","accountant","reception","manager"]);
+  document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+  document.getElementById('admDate').value = new Date().toISOString().slice(0,10);
+
+  let currentReferType = 'quack';
+  let quackData = [];
+
+  // Refer type toggle
+  function switchAdmReferType(type) {
+    currentReferType = type;
+    document.querySelectorAll('#referTypeToggle .refer-type-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.type === type);
+    });
+    document.getElementById('referQuackSection').style.display = type === 'quack' ? '' : 'none';
+    document.getElementById('quackInfoBox').style.display = 'none';
+  }
+  // Case mode Other toggle
+  document.getElementById('caseMode').addEventListener('change', function() {
+    const w = document.getElementById('caseModeOtherWrap');
+    const f = document.getElementById('caseModeOther');
+    if (this.value === 'Other') { w.classList.remove('hidden'); f.required = true; }
+    else { w.classList.add('hidden'); f.required = false; f.value=''; }
+  });
+
+  // Case type Other toggle
+  document.getElementById('caseType').addEventListener('change', function() {
+    const w = document.getElementById('caseTypeOtherWrap');
+    const f = document.getElementById('caseTypeOther');
+    if (this.value === 'Other') { w.classList.remove('hidden'); f.required = true; }
+    else { w.classList.add('hidden'); f.required = false; f.value=''; }
+  });
+
+  // ── Searchable Refer Autocomplete ──
+  let referActiveIdx = -1;
+
+  function highlightMatch(text, query) {
+    if (!query) return text;
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx < 0) return text;
+    return text.slice(0, idx) + '<mark>' + text.slice(idx, idx + query.length) + '</mark>' + text.slice(idx + query.length);
+  }
+
+  function onReferSearch() {
+    const input = document.getElementById('referSearchInput');
+    const dd    = document.getElementById('referDropdown');
+    const q     = input.value.trim();
+    document.getElementById('referClearBtn').style.display = q ? '' : 'none';
+    // clear selection if user is typing again
+    document.getElementById('quackDoctor').value = '';
+    document.getElementById('quackInfoBox').style.display = 'none';
+
+    const results = q
+      ? quackData.filter(d =>
+          (d.doctor_name||'').toLowerCase().includes(q.toLowerCase()) ||
+          (d.mobile||'').includes(q) ||
+          (d.recorded_by_name||'').toLowerCase().includes(q.toLowerCase()))
+      : quackData;
+
+    if (results.length === 0) {
+      dd.innerHTML = '<div class="refer-option" style="color:#999;cursor:default;">No match found</div>';
+    } else {
+      dd.innerHTML = results.map((d, i) => {
+        const val   = `${d.doctor_name}|${d.mobile}|${d.recorded_by_name||''}`;
+        const nameH = highlightMatch(d.doctor_name||'', q);
+        const mobH  = highlightMatch(d.mobile||'—', q);
+        const teamH = highlightMatch(d.recorded_by_name||'Unknown Team', q);
+        return `<div class="refer-option" data-val="${val.replace(/"/g,'&quot;')}" data-name="${(d.doctor_name||'').replace(/"/g,'&quot;')}" data-idx="${i}">${nameH}<div class="sub">📞 ${mobH} &nbsp;|&nbsp; 🏷️ ${teamH}</div></div>`;
+      }).join('');
+      dd.querySelectorAll('.refer-option[data-val]').forEach(el => {
+        el.addEventListener('mousedown', function(ev) {
+          ev.preventDefault();
+          selectReferOption(this.dataset.val, this.dataset.name);
+        });
+      });
+    }
+    referActiveIdx = -1;
+    dd.classList.add('open');
+  }
+
+  function selectReferOption(val, label) {
+    document.getElementById('referSearchInput').value = label;
+    document.getElementById('quackDoctor').value = val;
+    document.getElementById('referClearBtn').style.display = '';
+    document.getElementById('referDropdown').classList.remove('open');
+    // show info box
+    const parts = val.split('|');
+    const box = document.getElementById('quackInfoBox');
+    box.style.display = 'block';
+    box.innerHTML = `<strong>👨‍⚕️ ${parts[0]}</strong><br>📞 Mobile: <b>${parts[1]}</b> | 🏷️ Team: <b>${parts[2] || 'N/A'}</b>`;
+  }
+
+  function clearReferSearch() {
+    document.getElementById('referSearchInput').value = '';
+    document.getElementById('quackDoctor').value = '';
+    document.getElementById('referClearBtn').style.display = 'none';
+    document.getElementById('referDropdown').classList.remove('open');
+    document.getElementById('quackInfoBox').style.display = 'none';
+  }
+
+  function onReferKeydown(e) {
+    const dd = document.getElementById('referDropdown');
+    const items = dd.querySelectorAll('.refer-option[data-val]');
+    if (!dd.classList.contains('open') || items.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      referActiveIdx = Math.min(referActiveIdx + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      referActiveIdx = Math.max(referActiveIdx - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (referActiveIdx >= 0) items[referActiveIdx].dispatchEvent(new MouseEvent('mousedown'));
+      return;
+    } else if (e.key === 'Escape') {
+      dd.classList.remove('open'); return;
+    }
+    items.forEach((it, i) => it.classList.toggle('active', i === referActiveIdx));
+    if (referActiveIdx >= 0) items[referActiveIdx].scrollIntoView({ block: 'nearest' });
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!document.getElementById('referSearchWrap').contains(e.target))
+      document.getElementById('referDropdown').classList.remove('open');
+  });
+
+  // Load quack doctors from gramin_doctor_visits
+  async function loadQuackDoctors(autoSelect) {
+    const { data } = await BNH_PAGE.sb.from('gramin_doctor_visits')
+      .select('doctor_name,mobile,recorded_by_name').order('doctor_name');
+    if (!data) return;
+    const seen = new Set();
+    quackData = data.filter(d => {
+      const key = d.mobile || d.doctor_name;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (autoSelect) {
+      const parts = autoSelect.split('|');
+      selectReferOption(autoSelect, parts[0]);
+    }
+  }
+
+  // ── Add New Refer Modal ──
+  function openAddReferModal() {
+    ['nr_name','nr_address','nr_mobile'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('modalErr').textContent = '';
+    document.getElementById('addReferModal').classList.remove('hidden');
+    document.getElementById('nr_name').focus();
+  }
+  function closeAddReferModal() {
+    document.getElementById('addReferModal').classList.add('hidden');
+  }
+  document.getElementById('addReferModal').addEventListener('click', function(e) {
+    if (e.target === this) closeAddReferModal();
+  });
+
+  async function saveNewRefer() {
+    const errEl = document.getElementById('modalErr');
+    errEl.textContent = '';
+    const name    = document.getElementById('nr_name').value.trim();
+    const address = document.getElementById('nr_address').value.trim();
+    const mobile  = document.getElementById('nr_mobile').value.trim();
+    if (!name)    { errEl.textContent = 'Doctor name is required.'; return; }
+    if (!address) { errEl.textContent = 'Address is required.'; return; }
+    if (!/^[6-9][0-9]{9}$/.test(mobile)) { errEl.textContent = 'Enter a valid 10-digit mobile number.'; return; }
+
+    const btn = document.getElementById('saveReferBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const payload = BNH_PAGE.stamp({ doctor_name: name, address, mobile });
+      const { error } = await BNH_PAGE.sb.from('gramin_doctor_visits').insert(payload);
+      if (error) throw error;
+      closeAddReferModal();
+      const autoVal = `${name}|${mobile}|${BNH_PAGE.user.name}`;
+      await loadQuackDoctors(autoVal);
+    } catch(ex) {
+      errEl.textContent = ex.message;
+    } finally {
+      btn.disabled = false; btn.textContent = '💾 Save & Select';
+    }
+  }
+
+  async function loadAdmissions() {
+    const div = document.getElementById('admList');
+    const { data, error } = await BNH_PAGE.sb.from('ipd_admissions')
+      .select('*').order('admission_date', { ascending: false }).limit(20);
+    if (error || !data || data.length === 0) { div.textContent = 'No admissions yet.'; return; }
+    div.innerHTML = `<table>
+      <thead><tr>
+        <th>Date</th><th>Adm No.</th><th>Patient</th><th>Mode</th><th>Type</th><th>Refer / Doctor</th>
+      </tr></thead>
+      <tbody>${data.map(r=>`<tr>
+        <td>${r.admission_date}</td>
+        <td>${r.admission_no}</td>
+        <td>${r.patient_name}</td>
+        <td>${r.case_mode}${r.case_mode==='Other'?' ('+r.case_mode_other+')':''}</td>
+        <td>${r.case_type}${r.case_type==='Other'?' ('+r.case_type_other+')':''}</td>
+        <td>${r.refer_name||'N/A'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  loadQuackDoctors(null);
+  loadAdmissions();
+
+  document.getElementById('admForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const spinner = document.getElementById('spinner');
+    const err = document.getElementById('err');
+    const ok  = document.getElementById('ok');
+    err.textContent = ''; ok.style.display = 'none';
+
+    const caseMode = document.getElementById('caseMode').value;
+    const caseType = document.getElementById('caseType').value;
+    if (caseMode === 'Other' && !document.getElementById('caseModeOther').value.trim()) {
+      err.textContent = 'Please specify the Case Mode.'; return;
+    }
+    if (caseType === 'Other' && !document.getElementById('caseTypeOther').value.trim()) {
+      err.textContent = 'Please specify the Case Type.'; return;
+    }
+
+    const patientMobile = document.getElementById('patientMobile').value.trim();
+    const patientAdhar  = document.getElementById('patientAdhar').value.trim();
+    if (!/^[6-9][0-9]{9}$/.test(patientMobile)) {
+      err.textContent = 'Enter a valid 10-digit mobile number.'; return;
+    }
+    if (patientAdhar && !/^[0-9]{12}$/.test(patientAdhar)) {
+      err.textContent = 'Aadhaar must be exactly 12 digits.'; return;
+    }
+
+    let referId = null;
+    let referNm = null;
+
+    if (currentReferType === 'quack') {
+      const qsel = document.getElementById('quackDoctor');
+      const qval = qsel.value;
+      if (qval) {
+        const parts = qval.split('|');
+        referNm = `👨‍⚕️ ${parts[0]} (📞${parts[1]}, Team: ${parts[2] || 'N/A'})`;
+      }
+    }
+
+    spinner.classList.remove('hidden');
+    try {
+      const payload = BNH_PAGE.stamp({
+        admission_date:  document.getElementById('admDate').value,
+        admission_no:    document.getElementById('admNo').value.trim(),
+        patient_name:    document.getElementById('patientName').value.trim(),
+        address:         document.getElementById('address').value.trim() || null,
+        mobile:          patientMobile,
+        adhar:           patientAdhar || null,
+        case_mode:       caseMode,
+        case_mode_other: caseMode === 'Other' ? document.getElementById('caseModeOther').value.trim() : null,
+        case_type:       caseType,
+        case_type_other: caseType === 'Other' ? document.getElementById('caseTypeOther').value.trim() : null,
+        refer_name:      referNm,
+        remark:          document.getElementById('remark').value.trim() || null
+      });
+      const { error } = await BNH_PAGE.sb.from('ipd_admissions').insert(payload);
+      if (error) throw error;
+      ok.style.display = 'block';
+      ok.textContent = '✅ Admission saved successfully!';
+      e.target.reset();
+      document.getElementById('admDate').value = new Date().toISOString().slice(0,10);
+      document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
+      currentReferType = 'quack';
+      switchAdmReferType('quack');
+      clearReferSearch();
+      loadAdmissions();
+    } catch(ex) {
+      err.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocVault — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-0: #0a0a0f; --bg-1: #111118; --bg-2: #16161f; --bg-3: #1e1e2a; --bg-4: #252534;
+    --border: rgba(255,255,255,0.07); --border-h: rgba(255,255,255,0.14);
+    --gold: #c9933a; --gold-l: #e8b05a; --gold-d: #9a6e2a;
+    --gold-glow: rgba(201,147,58,0.15); --gold-glow-h: rgba(201,147,58,0.25);
+    --text-0: #f0efe8; --text-1: #b8b6aa; --text-2: #6e6c66;
+    --red: #e05252; --green: #52c47a;
+    --font-serif: 'Instrument Serif', Georgia, serif;
+    --font-sans: 'DM Sans', system-ui, sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+  html { font-size: 15px; }
+  body {
+    font-family: var(--font-sans); background: var(--bg-0); color: var(--text-0);
+    min-height: 100vh; display: flex; overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Left decorative panel */
+  .auth-deco {
+    flex: 1; background: var(--bg-1); position: relative;
+    display: flex; flex-direction: column; justify-content: center; padding: 60px;
+    border-right: 1px solid var(--border); overflow: hidden;
+  }
+  .deco-grid {
+    position: absolute; inset: 0; opacity: 0.04;
+    background-image: linear-gradient(var(--gold) 1px, transparent 1px),
+      linear-gradient(90deg, var(--gold) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .deco-orb {
+    position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none;
+  }
+  .deco-orb-1 { width: 400px; height: 400px; background: rgba(201,147,58,0.08); top: -100px; right: -100px; }
+  .deco-orb-2 { width: 300px; height: 300px; background: rgba(91,155,213,0.05); bottom: -50px; left: -50px; }
+  .deco-content { position: relative; z-index: 1; }
+  .deco-logo { display: flex; align-items: center; gap: 14px; margin-bottom: 60px; }
+  .deco-logo-icon {
+    width: 46px; height: 46px; background: var(--gold); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: #0a0a0f; font-weight: 700;
+  }
+  .deco-logo-name { font-family: var(--font-serif); font-size: 1.6rem; color: var(--text-0); }
+  .deco-headline { font-family: var(--font-serif); font-size: 2.8rem; line-height: 1.2; color: var(--text-0); margin-bottom: 20px; }
+  .deco-headline em { color: var(--gold-l); font-style: italic; }
+  .deco-sub { font-size: 0.95rem; color: var(--text-2); line-height: 1.7; max-width: 380px; margin-bottom: 48px; }
+  .deco-features { display: flex; flex-direction: column; gap: 14px; }
+  .deco-feat { display: flex; align-items: center; gap: 12px; font-size: 0.875rem; color: var(--text-1); }
+  .deco-feat-dot {
+    width: 28px; height: 28px; border-radius: 8px; background: var(--gold-glow);
+    border: 1px solid rgba(201,147,58,0.2); display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; flex-shrink: 0;
+  }
+
+  /* Right login panel */
+  .auth-panel {
+    width: 460px; flex-shrink: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 40px;
+    background: var(--bg-0);
+  }
+  .login-card {
+    width: 100%; max-width: 380px;
+    animation: slideUp 0.5s ease;
+  }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+
+  .login-header { margin-bottom: 32px; }
+  .login-title { font-size: 1.5rem; font-weight: 600; color: var(--text-0); margin-bottom: 6px; }
+  .login-sub { font-size: 0.875rem; color: var(--text-2); }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .form-label { font-size: 0.78rem; font-weight: 500; color: var(--text-2); letter-spacing: 0.04em; text-transform: uppercase; }
+  .input-wrap { position: relative; }
+  .form-input {
+    width: 100%; background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 11px 14px; color: var(--text-0);
+    font-size: 0.9rem; font-family: var(--font-sans); outline: none;
+    transition: all 0.2s;
+  }
+  .form-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-glow); background: var(--bg-3); }
+  .form-input::placeholder { color: rgba(110,108,102,0.5); }
+  .input-icon {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--text-2); cursor: pointer; background: none; border: none; padding: 0;
+    display: flex; align-items: center; transition: color 0.2s;
+  }
+  .input-icon:hover { color: var(--text-0); }
+
+  .btn-login {
+    width: 100%; padding: 12px; background: var(--gold); color: #0a0a0f;
+    border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600;
+    font-family: var(--font-sans); cursor: pointer; transition: all 0.2s;
+    margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-login:hover { background: var(--gold-l); box-shadow: 0 0 30px var(--gold-glow-h); }
+  .btn-login:active { transform: scale(0.99); }
+  .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .error-msg {
+    background: rgba(224,82,82,0.1); border: 1px solid rgba(224,82,82,0.25);
+    border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; color: var(--red);
+    margin-bottom: 16px; display: none; align-items: center; gap: 8px;
+  }
+  .error-msg.show { display: flex; }
+
+  .role-badges { display: flex; gap: 8px; margin-top: 28px; justify-content: center; }
+  .role-badge {
+    padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.03em;
+  }
+  .role-badge.admin { background: rgba(201,147,58,0.1); color: var(--gold-l); border: 1px solid rgba(201,147,58,0.2); }
+  .role-badge.editor { background: rgba(91,155,213,0.1); color: #5b9bd5; border: 1px solid rgba(91,155,213,0.2); }
+  .role-badge.viewer { background: rgba(155,114,207,0.1); color: #9b72cf; border: 1px solid rgba(155,114,207,0.2); }
+
+  .divider-line { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
+  .divider-line span { flex: 1; height: 1px; background: var(--border); }
+  .divider-line p { font-size: 0.75rem; color: var(--text-2); white-space: nowrap; }
+
+  .spinner-mini { width: 18px; height: 18px; border: 2px solid rgba(10,10,15,0.3); border-top-color: #0a0a0f; border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 10px; font-size: 0.875rem; font-weight: 500; background: var(--bg-3); border: 1px solid var(--border-h); box-shadow: 0 4px 20px rgba(0,0,0,0.5); min-width: 240px; transform: translateX(110%); transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+  .toast.show { transform: translateX(0); }
+  .toast-success .toast-icon { color: var(--green); }
+  .toast-error .toast-icon { color: var(--red); }
+
+  @media (max-width: 860px) { .auth-deco { display: none; } .auth-panel { width: 100%; } }
+</style>
+</head>
+<body>
+
+<!-- Left Decoration -->
+<div class="auth-deco">
+  <div class="deco-grid"></div>
+  <div class="deco-orb deco-orb-1"></div>
+  <div class="deco-orb deco-orb-2"></div>
+  <div class="deco-content">
+    <div class="deco-logo">
+      <div class="deco-logo-icon">D</div>
+      <span class="deco-logo-name">DocVault</span>
+    </div>
+    <h1 class="deco-headline">Every document,<br><em>perfectly stored.</em></h1>
+    <p class="deco-sub">A secure document management system with version control, expiry tracking, and automated renewal alerts.</p>
+    <div class="deco-features">
+      <div class="deco-feat"><div class="deco-feat-dot">📂</div> Organize by categories</div>
+      <div class="deco-feat"><div class="deco-feat-dot">📅</div> Track expiry & get notified</div>
+      <div class="deco-feat"><div class="deco-feat-dot">🔄</div> Version history for renewals</div>
+      <div class="deco-feat"><div class="deco-feat-dot">👥</div> Role-based access control</div>
+    </div>
+  </div>
+</div>
+
+<!-- Login Panel -->
+<div class="auth-panel">
+  <div class="login-card">
+    <div class="login-header">
+      <h2 class="login-title">Welcome back</h2>
+      <p class="login-sub">Sign in to access your documents</p>
+    </div>
+
+    <div class="error-msg" id="error-msg">
+      <span>⚠</span>
+      <span id="error-text">Invalid credentials. Please try again.</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <div class="input-wrap">
+        <input type="text" class="form-input" id="username" placeholder="Enter your username" autocomplete="username">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <div class="input-wrap">
+        <input type="password" class="form-input" id="password" placeholder="Enter your password" autocomplete="current-password">
+        <button class="input-icon" id="toggle-pass" tabindex="-1">
+          <svg id="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <button class="btn-login" id="login-btn">
+      <span id="btn-label">Sign In</span>
+    </button>
+
+    <div class="divider-line">
+      <span></span><p>Access levels</p><span></span>
+    </div>
+    <div class="role-badges">
+      <span class="role-badge admin">Admin</span>
+      <span class="role-badge editor">Editor</span>
+      <span class="role-badge viewer">Viewer</span>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ── On load, redirect if already logged in ──
+window.addEventListener('DOMContentLoaded', async () => {
+  const session = Auth.getSession();
+  if (session) redirectByRole(session.user.role);
+
+  // Check if default admin needs initialization
+  await initDefaultAdmin();
+});
+
+async function initDefaultAdmin() {
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client.from('dv_users').select('id, password_hash').eq('username', 'admin').single();
+    if (!data || error) {
+      // Create admin if doesn't exist
+      const hash = await Auth.hashPassword(CONFIG.DEFAULT_ADMIN_PASSWORD);
+      await client.from('dv_users').insert({
+        username: 'admin', password_hash: hash, role: 'admin', full_name: 'System Administrator'
+      });
+    } else if (data.password_hash === '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi' || !data.password_hash.startsWith('pbkdf2:')) {
+      // Reset to proper hash if still placeholder
+      const hash = await Auth.hashPassword(CONFIG.DEFAULT_ADMIN_PASSWORD);
+      await client.from('dv_users').update({ password_hash: hash }).eq('username', 'admin');
+    }
+  } catch (e) { /* silent */ }
+}
+
+// ── Toggle password visibility ──
+document.getElementById('toggle-pass').addEventListener('click', () => {
+  const input = document.getElementById('password');
+  const icon = document.getElementById('eye-icon');
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  } else {
+    input.type = 'password';
+    icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  }
+});
+
+// ── Enter key login ──
+['username', 'password'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+});
+document.getElementById('login-btn').addEventListener('click', login);
+
+// ── Login handler ──
+async function login() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('error-msg');
+  const errText = document.getElementById('error-text');
+
+  if (!username || !password) {
+    showError('Please enter your username and password.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner-mini"></div>';
+  errEl.classList.remove('show');
+
+  try {
+    const client = getSupabaseClient();
+    const { data: user, error } = await client
+      .from('dv_users')
+      .select('*')
+      .eq('username', username)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !user) { showError('Invalid username or password.'); return; }
+
+    const valid = await Auth.verifyPassword(password, user.password_hash);
+    if (!valid) { showError('Invalid username or password.'); return; }
+
+    // Create session token
+    const token = Auth.generateToken();
+    const expiresAt = new Date(Date.now() + CONFIG.SESSION_DURATION_HOURS * 3600000).toISOString();
+    await client.from('dv_sessions').insert({ user_id: user.id, token, expires_at: expiresAt });
+
+    // Save locally (without password hash)
+    const { password_hash, ...safeUser } = user;
+    Auth.saveSession(safeUser, token);
+
+    showToast(`Welcome, ${user.full_name || user.username}!`, 'success');
+    setTimeout(() => redirectByRole(user.role), 800);
+
+  } catch (err) {
+    showError('Connection error. Check your config.js settings.');
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>Sign In</span>';
+  }
+}
+
+function showError(msg) {
+  document.getElementById('error-text').textContent = msg;
+  document.getElementById('error-msg').classList.add('show');
+  document.getElementById('login-btn').disabled = false;
+  document.getElementById('login-btn').innerHTML = '<span>Sign In</span>';
+}
+
+function redirectByRole(role) {
+  if (role === 'admin') window.location.href = 'admin.html';
+  else if (role === 'editor') window.location.href = 'editor.html';
+  else window.location.href = 'viewer.html';
+}
+
+function showToast(msg, type = 'info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  const icons = { success: '✓', error: '✕', info: 'ℹ' };
+  t.className = `toast toast-${type}`;
+  t.innerHTML = `<span class="toast-icon">${icons[type] || '•'}</span><span>${msg}</span>`;
+  c.appendChild(t);
+  setTimeout(() => t.classList.add('show'), 10);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 3000);
+}
+</script>
+</body>
+</html>
