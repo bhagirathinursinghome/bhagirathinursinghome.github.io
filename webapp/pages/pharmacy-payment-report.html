@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Supplier Payment Report – Pharmacy</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    .form-row { display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end; }
+    .form-row > * { flex:1; min-width:150px; }
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f0f4ff; padding:9px 10px; text-align:left; font-size:.82rem; color:#4338ca; font-weight:700; border-bottom:2px solid #e0e7ff; }
+    td { padding:8px 10px; border-bottom:1px solid #f0f0f0; font-size:.83rem; vertical-align:middle; }
+    tr:hover td { background:#fafafe; }
+    .r { text-align:right; }
+    tfoot td { font-weight:700; background:#f9f9f9; }
+    .badge { display:inline-block; padding:2px 9px; border-radius:12px; font-size:.72rem; font-weight:700; }
+    .cat-disp { background:#dbeafe; color:#1e40af; }
+    .cat-ipd  { background:#ede9fe; color:#5b21b6; }
+    .chip-row { display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.7rem; align-items:center; font-size:.76rem; color:#6b7280; }
+    .chip-btn { padding:3px 11px; border-radius:999px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca; font-size:.76rem; font-weight:600; cursor:pointer; }
+    .chip-btn:hover { background:#e0e7ff; }
+    .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:.75rem; margin:1rem 0; }
+    .kpi { background:#fff; border:1px solid #e5e7eb; border-left:4px solid #6366f1; border-radius:12px; padding:.7rem .95rem; }
+    .kpi small { display:block; color:#6b7280; font-weight:700; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; }
+    .kpi b { font-size:1.12rem; color:#111827; }
+    .kpi.k-orange { border-left-color:#f59e0b; } .kpi.k-green { border-left-color:#16a34a; } .kpi.k-red { border-left-color:#dc2626; }
+    .empty-state { text-align:center; padding:2.5rem 1rem; color:#9ca3af; font-size:.9rem; }
+    .btn-x { width:auto; }
+  </style>
+</head>
+<body>
+<div id="spinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
+
+<div class="page">
+  <h1>📊 Supplier Payment Report</h1>
+
+  <div class="page-card">
+    <div class="form-row">
+      <div><label>From Date</label><input id="fFrom" type="date"/></div>
+      <div><label>To Date</label><input id="fTo" type="date"/></div>
+      <div>
+        <label>Type</label>
+        <select id="fCat">
+          <option value="">Dispensary + IPD</option>
+          <option value="Dispensary">Dispensary</option>
+          <option value="IPD">IPD</option>
+        </select>
+      </div>
+      <div>
+        <label>Supplier</label>
+        <select id="fSup"><option value="">All Suppliers</option></select>
+      </div>
+      <div>
+        <label>Mode</label>
+        <select id="fMode">
+          <option value="">All Modes</option>
+          <option value="Cash">Cash</option>
+          <option value="Bank">Bank</option>
+          <option value="PhonePe">PhonePe</option>
+        </select>
+      </div>
+    </div>
+    <div class="chip-row">Quick range:
+      <button class="chip-btn" onclick="setRange('today')">Today</button>
+      <button class="chip-btn" onclick="setRange('month')">This month</button>
+      <button class="chip-btn" onclick="setRange('lastmonth')">Last month</button>
+      <button class="chip-btn" onclick="setRange('30')">Last 30 days</button>
+      <button class="chip-btn" onclick="setRange('fy')">This financial year</button>
+    </div>
+    <div class="actions-row" style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap">
+      <button class="btn-primary btn-x" onclick="loadReport()">🔍 Show</button>
+      <button class="btn-primary btn-x" style="background:#dc2626" onclick="downloadPDF()">⬇ PDF</button>
+      <button class="btn-primary btn-x" style="background:#059669" onclick="downloadExcel()">⬇ Excel</button>
+    </div>
+    <p class="err" id="err"></p>
+  </div>
+
+  <div class="page-card">
+    <div id="summary"></div>
+    <div id="out"><div class="empty-state">Choose filters and click Show.</div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/menu.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+  const perms = BNH_PAGE.requirePermissions("pages/pharmacy-payment-report.html");
+
+  const num = v => parseFloat(v || 0) || 0;
+  const fmt = n => '₹' + num(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const spin = show => document.getElementById('spinner').classList[show ? 'remove' : 'add']('hidden');
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const payCat = r => r.category === 'IPD' ? 'IPD' : 'Dispensary';
+  const catBadge = c => `<span class="badge ${c === 'IPD' ? 'cat-ipd' : 'cat-disp'}">${c}</span>`;
+  const iso = d => { const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return z.toISOString().slice(0, 10); };
+
+  let rows = [];        // currently displayed (filtered) rows
+  let lastFilters = {}; // for report headings / file names
+
+  // ── Defaults & quick ranges ──
+  function setRange(k) {
+    const now = new Date();
+    let a = now, b = now;
+    if (k === 'month') a = new Date(now.getFullYear(), now.getMonth(), 1);
+    else if (k === 'lastmonth') { a = new Date(now.getFullYear(), now.getMonth() - 1, 1); b = new Date(now.getFullYear(), now.getMonth(), 0); }
+    else if (k === '30') a = new Date(now.getTime() - 29 * 86400000);
+    else if (k === 'fy') a = new Date(now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1, 3, 1);
+    document.getElementById('fFrom').value = iso(a);
+    document.getElementById('fTo').value = iso(b);
+    loadReport();
+  }
+  document.getElementById('fFrom').value = iso(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  document.getElementById('fTo').value = iso(new Date());
+
+  // ── Supplier dropdown ──
+  (async () => {
+    const { data } = await BNH_PAGE.sb.from('pharmacy_suppliers').select('supplier_name').order('supplier_name');
+    const sel = document.getElementById('fSup');
+    (data || []).forEach(s => {
+      const o = document.createElement('option');
+      o.value = o.textContent = s.supplier_name;
+      sel.appendChild(o);
+    });
+  })();
+
+  // ── Load (paged, supabase returns max 1000 rows per request) ──
+  async function loadReport() {
+    const from = document.getElementById('fFrom').value;
+    const to = document.getElementById('fTo').value;
+    const cat = document.getElementById('fCat').value;
+    const sup = document.getElementById('fSup').value;
+    const mode = document.getElementById('fMode').value;
+    const err = document.getElementById('err');
+    err.textContent = '';
+    if (!from || !to) { err.textContent = 'Please select both dates.'; return; }
+    if (from > to) { err.textContent = '"From" date must be before "To" date.'; return; }
+
+    spin(true);
+    try {
+      let all = [], start = 0; const step = 1000;
+      while (true) {
+        let q = BNH_PAGE.sb.from('pharmacy_supplier_payments').select('*')
+          .gte('pay_date', from).lte('pay_date', to);
+        if (sup) q = q.eq('supplier_name', sup);
+        if (mode) q = q.eq('mode', mode);
+        const { data, error } = await q.order('pay_date').order('id').range(start, start + step - 1);
+        if (error) throw error;
+        all = all.concat(data || []);
+        if (!data || data.length < step) break;
+        start += step;
+      }
+      // category filtered in JS so old rows with empty category count as Dispensary
+      rows = all.filter(r => !cat || payCat(r) === cat);
+      lastFilters = { from, to, cat: cat || 'Dispensary + IPD', sup: sup || 'All Suppliers', mode: mode || 'All Modes' };
+      render();
+    } catch (ex) {
+      err.textContent = ex.message;
+    } finally {
+      spin(false);
+    }
+  }
+
+  function render() {
+    const out = document.getElementById('out');
+    const sum = document.getElementById('summary');
+    if (!rows.length) {
+      sum.innerHTML = '';
+      out.innerHTML = '<div class="empty-state">😶 No payments found for these filters.</div>';
+      return;
+    }
+    const total = rows.reduce((a, r) => a + num(r.amount), 0);
+    const disp = rows.filter(r => payCat(r) === 'Dispensary').reduce((a, r) => a + num(r.amount), 0);
+    const ipd = rows.filter(r => payCat(r) === 'IPD').reduce((a, r) => a + num(r.amount), 0);
+    const kpi = (l, v, c) => `<div class="kpi ${c}"><small>${l}</small><b>${v}</b></div>`;
+    sum.innerHTML = `<div class="kpis">
+      ${kpi('Total Paid', fmt(total), 'k-red')}
+      ${kpi('Dispensary', fmt(disp), 'k-orange')}
+      ${kpi('IPD', fmt(ipd), 'k-green')}
+      ${kpi('Payments', rows.length, '')}
+    </div>
+    <p style="font-size:.8rem;color:#6b7280;margin:0 0 .6rem">
+      ${esc(lastFilters.from)} → ${esc(lastFilters.to)} · ${esc(lastFilters.cat)} · ${esc(lastFilters.sup)} · ${esc(lastFilters.mode)}</p>`;
+
+    const body = rows.map((r, i) => `<tr>
+      <td>${i + 1}</td><td>${esc(r.pay_date)}</td><td>${esc(r.supplier_name)}</td>
+      <td>${catBadge(payCat(r))}</td><td>${esc(r.mode)}</td>
+      <td class="r">${fmt(r.amount)}</td>
+      <td>${r.remark ? esc(r.remark) : '<span style="color:#ccc">—</span>'}</td>
+      <td>${esc(r.recorded_by_name || r.recorded_by || '—')}</td></tr>`).join('');
+    out.innerHTML = `<div style="overflow-x:auto"><table id="reportTable">
+      <thead><tr><th>#</th><th>Date</th><th>Supplier</th><th>Type</th><th>Mode</th>
+        <th class="r">Amount</th><th>Remark</th><th>By</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td colspan="5" style="text-align:right">Total</td><td class="r">${fmt(total)}</td><td colspan="2"></td></tr></tfoot>
+    </table></div>`;
+  }
+
+  // ── Downloads ──
+  function fileBase() {
+    return 'Supplier_Payments_' + lastFilters.from + '_to_' + lastFilters.to;
+  }
+
+  function downloadPDF() {
+    if (!rows.length) { alert('Nothing to download. Load the report first.'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    doc.setFontSize(14); doc.text('Bhagirathy Nursing Home – Pharmacy', 14, 14);
+    doc.setFontSize(11); doc.text('Supplier Payment Report', 14, 21);
+    doc.setFontSize(8);
+    doc.text(`Period: ${lastFilters.from} to ${lastFilters.to}  |  Type: ${lastFilters.cat}  |  Supplier: ${lastFilters.sup}  |  Mode: ${lastFilters.mode}`, 14, 27);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN'), 14, 31);
+
+    const money = n => 'Rs. ' + num(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    const total = rows.reduce((a, r) => a + num(r.amount), 0);
+    const disp = rows.filter(r => payCat(r) === 'Dispensary').reduce((a, r) => a + num(r.amount), 0);
+    const ipd = rows.filter(r => payCat(r) === 'IPD').reduce((a, r) => a + num(r.amount), 0);
+
+    doc.autoTable({
+      startY: 35,
+      head: [['#', 'Date', 'Supplier', 'Type', 'Mode', 'Amount', 'Remark', 'By']],
+      body: rows.map((r, i) => [i + 1, r.pay_date, r.supplier_name, payCat(r), r.mode, money(r.amount),
+        r.remark || '', r.recorded_by_name || r.recorded_by || '']),
+      foot: [
+        [{ content: 'Dispensary Total', colSpan: 5, styles: { halign: 'right' } }, money(disp), '', ''],
+        [{ content: 'IPD Total', colSpan: 5, styles: { halign: 'right' } }, money(ipd), '', ''],
+        [{ content: 'Grand Total', colSpan: 5, styles: { halign: 'right' } }, money(total), '', '']
+      ],
+      styles: { fontSize: 8, valign: 'middle' },
+      headStyles: { fillColor: [99, 102, 241], halign: 'center' },
+      footStyles: { fillColor: [240, 240, 240], textColor: [30, 30, 30], fontStyle: 'bold' },
+      columnStyles: { 5: { halign: 'right' } },
+      margin: { left: 10, right: 10 }
+    });
+    doc.save(fileBase() + '.pdf');
+  }
+
+  function downloadExcel() {
+    if (!rows.length) { alert('Nothing to download. Load the report first.'); return; }
+    const total = rows.reduce((a, r) => a + num(r.amount), 0);
+    const aoa = [
+      ['Bhagirathy Nursing Home – Pharmacy'],
+      ['Supplier Payment Report'],
+      [`Period: ${lastFilters.from} to ${lastFilters.to}`, `Type: ${lastFilters.cat}`, `Supplier: ${lastFilters.sup}`, `Mode: ${lastFilters.mode}`],
+      [],
+      ['#', 'Date', 'Supplier', 'Type', 'Mode', 'Amount (INR)', 'Remark', 'Recorded By'],
+      ...rows.map((r, i) => [i + 1, r.pay_date, r.supplier_name, payCat(r), r.mode, num(r.amount),
+        r.remark || '', r.recorded_by_name || r.recorded_by || '']),
+      [],
+      ['', '', '', '', 'Total', total]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 5 }, { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 30 }, { wch: 22 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Payments');
+    XLSX.writeFile(wb, fileBase() + '.xlsx');
+  }
+
+  loadReport();
+</script>
+</body>
+</html>
