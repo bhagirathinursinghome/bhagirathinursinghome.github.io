@@ -123,6 +123,7 @@
     <button class="tab-btn" onclick="switchMainTab('mtRange',this)">🎫 Voucher Range</button>
     <button class="tab-btn" onclick="switchMainTab('mtTrack',this)">📋 Voucher Tracker</button>
     <button class="tab-btn" onclick="switchMainTab('mtRegister',this)">🧾 Voucher Register</button>
+    <button class="tab-btn" onclick="switchMainTab('mtReport',this)">📊 Category Report</button>
     <button class="tab-btn" onclick="switchMainTab('mtUpload',this)">📤 Excel Upload</button>
   </div>
 
@@ -244,6 +245,25 @@
     </div>
   </div>
 
+  <!-- ══════════════════ TAB: CATEGORY REPORT ══════════════════ -->
+  <div id="mtReport" class="tab-panel">
+    <div class="page-card">
+      <h2 style="font-size:1rem;margin-bottom:.5rem">📊 Category Report</h2>
+      <p style="font-size:.85rem;color:#666;margin-bottom:1rem">
+        Pick a date range to see every filled voucher grouped by category. Cash vouchers are split
+        sub-category wise (the category chosen when the cash voucher was entered) with a total for each.
+      </p>
+      <div class="form-row" style="max-width:640px">
+        <div><label>Date From <span class="req">*</span></label><input id="rpFrom" type="date"/></div>
+        <div><label>Date To <span class="req">*</span></label><input id="rpTo" type="date"/></div>
+        <div style="flex:0"><button class="btn-primary" style="width:auto;white-space:nowrap" onclick="loadReport()">Show Report</button></div>
+        <div style="flex:0"><button class="btn-primary" style="width:auto;white-space:nowrap;background:#059669" onclick="downloadReportExcel()">⬇️ Excel</button></div>
+      </div>
+      <p class="err" id="rpErr"></p>
+      <div id="rpOut" style="margin-top:.5rem">Select a date range and click Show Report.</div>
+    </div>
+  </div>
+
   <!-- ══════════════════ TAB: EXCEL UPLOAD ══════════════════ -->
   <div id="mtUpload" class="tab-panel">
     <div class="page-card">
@@ -269,20 +289,25 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="../assets/config.js"></script>
-<script src="../assets/menu.js"></script>
 <script src="../assets/page.js"></script>
 <script>
-const pageAccess = BNH_PAGE.requirePageAccess("pages/payment.html");
+BNH_PAGE.requireRole(["admin","accountant","manager"]);
 const sb = BNH_PAGE.sb;
 
 // ════════════════════════════════════════════════════════════
 // ACCESS LEVEL — two tiers within the page
 //   full    → add, view, edit, delete, export
 //   limited → add, view, export only (no edit/delete of existing entries)
-// Role assignments are centralized in assets/menu.js.
+// Edit FULL_ACCESS_ROLES below to change who can edit/delete vouchers.
 // ════════════════════════════════════════════════════════════
+const FULL_ACCESS_ROLES = ['admin', 'accountant'];
+function detectRole(){
+  const u = (BNH_PAGE && BNH_PAGE.user) || {};
+  const raw = u.role ?? u.Role ?? u.user_role ?? u.userRole ?? u.type ?? u.Type ?? '';
+  return String(raw).trim().toLowerCase();
+}
 function hasFullAccess(){
-  return pageAccess === "full";
+  return FULL_ACCESS_ROLES.includes(detectRole());
 }
 const fmt = n => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -313,13 +338,6 @@ TYPE_LABELS.cash_voucher = TYPE_LABELS.cash;   // DB may store cash entries as "
 // Per-type table + column mapping, used by Edit/Delete in the Voucher Tracker and
 // Voucher Register (full access only). ipd_refer / opd_refer are kept here only so
 // old vouchers can still be edited or deleted.
-function buildIpdReferRemark(r){
-  const details = [];
-  if (r && r.patient_name) details.push(`Patient: ${r.patient_name}`);
-  if (r && r.admission_no) details.push(`Admission No: ${r.admission_no}`);
-  if (r && r.remark) details.push(String(r.remark).trim());
-  return details.join(' | ');
-}
 const TYPE_META = {
   ipd_refer: { table:'ipd_refer_payments', dateCol:'payment_date', amountCol:'amount', modeCol:'mode', remarkCol:'remark',
     label:r=>`${r.patient_name||''} (${r.admission_no||''}) — Refer: ${r.refer_name||''}` },
@@ -355,14 +373,6 @@ function normalizeType(raw){
   if (TYPE_META[stripped]) return stripped;
   return t;
 }
-function voucherDisplayType(row){
-  const type = normalizeType(row && row.type);
-  if (type === 'cash' || type === 'cash_voucher') {
-    const sub = String(row && row.category ? row.category : '').trim();
-    return sub ? `Cash Voucher - ${sub}` : 'Cash Voucher';
-  }
-  return TYPE_LABELS[type]?.label || TYPE_LABELS[row && row.type]?.label || row && row.type || '-';
-}
 
 document.getElementById('typeGrid').innerHTML = Object.entries(TYPES).map(([k,t])=>
   `<div class="type-card" id="tcard-${k}" onclick="selectType('${k}')">
@@ -372,6 +382,30 @@ document.getElementById('uploadTypeGrid').innerHTML = Object.entries(TYPES).map(
   `<div class="type-card" id="ucard-${k}" onclick="selectUploadType('${k}')">
      <span class="ti">${t.icon}</span><span class="tl">${esc(t.label)}</span>
    </div>`).join('');
+
+// ── cash voucher category display ────────────────────────────
+// payment_vouchers doesn't carry the cash category, so it is looked up from
+// cash_vouchers and shown as "Cash Voucher - <category>".
+const isCashType = t => t === 'cash' || t === 'cash_voucher';
+let cashCatMap = {};
+async function loadCashCats(rows){
+  const nos = [...new Set(rows.filter(r=>r.status==='filled' && isCashType(r.type)).map(r=>r.voucher_no))];
+  const chunks = [];
+  for (let i=0; i<nos.length; i+=150) chunks.push(nos.slice(i,i+150));
+  const results = await Promise.all(chunks.map(c => sb.from('cash_vouchers').select('voucher_no,category').in('voucher_no', c)));
+  results.forEach((res, i) => {
+    const m = {};
+    (res.data||[]).forEach(x=>{
+      const c = (x.category||'').trim() || 'General';
+      (m[x.voucher_no] = m[x.voucher_no] || new Set()).add(c);
+    });
+    chunks[i].forEach(n => { cashCatMap[n] = m[n] ? [...m[n]].join(', ') : 'General'; });
+  });
+}
+function typeLabel(r){
+  if (isCashType(r.type)) return 'Cash Voucher - ' + (cashCatMap[r.voucher_no] || 'General');
+  return (TYPE_LABELS[r.type] && TYPE_LABELS[r.type].label) || r.type || '-';
+}
 
 function switchMainTab(id, btn){
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
@@ -785,13 +819,11 @@ async function getSalaryDue(empId, month, year){
   const { data: emp } = await sb.from('employees').select('*').eq('id',empId).single();
   const { data: bonus } = await sb.from('salary_bonuses').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
   const { data: absent } = await sb.from('salary_absent').select('absent_days').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
-  const { data: extraDeduction } = await sb.from('salary_extra_deductions').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
   const gross = parseFloat(emp.salary||0);
   const absentDays = absent?.absent_days || 0;
   const deductDays = Math.max(0, absentDays - 4);
   const deduction = Math.round(((gross/26)*deductDays)/10)*10;
-  const totalDeduction = deduction + (extraDeduction?.amount || 0);
-  const net = gross - totalDeduction + (bonus?.amount||0);
+  const net = gross - deduction + (bonus?.amount||0);
   const { data: pays } = await sb.from('salary_payments').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year);
   const collected = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount||0),0);
   return { emp, net, collected, due: Math.max(0, net-collected) };
@@ -1261,7 +1293,7 @@ async function viewShot(voucherNo){
 function downloadTrackerExcel(){
   if (!trackerShown.length) { alert('Click Show first — there are no vouchers on screen to download.'); return; }
   const data = trackerShown.map(r=>({
-    'Voucher No': r.voucher_no, 'Status': r.status, 'Type': voucherDisplayType(r), 'Party': r.party_name||'',
+    'Voucher No': r.voucher_no, 'Status': r.status, 'Type': r.type ? typeLabel(r) : '', 'Party': r.party_name||'',
     'Amount': r.amount ? parseFloat(r.amount) : '', 'Mode': r.mode||'', 'Payment Date': r.payment_date||'',
     'Description': r.description||'', 'Screenshot': trackerShots[r.voucher_no] ? 'Yes' : (r.mode==='PhonePe' ? 'No' : '')
   }));
@@ -1270,40 +1302,6 @@ function downloadTrackerExcel(){
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Vouchers');
   const pfx = (document.getElementById('trackPrefix').value||'').trim().toUpperCase();
   XLSX.writeFile(wb, `Vouchers${pfx?'_'+pfx:''}_${todayISO()}.xlsx`);
-}
-async function enrichIpdReferDisplayRows(rows){
-  const voucherNos = rows.filter(r => normalizeType(r.type) === 'ipd_refer').map(r => r.voucher_no).filter(Boolean);
-  if (!voucherNos.length) return rows;
-  const { data } = await sb.from('ipd_refer_payments').select('voucher_no,patient_name,admission_no,refer_name,remark').in('voucher_no', voucherNos);
-  const byVoucher = {};
-  (data || []).forEach(r => {
-    if (!byVoucher[r.voucher_no]) byVoucher[r.voucher_no] = [];
-    byVoucher[r.voucher_no].push(r);
-  });
-  return rows.map(r => {
-    if (normalizeType(r.type) !== 'ipd_refer') return r;
-    const first = (byVoucher[r.voucher_no] || [])[0];
-    if (!first) return r;
-    const detailText = [first.patient_name ? `Patient: ${first.patient_name}` : '', first.admission_no ? `Admission No: ${first.admission_no}` : '', first.remark].filter(Boolean).join(' | ');
-    return {
-      ...r,
-      party_name: `${first.patient_name || ''} (${first.admission_no || ''}) — Refer: ${first.refer_name || ''}`.replace(/\s*\(\)\s*—\s*Refer:/, '').replace(/\s+$/,'') || r.party_name || '',
-      description: detailText || r.description || null
-    };
-  });
-}
-async function enrichCashVoucherCategory(rows){
-  const voucherNos = rows.filter(r => ['cash','cash_voucher'].includes(normalizeType(r.type))).map(r => r.voucher_no).filter(Boolean);
-  if (!voucherNos.length) return rows;
-  const { data } = await sb.from('cash_vouchers').select('voucher_no,category').in('voucher_no', voucherNos);
-  const byVoucher = {};
-  (data || []).forEach(r => { byVoucher[r.voucher_no] = r.category || null; });
-  return rows.map(r => {
-    const type = normalizeType(r.type);
-    if (!['cash','cash_voucher'].includes(type)) return r;
-    const category = byVoucher[r.voucher_no] || r.category || null;
-    return { ...r, category };
-  });
 }
 async function loadTracker(){
   const from = document.getElementById('trackFrom').value;
@@ -1334,10 +1332,9 @@ async function loadTracker(){
     if (toN!=null && !(v.n <= toN)) return false;
     return true;
   }).sort((a,b)=>vnoCompare(a.voucher_no,b.voucher_no));
-  let enrichedRows = await enrichCashVoucherCategory(rows);
-  enrichedRows = await enrichIpdReferDisplayRows(enrichedRows);
   if (!rows.length) { out.textContent = 'No vouchers found for this filter.'; return; }
-  trackerShown = enrichedRows;
+  await loadCashCats(rows);
+  trackerShown = rows;
   trackerShots = {};
   for (let off = 0; ; off += 1000){
     const res = await sb.from('voucher_screenshots').select('voucher_no,file_path').order('voucher_no').range(off, off+999);
@@ -1345,18 +1342,18 @@ async function loadTracker(){
     res.data.forEach(x=>{ trackerShots[x.voucher_no] = x.file_path; });
     if (res.data.length < 1000) break;
   }
-  const blankCount = enrichedRows.filter(r=>r.status==='blank').length;
+  const blankCount = rows.filter(r=>r.status==='blank').length;
   const fullAccess = hasFullAccess();
   out.innerHTML = `
     <p style="font-size:.85rem;margin-bottom:.5rem">
-      ${enrichedRows.length} voucher(s) shown — <b style="color:${blankCount?'#dc2626':'#059669'}">${blankCount} blank (missed)</b>, ${enrichedRows.length-blankCount} filled.
+      ${rows.length} voucher(s) shown — <b style="color:${blankCount?'#dc2626':'#059669'}">${blankCount} blank (missed)</b>, ${rows.length-blankCount} filled.
     </p>
     <table>
       <thead><tr><th>Voucher No</th><th>Status</th><th>Type</th><th>Party</th><th class="r">Amount</th><th>Mode</th><th>Screenshot</th><th>Date</th><th>Description</th><th>Actions</th></tr></thead>
-      <tbody>${enrichedRows.map(r=>`<tr class="${r.status==='blank'?'row-blank':'row-filled'}">
+      <tbody>${rows.map(r=>`<tr class="${r.status==='blank'?'row-blank':'row-filled'}">
         <td><b>${r.voucher_no}</b></td>
         <td><span class="pill ${r.status==='blank'?'pill-blank':'pill-filled'}">${r.status}</span></td>
-        <td>${esc(voucherDisplayType(r))}</td><td>${esc(r.party_name||'-')}</td>
+        <td>${esc(typeLabel(r))}</td><td>${esc(r.party_name||'-')}</td>
         <td class="r">${r.amount?fmt(r.amount):'-'}</td><td>${esc(r.mode||'-')}</td>
         <td>${trackerShots[r.voucher_no] ? `<button class="btn-small btn-secondary" onclick="viewShot('${esc(r.voucher_no)}')">🖼️ View</button>` : '-'}</td>
         <td>${r.payment_date||'-'}</td><td style="max-width:280px">${esc(r.description||'-')}</td>
@@ -1407,7 +1404,6 @@ function renderEditModal(type, meta, rows){
   document.getElementById('pmModalOverlay').classList.remove('hidden');
 }
 function renderEditRow(type, meta, r){
-  const rowRemark = type === 'ipd_refer' ? (r[meta.remarkCol] || buildIpdReferRemark(r)) : (r[meta.remarkCol] || '');
   return `
   <div class="pm-row" id="pmRow-${r.id}">
     <div class="pm-row-label">${esc(meta.label(r))}</div>
@@ -1419,7 +1415,7 @@ function renderEditRow(type, meta, r){
       </div>
     </div>
     <div class="form-row" style="margin-top:.5rem">
-      <div style="flex:2"><label>Remark / Note</label><input id="pmRemark-${r.id}" value="${esc(rowRemark)}"/></div>
+      <div style="flex:2"><label>Remark / Note</label><input id="pmRemark-${r.id}" value="${esc(r[meta.remarkCol]||'')}"/></div>
     </div>
     <div class="pm-row-actions">
       <button class="btn-danger btn-small" onclick="deleteEntryRow('${type}','${r.id}','${esc(r.voucher_no)}')">🗑️ Delete this entry</button>
@@ -1449,7 +1445,6 @@ async function syncVoucherRow(voucherNo, type){
     }
     const total = rows.reduce((a,r)=>a + parseFloat(r[meta.amountCol]||0), 0);
     const first = rows[0];
-    const effectiveDescription = type === 'ipd_refer' ? (buildIpdReferRemark(first) || first[meta.remarkCol] || null) : (first[meta.remarkCol] || null);
     const { error: e3 } = await sb.from('payment_vouchers').update({
       status: 'filled',
       type: type,
@@ -1457,7 +1452,7 @@ async function syncVoucherRow(voucherNo, type){
       amount: total,
       mode: first[meta.modeCol] || null,
       payment_date: first[meta.dateCol] || null,
-      description: effectiveDescription
+      description: first[meta.remarkCol] || null
     }).eq('voucher_no', voucherNo);
     if (e3) throw e3;
   } catch(ex){
@@ -1603,8 +1598,7 @@ async function runSearch(){
     const d = (b.payment_date||'').localeCompare(a.payment_date||'');
     return d !== 0 ? d : (parseInt(b.voucher_no)||0) - (parseInt(a.voucher_no)||0);
   });
-  lastRows = await enrichCashVoucherCategory(lastRows);
-  lastRows = await enrichIpdReferDisplayRows(lastRows);
+  await loadCashCats(lastRows);
   renderList();
 }
 function renderList(){
@@ -1633,7 +1627,7 @@ function renderList(){
       <tbody>${lastRows.map(r=>`<tr class="${r.status==='blank'?'row-blank':'row-filled'}">
         <td><b>${esc(r.voucher_no)}</b></td>
         <td><span class="pill ${r.status==='blank'?'pill-blank':'pill-filled'}">${esc(r.status)}</span></td>
-        <td>${esc(voucherDisplayType(r))}</td>
+        <td>${esc(typeLabel(r))}</td>
         <td>${esc(r.party_name||'-')}</td>
         <td class="r">${r.amount?fmt(r.amount):'-'}</td>
         <td>${esc(r.mode||'-')}</td>
@@ -1647,7 +1641,7 @@ function exportRowsPlain(){
   return lastRows.map(r=>({
     'Voucher No': r.voucher_no,
     'Status': r.status,
-    'Category': voucherDisplayType(r),
+    'Category': r.type ? typeLabel(r) : '',
     'Party / Payee': r.party_name || '',
     'Amount': r.amount ? parseFloat(r.amount) : '',
     'Mode': r.mode || '',
@@ -1682,6 +1676,150 @@ function exportPDF(){
     margin: { left:40, right:40 }
   });
   doc.save(`voucher_register_${todayISO()}.pdf`);
+}
+
+// ════════════════════════════════════════════════════════════
+// CATEGORY REPORT TAB — date range, grouped by category / cash sub-category
+// Non-cash vouchers come from payment_vouchers (grouped by type). Cash vouchers
+// are read from cash_vouchers so each entry lands under its own category.
+// ════════════════════════════════════════════════════════════
+(function(){
+  const d = new Date();
+  document.getElementById('rpFrom').value = new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString('en-CA');
+  document.getElementById('rpTo').value = todayISO();
+})();
+let reportRows = [];   // { group, sub, voucher_no, payment_date, party, amount, mode, description }
+
+async function fetchAllPages(buildQuery){
+  let all = [];
+  for (let off = 0; ; off += 1000){
+    const res = await buildQuery().range(off, off+999);
+    if (res.error) throw res.error;
+    all = all.concat(res.data||[]);
+    if (!res.data || res.data.length < 1000) break;
+  }
+  return all;
+}
+async function loadReport(){
+  const err = document.getElementById('rpErr'), out = document.getElementById('rpOut');
+  err.textContent = '';
+  const from = document.getElementById('rpFrom').value, to = document.getElementById('rpTo').value;
+  if (!from || !to) { err.textContent = 'Select both dates.'; return; }
+  if (to < from) { err.textContent = '"Date To" must not be before "Date From".'; return; }
+  out.textContent = 'Loading…';
+  spin(true);
+  try{
+    const [vouchers, cash] = await Promise.all([
+      fetchAllPages(()=>sb.from('payment_vouchers').select('*').eq('status','filled')
+        .gte('payment_date', from).lte('payment_date', to).order('payment_date').order('voucher_no')),
+      fetchAllPages(()=>sb.from('cash_vouchers').select('*')
+        .gte('payment_date', from).lte('payment_date', to).order('payment_date').order('voucher_no'))
+    ]);
+    reportRows = [];
+    vouchers.forEach(r=>{
+      const t = normalizeType(r.type);
+      if (isCashType(t)) return;                     // cash handled from cash_vouchers below
+      reportRows.push({
+        group: (TYPE_LABELS[t] && TYPE_LABELS[t].label) || t || 'Other', sub: '',
+        voucher_no: r.voucher_no, payment_date: r.payment_date || '', party: r.party_name || '',
+        amount: parseFloat(r.amount||0), mode: r.mode || '', description: r.description || ''
+      });
+    });
+    cash.forEach(r=>{
+      reportRows.push({
+        group: 'Cash Voucher', sub: (r.category||'').trim() || 'General',
+        voucher_no: r.voucher_no, payment_date: r.payment_date || '', party: r.party_name || '',
+        amount: parseFloat(r.amount||0), mode: r.mode || '',
+        description: [r.description, r.remark].filter(Boolean).join(' — ')
+      });
+    });
+    renderReport();
+  } catch(ex){
+    err.textContent = ex.message; out.textContent = '';
+  } finally { spin(false); }
+}
+function reportSummary(){
+  // [{group, sub, count, total}] in display order (cash last, its sub-categories together)
+  const map = {};
+  reportRows.forEach(r=>{
+    const k = r.group + '\u0000' + r.sub;
+    (map[k] = map[k] || { group:r.group, sub:r.sub, count:0, total:0 });
+    map[k].count++; map[k].total += r.amount;
+  });
+  return Object.values(map).sort((a,b)=>{
+    const ac = a.group==='Cash Voucher', bc = b.group==='Cash Voucher';
+    if (ac !== bc) return ac ? 1 : -1;
+    if (a.group !== b.group) return a.group.localeCompare(b.group);
+    return a.sub.localeCompare(b.sub);
+  });
+}
+function reportDetailTable(rows){
+  const total = rows.reduce((a,r)=>a+r.amount,0);
+  return `<table>
+    <thead><tr><th>Voucher No</th><th>Date</th><th>Party / Payee</th><th class="r">Amount</th><th>Mode</th><th>Description</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr class="row-filled"><td><b>${esc(r.voucher_no)}</b></td><td>${esc(r.payment_date)}</td>
+      <td>${esc(r.party||'-')}</td><td class="r">${fmt(r.amount)}</td><td>${esc(r.mode||'-')}</td>
+      <td style="max-width:300px">${esc(r.description||'-')}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="3">Total (${rows.length})</td><td class="r">${fmt(total)}</td><td colspan="2"></td></tr></tfoot>
+  </table>`;
+}
+function renderReport(){
+  const out = document.getElementById('rpOut');
+  if (!reportRows.length){ out.textContent = 'No filled vouchers in this date range.'; return; }
+  const summary = reportSummary();
+  const grand = reportRows.reduce((a,r)=>a+r.amount,0);
+  const cashTotal = reportRows.filter(r=>r.group==='Cash Voucher').reduce((a,r)=>a+r.amount,0);
+
+  let sumHtml = `<div class="section-title">Summary</div>
+    <table><thead><tr><th>Category</th><th>Sub-category</th><th class="r">Entries</th><th class="r">Total</th></tr></thead><tbody>`;
+  summary.forEach((s, i)=>{
+    sumHtml += `<tr class="row-filled"><td>${esc(s.group)}</td><td>${esc(s.sub||'-')}</td><td class="r">${s.count}</td><td class="r">${fmt(s.total)}</td></tr>`;
+    const next = summary[i+1];
+    if (s.group==='Cash Voucher' && (!next || next.group!==s.group)){
+      sumHtml += `<tr><td colspan="2"><b>Cash Voucher — Total</b></td><td class="r"><b>${reportRows.filter(r=>r.group==='Cash Voucher').length}</b></td><td class="r"><b>${fmt(cashTotal)}</b></td></tr>`;
+    }
+  });
+  sumHtml += `</tbody><tfoot><tr><td colspan="2">Grand Total</td><td class="r">${reportRows.length}</td><td class="r">${fmt(grand)}</td></tr></tfoot></table>`;
+
+  let detHtml = '<div class="section-title">Details</div>';
+  const seen = [];
+  summary.forEach(s=>{
+    const rows = reportRows.filter(r=>r.group===s.group && r.sub===s.sub);
+    const title = s.sub ? `${esc(s.group)} — ${esc(s.sub)}` : esc(s.group);
+    detHtml += `<h3 style="font-size:.92rem;margin:1rem 0 .2rem;color:#312e81">${title}
+      <span style="font-weight:500;color:#475569">· ${rows.length} entr${rows.length===1?'y':'ies'} · ${fmt(s.total)}</span></h3>` + reportDetailTable(rows);
+  });
+  out.innerHTML = sumHtml + detHtml;
+}
+function downloadReportExcel(){
+  if (!reportRows.length){ alert('Click Show Report first — there is nothing to download.'); return; }
+  const summary = reportSummary();
+  const sumData = [];
+  summary.forEach((s,i)=>{
+    sumData.push({ 'Category':s.group, 'Sub-category':s.sub, 'Entries':s.count, 'Total':s.total });
+    const next = summary[i+1];
+    if (s.group==='Cash Voucher' && (!next || next.group!==s.group)){
+      const cr = reportRows.filter(r=>r.group==='Cash Voucher');
+      sumData.push({ 'Category':'Cash Voucher — Total', 'Sub-category':'', 'Entries':cr.length, 'Total':cr.reduce((a,r)=>a+r.amount,0) });
+    }
+  });
+  sumData.push({ 'Category':'GRAND TOTAL', 'Sub-category':'', 'Entries':reportRows.length, 'Total':reportRows.reduce((a,r)=>a+r.amount,0) });
+
+  const detData = [];
+  summary.forEach(s=>{
+    reportRows.filter(r=>r.group===s.group && r.sub===s.sub).forEach(r=>{
+      detData.push({ 'Category':r.group, 'Sub-category':r.sub, 'Voucher No':r.voucher_no, 'Date':r.payment_date,
+        'Party / Payee':r.party, 'Amount':r.amount, 'Mode':r.mode, 'Description':r.description });
+    });
+  });
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.json_to_sheet(sumData);
+  ws1['!cols'] = [{wch:26},{wch:22},{wch:9},{wch:14}];
+  const ws2 = XLSX.utils.json_to_sheet(detData);
+  ws2['!cols'] = [{wch:24},{wch:20},{wch:12},{wch:12},{wch:26},{wch:13},{wch:9},{wch:44}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Details');
+  XLSX.writeFile(wb, `category_report_${document.getElementById('rpFrom').value}_to_${document.getElementById('rpTo').value}.xlsx`);
 }
 
 // ════════════════════════════════════════════════════════════
