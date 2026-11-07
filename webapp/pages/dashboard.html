@@ -22,6 +22,13 @@
     .cash-summary-card .label{font-size:.76rem;color:#64748b;font-weight:700;text-transform:uppercase}
     .cash-summary-card .amount{font-size:1.25rem;font-weight:800;margin-top:.25rem;color:#0f172a}
     .cash-summary-card.net .amount{color:#047857}
+    .top-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem}
+    .top-card{border-radius:14px;padding:1.1rem 1.2rem;border:1px solid #a7f3d0;background:#ecfdf5}
+    .top-card.phonepe{background:#f5f3ff;border-color:#ddd6fe}
+    .top-card .label{font-size:.8rem;color:#64748b;font-weight:700;text-transform:uppercase}
+    .top-card .amount{font-size:1.8rem;font-weight:800;margin-top:.3rem;color:#047857}
+    .top-card.phonepe .amount{color:#5b21b6}
+    .top-card .sub{font-size:.78rem;color:#64748b;margin-top:.4rem}
     .due-card{background:#f8fafc}
     .due-card .amount{color:#0f766e}
     .section-note{font-size:.78rem;color:#64748b;margin:.55rem 0 0}
@@ -42,6 +49,10 @@
   </div>
 
   <div id="dashboardContent" class="hidden">
+    <section class="page-card dashboard-section">
+      <div id="topSummary" class="top-summary"></div>
+    </section>
+
     <section class="page-card dashboard-section">
       <h2>🏥 Nursing Home Closing Balance</h2>
       <div id="nursingBalances" class="balance-grid"></div>
@@ -332,6 +343,18 @@ async function loadDashboard() {
         <div class="amount">${fmt(netNursingCash)}</div>
       </div>`;
     renderBalances('pharmacyBalances',pharmacyBalances);
+    const totalPhonepe = nursingBalances.phonepe.closing + pharmacyBalances.phonepe.closing;
+    $('topSummary').innerHTML = `
+      <div class="top-card">
+        <div class="label">Net Cash</div>
+        <div class="amount">${fmt(netNursingCash)}</div>
+        <div class="sub">Gross cash ${fmt(nursingBalances.cash.closing)} − Extra Out ${fmt(totalOutstandingExtraOut)}</div>
+      </div>
+      <div class="top-card phonepe">
+        <div class="label">Total PhonePe</div>
+        <div class="amount">${fmt(totalPhonepe)}</div>
+        <div class="sub">Nursing Home ${fmt(nursingBalances.phonepe.closing)} + Pharmacy ${fmt(pharmacyBalances.phonepe.closing)}</div>
+      </div>`;
     renderDueTotals({
       doctor:doctorDue,
       creditor:creditorDue,
