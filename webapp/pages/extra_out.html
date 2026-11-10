@@ -44,6 +44,21 @@
     .modal-box .mf{margin-bottom:.6rem}
     .modal-box .mf label{display:block;font-size:.8rem;margin-bottom:.2rem}
     .modal-box .mf input,.modal-box .mf select{width:100%;box-sizing:border-box}
+    .name-link{color:#3730a3;font-weight:700;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+    .name-link:hover{color:#4338ca;text-decoration:underline}
+    .balance-card{cursor:pointer;transition:box-shadow .15s,transform .15s}
+    .balance-card:hover{box-shadow:0 2px 8px rgba(67,56,202,.18);transform:translateY(-1px)}
+    .modal-box.wide{max-width:960px}
+    .ledger-head{display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap;margin-bottom:.6rem}
+    .ledger-head h3{margin:0}
+    .ledger-sum{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.6rem}
+    .ledger-sum div{flex:1;min-width:120px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:.45rem .7rem;font-size:.78rem;color:#6b7280}
+    .ledger-sum b{display:block;font-size:.95rem;color:#111827;margin-top:2px}
+    .ledger-sum .due b{color:#b45309}
+    .ledger-sum .clr b{color:#166534}
+    .ledger-scroll{overflow-x:auto}
+    .dr{color:#991b1b}.cr{color:#166534}
+    @media print{body *{visibility:hidden}#ledgerModal,#ledgerModal *{visibility:visible}#ledgerModal{position:absolute;inset:0;background:#fff}.no-print{display:none!important}}
     .modal-actions{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem}
   </style>
 </head>
@@ -263,11 +278,102 @@
     afterChange();
   }
 
-  function afterChange() {
-    loadOutstanding();
+  async function afterChange() {
     loadRecentExtraOut();
     loadRecentRepayments();
     if (document.getElementById('histFrom').value && document.getElementById('histTo').value) loadHistory();
+    await loadOutstanding();
+    if (document.getElementById('ledgerModal')) renderLedger();
+  }
+
+  // ===== Name click -> Ledger =====
+  const esc = v => String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const nameLink = n => `<span class="name-link" data-name="${esc(n)}" title="Open ledger">${esc(n)}</span>`;
+
+  // one delegated listener handles every clickable name on the page
+  document.addEventListener('click', e => {
+    const el = e.target.closest('[data-name]');
+    if (!el || el.closest('#ledgerModal')) return;
+    if (e.target.closest('.mini-btn')) return;
+    openLedger(el.dataset.name);
+  });
+
+  let ledgerName = null;
+
+  async function openLedger(name) {
+    ledgerName = name;
+    closeLedger(true);
+    const bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    bg.id = 'ledgerModal';
+    bg.innerHTML = `<div class="modal-box wide"><p>Loading ledger…</p></div>`;
+    bg.addEventListener('click', e => { if (e.target === bg) closeLedger(); });
+    document.body.appendChild(bg);
+    await fetchAllExtraOutAndRepay();
+    renderLedger();
+  }
+
+  function closeLedger(keepName) {
+    const m = document.getElementById('ledgerModal');
+    if (m) m.remove();
+    if (!keepName) ledgerName = null;
+  }
+
+  function renderLedger() {
+    const bg = document.getElementById('ledgerModal');
+    if (!bg || !ledgerName) return;
+    const key = ledgerName.trim().toLowerCase();
+    const same = r => String(r.name || '').trim().toLowerCase() === key;
+    const rows = [
+      ...allExtraOut.filter(same).map(r => ({type:'out', ...r})),
+      ...allRepayments.filter(same).map(r => ({type:'repay', ...r}))
+    ].sort((a,b) =>
+      String(a.date).localeCompare(String(b.date)) ||
+      (a.type === b.type ? 0 : a.type === 'out' ? -1 : 1) ||
+      String(a.created_at || '').localeCompare(String(b.created_at || '')));
+
+    let totalOut = 0, totalRepay = 0, running = 0;
+    const body = rows.map(r => {
+      const amt = Number(r.amount) || 0;
+      let dr = '', cr = '', particulars, details;
+      if (r.type === 'out') {
+        totalOut += amt; running += amt; dr = '₹' + fmt(amt);
+        particulars = '<span class="badge badge-out">Extra Out</span>';
+        details = `Given by ${esc(r.given_by)}${r.reason ? ' — ' + esc(r.reason) : ''}`;
+      } else {
+        totalRepay += amt; running -= amt; cr = '₹' + fmt(amt);
+        particulars = '<span class="badge badge-repay">Repayment</span>';
+        details = `${esc(r.mode)}${r.voucher_no ? ' #' + esc(r.voucher_no) : ''}${r.remark ? ' — ' + esc(r.remark) : ''}`;
+      }
+      const tbl = r.type === 'out' ? 'extra_out' : 'extra_out_repayment';
+      return `<tr><td>${esc(r.date)}</td><td>${particulars}</td><td>${details}</td>
+        <td class="r dr">${dr}</td><td class="r cr">${cr}</td>
+        <td class="r"><b>₹${fmt(running)}</b></td><td>${esc(r.recorded_by_name || '')}</td>${actionTd(tbl, r.id)}</tr>`;
+    }).join('');
+
+    const bal = totalOut - totalRepay;
+    const cleared = Math.abs(bal) < 0.005;
+    bg.innerHTML = `<div class="modal-box wide">
+      <div class="ledger-head">
+        <h3>📒 Ledger — ${esc(ledgerName)}</h3>
+        <div class="no-print">
+          <button type="button" class="mini-btn" onclick="window.print()" style="padding:.4rem .8rem">🖨️ Print</button>
+          <button type="button" class="mini-btn" onclick="closeLedger()" style="padding:.4rem .8rem">✖ Close</button>
+        </div>
+      </div>
+      <div class="ledger-sum">
+        <div>Total Given (Extra Out)<b>₹${fmt(totalOut)}</b></div>
+        <div>Total Received / Adjusted<b>₹${fmt(totalRepay)}</b></div>
+        <div class="${cleared ? 'clr' : 'due'}">${cleared ? 'Status' : 'Balance Due'}<b>${cleared ? 'Cleared ✔' : '₹' + fmt(bal)}</b></div>
+      </div>
+      ${rows.length ? `<div class="ledger-scroll"><table>
+        <thead><tr><th>Date</th><th>Type</th><th>Details</th>
+          <th class="r">Given (Dr)</th><th class="r">Received (Cr)</th><th class="r">Balance</th><th>Recorded By</th>${adminTh()}</tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr><td colspan="3">Totals</td><td class="r dr">₹${fmt(totalOut)}</td><td class="r cr">₹${fmt(totalRepay)}</td>
+          <td class="r">₹${fmt(bal)}</td><td></td>${adminTd()}</tr></tfoot>
+      </table></div>` : '<p>No entries found for this name.</p>'}
+    </div>`;
   }
 
   function showTab(name) {
@@ -334,8 +440,8 @@
     const box = document.getElementById('outstandingBox');
     if (!rows.length) { box.innerHTML = '<p class="info" style="display:block">No outstanding balances 🎉</p>'; return; }
     box.innerHTML = rows.map(r=>`
-      <div class="balance-card">
-        <span><strong>${r.name}</strong> — given ₹${fmt(r.given)}, repaid ₹${fmt(r.repaid)}</span>
+      <div class="balance-card" data-name="${esc(r.name)}" title="Click to open ledger">
+        <span><strong>${esc(r.name)}</strong> — given ₹${fmt(r.given)}, repaid ₹${fmt(r.repaid)}</span>
         <span class="amt">Due: ₹${fmt(r.balance)}</span>
       </div>`).join('');
   }
@@ -362,13 +468,13 @@
         if (r.type==='out') {
           totalOut += Number(r.amount);
           return `<tr><td>${r.date}</td><td><span class="badge badge-out">Extra Out</span></td>
-            <td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
+            <td>${nameLink(r.name)}</td><td class="r">₹${fmt(r.amount)}</td>
             <td>Given by ${r.given_by}${r.reason? ' — '+r.reason:''}</td>
             <td>${r.recorded_by_name||''}</td>${actionTd('extra_out',r.id)}</tr>`;
         } else {
           totalRepay += Number(r.amount);
           return `<tr><td>${r.date}</td><td><span class="badge badge-repay">Repayment</span></td>
-            <td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
+            <td>${nameLink(r.name)}</td><td class="r">₹${fmt(r.amount)}</td>
             <td>${r.mode}${r.voucher_no? ' #'+r.voucher_no:''}${r.remark? ' — '+r.remark:''}</td>
             <td>${r.recorded_by_name||''}</td>${actionTd('extra_out_repayment',r.id)}</tr>`;
         }
@@ -384,7 +490,7 @@
     if (!data || !data.length) { box.innerHTML='<p>No entries yet.</p>'; return; }
     box.innerHTML = `<table><thead><tr><th>Date</th><th>Name</th><th class="r">Amount</th>
       <th>Given By</th><th>Reason</th><th>Recorded By</th>${adminTh()}</tr></thead><tbody>${
-      data.map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
+      data.map(r=>`<tr><td>${r.date}</td><td>${nameLink(r.name)}</td><td class="r">₹${fmt(r.amount)}</td>
         <td>${r.given_by}</td><td>${r.reason||''}</td><td>${r.recorded_by_name||''}</td>${actionTd('extra_out',r.id)}</tr>`).join('')
       }</tbody></table>`;
   }
@@ -396,7 +502,7 @@
     if (!data || !data.length) { box.innerHTML='<p>No repayments yet.</p>'; return; }
     box.innerHTML = `<table><thead><tr><th>Date</th><th>Name</th><th class="r">Amount</th>
       <th>Mode</th><th>Remark</th><th>Recorded By</th>${adminTh()}</tr></thead><tbody>${
-      data.map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td class="r">₹${fmt(r.amount)}</td>
+      data.map(r=>`<tr><td>${r.date}</td><td>${nameLink(r.name)}</td><td class="r">₹${fmt(r.amount)}</td>
         <td>${r.mode}${r.voucher_no? ' #'+r.voucher_no:''}</td><td>${r.remark||''}</td>
         <td>${r.recorded_by_name||''}</td>${actionTd('extra_out_repayment',r.id)}</tr>`).join('')
       }</tbody></table>`;
@@ -475,6 +581,10 @@
     } catch(ex) { err.textContent = ex.message; }
     finally { spinner.classList.add('hidden'); }
   };
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.querySelectorAll('.modal-bg').length === 1) closeLedger();
+  });
 
   // initial load
   fetchAllExtraOutAndRepay().then(loadOutstanding);
