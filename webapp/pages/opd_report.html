@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>OPD Report</title>
+<link rel="stylesheet" href="../assets/style.css"/>
+<style>
+:root{--p:#0f3d5e;--p2:#1c6e9c;--bd:#dde3ea;--bg:#f4f6f9;--g:#198754;--r:#c0392b;--m:#6c757d}
+.rp{max-width:1500px;margin:0 auto;padding:1rem;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1f2d3a}
+.rp *{box-sizing:border-box}
+.hd{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem}
+.hd h1{margin:0;font-size:1.4rem;color:var(--p)}.hd small{color:var(--m);display:block;font-size:.8rem;margin-top:2px}
+.bdg{font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:10px;margin-left:.5rem;vertical-align:middle}
+.bdg.f{background:#d1e7dd;color:#0a3622}.bdg.v{background:#fff3cd;color:#856404}
+.card{background:#fff;border:1px solid var(--bd);border-radius:8px;padding:1rem;margin-bottom:1rem;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.btn{border:1px solid var(--bd);background:#fff;color:var(--p);padding:.5rem .9rem;border-radius:6px;cursor:pointer;font-size:.84rem;font-weight:600;width:auto}
+.btn:hover{background:var(--bg)}.btn.pr{background:var(--p);color:#fff;border-color:var(--p)}.btn.pr:hover{background:var(--p2)}
+.btn.x{color:#fff;background:var(--g);border-color:var(--g)}.btn.pd{color:#fff;background:var(--r);border-color:var(--r)}
+.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem}
+.fg label{display:block;font-size:.7rem;font-weight:700;color:var(--m);text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px}
+.fg input,.fg select,.mb input,.mb select{width:100%;padding:.45rem .6rem;border:1px solid #c9d1da;border-radius:5px;font-size:.85rem;background:#fff}
+.fa{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--bd)}
+.fa label{font-size:.83rem;display:flex;gap:.35rem;align-items:center}
+.kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:.7rem;margin-bottom:1rem}
+.k{background:#fff;border:1px solid var(--bd);border-left:4px solid var(--p2);border-radius:6px;padding:.7rem .9rem}
+.k b{display:block;font-size:1.25rem;color:var(--p)}.k span{font-size:.72rem;color:var(--m);text-transform:uppercase;letter-spacing:.03em}
+.k.g{border-left-color:var(--g)}.k.g b{color:var(--g)}.k.r{border-left-color:var(--r)}.k.r b{color:var(--r)}.k.m{border-left-color:var(--m)}.k.m b{color:var(--m)}
+.tw{overflow-x:auto;border:1px solid var(--bd);border-radius:6px}
+.rp table{width:100%;border-collapse:collapse;font-size:.84rem}
+.rp th{background:var(--p);color:#fff;padding:9px 10px;text-align:left;white-space:nowrap;cursor:pointer;position:sticky;top:0;user-select:none;font-weight:600}
+.rp td{padding:8px 10px;border-bottom:1px solid #edf0f3}
+.rp tbody tr{cursor:pointer}.rp tbody tr:hover td{background:#eef6fb}
+.rp tbody tr.cx td{background:#fff1f0;color:#a33}
+.rp tfoot td{background:#eaf1f6;font-weight:700;border-top:2px solid var(--p)}
+.n{text-align:right;font-variant-numeric:tabular-nums}.cn{color:var(--p2);font-weight:700}
+.tl{max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#555;font-size:.8rem}
+.bg{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700}
+.bg.paid{background:#d1e7dd;color:#0a3622}.bg.partial{background:#fff3cd;color:#856404}.bg.due{background:#f8d7da;color:#721c24}.bg.cancel{background:#f1c0bd;color:#7a1710}
+.pg{display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.8rem;font-size:.83rem;color:var(--m)}
+.pg div{display:flex;gap:.3rem}.pg button{padding:.35rem .65rem;border:1px solid var(--bd);background:#fff;border-radius:4px;cursor:pointer}.pg button.a{background:var(--p);color:#fff}
+.mo{position:fixed;inset:0;background:rgba(15,30,45,.55);z-index:1000;display:none;align-items:flex-start;justify-content:center;padding:2vh 1rem;overflow-y:auto}
+.mo.on{display:flex}
+.md{background:#fff;border-radius:10px;width:min(1000px,100%);box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.3rem;background:var(--p);color:#fff;border-radius:10px 10px 0 0}
+.mh h2{margin:0;font-size:1.05rem;color:#fff}.mh button{background:none;border:0;color:#fff;font-size:1.6rem;cursor:pointer;line-height:1}
+.mb{padding:1.2rem 1.3rem}.mb h3{font-size:.9rem;color:var(--p);margin:1.1rem 0 .5rem;padding-bottom:.3rem;border-bottom:2px solid var(--bd)}
+.mb h3:first-child{margin-top:0}
+.sm{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.6rem;background:var(--bg);padding:.8rem;border-radius:6px;margin-bottom:.5rem}
+.sm div{font-size:.7rem;color:var(--m);text-transform:uppercase}.sm b{display:block;font-size:1.05rem;color:var(--p);text-transform:none}
+.mb table input{padding:.3rem .45rem;font-size:.83rem}.mb table input:disabled{background:#fff;border-color:transparent;color:#222}
+.ac{white-space:nowrap;width:1%}.ac button{border:1px solid var(--bd);background:#fff;border-radius:4px;padding:3px 8px;cursor:pointer;margin-left:3px}.ac button.d:hover{background:#f8d7da}
+.mf{display:flex;gap:.6rem;justify-content:space-between;padding:.9rem 1.3rem;border-top:1px solid var(--bd);background:#fafbfc;border-radius:0 0 10px 10px;flex-wrap:wrap}
+.sp{position:fixed;inset:0;background:rgba(255,255,255,.6);z-index:2000;display:none;align-items:center;justify-content:center;font-weight:700;color:var(--p)}.sp.on{display:flex}
+.ts{position:fixed;bottom:20px;right:20px;background:#198754;color:#fff;padding:.7rem 1.1rem;border-radius:6px;z-index:3000;display:none;box-shadow:0 4px 14px rgba(0,0,0,.25)}.ts.e{background:var(--r)}
+.em{text-align:center;padding:2.5rem;color:#999}
+</style>
+</head>
+<body>
+<div class="sp" id="sp">Loading…</div><div class="ts" id="ts"></div>
+<div class="rp">
+  <div class="hd">
+    <div><h1>📊 OPD Report <span id="rb" class="bdg"></span></h1><small id="sub"></small></div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <button class="btn" onclick="load()">↻ Refresh</button>
+      <button class="btn x" onclick="xl()">⬇ Excel</button>
+      <button class="btn pd" onclick="pdf()">⬇ PDF</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="fg">
+      <div><label>Quick Range</label><select id="pre" onchange="preset()">
+        <option value="m">This Month</option><option value="t">Today</option><option value="y">Yesterday</option>
+        <option value="w">Last 7 Days</option><option value="l">Last Month</option><option value="f">This Financial Year</option>
+        <option value="a">All Time</option><option value="c">Custom</option></select></div>
+      <div><label>Date From</label><input type="date" id="df" onchange="cust()"/></div>
+      <div><label>Date To</label><input type="date" id="dt" onchange="cust()"/></div>
+      <div><label>Search</label><input id="q" placeholder="Case no, patient, test, trans no…" oninput="apply()"/></div>
+      <div><label>Payment Status</label><select id="ps" onchange="apply()"><option value="">All</option><option value="paid">Paid</option><option value="partial">Partial</option><option value="due">Due</option></select></div>
+      <div><label>Case Status</label><select id="cs" onchange="apply()"><option value="">All</option><option value="a">Active</option><option value="c">Cancelled</option></select></div>
+      <div><label>Case Type</label><select id="ty" onchange="apply()"></select></div>
+      <div><label>Referral</label><select id="rf" onchange="apply()"></select></div>
+      <div><label>Referral Payment</label><select id="rp" onchange="apply()"><option value="">All</option><option value="paid">Paid</option><option value="pending">Pending</option></select></div>
+      <div><label>Test</label><select id="ts2" onchange="apply()"></select></div>
+      <div><label>Entry By (Staff)</label><select id="sf" onchange="apply()"></select></div>
+      <div><label>Discount</label><select id="dc" onchange="apply()"><option value="">All</option><option value="y">With Discount</option><option value="n">No Discount</option></select></div>
+      <div><label>Bill Min (₹)</label><input type="number" id="mn" oninput="apply()"/></div>
+      <div><label>Bill Max (₹)</label><input type="number" id="mx" oninput="apply()"/></div>
+    </div>
+    <div class="fa">
+      <label><input type="checkbox" id="xc" checked onchange="apply()"/> Exclude cancelled cases from totals</label>
+      <button class="btn" onclick="reset()">Reset Filters</button>
+      <span id="cnt" style="margin-left:auto;color:var(--m);font-size:.85rem"></span>
+    </div>
+  </div>
+
+  <div class="kp" id="kp"></div>
+  <div class="card"><div class="tw" id="tb"></div><div class="pg" id="pg"></div></div>
+</div>
+
+<div class="mo" id="mo"><div class="md">
+  <div class="mh"><h2 id="mt"></h2><button onclick="closeM()">×</button></div>
+  <div class="mb" id="mbd"></div>
+  <div class="mf" id="mft"></div>
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/menu.js"></script>
+<script src="../assets/page.js"></script>
+<script>
+const FULL=BNH_PAGE.requirePageAccess("pages/opd_report.html")==="full",sb=BNH_PAGE.sb,ORG="Bhagirathi Health Care & Nursing Home";
+$('rb').textContent=FULL?'🔓 Full Access':'👁 View Only';$('rb').className='bdg '+(FULL?'f':'v');
+let cases=[],tests=[],cash=[],F=[],K={},sk='case_date',sd=-1,pn=1,PS=25,cur=null;
+function $(i){return document.getElementById(i)}
+const v=i=>$(i).value,num=x=>Number(x)||0,fd=d=>d?String(d).slice(0,10):'—';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=n=>'₹'+num(n).toLocaleString('en-IN',{maximumFractionDigits:2}),rs=n=>'Rs. '+num(n).toLocaleString('en-IN',{maximumFractionDigits:2});
+const ld=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const spin=x=>$('sp').classList.toggle('on',!!x);
+function toast(m,e){const t=$('ts');t.textContent=m;t.className='ts'+(e?' e':'');t.style.display='block';setTimeout(()=>t.style.display='none',3200)}
+const stamp=()=>{const s=BNH_PAGE.stamp({});return{created_by_id:s.recorded_by||null,created_by_name:s.recorded_by_name||null}};
+
+async function fetchAll(make,ord){const o=[];for(let f=0;;f+=1000){let q=make();if(ord)q=q.order(ord,{ascending:true});const{data,error}=await q.range(f,f+999);if(error)throw error;o.push(...(data||[]));if(!data||data.length<1000)break}return o}
+const fetchSafe=async m=>{try{return await fetchAll(m,'id')}catch(e){return await fetchAll(m,null)}};
+
+async function load(){spin(1);try{
+  [cases,tests,cash]=await Promise.all([fetchAll(()=>sb.from('opd_case').select('*'),'case_no'),fetchSafe(()=>sb.from('opd_test').select('*')),fetchSafe(()=>sb.from('opd_cash_register').select('*'))]);
+  build();opts();apply();
+}catch(e){toast('Load error: '+e.message,1)}finally{spin(0)}}
+
+function build(){K={};const g=k=>K[k]||(K[k]={t:[],c:[]});
+  tests.forEach(r=>g((r.case_number||'').trim()).t.push(r));cash.forEach(r=>g((r.case_no||'').trim()).c.push(r));
+  cases.forEach(r=>{const k=(r.case_no||'').trim(),x=g(k);r._k=k;r._x=x;
+    r._bill=num(r.total_amount)||x.t.reduce((s,t)=>s+num(t.test_amount),0);
+    r._paid=x.c.reduce((s,c)=>s+num(c.income),0);r._disc=x.c.reduce((s,c)=>s+num(c.discount),0);
+    r._due=Math.max(0,r._bill-r._paid-r._disc);
+    r._st=!r._bill?'due':r._due<=0?'paid':r._paid>0?'partial':'due';
+    r._tests=x.t.map(t=>t.test_name).filter(Boolean).join(', ');
+    r._staff=[...new Set(x.c.map(c=>c.entry_by||c.created_by_name).filter(Boolean))]})}
+
+function fill(id,first,vals,extra){const s=$(id),c=s.value;s.innerHTML=`<option value="">${first}</option>`+(extra||'')+[...new Set(vals.filter(Boolean))].sort().map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');s.value=c}
+function opts(){fill('ty','All Types',cases.map(c=>c.type));
+  fill('rf','All',cases.map(c=>c.refer_name),'<option value="__y">With Referral (any)</option><option value="__n">No Referral</option>');
+  fill('ts2','All Tests',tests.map(t=>t.test_name));fill('sf','All Staff',cash.map(c=>c.entry_by||c.created_by_name))}
+
+function preset(){const p=v('pre'),n=new Date(),y=n.getFullYear(),m=n.getMonth();let a='',b='';
+  if(p==='t')a=b=ld(n);else if(p==='y'){const d=new Date(y,m,n.getDate()-1);a=b=ld(d)}
+  else if(p==='w'){a=ld(new Date(y,m,n.getDate()-6));b=ld(n)}else if(p==='m'){a=ld(new Date(y,m,1));b=ld(n)}
+  else if(p==='l'){a=ld(new Date(y,m-1,1));b=ld(new Date(y,m,0))}
+  else if(p==='f'){const fy=m>=3?y:y-1;a=ld(new Date(fy,3,1));b=ld(n)}
+  if(p!=='c'){$('df').value=a;$('dt').value=b}apply()}
+const cust=()=>{$('pre').value='c';apply()};
+function reset(){['q','ps','cs','ty','rf','rp','ts2','sf','dc','mn','mx'].forEach(i=>$(i).value='');$('xc').checked=true;$('pre').value='m';preset()}
+
+function apply(){const q=v('q').toLowerCase(),df=v('df'),dt=v('dt'),ps=v('ps'),cs=v('cs'),ty=v('ty'),rf=v('rf'),rp=v('rp'),ts=v('ts2'),sf=v('sf'),dc=v('dc'),mn=v('mn'),mx=v('mx');
+  F=cases.filter(r=>{
+    if(q&&![r.case_no,r.patient_name,r._tests,...r._x.c.map(c=>c.transaction_no)].some(s=>String(s||'').toLowerCase().includes(q)))return false;
+    const d=fd(r.case_date);if(df&&d<df)return false;if(dt&&d>dt)return false;
+    if(ps&&r._st!==ps)return false;if(cs==='a'&&r.cancelled_by)return false;if(cs==='c'&&!r.cancelled_by)return false;
+    if(ty&&r.type!==ty)return false;
+    if(rf==='__y'&&!r.refer_name)return false;if(rf==='__n'&&r.refer_name)return false;if(rf&&rf[0]!=='_'&&r.refer_name!==rf)return false;
+    if(rp==='paid'&&!(r.refer_name&&r.refer_payment_status==='paid'))return false;if(rp==='pending'&&!(r.refer_name&&r.refer_payment_status!=='paid'))return false;
+    if(ts&&!r._x.t.some(t=>t.test_name===ts))return false;if(sf&&!r._staff.includes(sf))return false;
+    if(dc==='y'&&!r._disc)return false;if(dc==='n'&&r._disc)return false;
+    if(mn!==''&&r._bill<num(mn))return false;if(mx!==''&&r._bill>num(mx))return false;return true});
+  F.sort((a,b)=>{const x=a[sk],y=b[sk],n=typeof x==='number'||typeof y==='number';return sd*(n?num(x)-num(y):String(x??'').localeCompare(String(y??'')))});
+  pn=1;kpi();table()}
+
+function agg(list){const L=v('xc')&&$('xc').checked?list.filter(r=>!r.cancelled_by):list,s=k=>L.reduce((a,r)=>a+r[k],0);
+  const bill=s('_bill'),disc=s('_disc'),paid=s('_paid'),net=bill-disc;
+  return{n:L.length,pts:new Set(L.map(r=>(r.patient_name||'').trim().toLowerCase())).size,bill,disc,net,paid,due:s('_due'),
+    pct:net>0?paid/net*100:0,avg:L.length?bill/L.length:0,dp:bill>0?disc/bill*100:0,
+    tc:L.reduce((a,r)=>a+r._x.t.length,0),can:list.filter(r=>r.cancelled_by).length,
+    ref:L.reduce((a,r)=>a+num(r.refer_amount),0),refp:L.filter(r=>r.refer_name&&r.refer_payment_status!=='paid').reduce((a,r)=>a+num(r.refer_amount),0)}}
+function kpi(){const a=agg(F);$('cnt').textContent=F.length+' of '+cases.length+' cases match';
+  $('sub').textContent='Period: '+(v('df')||'start')+' → '+(v('dt')||'today')+(a.can?' • '+a.can+' cancelled':'');
+  const c=[['Total Cases',a.n,''],['Unique Patients',a.pts,''],['Tests Performed',a.tc,''],['Gross Bill',fmt(a.bill),''],
+   ['Discount ('+a.dp.toFixed(1)+'%)',fmt(a.disc),'m'],['Net Payable',fmt(a.net),''],['Collected',fmt(a.paid),'g'],['Outstanding Due',fmt(a.due),'r'],
+   ['Collection Rate',a.pct.toFixed(1)+'%','g'],['Avg Bill / Case',fmt(a.avg),''],['Referral Amount',fmt(a.ref),'m'],['Referral Pending',fmt(a.refp),'r'],['Cancelled Cases',a.can,'r']];
+  $('kp').innerHTML=c.map(x=>`<div class="k ${x[2]}"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('')}
+
+const COLS=[['case_no','Case No'],['case_date','Date'],['patient_name','Patient'],['_tests','Tests'],['_bill','Bill','n'],['_disc','Discount','n'],['_paid','Paid','n'],['_due','Due','n'],['type','Type'],['refer_name','Referral'],['_st','Status']];
+function sortBy(k){sd=sk===k?-sd:(k==='case_no'||k==='patient_name'?1:-1);sk=k;apply()}
+function table(){const w=$('tb');if(!F.length){w.innerHTML='<div class="em">No records match the selected filters.</div>';$('pg').innerHTML='';return}
+  const rows=F.slice((pn-1)*PS,pn*PS),a=agg(F);
+  w.innerHTML=`<table><thead><tr>${COLS.map(c=>`<th class="${c[2]||''}" onclick="sortBy('${c[0]}')">${c[1]}${sk===c[0]?(sd>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>{const i=F.indexOf(r);
+    return`<tr class="${r.cancelled_by?'cx':''}" onclick="openC(${i})"><td class="cn">${esc(r.case_no)}</td><td>${fd(r.case_date)}</td><td>${esc(r.patient_name)}</td><td class="tl" title="${esc(r._tests)}">${esc(r._tests||'—')}</td>
+    <td class="n">${fmt(r._bill)}</td><td class="n">${r._disc?fmt(r._disc):'—'}</td><td class="n" style="color:var(--g)">${fmt(r._paid)}</td><td class="n" style="color:${r._due?'var(--r)':'var(--g)'}">${fmt(r._due)}</td>
+    <td>${esc(r.type||'—')}</td><td>${esc(r.refer_name||'—')}</td><td>${r.cancelled_by?'<span class="bg cancel">Cancelled</span>':`<span class="bg ${r._st}">${r._st.toUpperCase()}</span>`}</td></tr>`}).join('')}</tbody>
+    <tfoot><tr><td colspan="4">TOTAL (${a.n} cases)</td><td class="n">${fmt(a.bill)}</td><td class="n">${fmt(a.disc)}</td><td class="n">${fmt(a.paid)}</td><td class="n">${fmt(a.due)}</td><td colspan="3"></td></tr></tfoot></table>`;
+  const tp=Math.ceil(F.length/PS),b=[];for(let i=Math.max(1,pn-2);i<=Math.min(tp,pn+2);i++)b.push(`<button class="${i===pn?'a':''}" onclick="go(${i})">${i}</button>`);
+  $('pg').innerHTML=`<span>Rows per page <select onchange="PS=+this.value;pn=1;table()">${[25,50,100,500].map(x=>`<option ${x===PS?'selected':''}>${x}</option>`).join('')}</select></span><div>${pn>1?`<button onclick="go(${pn-1})">‹ Prev</button>`:''}${b.join('')}${pn<tp?`<button onclick="go(${pn+1})">Next ›</button>`:''}</div>`}
+const go=p=>{pn=p;table()};
+
+/* ───────── Case detail / edit ───────── */
+const cr=()=>cases.find(x=>x._k===cur),A=h=>FULL?`<td class="ac">${h}</td>`:'',ro=FULL?'':' disabled';
+function openC(i){cur=F[i]._k;render();$('mo').classList.add('on')}
+function closeM(){$('mo').classList.remove('on');cur=null}
+$('mo').addEventListener('click',e=>{if(e.target===$('mo'))closeM()});
+function render(){const r=cr();if(!r)return closeM();const x=r._x;$('mt').textContent='Case '+r.case_no+' — '+(r.patient_name||'');
+  const ip=(id,val,t)=>`<input id="${id}" type="${t||'text'}" ${t==='number'?'step="0.01"':''} value="${esc(val)}"${ro}/>`;
+  $('mbd').innerHTML=`${r.cancelled_by?`<div style="background:#fff1f0;border:1px solid #f5c6cb;padding:.6rem .9rem;border-radius:6px;margin-bottom:.8rem">🚫 <b>Cancelled</b> by ${esc(r.cancelled_by)} on ${fd(r.cancelled_at)} — ${esc(r.cancel_remark||'no remark')}</div>`:''}
+  <div class="sm"><div>Bill<b>${fmt(r._bill)}</b></div><div>Discount<b>${fmt(r._disc)}</b></div><div>Received<b style="color:var(--g)">${fmt(r._paid)}</b></div><div>Due<b style="color:${r._due?'var(--r)':'var(--g)'}">${fmt(r._due)}</b></div><div>Status<b>${r._st.toUpperCase()}</b></div></div>
+  <h3>Case Information</h3>
+  <div class="fg"><div><label>Case No (key)</label><input value="${esc(r.case_no)}" disabled/></div><div><label>Case Date</label>${ip('e_date',fd(r.case_date)==='—'?'':fd(r.case_date),'date')}</div>
+  <div><label>Patient Name</label>${ip('e_pt',r.patient_name)}</div><div><label>Case Type</label>${ip('e_ty',r.type)}</div><div><label>IPD Link</label>${ip('e_ipd',r.ipd_link)}</div>
+  <div><label>Referral Name</label>${ip('e_rn',r.refer_name)}</div><div><label>Referral Amount</label>${ip('e_ra',r.refer_amount,'number')}</div>
+  <div><label>Referral Payment</label><input value="${r.refer_name?(r.refer_payment_status==='paid'?'Paid':'Pending'):'—'}" disabled/></div></div>
+  ${FULL?'<div style="margin-top:.6rem"><button class="btn pr" onclick="svCase()">💾 Save Case Info</button></div>':''}
+  <h3>🧪 Tests (${x.t.length})</h3><div class="tw"><table><thead><tr><th style="cursor:default">Test Name</th><th style="cursor:default;width:150px">Amount (₹)</th>${FULL?'<th style="cursor:default"></th>':''}</tr></thead><tbody>
+  ${x.t.map((t,i)=>`<tr style="cursor:default"><td>${ip('tn'+i,t.test_name)}</td><td>${ip('ta'+i,num(t.test_amount),'number')}</td>${A(`<button onclick="svT(${i})">💾</button><button class="d" onclick="dlT(${i})">🗑</button>`)}</tr>`).join('')||'<tr><td colspan="3" class="em">No tests</td></tr>'}
+  ${FULL?`<tr style="cursor:default"><td><input id="nn" placeholder="＋ New test name"/></td><td><input id="na" type="number" step="0.01" placeholder="Amount"/></td><td class="ac"><button onclick="addT()">Add</button></td></tr>`:''}</tbody></table></div>
+  <h3>💵 Payments Received (${x.c.length})</h3><div class="tw"><table><thead><tr>${['Date','Trans No','Received (₹)','Discount (₹)','Entry By'].map(h=>`<th style="cursor:default">${h}</th>`).join('')}${FULL?'<th style="cursor:default"></th>':''}</tr></thead><tbody>
+  ${x.c.map((c,i)=>`<tr style="cursor:default"><td>${ip('cd'+i,fd(c.transaction_date)==='—'?'':fd(c.transaction_date),'date')}</td><td>${ip('cn'+i,c.transaction_no)}</td><td>${ip('ci'+i,num(c.income),'number')}</td><td>${ip('cc'+i,num(c.discount),'number')}</td><td>${ip('ce'+i,c.entry_by||c.created_by_name||'')}</td>${A(`<button onclick="svC(${i})">💾</button><button class="d" onclick="dlC(${i})">🗑</button>`)}</tr>`).join('')||'<tr><td colspan="6" class="em">No payments recorded</td></tr>'}
+  ${FULL?`<tr style="cursor:default"><td><input id="nd" type="date" value="${ld(new Date())}"/></td><td><input id="nt" placeholder="Trans no (auto if blank)"/></td><td><input id="ni" type="number" step="0.01"/></td><td><input id="nc" type="number" step="0.01"/></td><td><input id="ne"/></td><td class="ac"><button onclick="addC()">Add</button></td></tr>`:''}</tbody></table></div>
+  <div style="font-size:.78rem;color:#999;margin-top:1rem">Created ${fd(r.created_at)} • Updated ${fd(r.updated_at)}</div>`;
+  $('mft').innerHTML=`<button class="btn" onclick="closeM()">Close</button>${FULL?'<button class="btn pd" onclick="dlCase()">🗑 Delete Entire Case</button>':''}`}
+
+async function run(fn,m){spin(1);try{await fn();toast(m||'✅ Saved')}catch(e){toast('Error: '+e.message,1)}finally{spin(0)}}
+async function upd(tb,row,patch,keys){let q=sb.from(tb).update(patch);q=row.id!=null?q.eq('id',row.id):keys.reduce((a,c)=>a.eq(c,row[c]),q);const{error}=await q;if(error)throw error}
+async function del(tb,row,keys){let q=sb.from(tb).delete();q=row.id!=null?q.eq('id',row.id):keys.reduce((a,c)=>a.eq(c,row[c]),q);const{error}=await q;if(error)throw error}
+async function ins(tb,row){const{error}=await sb.from(tb).insert(row);if(error)throw error}
+async function refresh(sync){const no=cr().case_no;
+  const[a,b,c]=await Promise.all([sb.from('opd_case').select('*').eq('case_no',no),sb.from('opd_test').select('*').eq('case_number',no),sb.from('opd_cash_register').select('*').eq('case_no',no)]);
+  for(const q of[a,b,c])if(q.error)throw q.error;const row=a.data[0];
+  if(sync){const s=b.data.reduce((z,t)=>z+num(t.test_amount),0);if(num(row.total_amount)!==s){const{error}=await sb.from('opd_case').update({total_amount:s,updated_at:new Date().toISOString()}).eq('case_no',no);if(error)throw error;row.total_amount=s}}
+  cases=cases.map(x=>x._k===cur?row:x);tests=tests.filter(t=>(t.case_number||'').trim()!==cur).concat(b.data);cash=cash.filter(t=>(t.case_no||'').trim()!==cur).concat(c.data);
+  build();opts();apply();render()}
+const T=()=>cr()._x.t,C=()=>cr()._x.c,nl=s=>s.trim()||null;
+
+function svCase(){const r=cr(),p={case_date:nl(v('e_date')),patient_name:nl(v('e_pt')),type:nl(v('e_ty')),ipd_link:nl(v('e_ipd')),refer_name:nl(v('e_rn')),refer_amount:v('e_ra')===''?null:num(v('e_ra')),updated_at:new Date().toISOString()};
+  run(async()=>{const{error}=await sb.from('opd_case').update(p).eq('case_no',r.case_no);if(error)throw error;
+    if(p.case_date!==fd(r.case_date)||p.patient_name!==r.patient_name){const s={case_date:p.case_date,patient_name:p.patient_name};
+      let e1=await sb.from('opd_test').update(s).eq('case_number',r.case_no);if(e1.error)throw e1.error;e1=await sb.from('opd_cash_register').update(s).eq('case_no',r.case_no);if(e1.error)throw e1.error}
+    await refresh(false)})}
+const svT=i=>run(async()=>{await upd('opd_test',T()[i],{test_name:v('tn'+i).trim(),test_amount:num(v('ta'+i))},['case_number','test_name']);await refresh(true)});
+const dlT=i=>{if(confirm('Delete this test?'))run(async()=>{await del('opd_test',T()[i],['case_number','test_name']);await refresh(true)},'🗑 Deleted')};
+function addT(){const n=v('nn').trim();if(!n)return toast('Enter a test name',1);const r=cr();
+  run(async()=>{await ins('opd_test',{case_number:r.case_no,case_date:r.case_date,patient_name:r.patient_name,test_name:n,test_amount:num(v('na')),...stamp()});await refresh(true)})}
+const svC=i=>run(async()=>{await upd('opd_cash_register',C()[i],{transaction_date:nl(v('cd'+i)),transaction_no:nl(v('cn'+i)),income:num(v('ci'+i)),discount:num(v('cc'+i)),entry_by:nl(v('ce'+i))},['transaction_no']);await refresh(false)});
+const dlC=i=>{if(confirm('Delete this payment entry?'))run(async()=>{await del('opd_cash_register',C()[i],['transaction_no']);await refresh(false)},'🗑 Deleted')};
+function addC(){const r=cr();if(!num(v('ni'))&&!num(v('nc')))return toast('Enter received amount or discount',1);
+  run(async()=>{await ins('opd_cash_register',{transaction_date:nl(v('nd')),transaction_no:v('nt').trim()||'MAN-'+Date.now(),case_no:r.case_no,case_date:r.case_date,patient_name:r.patient_name,income:num(v('ni')),discount:num(v('nc')),entry_by:nl(v('ne')),...stamp()});await refresh(false)})}
+function dlCase(){const r=cr();if(!confirm('⚠️ Delete case '+r.case_no+'?\n\nAll its tests and payment entries will also be deleted. This CANNOT be undone.'))return;
+  run(async()=>{for(const[t,c]of[['opd_test','case_number'],['opd_cash_register','case_no'],['opd_case','case_no']]){const{error}=await sb.from(t).delete().eq(c,r.case_no);if(error)throw error}
+    cases=cases.filter(x=>x._k!==cur);tests=tests.filter(t=>(t.case_number||'').trim()!==cur);cash=cash.filter(t=>(t.case_no||'').trim()!==cur);closeM();build();opts();apply()},'🗑 Case deleted')}
+
+/* ───────── Exports ───────── */
+function filt(){const o=[['From',v('df')||'—'],['To',v('dt')||'—']];[['q','Search'],['ps','Payment'],['cs','Case Status'],['ty','Type'],['rf','Referral'],['rp','Referral Pay'],['ts2','Test'],['sf','Staff'],['dc','Discount'],['mn','Bill Min'],['mx','Bill Max']].forEach(([i,l])=>{const x=v(i);if(x)o.push([l,x.replace('__y','Any referral').replace('__n','No referral')])});return o}
+const sumRows=()=>{const a=agg(F);return[['Total Cases',a.n],['Unique Patients',a.pts],['Tests Performed',a.tc],['Gross Bill',a.bill],['Discount',a.disc],['Net Payable',a.net],['Collected',a.paid],['Outstanding Due',a.due],['Collection Rate %',+a.pct.toFixed(1)],['Avg Bill / Case',Math.round(a.avg)],['Referral Amount',a.ref],['Referral Pending',a.refp],['Cancelled Cases',a.can]]};
+function grp(rows,kf,cols){const m={};rows.forEach(r=>{const k=kf(r)||'—';const o=m[k]||(m[k]={Name:k,Count:0,Amount:0});o.Count++;o.Amount+=cols(r)});return Object.values(m).sort((a,b)=>b.Amount-a.Amount)}
+function xl(){if(!F.length)return toast('No data to export',1);const wb=XLSX.utils.book_new(),L=F,ids=new Set(L.map(r=>r._k));
+  const add=(n,rows,w)=>{const s=Array.isArray(rows[0])?XLSX.utils.aoa_to_sheet(rows):XLSX.utils.json_to_sheet(rows);s['!cols']=(w||[]).map(x=>({wch:x}));XLSX.utils.book_append_sheet(wb,s,n)};
+  add('Summary',[[ORG],['OPD Report'],['Generated',new Date().toLocaleString('en-IN')],[],['FILTERS'],...filt(),[],['AGGREGATES'],...sumRows()],[28,30]);
+  add('Cases',L.map(r=>({'Case No':r.case_no,'Date':fd(r.case_date),'Patient':r.patient_name,'Tests':r._tests,'Bill':r._bill,'Discount':r._disc,'Paid':r._paid,'Due':r._due,'Type':r.type||'','Referral':r.refer_name||'','Referral Amount':num(r.refer_amount),'Referral Pay':r.refer_name?(r.refer_payment_status==='paid'?'Paid':'Pending'):'','Payment Status':r._st,'Case Status':r.cancelled_by?'Cancelled':'Active'})),[12,12,24,50,11,11,11,11,12,20,14,12,13,12]);
+  add('Test Lines',tests.filter(t=>ids.has((t.case_number||'').trim())).map(t=>({'Case No':t.case_number,'Date':fd(t.case_date),'Patient':t.patient_name,'Test':t.test_name,'Amount':num(t.test_amount)})),[12,12,24,34,12]);
+  add('Payments',cash.filter(c=>ids.has((c.case_no||'').trim())).map(c=>({'Trans No':c.transaction_no,'Trans Date':fd(c.transaction_date),'Case No':c.case_no,'Patient':c.patient_name,'Received':num(c.income),'Discount':num(c.discount),'Entry By':c.entry_by||c.created_by_name||''})),[16,12,12,24,12,12,18]);
+  add('By Day',grp(L,r=>fd(r.case_date),r=>r._bill).sort((a,b)=>a.Name.localeCompare(b.Name)).map(o=>({Date:o.Name,Cases:o.Count,'Gross Bill':o.Amount})),[12,10,14]);
+  add('By Test',grp(tests.filter(t=>ids.has((t.case_number||'').trim())),t=>t.test_name,t=>num(t.test_amount)).map(o=>({Test:o.Name,Count:o.Count,Amount:o.Amount})),[36,10,14]);
+  add('By Staff',grp(cash.filter(c=>ids.has((c.case_no||'').trim())),c=>c.entry_by||c.created_by_name,c=>num(c.income)).map(o=>({Staff:o.Name,Entries:o.Count,Received:o.Amount})),[24,10,14]);
+  XLSX.writeFile(wb,`OPD_Report_${v('df')||'all'}_to_${v('dt')||'all'}.xlsx`)}
+function pdf(){if(!F.length)return toast('No data to export',1);const d=new window.jspdf.jsPDF({orientation:'landscape',unit:'pt',format:'a4'}),W=d.internal.pageSize.getWidth(),a=agg(F);
+  d.setFillColor(15,61,94);d.rect(0,0,W,58,'F');d.setTextColor(255);d.setFontSize(16);d.setFont(undefined,'bold');d.text(ORG,30,26);d.setFontSize(10.5);d.setFont(undefined,'normal');
+  d.text(`OPD Report  |  ${v('df')||'Start'} to ${v('dt')||'Today'}  |  Generated ${new Date().toLocaleString('en-IN')}`,30,45);
+  d.setTextColor(60);d.setFontSize(8.5);d.text('Filters: '+filt().slice(2).map(x=>x.join(': ')).join('  •  ')||'None',30,74,{maxWidth:W-60});
+  const S=sumRows(),mon=['Gross Bill','Discount','Net Payable','Collected','Outstanding Due','Avg Bill / Case','Referral Amount','Referral Pending'];
+  const cells=S.map(([l,x])=>[l,mon.includes(l)?rs(x):x]),rows=[];for(let i=0;i<cells.length;i+=3)rows.push([...(cells[i]||['','']),...(cells[i+1]||['','']),...(cells[i+2]||['',''])]);
+  d.autoTable({startY:84,body:rows,theme:'grid',styles:{fontSize:8.5,cellPadding:4},columnStyles:{0:{fontStyle:'bold',fillColor:[234,241,246]},2:{fontStyle:'bold',fillColor:[234,241,246]},4:{fontStyle:'bold',fillColor:[234,241,246]}}});
+  d.autoTable({startY:d.lastAutoTable.finalY+12,theme:'striped',styles:{fontSize:7.5,cellPadding:3},headStyles:{fillColor:[15,61,94]},footStyles:{fillColor:[234,241,246],textColor:20,fontStyle:'bold'},
+    head:[['Case No','Date','Patient','Tests','Bill (Rs.)','Disc (Rs.)','Paid (Rs.)','Due (Rs.)','Referral','Status']],
+    body:F.map(r=>[r.case_no,fd(r.case_date),r.patient_name||'',(r._tests||'').slice(0,70),num(r._bill).toLocaleString('en-IN'),num(r._disc).toLocaleString('en-IN'),num(r._paid).toLocaleString('en-IN'),num(r._due).toLocaleString('en-IN'),r.refer_name||'',r.cancelled_by?'Cancelled':r._st]),
+    foot:[['TOTAL','','','',a.bill.toLocaleString('en-IN'),a.disc.toLocaleString('en-IN'),a.paid.toLocaleString('en-IN'),a.due.toLocaleString('en-IN'),'','']],showFoot:'lastPage',
+    columnStyles:{4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'}},
+    didDrawPage:()=>{d.setFontSize(8);d.setTextColor(120);d.text('Page '+d.internal.getNumberOfPages(),W-60,d.internal.pageSize.getHeight()-14)}});
+  d.save(`OPD_Report_${v('df')||'all'}_to_${v('dt')||'all'}.pdf`)}
+
+preset();load();
+</script>
+</body>
+</html>
