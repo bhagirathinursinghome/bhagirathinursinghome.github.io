@@ -14,6 +14,14 @@
     .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:.75rem; font-weight:600; }
     .badge-s { background:#dbeafe; color:#1d4ed8; }
     .badge-a { background:#dcfce7; color:#15803d; }
+    .ipd-modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:1rem; }
+    .ipd-modal-bg.hidden { display:none; }
+    .ipd-modal { background:#fff; border-radius:10px; padding:1.25rem; width:100%; max-width:480px; max-height:90vh; overflow:auto; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+    .ipd-modal h3 { margin:0 0 .75rem; font-size:1.05rem; }
+    .ipd-modal label { display:block; margin-top:.6rem; font-size:.82rem; }
+    .ipd-modal input, .ipd-modal select, .ipd-modal textarea { width:100%; box-sizing:border-box; }
+    .ipd-modal-actions { display:flex; gap:.5rem; margin-top:1rem; justify-content:flex-end; }
+    .ipd-edit-btn { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:4px 10px; font-size:.78rem; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -77,6 +85,34 @@
   </div>
 </div>
 
+<div id="ipdEditModal" class="ipd-modal-bg hidden">
+  <div class="ipd-modal">
+    <h3>✏️ Edit Doctor</h3>
+    <form id="ipdEditForm">
+      <label>Doctor Name <span style="color:red">*</span></label>
+      <input id="eName" required/>
+      <label>Mobile No.</label>
+      <input id="eMobile"/>
+      <label>Specialisation / Department</label>
+      <input id="eSpec"/>
+      <label>Type <span style="color:red">*</span></label>
+      <select id="eType" required>
+        <option value="Surgent">Surgent</option>
+        <option value="Anaesthesia">Anaesthesia</option>
+      </select>
+      <label>Opening Balance (₹)</label>
+      <input id="eBal" type="number" min="0" step="0.01"/>
+      <label>Remark</label>
+      <textarea id="eRemark" rows="2"></textarea>
+      <p class="err" id="eErr"></p>
+      <div class="ipd-modal-actions">
+        <button type="button" id="eCancel">Cancel</button>
+        <button type="submit" class="btn-primary" style="width:auto">💾 Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
@@ -84,26 +120,83 @@
   BNH_PAGE.requireRole(["admin","accountant","manager"]);
   document.getElementById('recBy').value = BNH_PAGE.user.name + ' (' + BNH_PAGE.user.username + ')';
 
+  // Full-access users can edit. Adjust this line if your BNH_PAGE uses a different field.
+  const CAN_EDIT = (BNH_PAGE.user.access === 'full') || (BNH_PAGE.user.role === 'admin');
+  let DOCTORS = [];
+  const esc = v => v==null ? '' : String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
   async function loadDoctors() {
     const div = document.getElementById('docList');
     const { data, error } = await BNH_PAGE.sb.from('ipd_doctors')
       .select('*').order('doctor_name');
     if (error || !data || data.length === 0) { div.textContent = 'No doctors added yet.'; return; }
+    DOCTORS = data;
     div.innerHTML = `<table>
       <thead><tr>
-        <th>Name</th><th>Type</th><th>Mobile</th><th>Specialisation</th><th>Opening Bal.</th><th>Remark</th>
+        <th>Name</th><th>Type</th><th>Mobile</th><th>Specialisation</th><th>Opening Bal.</th><th>Remark</th>${CAN_EDIT?'<th></th>':''}
       </tr></thead>
       <tbody>${data.map(r=>`<tr>
-        <td>${r.doctor_name}</td>
+        <td>${esc(r.doctor_name)}</td>
         <td><span class="badge ${r.doctor_type==='Surgent'?'badge-s':'badge-a'}">${r.doctor_type}</span></td>
-        <td>${r.mobile||'-'}</td>
-        <td>${r.specialisation||'-'}</td>
+        <td>${esc(r.mobile)||'-'}</td>
+        <td>${esc(r.specialisation)||'-'}</td>
         <td style="text-align:right">₹${parseFloat(r.opening_balance||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
-        <td>${r.remark||'-'}</td>
+        <td>${esc(r.remark)||'-'}</td>
+        ${CAN_EDIT?`<td><button class="ipd-edit-btn" data-id="${r.id}">✏️ Edit</button></td>`:''}
       </tr>`).join('')}</tbody>
     </table>`;
   }
   loadDoctors();
+
+  // ---- Edit (full access only) ----
+  const modal = document.getElementById('ipdEditModal');
+  let editingId = null;
+  document.getElementById('docList').addEventListener('click', e => {
+    const btn = e.target.closest('.ipd-edit-btn');
+    if (!btn || !CAN_EDIT) return;
+    const r = DOCTORS.find(d => String(d.id) === btn.dataset.id);
+    if (!r) return;
+    editingId = r.id;
+    document.getElementById('eName').value   = r.doctor_name || '';
+    document.getElementById('eMobile').value = r.mobile || '';
+    document.getElementById('eSpec').value   = r.specialisation || '';
+    document.getElementById('eType').value   = r.doctor_type || 'Surgent';
+    document.getElementById('eBal').value    = r.opening_balance ?? 0;
+    document.getElementById('eRemark').value = r.remark || '';
+    document.getElementById('eErr').textContent = '';
+    modal.classList.remove('hidden');
+  });
+  document.getElementById('eCancel').onclick = () => modal.classList.add('hidden');
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+
+  document.getElementById('ipdEditForm').onsubmit = async (e) => {
+    e.preventDefault();
+    if (!CAN_EDIT || editingId == null) return;
+    const spinner = document.getElementById('spinner');
+    const eErr = document.getElementById('eErr');
+    eErr.textContent = '';
+    spinner.classList.remove('hidden');
+    try {
+      // plain object (not stamp()) so audit fields of the original insert are not overwritten
+      const upd = {
+        doctor_name:     document.getElementById('eName').value.trim(),
+        mobile:          document.getElementById('eMobile').value.trim() || null,
+        specialisation:  document.getElementById('eSpec').value.trim() || null,
+        doctor_type:     document.getElementById('eType').value,
+        opening_balance: parseFloat(document.getElementById('eBal').value || 0),
+        remark:          document.getElementById('eRemark').value.trim() || null
+      };
+      if (!upd.doctor_name) throw new Error('Doctor name is required');
+      const { error } = await BNH_PAGE.sb.from('ipd_doctors').update(upd).eq('id', editingId);
+      if (error) throw error;
+      modal.classList.add('hidden');
+      loadDoctors();
+    } catch(ex) {
+      eErr.textContent = ex.message;
+    } finally {
+      spinner.classList.add('hidden');
+    }
+  };
 
   document.getElementById('docForm').onsubmit = async (e) => {
     e.preventDefault();
