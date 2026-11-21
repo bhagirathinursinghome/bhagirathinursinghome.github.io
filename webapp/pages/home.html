@@ -1,35 +1,318 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Home</title><link rel="stylesheet" href="../assets/style.css"/></head>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Home</title>
+  <link rel="stylesheet" href="../assets/style.css"/>
+  <style>
+    :root{
+      --hm-navy:#0f2a43;
+      --hm-teal:#117a8b;
+      --hm-ink:#1f2d3d;
+      --hm-muted:#6b7a8c;
+      --hm-line:#e6ebf1;
+      --hm-bg:#f4f7fb;
+
+      --hm-green-1:#34c28a; --hm-green-2:#13915f;
+      --hm-amber-1:#ffcf5c; --hm-amber-2:#f5a623;
+      --hm-red-1:#ff7a7a;   --hm-red-2:#e5484d;
+      --hm-gray-1:#eceff4;  --hm-gray-2:#dfe4ec;
+    }
+
+    .hm-wrap{max-width:900px;margin:0 auto}
+
+    /* ---------- Hero ---------- */
+    .hm-hero{
+      position:relative;overflow:hidden;
+      background:linear-gradient(135deg,var(--hm-navy) 0%,#134e6f 55%,var(--hm-teal) 100%);
+      color:#fff;border-radius:18px;padding:1.5rem 1.6rem;
+      display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;
+      box-shadow:0 10px 30px rgba(15,42,67,.25);
+    }
+    .hm-hero::after{
+      content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;
+      background:radial-gradient(circle,rgba(255,255,255,.18),rgba(255,255,255,0) 70%);
+    }
+    .hm-hero::before{
+      content:"";position:absolute;left:-40px;bottom:-80px;width:200px;height:200px;border-radius:50%;
+      background:radial-gradient(circle,rgba(255,255,255,.10),rgba(255,255,255,0) 70%);
+    }
+    .hm-user{display:flex;align-items:center;gap:1rem;position:relative;z-index:1}
+    .hm-avatar{
+      width:58px;height:58px;border-radius:16px;flex:none;
+      background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.4rem;font-weight:700;letter-spacing:.5px;backdrop-filter:blur(4px);
+    }
+    .hm-hello{font-size:.8rem;opacity:.8;letter-spacing:.08em;text-transform:uppercase}
+    .hm-name{font-size:1.5rem;font-weight:700;line-height:1.2;margin:.1rem 0 .4rem}
+    .hm-chips{display:flex;gap:.4rem;flex-wrap:wrap}
+    .hm-chip{
+      font-size:.74rem;font-weight:600;padding:.2rem .65rem;border-radius:999px;
+      background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
+      text-transform:capitalize;
+    }
+    .hm-date{
+      position:relative;z-index:1;text-align:right;
+      background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
+      border-radius:14px;padding:.6rem 1rem;
+    }
+    .hm-date .d1{font-size:1.9rem;font-weight:700;line-height:1}
+    .hm-date .d2{font-size:.8rem;opacity:.85;margin-top:.2rem}
+
+    /* ---------- Calendar card ---------- */
+    .hm-card{
+      background:#fff;border:1px solid var(--hm-line);border-radius:18px;
+      padding:1.4rem;margin-top:1.25rem;
+      box-shadow:0 6px 22px rgba(20,40,70,.06);
+    }
+    .hm-card-title{display:flex;align-items:center;gap:.5rem;font-size:1rem;font-weight:700;color:var(--hm-ink);margin-bottom:1rem}
+    .hm-card-title .ic{
+      width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+      background:#e7f3f6;color:var(--hm-teal);font-size:1rem;
+    }
+
+    .hm-cal-head{
+      display:flex;align-items:center;justify-content:space-between;
+      background:var(--hm-bg);border-radius:12px;padding:.4rem;margin-bottom:1rem;
+    }
+    .hm-cal-title{font-size:1.05rem;font-weight:700;color:var(--hm-ink)}
+    .hm-nav{
+      width:38px;height:38px;border:none;border-radius:10px;background:#fff;color:var(--hm-navy);
+      font-size:1rem;cursor:pointer;box-shadow:0 1px 4px rgba(20,40,70,.12);
+      transition:transform .15s,box-shadow .15s;
+    }
+    .hm-nav:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 10px rgba(20,40,70,.18)}
+    .hm-nav:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+
+    .hm-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+    .hm-dow{text-align:center;font-size:.72rem;font-weight:700;color:var(--hm-muted);padding:.3rem 0;text-transform:uppercase;letter-spacing:.05em}
+    .hm-cell{
+      aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
+      border-radius:12px;font-weight:700;font-size:.95rem;
+      transition:transform .15s,box-shadow .15s;cursor:default;
+    }
+    .hm-cell:not(.empty):hover{transform:translateY(-2px)}
+    .hm-cell.empty{visibility:hidden}
+
+    .hm-present{background:linear-gradient(145deg,var(--hm-green-1),var(--hm-green-2));color:#fff;box-shadow:0 4px 10px rgba(19,145,95,.30)}
+    .hm-progress{background:linear-gradient(145deg,var(--hm-amber-1),var(--hm-amber-2));color:#4a3300;box-shadow:0 4px 10px rgba(245,166,35,.32)}
+    .hm-absent{background:linear-gradient(145deg,var(--hm-red-1),var(--hm-red-2));color:#fff;box-shadow:0 4px 10px rgba(229,72,77,.30)}
+    .hm-future{background:var(--hm-gray-1);color:#9aa6b6;border:1px dashed var(--hm-gray-2)}
+    .hm-pending{background:#fff;color:var(--hm-ink);border:2px dashed #9bb2c7}
+    .hm-today{outline:3px solid rgba(17,122,139,.35);outline-offset:2px}
+
+    /* Legend */
+    .hm-legend{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1.2rem}
+    .hm-pill{
+      display:inline-flex;align-items:center;gap:.4rem;font-size:.76rem;font-weight:600;
+      padding:.3rem .7rem;border-radius:999px;background:var(--hm-bg);color:var(--hm-ink);
+    }
+    .hm-pill i{width:11px;height:11px;border-radius:4px;display:inline-block}
+
+    /* ---------- Summary ---------- */
+    .hm-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.25rem}
+    .hm-stat{
+      background:#fff;border:1px solid var(--hm-line);border-radius:16px;padding:1rem 1.1rem;
+      display:flex;align-items:center;gap:.9rem;box-shadow:0 6px 22px rgba(20,40,70,.06);
+      position:relative;overflow:hidden;
+    }
+    .hm-stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px}
+    .hm-stat.s-present::before{background:linear-gradient(var(--hm-green-1),var(--hm-green-2))}
+    .hm-stat.s-progress::before{background:linear-gradient(var(--hm-amber-1),var(--hm-amber-2))}
+    .hm-stat.s-absent::before{background:linear-gradient(var(--hm-red-1),var(--hm-red-2))}
+    .hm-stat .ic{
+      width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+      font-size:1.3rem;flex:none;
+    }
+    .s-present .ic{background:#e3f7ee;color:var(--hm-green-2)}
+    .s-progress .ic{background:#fff3d6;color:#c47f00}
+    .s-absent .ic{background:#ffe6e6;color:var(--hm-red-2)}
+    .hm-stat .num{font-size:1.8rem;font-weight:800;line-height:1;color:var(--hm-ink)}
+    .hm-stat .lbl{font-size:.78rem;color:var(--hm-muted);margin-top:.25rem;font-weight:600}
+
+    .hm-msg{color:#c0392b;font-size:.85rem;margin-top:.8rem}
+
+    @media (max-width:600px){
+      .hm-hero{padding:1.1rem}
+      .hm-name{font-size:1.2rem}
+      .hm-date{text-align:left;width:100%}
+      .hm-card{padding:1rem}
+      .hm-grid{gap:5px}
+      .hm-cell{font-size:.8rem;border-radius:9px}
+      .hm-stats{grid-template-columns:1fr;gap:.7rem}
+    }
+  </style>
+</head>
 <body>
 <div class="page">
-  <h1>Welcome, <span id="who"></span> 👋</h1>
-  <p class="muted">You are signed in as <b id="role"></b> at Bhagirathy Nursing Home.</p>
+ <div class="hm-wrap">
 
-  <div class="stat-grid">
-    <div class="stat"><div class="stat-label">Today's Date</div><div class="stat-value" id="today"></div></div>
-    <div class="stat"><div class="stat-label">Your Role</div><div class="stat-value" id="srole" style="text-transform:capitalize"></div></div>
-    <div class="stat"><div class="stat-label">User ID</div><div class="stat-value" id="suser" style="font-size:1.2rem"></div></div>
+  <!-- Hero: user + date -->
+  <div class="hm-hero">
+    <div class="hm-user">
+      <div class="hm-avatar" id="avatar">U</div>
+      <div>
+        <div class="hm-hello">Welcome back</div>
+        <div class="hm-name" id="who"></div>
+        <div class="hm-chips">
+          <span class="hm-chip" id="role"></span>
+          <span class="hm-chip">ID: <span id="suser"></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="hm-date">
+      <div class="d1" id="dDay"></div>
+      <div class="d2" id="dRest"></div>
+    </div>
   </div>
 
-  <div class="page-card">
-    <h3>Quick tips</h3>
-    <ul>
-      <li>Use the sidebar to navigate. On mobile, tap the ☰ icon.</li>
-      <li>Change your password from the top-right button.</li>
-      <li>All your entries are stamped with your User ID automatically.</li>
-    </ul>
+  <!-- Attendance calendar -->
+  <div class="hm-card">
+    <div class="hm-card-title"><span class="ic">📅</span>My Attendance</div>
+
+    <div class="hm-cal-head">
+      <button class="hm-nav" id="prevBtn" title="Previous month">&#10094;</button>
+      <div class="hm-cal-title" id="calTitle"></div>
+      <button class="hm-nav" id="nextBtn" title="Next month">&#10095;</button>
+    </div>
+
+    <div class="hm-grid" id="calGrid"></div>
+
+    <div class="hm-legend">
+      <span class="hm-pill"><i style="background:linear-gradient(145deg,#34c28a,#13915f)"></i>Present</span>
+      <span class="hm-pill"><i style="background:linear-gradient(145deg,#ffcf5c,#f5a623)"></i>Punch In only</span>
+      <span class="hm-pill"><i style="background:linear-gradient(145deg,#ff7a7a,#e5484d)"></i>Absent</span>
+      <span class="hm-pill"><i style="background:#eceff4;border:1px dashed #c9d1dc"></i>Future</span>
+    </div>
+    <div class="hm-msg" id="calMsg"></div>
   </div>
+
+  <!-- Totals -->
+  <div class="hm-stats">
+    <div class="hm-stat s-present"><div class="ic">✔</div><div><div class="num" id="cntPresent">0</div><div class="lbl">Total Present</div></div></div>
+    <div class="hm-stat s-progress"><div class="ic">⏳</div><div><div class="num" id="cntProgress">0</div><div class="lbl">Punch In only</div></div></div>
+    <div class="hm-stat s-absent"><div class="ic">✖</div><div><div class="num" id="cntAbsent">0</div><div class="lbl">Total Absent</div></div></div>
+  </div>
+
+ </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/page.js"></script>
 <script>
   BNH_PAGE.requireRole(["*"]);
   const u = BNH_PAGE.user;
+
+  /* ---------- Header ---------- */
   document.getElementById('who').textContent = u.name;
   document.getElementById('role').textContent = u.role;
-  document.getElementById('srole').textContent = u.role;
   document.getElementById('suser').textContent = u.username;
-  document.getElementById('today').textContent = new Date().toLocaleDateString();
+  document.getElementById('avatar').textContent =
+    (u.name || 'U').trim().split(/\s+/).slice(0,2).map(w => w.charAt(0).toUpperCase()).join('');
+
+  const nowD = new Date();
+  document.getElementById('dDay').textContent = nowD.getDate();
+  document.getElementById('dRest').textContent = nowD.toLocaleDateString(undefined, {
+    weekday:'long', month:'long', year:'numeric'
+  });
+
+  /* ---------- Helpers (local dates, avoids UTC shift) ---------- */
+  const pad = (n) => String(n).padStart(2, '0');
+  const ymd = (y, m, d) => y + '-' + pad(m + 1) + '-' + pad(d);   // m is 0-based
+
+  const todayY = nowD.getFullYear(), todayM = nowD.getMonth(), todayD = nowD.getDate();
+  const todayStr = ymd(todayY, todayM, todayD);
+
+  let viewY = todayY, viewM = todayM;
+
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dows = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  document.getElementById('prevBtn').onclick = () => {
+    viewM--; if (viewM < 0) { viewM = 11; viewY--; }
+    loadCalendar();
+  };
+  document.getElementById('nextBtn').onclick = () => {
+    viewM++; if (viewM > 11) { viewM = 0; viewY++; }
+    loadCalendar();
+  };
+
+  async function loadCalendar() {
+    const msg = document.getElementById('calMsg');
+    msg.textContent = '';
+    document.getElementById('calTitle').textContent = monthNames[viewM] + ' ' + viewY;
+
+    // Don't allow going past the current month
+    document.getElementById('nextBtn').disabled = (viewY === todayY && viewM === todayM);
+
+    const daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
+    const firstDow = new Date(viewY, viewM, 1).getDay();
+    const from = ymd(viewY, viewM, 1);
+    const to = ymd(viewY, viewM, daysInMonth);
+
+    // Fetch this user's punches for the month
+    const byDate = {};
+    try {
+      const { data, error } = await BNH_PAGE.sb.from('attendance_punches')
+        .select('punch_date,punch_in,punch_out')
+        .eq('staff_id', u.id)
+        .gte('punch_date', from)
+        .lte('punch_date', to);
+      if (error) throw error;
+      (data || []).forEach(p => byDate[p.punch_date] = p);
+    } catch (err) {
+      msg.textContent = 'Could not load attendance: ' + err.message;
+    }
+
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    dows.forEach(d => {
+      const h = document.createElement('div');
+      h.className = 'hm-dow';
+      h.textContent = d;
+      grid.appendChild(h);
+    });
+    for (let i = 0; i < firstDow; i++) {
+      const e = document.createElement('div');
+      e.className = 'hm-cell empty';
+      grid.appendChild(e);
+    }
+
+    let present = 0, progress = 0, absent = 0;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = ymd(viewY, viewM, day);
+      const p = byDate[dateStr];
+      const cell = document.createElement('div');
+      cell.textContent = day;
+
+      let cls, tip;
+      if (dateStr > todayStr) {
+        cls = 'hm-future'; tip = 'Upcoming';
+      } else if (p && p.punch_in && p.punch_out) {
+        cls = 'hm-present'; present++; tip = 'Present';
+      } else if (p && p.punch_in) {
+        cls = 'hm-progress'; progress++; tip = 'Punched in, no punch out';
+      } else if (dateStr === todayStr) {
+        cls = 'hm-pending'; tip = 'Not punched in yet';   // today isn't counted absent until the day ends
+      } else {
+        cls = 'hm-absent'; absent++; tip = 'Absent';
+      }
+
+      cell.className = 'hm-cell ' + cls + (dateStr === todayStr ? ' hm-today' : '');
+      cell.title = dateStr + ' — ' + tip;
+      grid.appendChild(cell);
+    }
+
+    document.getElementById('cntPresent').textContent = present;
+    document.getElementById('cntProgress').textContent = progress;
+    document.getElementById('cntAbsent').textContent = absent;
+  }
+
+  loadCalendar();
 </script>
-</body></html>
+</body>
+</html>
