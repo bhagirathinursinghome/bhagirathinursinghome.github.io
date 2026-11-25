@@ -108,6 +108,21 @@
     .export-bar { display:flex; gap:.6rem; flex-wrap:wrap; }
     .hint { font-size:.78rem; color:#888; margin-top:.3rem; }
     #mtRegister tr.row-filled td { background:#fff; }
+
+    /* searchable employee dropdown */
+    .combo { position:relative; }
+    .combo > input[type=text], .combo > input:not([type=hidden]) { width:100%; box-sizing:border-box; }
+    .combo-list { position:absolute; left:0; right:0; top:100%; margin-top:2px; max-height:260px; overflow:auto;
+      background:#fff; border:1px solid #c7d2fe; border-radius:8px; box-shadow:0 10px 30px rgba(15,23,42,.15); z-index:50; }
+    .combo-item { display:flex; justify-content:space-between; align-items:center; gap:.6rem; padding:.45rem .7rem;
+      font-size:.88rem; cursor:pointer; border-bottom:1px solid #f1f5f9; }
+    .combo-item:hover, .combo-item.active { background:#eef2ff; }
+    .combo-item.disabled { color:#94a3b8; background:#f8fafc; cursor:not-allowed; }
+    .combo-item.disabled:hover { background:#f8fafc; }
+    .combo-tag { font-size:.72rem; font-weight:700; padding:1px 8px; border-radius:10px; white-space:nowrap; }
+    .combo-tag.paid { background:#d1fae5; color:#065f46; }
+    .combo-tag.due { background:#fef3c7; color:#92400e; }
+    .combo-empty { padding:.7rem; color:#94a3b8; font-size:.85rem; text-align:center; }
   </style>
 </head>
 <body>
@@ -786,15 +801,24 @@ function formSalary(){
         <div class="voucher-badge" id="syVStatus"></div>
       </div>
       <div><label>Payment Date <span class="req">*</span></label><input id="syDate" type="date" value="${todayISO()}"/></div>
-      <div><label>Employee <span class="req">*</span></label><select id="syEmp" onchange="onEmpSelect()"><option value="">— select —</option></select></div>
-    </div>
-    <div class="form-row">
       <div><label>Month <span class="req">*</span></label>
-        <select id="syMonth" onchange="onEmpSelect()">${MONTHS.slice(1).map((m,i)=>`<option value="${i+1}" ${i+1===now.getMonth()+1?'selected':''}>${m}</option>`).join('')}</select>
+        <select id="syMonth" onchange="loadSalaryEmployees()">${MONTHS.slice(1).map((m,i)=>`<option value="${i+1}" ${i+1===now.getMonth()+1?'selected':''}>${m}</option>`).join('')}</select>
       </div>
-      <div><label>Year <span class="req">*</span></label><input id="syYear" type="number" value="${now.getFullYear()}" onchange="onEmpSelect()"/></div>
+      <div><label>Year <span class="req">*</span></label><input id="syYear" type="number" min="2000" max="2100" value="${now.getFullYear()}" onchange="loadSalaryEmployees()"/></div>
     </div>
-    <div class="due-box hidden" id="syDueBox">Net Payable this month: <span class="dv" id="syDueVal">—</span> &nbsp;|&nbsp; Collected: <span id="syCollVal">—</span></div>
+    <div class="form-row" style="margin-top:.75rem">
+      <div style="flex:2">
+        <label>Employee <span class="req">*</span> <span style="font-weight:400;color:#94a3b8">(type to search)</span></label>
+        <div class="combo" id="syCombo">
+          <input id="syEmpSearch" autocomplete="off" placeholder="Loading staff…"
+                 onfocus="syComboOpen()" oninput="syComboFilter()" onkeydown="syComboKey(event)"/>
+          <input type="hidden" id="syEmp"/>
+          <div class="combo-list hidden" id="syEmpList"></div>
+        </div>
+        <p class="hint" id="syEmpHint"></p>
+      </div>
+    </div>
+    <div class="due-box hidden" id="syDueBox">Net Payable this month: <span class="dv" id="syNetVal">—</span> &nbsp;|&nbsp; Collected: <span id="syCollVal">—</span> &nbsp;|&nbsp; Due: <span class="dv" id="syDueVal">—</span></div>
     <div class="form-row">
       <div><label>Amount (₹) <span class="req">*</span></label><input id="syAmount" type="number" min="0.01" step="0.01"/></div>
       <div><label>Mode <span class="req">*</span></label>${modeChipsHtml('sy')}</div>
@@ -808,39 +832,153 @@ function formSalary(){
     <p class="info" id="syOk" style="display:none"></p>
   </div>`;
 }
-let syEmployees = [];
-async function initSalaryForm(){
-  const { data } = await sb.from('employees').select('id,name,salary').order('name');
-  syEmployees = data||[];
-  document.getElementById('syEmp').innerHTML = '<option value="">— select —</option>' +
-    syEmployees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+
+// syEmployees: staff who were active in the chosen month, each with net / collected / due / paid.
+// Same eligibility + salary rules as the Salary Sheet page.
+let syEmployees = [], syFiltered = [], syActiveIdx = -1;
+function initSalaryForm(){
+  document.addEventListener('click', syOutsideClick);
+  return loadSalaryEmployees();
 }
-async function getSalaryDue(empId, month, year){
-  const { data: emp } = await sb.from('employees').select('*').eq('id',empId).single();
-  const { data: bonus } = await sb.from('salary_bonuses').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
-  const { data: absent } = await sb.from('salary_absent').select('absent_days').eq('employee_id',empId).eq('month',month).eq('year',year).maybeSingle();
-  const gross = parseFloat(emp.salary||0);
-  const absentDays = absent?.absent_days || 0;
-  const deductDays = Math.max(0, absentDays - 4);
-  const deduction = Math.round(((gross/26)*deductDays)/10)*10;
-  const net = gross - deduction + (bonus?.amount||0);
-  const { data: pays } = await sb.from('salary_payments').select('amount').eq('employee_id',empId).eq('month',month).eq('year',year);
-  const collected = (pays||[]).reduce((a,p)=>a+parseFloat(p.amount||0),0);
-  return { emp, net, collected, due: Math.max(0, net-collected) };
+function syOutsideClick(e){
+  const combo = document.getElementById('syCombo');
+  if (!combo) { document.removeEventListener('click', syOutsideClick); return; }
+  if (!combo.contains(e.target)) syComboClose();
 }
-async function onEmpSelect(){
-  const id = document.getElementById('syEmp').value;
-  const box = document.getElementById('syDueBox');
-  const month = parseInt(document.getElementById('syMonth').value), year = parseInt(document.getElementById('syYear').value);
-  if (!id || !month || !year) { box.classList.add('hidden'); return; }
+async function loadSalaryEmployees(){
+  const month = parseInt(document.getElementById('syMonth').value);
+  const year = parseInt(document.getElementById('syYear').value);
+  const search = document.getElementById('syEmpSearch');
+  syClearEmployee();
+  if (!month || !year) { syEmployees = []; search.placeholder = 'Select month and year first'; syRenderList(); return; }
+  search.placeholder = 'Loading staff…'; search.disabled = true;
   spin(true);
   try{
-    const { due, collected } = await getSalaryDue(id, month, year);
-    box.classList.remove('hidden');
-    document.getElementById('syDueVal').textContent = fmt(due);
-    document.getElementById('syCollVal').textContent = fmt(collected);
+    const mm = String(month).padStart(2,'0');
+    const firstDay = `${year}-${mm}-01`;
+    const lastDay = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2,'0')}`;
+
+    // Joined on/before the end of the month AND (still active OR deactivated on/after the start of the month)
+    const { data: emps, error } = await sb.from('employees').select('*')
+      .lte('joining_date', lastDay)
+      .or(`is_active.eq.true,inactive_date.gte.${firstDay}`)
+      .order('name');
+    if (error) throw error;
+    const list = emps || [];
+    const ids = list.map(e=>e.id);
+
+    const salaryAsOf = {}, payMap = {}, bonusMap = {}, absentMap = {}, extraMap = {};
+    if (ids.length){
+      const [hist, pays, bonuses, absents] = await Promise.all([
+        sb.from('salary_history').select('employee_id,salary,effective_date').in('employee_id', ids)
+          .lte('effective_date', lastDay).order('effective_date', { ascending:true }),
+        sb.from('salary_payments').select('employee_id,amount').eq('month',month).eq('year',year),
+        sb.from('salary_bonuses').select('employee_id,amount').eq('month',month).eq('year',year),
+        sb.from('salary_absent').select('employee_id,absent_days').eq('month',month).eq('year',year)
+      ]);
+      (hist.data||[]).forEach(h=>{ salaryAsOf[h.employee_id] = h.salary; });
+      (pays.data||[]).forEach(p=>{ payMap[p.employee_id] = (payMap[p.employee_id]||0) + parseFloat(p.amount||0); });
+      (bonuses.data||[]).forEach(b=>{ bonusMap[b.employee_id] = parseFloat(b.amount||0); });
+      (absents.data||[]).forEach(a=>{ absentMap[a.employee_id] = a.absent_days||0; });
+      try{
+        const ex = await sb.from('salary_extra_deductions').select('employee_id,amount').eq('month',month).eq('year',year);
+        (ex.data||[]).forEach(d=>{ extraMap[d.employee_id] = parseFloat(d.amount||0); });
+      } catch(_) { /* table may not exist yet */ }
+    }
+
+    syEmployees = list.map(e=>{
+      const gross = salaryAsOf[e.id] !== undefined ? parseFloat(salaryAsOf[e.id]||0) : parseFloat(e.salary||0);
+      const deductDays = Math.max(0, (absentMap[e.id]||0) - 4);
+      const autoDeduct = Math.round(((gross/26)*deductDays)/10)*10;
+      const net = gross - autoDeduct - (extraMap[e.id]||0) + (bonusMap[e.id]||0);
+      const collected = payMap[e.id] || 0;
+      const due = Math.max(0, net - collected);
+      return { id:e.id, name:e.name, net, collected, due, paid: collected >= net };
+    });
+    search.disabled = false;
+    search.placeholder = syEmployees.length ? 'Type first letters of name…' : 'No staff active in this month';
+    const paidCount = syEmployees.filter(e=>e.paid).length;
+    document.getElementById('syEmpHint').textContent =
+      `${syEmployees.length} staff active in ${MONTHS[month]} ${year}` + (paidCount ? ` — ${paidCount} already fully paid (cannot be selected).` : '.');
+    syRenderList();
+  } catch(ex){
+    search.disabled = false; search.placeholder = 'Could not load staff';
+    document.getElementById('syEmpHint').textContent = 'Failed to load staff: ' + ex.message;
+    syEmployees = []; syRenderList();
   } finally { spin(false); }
 }
+
+// ── searchable employee dropdown ─────────────────────────────
+function syComboOpen(){ syComboFilter(); document.getElementById('syEmpList').classList.remove('hidden'); }
+function syComboClose(){ const l = document.getElementById('syEmpList'); if (l) l.classList.add('hidden'); }
+function syComboFilter(){
+  // typing again invalidates a previously chosen employee
+  if (document.getElementById('syEmp').value) {
+    document.getElementById('syEmp').value = '';
+    document.getElementById('syDueBox').classList.add('hidden');
+  }
+  syRenderList();
+  document.getElementById('syEmpList').classList.remove('hidden');
+}
+function syRenderList(){
+  const q = (document.getElementById('syEmpSearch').value || '').trim().toLowerCase();
+  syFiltered = syEmployees.filter(e => !q || e.name.toLowerCase().includes(q))
+    .sort((a,b)=>{
+      // names that START with the typed text first
+      const as = q && a.name.toLowerCase().startsWith(q) ? 0 : 1, bs = q && b.name.toLowerCase().startsWith(q) ? 0 : 1;
+      return as - bs || a.name.localeCompare(b.name);
+    });
+  syActiveIdx = syFiltered.findIndex(e=>!e.paid);
+  const list = document.getElementById('syEmpList');
+  if (!syFiltered.length) { list.innerHTML = '<div class="combo-empty">No matching staff</div>'; return; }
+  list.innerHTML = syFiltered.map((e,i)=>`
+    <div class="combo-item ${e.paid?'disabled':''} ${i===syActiveIdx?'active':''}" data-i="${i}"
+         ${e.paid ? '' : `onclick="syPick(${i})"`}>
+      <span>${esc(e.name)}</span>
+      ${e.paid ? '<span class="combo-tag paid">✅ Fully paid</span>'
+               : `<span class="combo-tag due">Due ${fmt(e.due)}</span>`}
+    </div>`).join('');
+}
+function syComboKey(ev){
+  const list = document.getElementById('syEmpList');
+  if (ev.key === 'Escape') { syComboClose(); return; }
+  if (!['ArrowDown','ArrowUp','Enter'].includes(ev.key)) return;
+  ev.preventDefault();
+  list.classList.remove('hidden');
+  if (ev.key === 'Enter') { if (syActiveIdx >= 0 && syFiltered[syActiveIdx] && !syFiltered[syActiveIdx].paid) syPick(syActiveIdx); return; }
+  const step = ev.key === 'ArrowDown' ? 1 : -1;
+  let i = syActiveIdx;
+  for (let n = 0; n < syFiltered.length; n++){
+    i = (i + step + syFiltered.length) % syFiltered.length;
+    if (!syFiltered[i].paid) { syActiveIdx = i; break; }
+  }
+  list.querySelectorAll('.combo-item').forEach((el,k)=>el.classList.toggle('active', k===syActiveIdx));
+  const act = list.querySelector('.combo-item.active'); if (act) act.scrollIntoView({ block:'nearest' });
+}
+function syPick(i){
+  const e = syFiltered[i];
+  if (!e || e.paid) return;
+  document.getElementById('syEmp').value = e.id;
+  document.getElementById('syEmpSearch').value = e.name;
+  syComboClose();
+  onEmpSelect();
+}
+function syClearEmployee(){
+  document.getElementById('syEmp').value = '';
+  document.getElementById('syEmpSearch').value = '';
+  document.getElementById('syDueBox').classList.add('hidden');
+}
+function onEmpSelect(){
+  const id = document.getElementById('syEmp').value;
+  const box = document.getElementById('syDueBox');
+  const e = syEmployees.find(x=>x.id===id);
+  if (!e) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  document.getElementById('syNetVal').textContent = fmt(e.net);
+  document.getElementById('syCollVal').textContent = fmt(e.collected);
+  document.getElementById('syDueVal').textContent = fmt(e.due);
+}
+
 async function saveSalaryPayment(){
   const err = document.getElementById('syErr'), ok = document.getElementById('syOk');
   err.textContent=''; ok.style.display='none';
@@ -854,14 +992,18 @@ async function saveSalaryPayment(){
   const remark = document.getElementById('syRemark').value.trim() || null;
   if (!voucher) { err.textContent='Voucher No is required.'; return; }
   if (!date) { err.textContent='Payment date is required.'; return; }
-  if (!empId) { err.textContent='Select an employee.'; return; }
+  if (!month || !year) { err.textContent='Select month and year.'; return; }
+  if (!empId) { err.textContent='Select an employee from the list.'; return; }
   if (!amount || amount<=0) { err.textContent='Enter a valid amount.'; return; }
   if (!mode) { err.textContent='Select a payment mode.'; return; }
+
+  const emp = syEmployees.find(e=>e.id===empId);
+  if (!emp) { err.textContent='Selected employee is not active in this month.'; return; }
+  if (emp.paid) { err.textContent=`${emp.name}'s salary for ${MONTHS[month]} ${year} is already fully paid.`; return; }
 
   const vcheck = await checkVoucher('sy');
   if (!vcheck || !vcheck.ok) { err.textContent='Voucher No is not valid.'; return; }
 
-  const emp = syEmployees.find(e=>e.id===empId);
   spin(true);
   try{
     const payload = BNH_PAGE.stamp({
@@ -874,7 +1016,7 @@ async function saveSalaryPayment(){
     ok.style.display='block'; ok.textContent = '✅ Salary payment saved.';
     await saveShot('sy', voucher, ok);
     document.getElementById('syAmount').value=''; document.getElementById('syRemark').value='';
-    await onEmpSelect();
+    await loadSalaryEmployees();   // refresh paid / due status, clears the selection
     await checkVoucher('sy');
   } catch(ex){ err.textContent = ex.message; }
   finally { spin(false); }
